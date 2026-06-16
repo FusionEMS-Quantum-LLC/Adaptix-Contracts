@@ -17,6 +17,12 @@ Import patterns:
 
 from adaptix_contracts import schemas as _schemas
 
+# Static re-export surface for type checkers (runtime uses globals().update below).
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from adaptix_contracts.schemas import *  # noqa: F401,F403
+
 # Redundant aliases mark these as intentional re-exports (suppresses F401
 # without requiring entries in __all__, which preserves the package surface
 # invariant checked by test_contract_surface.py).

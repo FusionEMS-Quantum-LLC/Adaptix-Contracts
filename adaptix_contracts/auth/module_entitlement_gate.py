@@ -106,9 +106,7 @@ def _claims_module_entitlements(claims: dict) -> list[str]:
 
 def _decode_claims_for_gate(token: str) -> dict:
     try:
-        return pyjwt.decode(
-            token, options={"no_verify": True, "verify_signature": False}
-        )
+        return pyjwt.decode(token, options={"verify_signature": False})
     except Exception:  # pragma: no cover
         return {}
 

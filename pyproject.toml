@@ -50,3 +50,12 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+# Type-check library/source only. Test files intentionally construct models via
+# camelCase aliases (validated at runtime by populate_by_name) which the pydantic
+# mypy plugin cannot model on the synthesized __init__; excluding tests scopes
+# strict typing to shipped code without hiding any source/production error.
+exclude = "(^|/)tests/"
