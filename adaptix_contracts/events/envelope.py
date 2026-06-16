@@ -7,7 +7,7 @@ Every event must include tenant, actor, correlation, timestamp, idempotency, and
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime, timezone

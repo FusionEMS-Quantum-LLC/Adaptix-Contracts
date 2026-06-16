@@ -8,7 +8,7 @@ No raw exception text may be returned to clients.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime, timezone
