@@ -17,12 +17,14 @@ from pydantic import BaseModel, Field
 # CRM Enums
 # ---------------------------------------------------------------------------
 
+
 class RelationshipStage(str, enum.Enum):
     PROSPECT = "prospect"
     NEGOTIATION = "negotiation"
     ACTIVE = "active"
     CLOSED = "closed"
     CHURNED = "churned"
+
 
 class InvestorType(str, enum.Enum):
     ANGEL = "angel"
@@ -31,11 +33,13 @@ class InvestorType(str, enum.Enum):
     FAMILY_OFFICE = "family_office"
     DEBT = "debt"
 
+
 class CommitmentStatus(str, enum.Enum):
     PLEDGED = "pledged"
     COMMITTED = "committed"
     FUNDED = "funded"
     WITHDRAWN = "withdrawn"
+
 
 class PartnerType(str, enum.Enum):
     TECHNOLOGY = "technology"
@@ -44,10 +48,12 @@ class PartnerType(str, enum.Enum):
     RESELLER = "reseller"
     REFERRAL = "referral"
 
+
 class PartnerStatus(str, enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     PENDING = "pending"
+
 
 class OpportunityType(str, enum.Enum):
     PARTNERSHIP = "partnership"
@@ -55,6 +61,7 @@ class OpportunityType(str, enum.Enum):
     ACQUISITION = "acquisition"
     STRATEGIC = "strategic"
     OTHER = "other"
+
 
 class OpportunityStatus(str, enum.Enum):
     DISCOVERED = "discovered"
@@ -64,9 +71,11 @@ class OpportunityStatus(str, enum.Enum):
     LOST = "lost"
     STALLED = "stalled"
 
+
 # ---------------------------------------------------------------------------
 # Relationship contracts
 # ---------------------------------------------------------------------------
+
 
 class RelationshipCreateRequest(BaseModel):
     """Create a new CRM relationship."""
@@ -84,6 +93,7 @@ class RelationshipCreateRequest(BaseModel):
     estimated_value: int | None = Field(None, description="Estimated value in USD.")
     notes: str | None = Field(None, description="Free-text notes.")
 
+
 class RelationshipResponse(BaseModel):
     """CRM relationship record response."""
 
@@ -100,11 +110,13 @@ class RelationshipResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class RelationshipListResponse(BaseModel):
     """Paginated CRM relationship list."""
 
     total: int
     relationships: list[RelationshipResponse]
+
 
 class RelationshipStageTransitionRequest(BaseModel):
     """Request to transition a relationship to a new stage."""
@@ -115,9 +127,11 @@ class RelationshipStageTransitionRequest(BaseModel):
     )
     notes: str | None = Field(None, description="Optional notes for the transition.")
 
+
 # ---------------------------------------------------------------------------
 # Investor contracts
 # ---------------------------------------------------------------------------
+
 
 class InvestorCreateRequest(BaseModel):
     """Create a new investor record."""
@@ -131,6 +145,7 @@ class InvestorCreateRequest(BaseModel):
     contact_email: str | None = Field(None, description="Primary contact email.")
     notes: str | None = Field(None, description="Free-text notes.")
     metadata_json: dict = Field(default_factory=dict)
+
 
 class InvestorResponse(BaseModel):
     """Investor record response."""
@@ -146,6 +161,7 @@ class InvestorResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class InvestorRoundCreateRequest(BaseModel):
     """Create a new funding round."""
 
@@ -160,6 +176,7 @@ class InvestorRoundCreateRequest(BaseModel):
     )
     notes: str | None = Field(None, description="Free-text notes.")
 
+
 class InvestorRoundResponse(BaseModel):
     """Funding round response."""
 
@@ -173,6 +190,7 @@ class InvestorRoundResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class InvestorCommitmentCreateRequest(BaseModel):
     """Record investor commitment to a funding round."""
 
@@ -184,6 +202,7 @@ class InvestorCommitmentCreateRequest(BaseModel):
         description="Commitment status.",
     )
     notes: str | None = Field(None, description="Free-text notes.")
+
 
 class InvestorCommitmentResponse(BaseModel):
     """Investor commitment response."""
@@ -198,6 +217,7 @@ class InvestorCommitmentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class InvestorRoundSummaryResponse(BaseModel):
     """Full funding round summary including all commitments."""
 
@@ -207,9 +227,11 @@ class InvestorRoundSummaryResponse(BaseModel):
     total_funded: float
     funding_percentage: float
 
+
 # ---------------------------------------------------------------------------
 # Partner contracts
 # ---------------------------------------------------------------------------
+
 
 class PartnerCreateRequest(BaseModel):
     """Create a new partner record."""
@@ -228,6 +250,7 @@ class PartnerCreateRequest(BaseModel):
     notes: str | None = Field(None, description="Free-text notes.")
     metadata_json: dict = Field(default_factory=dict)
 
+
 class PartnerResponse(BaseModel):
     """Partner record response."""
 
@@ -243,6 +266,7 @@ class PartnerResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class PartnerAgreementCreateRequest(BaseModel):
     """Create a partner agreement record."""
 
@@ -253,6 +277,7 @@ class PartnerAgreementCreateRequest(BaseModel):
     effective_date: date = Field(..., description="Agreement effective date.")
     expiry_date: date | None = Field(None, description="Agreement expiry date.")
     notes: str | None = Field(None, description="Free-text notes.")
+
 
 class PartnerAgreementResponse(BaseModel):
     """Partner agreement response."""
@@ -267,6 +292,7 @@ class PartnerAgreementResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class PartnerPerformanceCreateRequest(BaseModel):
     """Record partner performance metrics for a period."""
 
@@ -275,6 +301,7 @@ class PartnerPerformanceCreateRequest(BaseModel):
     monthly_recurring_revenue: int = Field(default=0, ge=0, description="MRR in cents.")
     deals_closed: int = Field(default=0, ge=0)
     churn_rate: float = Field(default=0.0, ge=0, description="Churn rate percentage.")
+
 
 class PartnerPerformanceResponse(BaseModel):
     """Partner performance record response."""
@@ -288,6 +315,7 @@ class PartnerPerformanceResponse(BaseModel):
     churn_rate: float
     created_at: datetime
 
+
 class PartnerDashboardResponse(BaseModel):
     """Partner dashboard aggregation."""
 
@@ -296,9 +324,11 @@ class PartnerDashboardResponse(BaseModel):
     top_performers: list[PartnerPerformanceResponse]
     total_revenue_attributed: float
 
+
 # ---------------------------------------------------------------------------
 # Growth intelligence contracts
 # ---------------------------------------------------------------------------
+
 
 class GrowthMetricCreateRequest(BaseModel):
     """Record calculated growth metrics for a period."""
@@ -309,6 +339,7 @@ class GrowthMetricCreateRequest(BaseModel):
     lifetime_value: int = Field(..., ge=0, description="LTV in cents.")
     customer_acquisition_cost: int = Field(..., ge=0, description="CAC in cents.")
     net_retention_rate: float = Field(..., description="NRR as percentage, e.g. 115.0.")
+
 
 class GrowthMetricResponse(BaseModel):
     """Growth metric record response."""
@@ -324,6 +355,7 @@ class GrowthMetricResponse(BaseModel):
     growth_rate: float | None = None
     created_at: datetime
 
+
 class GrowthDashboardResponse(BaseModel):
     """Aggregated growth intelligence dashboard."""
 
@@ -331,6 +363,7 @@ class GrowthDashboardResponse(BaseModel):
     prior_period: GrowthMetricResponse | None = None
     mrr_growth_pct: float | None = None
     churn_delta: float | None = None
+
 
 class GrowthTrendResponse(BaseModel):
     """Growth trend analysis over multiple periods."""
@@ -343,6 +376,7 @@ class GrowthTrendResponse(BaseModel):
     nrr_trend: list[float] = Field(default_factory=list)
     growth_rates: list[float] = Field(default_factory=list)
 
+
 class GrowthForecastRequest(BaseModel):
     """Request a growth forecast."""
 
@@ -353,6 +387,7 @@ class GrowthForecastRequest(BaseModel):
         default="linear", description="Forecast model: linear | conservative."
     )
 
+
 class GrowthForecastResponse(BaseModel):
     """Growth forecast response."""
 
@@ -362,9 +397,11 @@ class GrowthForecastResponse(BaseModel):
     forecasted_ltv: list[int] = Field(default_factory=list)
     forecasted_cac: list[int] = Field(default_factory=list)
 
+
 # ---------------------------------------------------------------------------
 # Founder opportunity contracts
 # ---------------------------------------------------------------------------
+
 
 class FounderOpportunityCreateRequest(BaseModel):
     """Create a founder-level opportunity."""
@@ -388,6 +425,7 @@ class FounderOpportunityCreateRequest(BaseModel):
     target_date: date | None = Field(None, description="Target close date.")
     notes: str | None = Field(None, description="Free-text notes.")
 
+
 class FounderOpportunityUpdateRequest(BaseModel):
     """Update a founder opportunity."""
 
@@ -400,6 +438,7 @@ class FounderOpportunityUpdateRequest(BaseModel):
     likelihood_percentage: float | None = Field(None, ge=0.0, le=100.0)
     target_date: date | None = None
     notes: str | None = None
+
 
 class FounderOpportunityResponse(BaseModel):
     """Founder opportunity record response."""
@@ -417,6 +456,7 @@ class FounderOpportunityResponse(BaseModel):
     outcome_notes: str | None = None
     created_at: datetime
     updated_at: datetime
+
 
 class FounderOpportunityListResponse(BaseModel):
     """Founder opportunity list."""

@@ -10,6 +10,7 @@ from enum import Enum
 from pydantic import BaseModel
 from .modules import GravityAIRunPayload
 
+
 class EmailThreadState(str, Enum):
     OPEN = "open"
     SNOOZED = "snoozed"
@@ -17,11 +18,13 @@ class EmailThreadState(str, Enum):
     RESOLVED = "resolved"
     ARCHIVED = "archived"
 
+
 class SMSThreadState(str, Enum):
     OPEN = "open"
     RESOLVED = "resolved"
     OPTED_OUT = "opted_out"
     BLOCKED = "blocked"
+
 
 class CallState(str, Enum):
     COMPLETED = "completed"
@@ -29,6 +32,7 @@ class CallState(str, Enum):
     VOICEMAIL = "voicemail"
     FAILED = "failed"
     IN_PROGRESS = "in_progress"
+
 
 class EmailMessageResponse(BaseModel):
     id: str
@@ -43,6 +47,7 @@ class EmailMessageResponse(BaseModel):
     received_at: datetime | None = None
     has_attachments: bool
     phi_warning: bool
+
 
 class EmailThreadResponse(BaseModel):
     id: str
@@ -63,6 +68,7 @@ class EmailThreadResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class EmailThreadListItemResponse(BaseModel):
     id: str
     subject: str
@@ -74,12 +80,14 @@ class EmailThreadListItemResponse(BaseModel):
     has_ai_suggestion: bool
     phi_warning: bool
 
+
 class SendEmailRequest(BaseModel):
     thread_id: str | None = None
     to_addresses: list[str]
     subject: str
     body_html: str
     reply_to_message_id: str | None = None
+
 
 class SMSMessageResponse(BaseModel):
     id: str
@@ -89,6 +97,7 @@ class SMSMessageResponse(BaseModel):
     delivery_state: str
     sent_at: datetime
     phi_warning: bool
+
 
 class SMSThreadResponse(BaseModel):
     id: str
@@ -105,10 +114,12 @@ class SMSThreadResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class SendSMSRequest(BaseModel):
     thread_id: str | None = None
     phone_number: str
     body: str
+
 
 class PhoneCallResponse(BaseModel):
     id: str
@@ -126,9 +137,11 @@ class PhoneCallResponse(BaseModel):
     ended_at: datetime | None = None
     created_at: datetime
 
+
 class DispositionCallRequest(BaseModel):
     disposition: str
     notes: str | None = None
+
 
 class CommunicationActionResponse(BaseModel):
     audit_event_id: str

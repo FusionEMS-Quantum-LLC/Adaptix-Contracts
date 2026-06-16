@@ -16,6 +16,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 import uuid
 
+
 class AdaptixRole(str, Enum):
     """Canonical role set for Adaptix platform."""
 
@@ -35,6 +36,7 @@ class AdaptixRole(str, Enum):
     NARCOTICS_OFFICER = "narcotics_officer"
     READ_ONLY = "read_only"
     SERVICE_ACCOUNT = "service_account"
+
 
 class AdaptixRoleSet(BaseModel):
     """Verified role set for an authenticated user."""
@@ -61,6 +63,7 @@ class AdaptixRoleSet(BaseModel):
     def is_service_account(self) -> bool:
         return AdaptixRole.SERVICE_ACCOUNT in self.roles
 
+
 class AdaptixTenantContext(BaseModel):
     """Verified tenant context derived from auth token — never from raw headers."""
 
@@ -72,6 +75,7 @@ class AdaptixTenantContext(BaseModel):
 
     def has_module(self, module: str) -> bool:
         return module in self.modules_enabled
+
 
 class AdaptixAuthContext(BaseModel):
     """
@@ -156,6 +160,7 @@ class AdaptixAuthContext(BaseModel):
             token_jti=payload.get("jti"),
         )
 
+
 class AdaptixServiceContext(BaseModel):
     """
     Context for internal service-to-service calls.
@@ -169,6 +174,7 @@ class AdaptixServiceContext(BaseModel):
     actor_id: str | None = None  # User who initiated the chain
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     signature: str | None = None  # HMAC signature for verification
+
 
 class AdaptixSignedInternalContext(BaseModel):
     """

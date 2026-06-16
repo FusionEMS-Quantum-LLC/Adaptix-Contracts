@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+
 class SchedulingEvent(BaseModel):
     """Base scheduling event envelope."""
 
@@ -22,6 +23,7 @@ class SchedulingEvent(BaseModel):
     correlation_id: str | None = None
     audit_event_id: UUID | None = None
     occurred_at: datetime
+
 
 # ---------------------------------------------------------------------------
 # Shift Events

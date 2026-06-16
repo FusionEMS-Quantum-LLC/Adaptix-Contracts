@@ -17,11 +17,14 @@ Rules:
 
 from __future__ import annotations
 
+from typing import Optional
+
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
 # ─── Cognito Configuration ────────────────────────────────────────────────────
+
 
 @dataclass
 class AdaptixCognitoConfig:
@@ -76,7 +79,9 @@ class AdaptixCognitoConfig:
             self.user_pool_id and self.client_id and self.issuer and self.jwks_url
         )
 
+
 # ─── Cognito Claims ───────────────────────────────────────────────────────────
+
 
 class AdaptixCognitoClaims(BaseModel):
     """Validated Cognito JWT claims."""
@@ -128,7 +133,9 @@ class AdaptixCognitoClaims(BaseModel):
         }
         return cls(**{k: v for k, v in mapped.items() if v is not None})
 
+
 # ─── Auth Context ─────────────────────────────────────────────────────────────
+
 
 class AdaptixAuthContext(BaseModel):
     """
@@ -187,7 +194,9 @@ class AdaptixAuthContext(BaseModel):
     def has_module(self, module: str) -> bool:
         return module in self.modules_enabled
 
+
 # ─── Internal Service Context ─────────────────────────────────────────────────
+
 
 class AdaptixServiceContext(BaseModel):
     """
@@ -204,6 +213,7 @@ class AdaptixServiceContext(BaseModel):
     request_id: str | None = None
     internal_auth_marker: str | None = None  # Signed marker proving gateway origin
 
+
 class AdaptixSignedInternalContext(BaseModel):
     """
     Signed internal context passed between services.
@@ -218,6 +228,7 @@ class AdaptixSignedInternalContext(BaseModel):
         return self.signature_verified and bool(
             self.service_context.internal_auth_marker
         )
+
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 

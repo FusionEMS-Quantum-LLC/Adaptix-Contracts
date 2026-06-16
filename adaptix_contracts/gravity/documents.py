@@ -9,6 +9,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+
 class DocumentState(str, Enum):
     UPLOADING = "uploading"
     PROCESSING = "processing"
@@ -20,11 +21,13 @@ class DocumentState(str, Enum):
     LEGAL_HOLD = "legal_hold"
     EXPIRED = "expired"
 
+
 class DocumentSensitivity(str, Enum):
     PHI = "phi"
     PII = "pii"
     CONFIDENTIAL = "confidential"
     PUBLIC = "public"
+
 
 class DocumentReviewAction(BaseModel):
     id: str
@@ -34,6 +37,7 @@ class DocumentReviewAction(BaseModel):
     actor_name: str | None = None
     reason: str | None = None
     created_at: datetime
+
 
 class DocumentResponse(BaseModel):
     id: str
@@ -54,6 +58,7 @@ class DocumentResponse(BaseModel):
     updated_at: datetime
     deleted_at: datetime | None = None
 
+
 class DocumentListItemResponse(BaseModel):
     id: str
     name: str
@@ -66,21 +71,26 @@ class DocumentListItemResponse(BaseModel):
     updated_at: datetime
     link_count: int
 
+
 class DocumentListResponse(BaseModel):
     items: list[DocumentListItemResponse]
     total: int
     page: int
     limit: int
 
+
 class DocumentReviewRequest(BaseModel):
     reason: str | None = None
+
 
 class DocumentReviewResponse(BaseModel):
     document: DocumentResponse
     audit_event_id: str
 
+
 class BulkDocumentRequest(BaseModel):
     document_ids: list[str]
+
 
 class BulkDocumentResponse(BaseModel):
     processed: int

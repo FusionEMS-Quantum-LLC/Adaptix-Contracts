@@ -13,6 +13,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+
 class InventoryRole(str, Enum):
     """Roles specific to Inventory module."""
 
@@ -26,6 +27,7 @@ class InventoryRole(str, Enum):
     EMT = "emt"
     AUDITOR = "auditor"
     INSPECTOR = "inspector"
+
 
 class MedicationsRole(str, Enum):
     """Roles specific to Medications module."""
@@ -43,6 +45,7 @@ class MedicationsRole(str, Enum):
     AUDITOR = "auditor"
     INSPECTOR = "inspector"
 
+
 class NarcoticsRole(str, Enum):
     """Roles specific to Narcotics module."""
 
@@ -56,6 +59,7 @@ class NarcoticsRole(str, Enum):
     BILLING_OPERATOR = "billing_operator"
     AUDITOR = "auditor"
     INSPECTOR = "inspector"
+
 
 # ============================================================================
 # INVENTORY PERMISSIONS
@@ -377,6 +381,7 @@ MODULE_ENTITLEMENTS = {
     "narcotics": "Narcotics Module - Controlled substance tracking",
 }
 
+
 class RBACPermissionCheck(BaseModel):
     """Result of RBAC permission check."""
 
@@ -385,12 +390,14 @@ class RBACPermissionCheck(BaseModel):
     reason: str | None = None
     roles_with_permission: list[str] = Field(default_factory=list)
 
+
 class ModuleEntitlementCheck(BaseModel):
     """Result of module entitlement check."""
 
     has_entitlement: bool
     module: str
     reason: str | None = None
+
 
 class RBACContext(BaseModel):
     """Complete RBAC context for a request."""
@@ -425,6 +432,7 @@ class RBACContext(BaseModel):
         """Check if user is agency admin."""
         return "agency_admin" in self.roles or self.is_founder()
 
+
 def compute_inventory_permissions(roles: list[str]) -> set[str]:
     """Compute all inventory permissions for a user based on roles."""
     permissions = set()
@@ -434,6 +442,7 @@ def compute_inventory_permissions(roles: list[str]) -> set[str]:
             permissions.add(permission)
     return permissions
 
+
 def compute_medications_permissions(roles: list[str]) -> set[str]:
     """Compute all medications permissions for a user based on roles."""
     permissions = set()
@@ -442,6 +451,7 @@ def compute_medications_permissions(roles: list[str]) -> set[str]:
         if any(role in permission_roles for role in roles):
             permissions.add(permission)
     return permissions
+
 
 def compute_narcotics_permissions(roles: list[str]) -> set[str]:
     """Compute all narcotics permissions for a user based on roles."""

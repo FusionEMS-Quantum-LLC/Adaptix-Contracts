@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 from pydantic import BaseModel, Field
 
+
 class EpcrCadHandoffIngestRequest(BaseModel):
     """Request to ingest a CAD handoff payload into an ePCR chart draft.
 
@@ -36,6 +37,7 @@ class EpcrCadHandoffIngestRequest(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc)
     )
 
+
 class EpcrCadHandoffFieldMapping(BaseModel):
     """Single field mapping result from CAD handoff to NEMSIS element."""
 
@@ -47,6 +49,7 @@ class EpcrCadHandoffFieldMapping(BaseModel):
     mapping_note: str | None = None
     requires_clinician_review: bool = False
     missing_required: bool = False
+
 
 class EpcrCadHandoffIngestResult(BaseModel):
     """Result of ingesting a CAD handoff into an ePCR chart draft."""
@@ -65,6 +68,7 @@ class EpcrCadHandoffIngestResult(BaseModel):
     audit_id: str | None = None
     ingested_at: datetime
 
+
 class EpcrCadHandoffIngestedEvent(BaseModel):
     """Event emitted when ePCR ingests a CAD handoff."""
 
@@ -77,6 +81,7 @@ class EpcrCadHandoffIngestedEvent(BaseModel):
     fields_mapped: int
     emitted_at: datetime
 
+
 class EpcrNemsisCadFieldsMappedEvent(BaseModel):
     """Event emitted when ePCR maps CAD fields to NEMSIS elements."""
 
@@ -87,6 +92,7 @@ class EpcrNemsisCadFieldsMappedEvent(BaseModel):
     fields_mapped: int
     missing_required_elements: list[str] = Field(default_factory=list)
     emitted_at: datetime
+
 
 class EpcrNemsisValidationCompletedEvent(BaseModel):
     """Event emitted when ePCR completes NEMSIS validation after CAD handoff mapping."""

@@ -9,6 +9,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+
 class PortalDocumentState(str, Enum):
     REQUESTED = "requested"
     PENDING = "pending"
@@ -16,6 +17,7 @@ class PortalDocumentState(str, Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     RESUBMISSION_REQUIRED = "resubmission_required"
+
 
 class PortalDocumentRequestResponse(BaseModel):
     id: str
@@ -33,6 +35,7 @@ class PortalDocumentRequestResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class PortalDocumentStatusResponse(BaseModel):
     total_required: int
     submitted: int
@@ -41,9 +44,11 @@ class PortalDocumentStatusResponse(BaseModel):
     pending: int
     completion_pct: float
 
+
 class PortalDocumentListResponse(BaseModel):
     items: list[PortalDocumentRequestResponse]
     status: PortalDocumentStatusResponse
+
 
 class PortalDocumentSubmissionResponse(BaseModel):
     id: str
@@ -57,6 +62,7 @@ class PortalDocumentSubmissionResponse(BaseModel):
     submitted_at: datetime
     reviewed_at: datetime | None = None
     reviewed_by: str | None = None
+
 
 class PatientHomeResponse(BaseModel):
     """

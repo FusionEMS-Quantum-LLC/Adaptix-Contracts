@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any
 import uuid
 
+
 class AIProviderStatus(str, Enum):
     CONFIGURED = "configured"
     CREDENTIAL_GATED = "credential_gated"
@@ -14,11 +15,13 @@ class AIProviderStatus(str, Enum):
     UNAVAILABLE = "unavailable"
     ERROR = "error"
 
+
 class AIRiskLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
 
 @dataclass
 class AISourceField:
@@ -28,6 +31,7 @@ class AISourceField:
     field_path: str
     redacted: bool = True
     included_in_prompt: bool = False
+
 
 @dataclass
 class AIRedactionPolicy:
@@ -56,6 +60,7 @@ class AIRedactionPolicy:
         self.redact_prompts_from_logs = True
         self.redact_completions_from_logs = True
 
+
 @dataclass
 class AICapabilityRegistryEntry:
     """Registry entry for an AI capability."""
@@ -74,6 +79,7 @@ class AICapabilityRegistryEntry:
     enabled: bool = True
     version: str = "1.0"
 
+
 @dataclass
 class AITextGenerationRequest:
     """Request for AI text generation."""
@@ -88,6 +94,7 @@ class AITextGenerationRequest:
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     causation_id: str | None = None
     context_metadata: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class AITextGenerationResponse:
@@ -120,6 +127,7 @@ class AITextGenerationResponse:
         self.ai_signed = False
         self.ai_marked_complete = False
 
+
 @dataclass
 class AIReadinessAssessment:
     """AI-generated readiness assessment."""
@@ -138,6 +146,7 @@ class AIReadinessAssessment:
     created_at: datetime
     audit_event_id: str
     correlation_id: str
+
 
 @dataclass
 class AIDraftNarrative:
@@ -163,6 +172,7 @@ class AIDraftNarrative:
         self.ai_marked_complete = False
         self.ai_auto_locked = False
 
+
 @dataclass
 class AIHumanReviewRequirement:
     """Requirement for human review of AI output."""
@@ -175,6 +185,7 @@ class AIHumanReviewRequirement:
     required_reviewer_role: str
     deadline: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 @dataclass
 class AIAuditRecord:
@@ -200,6 +211,7 @@ class AIAuditRecord:
     # Explicitly excluded: prompt_text, completion_text, PHI, tokens, secrets
     error: str | None = None
     validation_passed: bool = False
+
 
 @dataclass
 class AIGeneratedTextMetadata:

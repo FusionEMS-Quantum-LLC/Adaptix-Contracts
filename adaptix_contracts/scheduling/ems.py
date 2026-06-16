@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+
 class EMSUnitAssignment(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -26,6 +27,7 @@ class EMSUnitAssignment(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class EMSCrewPairing(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -41,6 +43,7 @@ class EMSCrewPairing(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class ALSBLSCoverageRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -53,6 +56,7 @@ class ALSBLSCoverageRule(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class CredentialCoverageRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -63,6 +67,7 @@ class CredentialCoverageRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class EMSStationCoverage(BaseModel):
     id: UUID
@@ -76,6 +81,7 @@ class EMSStationCoverage(BaseModel):
     coverage_checked_at: datetime
     created_at: datetime
     updated_at: datetime
+
 
 class EMSSkillMixValidation(BaseModel):
     id: UUID

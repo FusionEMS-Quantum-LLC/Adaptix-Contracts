@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 # ─── Enums ───────────────────────────────────────────────────────────────────
+
 
 class GravityModuleState(str, Enum):
     LOADING = "loading"
@@ -24,6 +25,7 @@ class GravityModuleState(str, Enum):
     EMPTY = "empty"
     STALE = "stale"
 
+
 class GravityRiskLevel(str, Enum):
     CRITICAL = "critical"
     HIGH = "high"
@@ -31,11 +33,13 @@ class GravityRiskLevel(str, Enum):
     LOW = "low"
     INFO = "info"
 
+
 class GravityActionStatus(str, Enum):
     OPEN = "open"
     ASSIGNED = "assigned"
     SNOOZED = "snoozed"
     RESOLVED = "resolved"
+
 
 class GravityNotificationSeverity(str, Enum):
     CRITICAL = "critical"
@@ -44,6 +48,7 @@ class GravityNotificationSeverity(str, Enum):
     LOW = "low"
     INFO = "info"
 
+
 class GravityNotificationState(str, Enum):
     UNREAD = "unread"
     READ = "read"
@@ -51,7 +56,9 @@ class GravityNotificationState(str, Enum):
     SNOOZED = "snoozed"
     ESCALATED = "escalated"
 
+
 # ─── AI Run Payload ───────────────────────────────────────────────────────────
+
 
 class GravityAIRunPayload(BaseModel):
     """
@@ -77,7 +84,9 @@ class GravityAIRunPayload(BaseModel):
     rejected_by: str | None = None
     audit_event_id: str | None = None
 
+
 # ─── Audit Event Payload ──────────────────────────────────────────────────────
+
 
 class GravityAuditEventPayload(BaseModel):
     """
@@ -97,7 +106,9 @@ class GravityAuditEventPayload(BaseModel):
     timestamp: datetime
     version: int = 1
 
+
 # ─── Notification Payload ─────────────────────────────────────────────────────
+
 
 class GravityNotificationPayload(BaseModel):
     """
@@ -122,7 +133,9 @@ class GravityNotificationPayload(BaseModel):
     escalated_at: datetime | None = None
     audit_event_id: str | None = None
 
+
 # ─── Action Payload ───────────────────────────────────────────────────────────
+
 
 class GravityActionPayload(BaseModel):
     """
@@ -147,13 +160,16 @@ class GravityActionPayload(BaseModel):
     updated_at: datetime
     audit_event_id: str | None = None
 
+
 # ─── Validation Result ────────────────────────────────────────────────────────
+
 
 class GravityValidationError(BaseModel):
     field: str
     message: str
     code: str
     severity: GravityRiskLevel = GravityRiskLevel.HIGH
+
 
 class GravityValidationResult(BaseModel):
     """
@@ -166,7 +182,9 @@ class GravityValidationResult(BaseModel):
     validated_at: datetime
     validator_version: str = "1.0"
 
+
 # ─── Error Envelope ───────────────────────────────────────────────────────────
+
 
 class GravityErrorEnvelope(BaseModel):
     """
@@ -181,7 +199,9 @@ class GravityErrorEnvelope(BaseModel):
     timestamp: datetime
     request_id: str | None = None
 
+
 # ─── Pagination ───────────────────────────────────────────────────────────────
+
 
 class GravityPaginatedResponse(BaseModel):
     """

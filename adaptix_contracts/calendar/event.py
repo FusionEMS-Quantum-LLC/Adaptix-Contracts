@@ -52,5 +52,7 @@ class AdaptixCalendarEvent(BaseModel):
 
     model_config = {
         "populate_by_name": True,
+        "validate_by_name": True,
+        "validate_by_alias": True,
         "extra": "forbid",
     }

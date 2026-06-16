@@ -24,6 +24,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+
 class CadCrewMemberContext(BaseModel):
     """Crew member context from CAD dispatch."""
 
@@ -31,6 +32,7 @@ class CadCrewMemberContext(BaseModel):
     role: str | None = None
     certification_level: str | None = None
     unit_id: str | None = None
+
 
 class CadFacilityContext(BaseModel):
     """Facility context captured at CAD intake."""
@@ -42,6 +44,7 @@ class CadFacilityContext(BaseModel):
     facility_phone: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+
 
 class CadPatientMinimumContext(BaseModel):
     """Minimum patient identifiers available at CAD intake.
@@ -55,6 +58,7 @@ class CadPatientMinimumContext(BaseModel):
     date_of_birth: str | None = None
     patient_id_external: str | None = None
     mrn: str | None = None
+
 
 class CadPayerDocumentAwareness(BaseModel):
     """Payer and document dependency awareness from CAD intake.
@@ -70,6 +74,7 @@ class CadPayerDocumentAwareness(BaseModel):
     abn_awareness: bool = False
     aob_awareness: bool = False
     document_dependency_notes: str | None = None
+
 
 class CadDispatchTimeline(BaseModel):
     """Dispatch timeline timestamps from CAD.
@@ -114,6 +119,7 @@ class CadDispatchTimeline(BaseModel):
     # Cancellation
     cancelled_at: datetime | None = None
     cancellation_reason: str | None = None
+
 
 class CadDispatchContext(BaseModel):
     """eDispatch section data — CAD-owned dispatch metadata.
@@ -160,6 +166,7 @@ class CadDispatchContext(BaseModel):
         default=None,
         description="eDispatch.06 — Geographic area command identifier for this dispatch",
     )
+
 
 class CadNemsisHandoffPayload(BaseModel):
     """Structured CAD-to-ePCR handoff payload for NEMSIS 3.5.1 field population.
@@ -276,6 +283,7 @@ class CadNemsisHandoffPayload(BaseModel):
                 "handoff_created_at": "2026-05-03T12:00:00Z",
             }
         }
+
 
 class CadNemsisHandoffCreatedEvent(BaseModel):
     """Event emitted when CAD creates a NEMSIS handoff payload."""

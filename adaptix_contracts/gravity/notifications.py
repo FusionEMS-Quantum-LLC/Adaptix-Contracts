@@ -12,6 +12,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from .modules import GravityNotificationSeverity, GravityNotificationState
 
+
 class NotificationCreateRequest(BaseModel):
     tenant_id: str
     title: str
@@ -21,6 +22,7 @@ class NotificationCreateRequest(BaseModel):
     source_record_id: str | None = None
     source_record_type: str | None = None
     action_url: str | None = None
+
 
 class NotificationResponse(BaseModel):
     id: str
@@ -40,13 +42,16 @@ class NotificationResponse(BaseModel):
     escalated_at: datetime | None = None
     audit_event_id: str | None = None
 
+
 class NotificationListResponse(BaseModel):
     items: list[NotificationResponse]
     total: int
     unread_count: int
 
+
 class NotificationSnoozeRequest(BaseModel):
     snoozed_until: datetime
+
 
 class NotificationActionResponse(BaseModel):
     notification: NotificationResponse

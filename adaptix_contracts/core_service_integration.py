@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+
 class CoreServiceConfig(BaseModel):
     """Configuration for Core Service integration."""
 
@@ -30,10 +31,12 @@ class CoreServiceConfig(BaseModel):
     timeout_seconds: int = 10
     cache_ttl_seconds: int = 300
 
+
 class TenantLookupRequest(BaseModel):
     """Request to Core Service for tenant lookup."""
 
     tenant_slug: str
+
 
 class TenantLookupResponse(BaseModel):
     """Response from Core Service tenant lookup."""
@@ -45,6 +48,7 @@ class TenantLookupResponse(BaseModel):
     is_active: bool
     modules_enabled: list[str] = Field(default_factory=list)
 
+
 class RBACVerifyRequest(BaseModel):
     """Request to Core Service for RBAC verification."""
 
@@ -52,11 +56,13 @@ class RBACVerifyRequest(BaseModel):
     tenant_id: str
     permission: str
 
+
 class RBACVerifyResponse(BaseModel):
     """Response from Core Service RBAC verification."""
 
     has_permission: bool
     reason: str | None = None
+
 
 class EntitlementCheckRequest(BaseModel):
     """Request to Core Service for entitlement check."""
@@ -64,12 +70,14 @@ class EntitlementCheckRequest(BaseModel):
     tenant_id: str
     module: str
 
+
 class EntitlementCheckResponse(BaseModel):
     """Response from Core Service entitlement check."""
 
     has_entitlement: bool
     module: str
     reason: str | None = None
+
 
 class CoreServiceClient:
     """
@@ -238,6 +246,7 @@ class CoreServiceClient:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
         return headers
 
+
 def get_core_service_config() -> CoreServiceConfig:
     """Load Core Service configuration from environment."""
     base_url = os.environ.get("CORE_SERVICE_URL", "https://core.adaptixcore.com")
@@ -252,8 +261,10 @@ def get_core_service_config() -> CoreServiceConfig:
         cache_ttl_seconds=cache_ttl,
     )
 
+
 # Global client instance (will be initialized on app startup)
 _core_service_client: CoreServiceClient | None = None
+
 
 async def init_core_service_client():
     """Initialize global Core Service client."""
@@ -262,6 +273,7 @@ async def init_core_service_client():
     _core_service_client = CoreServiceClient(config)
     logger.info(f"Core Service client initialized: {config.base_url}")
 
+
 async def close_core_service_client():
     """Close global Core Service client."""
     global _core_service_client
@@ -269,6 +281,7 @@ async def close_core_service_client():
         await _core_service_client.close()
         _core_service_client = None
         logger.info("Core Service client closed")
+
 
 def get_core_service_client() -> CoreServiceClient:
     """Get global Core Service client instance."""

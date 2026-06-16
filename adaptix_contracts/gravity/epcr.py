@@ -20,6 +20,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+
 class EPCRChartState(str, Enum):
     DRAFT = "draft"
     IN_PROGRESS = "in_progress"
@@ -28,21 +29,25 @@ class EPCRChartState(str, Enum):
     EXPORTED = "exported"
     REJECTED = "rejected"
 
+
 class NEMSISReadiness(str, Enum):
     READY = "ready"
     BLOCKED = "blocked"
     WARNING = "warning"
     NOT_VALIDATED = "not_validated"
 
+
 class BillingReadiness(str, Enum):
     READY = "ready"
     INCOMPLETE = "incomplete"
     BLOCKED = "blocked"
 
+
 class NEMSISBlocker(BaseModel):
     field: str
     message: str
     severity: str
+
 
 class EPCRChartListItemResponse(BaseModel):
     id: str
@@ -54,6 +59,7 @@ class EPCRChartListItemResponse(BaseModel):
     clinical_completeness_pct: float
     created_at: datetime
     updated_at: datetime
+
 
 class EPCRChartDetailResponse(BaseModel):
     id: str
@@ -70,6 +76,7 @@ class EPCRChartDetailResponse(BaseModel):
     validation_state: str
     created_at: datetime
     updated_at: datetime
+
 
 class EPCRChartListResponse(BaseModel):
     items: list[EPCRChartListItemResponse]

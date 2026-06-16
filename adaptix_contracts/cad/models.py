@@ -7,10 +7,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
+
 
 class TransportType(str, Enum):
     SCHEDULED = "SCHEDULED"
@@ -23,6 +24,7 @@ class TransportType(str, Enum):
     STANDBY = "STANDBY"
     HEMS = "HEMS"
 
+
 class LevelOfCare(str, Enum):
     BLS = "BLS"
     ALS = "ALS"
@@ -32,6 +34,7 @@ class LevelOfCare(str, Enum):
     STRETCHER = "STRETCHER"
     HEMS = "HEMS"
     UNKNOWN = "UNKNOWN"
+
 
 class UnitStatus(str, Enum):
     AVAILABLE = "AVAILABLE"
@@ -49,12 +52,14 @@ class UnitStatus(str, Enum):
     RESTRICTED = "RESTRICTED"
     CANCELLED = "CANCELLED"
 
+
 class VehicleTrackingStatus(str, Enum):
     GPS_ACTIVE = "GPS_ACTIVE"
     GPS_STALE = "GPS_STALE"
     GPS_UNAVAILABLE = "GPS_UNAVAILABLE"
     MANUAL_STATUS_ONLY = "MANUAL_STATUS_ONLY"
     TELEMETRY_ERROR = "TELEMETRY_ERROR"
+
 
 class HemsStatus(str, Enum):
     REQUESTED = "REQUESTED"
@@ -69,7 +74,9 @@ class HemsStatus(str, Enum):
     COMPLETED = "COMPLETED"
     GROUND_FALLBACK_RECOMMENDED = "GROUND_FALLBACK_RECOMMENDED"
 
+
 # ─── Facility Models ──────────────────────────────────────────────────────────
+
 
 class CadOriginFacility(BaseModel):
     facility_name: str | None = None
@@ -80,6 +87,7 @@ class CadOriginFacility(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
 
+
 class CadDestinationFacility(BaseModel):
     facility_name: str | None = None
     facility_address: str | None = None
@@ -89,7 +97,9 @@ class CadDestinationFacility(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
 
+
 # ─── Patient / Payer Context ──────────────────────────────────────────────────
+
 
 class CadPatientContext(BaseModel):
     """Minimum patient identifiers available at CAD intake. CAD does NOT own clinical data."""
@@ -106,6 +116,7 @@ class CadPatientContext(BaseModel):
     bariatric_required: bool = False
     escort_required: bool = False
 
+
 class CadPayerContext(BaseModel):
     """Payer awareness from CAD intake. CAD does NOT own billing workflow."""
 
@@ -117,13 +128,16 @@ class CadPayerContext(BaseModel):
     aob_awareness: bool = False
     document_dependency_notes: str | None = None
 
+
 # ─── Transport Request ────────────────────────────────────────────────────────
+
 
 class CadTransportRequestReason(BaseModel):
     reason_code: str | None = None
     reason_text: str | None = None
     diagnosis_context: str | None = None
     medical_necessity_notes: str | None = None
+
 
 class CadMedicalTransportIntake(BaseModel):
     intake_id: str
@@ -154,7 +168,9 @@ class CadMedicalTransportIntake(BaseModel):
     created_by: str | None = None
     tenant_correlation_id: str | None = None
 
+
 # ─── Dispatch ─────────────────────────────────────────────────────────────────
+
 
 class CadTransportDispatch(BaseModel):
     dispatch_id: str
@@ -179,7 +195,9 @@ class CadTransportDispatch(BaseModel):
     updated_at: datetime
     created_by: str | None = None
 
+
 # ─── Assessments ──────────────────────────────────────────────────────────────
+
 
 class CadLevelOfCareAssessment(BaseModel):
     assessment_id: str
@@ -195,6 +213,7 @@ class CadLevelOfCareAssessment(BaseModel):
     human_review_required: bool = True
     assessed_at: datetime
     assessed_by: str | None = None
+
 
 class CadMedicalNecessityAssessment(BaseModel):
     assessment_id: str
@@ -214,23 +233,28 @@ class CadMedicalNecessityAssessment(BaseModel):
     assessed_at: datetime
     assessed_by: str | None = None
 
+
 class CadPCSRequirementAwareness(BaseModel):
     intake_id: str
     pcs_likely_required: bool
     explanation: str | None = None
     policy_reference: str | None = None
 
+
 class CadABNRequirementAwareness(BaseModel):
     intake_id: str
     abn_awareness: bool
     explanation: str | None = None
+
 
 class CadAOBRequirementAwareness(BaseModel):
     intake_id: str
     aob_awareness: bool
     explanation: str | None = None
 
+
 # ─── Unit / Crew Recommendations ─────────────────────────────────────────────
+
 
 class CadUnitRecommendation(BaseModel):
     recommendation_id: str
@@ -244,6 +268,7 @@ class CadUnitRecommendation(BaseModel):
     human_review_required: bool = True
     recommended_at: datetime
 
+
 class CadCrewRecommendation(BaseModel):
     recommendation_id: str
     intake_id: str
@@ -254,6 +279,7 @@ class CadCrewRecommendation(BaseModel):
     fatigue_warnings: list[str] = Field(default_factory=list)
     human_review_required: bool = True
     recommended_at: datetime
+
 
 class CadUnitAssignment(BaseModel):
     assignment_id: str
@@ -267,7 +293,9 @@ class CadUnitAssignment(BaseModel):
     reassignment: bool = False
     reassignment_reason: str | None = None
 
+
 # ─── Vehicle Tracking ─────────────────────────────────────────────────────────
+
 
 class CadVehicleTrackingSnapshot(BaseModel):
     snapshot_id: str
@@ -285,6 +313,7 @@ class CadVehicleTrackingSnapshot(BaseModel):
     captured_at: datetime
     is_stale: bool = False
 
+
 class CadVehicleTelemetryPoint(BaseModel):
     telemetry_id: str
     vehicle_id: str
@@ -300,6 +329,7 @@ class CadVehicleTelemetryPoint(BaseModel):
     source: str | None = None
     received_at: datetime
 
+
 class CadUnitStatusUpdate(BaseModel):
     status_id: str
     unit_id: str
@@ -313,7 +343,9 @@ class CadUnitStatusUpdate(BaseModel):
     updated_by: str | None = None
     mdt_source: bool = False
 
+
 # ─── Timeline ─────────────────────────────────────────────────────────────────
+
 
 class CadTransportTimeline(BaseModel):
     dispatch_id: str
@@ -333,7 +365,9 @@ class CadTransportTimeline(BaseModel):
     dispatch_created_at: datetime | None = None
     unit_assigned_at: datetime | None = None
 
+
 # ─── Routing / ETA ────────────────────────────────────────────────────────────
+
 
 class CadRoutingEta(BaseModel):
     eta_id: str
@@ -349,6 +383,7 @@ class CadRoutingEta(BaseModel):
     override_reason: str | None = None
     calculated_at: datetime
 
+
 class CadGeocodeResult(BaseModel):
     geocode_id: str
     input_address: str
@@ -359,7 +394,9 @@ class CadGeocodeResult(BaseModel):
     provider_credential_gated: bool = False
     geocoded_at: datetime
 
+
 # ─── HEMS ─────────────────────────────────────────────────────────────────────
+
 
 class CadHemsRequest(BaseModel):
     request_id: str
@@ -379,6 +416,7 @@ class CadHemsRequest(BaseModel):
     updated_at: datetime
     created_by: str
 
+
 class CadHemsEligibilityAssessment(BaseModel):
     assessment_id: str
     request_id: str
@@ -390,6 +428,7 @@ class CadHemsEligibilityAssessment(BaseModel):
     human_review_required: bool = True
     ai_may_not_accept: bool = True
     assessed_at: datetime
+
 
 class CadHemsBriefing(BaseModel):
     briefing_id: str
@@ -403,6 +442,7 @@ class CadHemsBriefing(BaseModel):
     medical_crew_availability: str | None = None
     generated_at: datetime
 
+
 class CadGroundFallbackRecommendation(BaseModel):
     recommendation_id: str
     request_id: str
@@ -413,7 +453,9 @@ class CadGroundFallbackRecommendation(BaseModel):
     human_review_required: bool = True
     recommended_at: datetime
 
+
 # ─── Handoffs ─────────────────────────────────────────────────────────────────
+
 
 class CadTransportLinkHandoff(BaseModel):
     handoff_id: str
@@ -436,6 +478,7 @@ class CadTransportLinkHandoff(BaseModel):
     downstream_id: str | None = None
     created_at: datetime
 
+
 class CadEpcrHandoff(BaseModel):
     handoff_id: str
     dispatch_id: str
@@ -457,6 +500,7 @@ class CadEpcrHandoff(BaseModel):
     downstream_epcr_id: str | None = None
     created_at: datetime
 
+
 class CadBillingHandoff(BaseModel):
     handoff_id: str
     dispatch_id: str
@@ -472,6 +516,7 @@ class CadBillingHandoff(BaseModel):
     downstream_billing_id: str | None = None
     created_at: datetime
 
+
 class CadCrewLinkPageRequest(BaseModel):
     page_id: str
     dispatch_id: str
@@ -485,7 +530,9 @@ class CadCrewLinkPageRequest(BaseModel):
     escalated: bool = False
     created_at: datetime
 
+
 # ─── MDT / Scheduling ─────────────────────────────────────────────────────────
+
 
 class CadMdtSyncEvent(BaseModel):
     sync_id: str
@@ -497,6 +544,7 @@ class CadMdtSyncEvent(BaseModel):
     mdt_online: bool = True
     last_sync_at: datetime
     offline_queued: bool = False
+
 
 class CadSchedulingAvailabilitySnapshot(BaseModel):
     snapshot_id: str
@@ -510,6 +558,7 @@ class CadSchedulingAvailabilitySnapshot(BaseModel):
     credential_expiry_notes: str | None = None
     captured_at: datetime
 
+
 class CadVoiceRoomRequest(BaseModel):
     room_id: str
     dispatch_id: str
@@ -519,7 +568,9 @@ class CadVoiceRoomRequest(BaseModel):
     communications_audit_id: str | None = None
     created_at: datetime
 
+
 # ─── AI Assessment ────────────────────────────────────────────────────────────
+
 
 class CadAIAssessment(BaseModel):
     assessment_id: str
@@ -540,7 +591,9 @@ class CadAIAssessment(BaseModel):
     ai_may_not_create_billing: bool = True
     assessed_at: datetime
 
+
 # ─── Audit ────────────────────────────────────────────────────────────────────
+
 
 class CadAuditEvent(BaseModel):
     audit_id: str

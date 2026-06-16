@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+
 class FireStationAssignment(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -21,6 +22,7 @@ class FireStationAssignment(BaseModel):
     created_at: datetime
     updated_at: datetime
     audit_event_id: UUID | None = None
+
 
 class ApparatusAssignment(BaseModel):
     id: UUID
@@ -40,6 +42,7 @@ class ApparatusAssignment(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class FireMinimumStaffingRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -55,6 +58,7 @@ class FireMinimumStaffingRule(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class FireRoleCoverageRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -65,6 +69,7 @@ class FireRoleCoverageRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class FireSpecialtyCoverage(BaseModel):
     id: UUID
@@ -77,6 +82,7 @@ class FireSpecialtyCoverage(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class VolunteerAvailability(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -88,6 +94,7 @@ class VolunteerAvailability(BaseModel):
     notes: str | None = None
     created_at: datetime
     updated_at: datetime
+
 
 class CallbackRoster(BaseModel):
     id: UUID
@@ -104,6 +111,7 @@ class CallbackRoster(BaseModel):
     created_at: datetime
     updated_at: datetime
     audit_event_id: UUID | None = None
+
 
 class MutualAidStaffingRequest(BaseModel):
     id: UUID
