@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+
 class CorrectionsPost(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -20,6 +21,7 @@ class CorrectionsPost(BaseModel):
     active: bool = True
     created_at: datetime
     updated_at: datetime
+
 
 class CorrectionsShiftAssignment(BaseModel):
     id: UUID
@@ -36,6 +38,7 @@ class CorrectionsShiftAssignment(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class CorrectionsReliefCoverage(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -51,6 +54,7 @@ class CorrectionsReliefCoverage(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class CorrectionsTransportStaffing(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -65,6 +69,7 @@ class CorrectionsTransportStaffing(BaseModel):
     created_at: datetime
     updated_at: datetime
     audit_event_id: UUID | None = None
+
 
 class CorrectionsPostCoverageRule(BaseModel):
     id: UUID

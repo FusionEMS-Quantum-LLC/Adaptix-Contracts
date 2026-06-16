@@ -9,6 +9,7 @@ import uuid
 
 from .capabilities import AIRiskLevel, AISourceField
 
+
 class SmartTextModule(str, Enum):
     CAD = "cad"
     EPCR = "epcr"
@@ -23,6 +24,7 @@ class SmartTextModule(str, Enum):
     COMMUNICATIONS = "communications"
     DOCUMENTS = "documents"
     FOUNDER = "founder"
+
 
 class SmartTextCapability(str, Enum):
     # CAD
@@ -66,6 +68,7 @@ class SmartTextCapability(str, Enum):
     # Founder
     FOUNDER_PLATFORM_READINESS = "founder.platform_readiness_summary"
 
+
 @dataclass
 class SmartTextRequest:
     """Request for smart text generation."""
@@ -80,6 +83,7 @@ class SmartTextRequest:
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     causation_id: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class SmartTextResponse:
@@ -108,6 +112,7 @@ class SmartTextResponse:
     def __post_init__(self):
         self.ai_signed = False
         self.ai_marked_complete = False
+
 
 @dataclass
 class SmartTextAuditEntry:

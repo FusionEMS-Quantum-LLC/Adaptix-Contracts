@@ -28,6 +28,7 @@ from adaptix_contracts.rbac_contracts import (
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
+
 async def require_permission(
     permission: str,
     permission_computer: Callable[[list[str]], set],
@@ -82,6 +83,7 @@ async def require_permission(
 
     return rbac_context
 
+
 def require_inventory_permission(permission: str):
     """
     Decorator factory for enforcing Inventory module permissions.
@@ -101,6 +103,7 @@ def require_inventory_permission(permission: str):
         return await require_permission(permission, compute_inventory_permissions, auth)
 
     return Depends(dependency)
+
 
 def require_medications_permission(permission: str):
     """
@@ -124,6 +127,7 @@ def require_medications_permission(permission: str):
 
     return Depends(dependency)
 
+
 def require_narcotics_permission(permission: str):
     """
     Decorator factory for enforcing Narcotics module permissions.
@@ -143,6 +147,7 @@ def require_narcotics_permission(permission: str):
         return await require_permission(permission, compute_narcotics_permissions, auth)
 
     return Depends(dependency)
+
 
 async def require_module_entitlement(
     module: str,
@@ -188,6 +193,7 @@ async def require_module_entitlement(
         modules_enabled=auth.tenant_context.modules_enabled,
     )
 
+
 async def require_billing_access(
     auth: AdaptixAuthContext = Depends(),
 ) -> RBACContext:
@@ -232,6 +238,7 @@ async def require_billing_access(
         modules_enabled=auth.tenant_context.modules_enabled,
     )
 
+
 async def verify_tenant_isolation(
     tenant_id: str,
     auth: AdaptixAuthContext = Depends(),
@@ -266,6 +273,7 @@ async def verify_tenant_isolation(
                 "message": "You do not have access to this tenant",
             },
         )
+
 
 def rbac_decorator(
     permission: str,

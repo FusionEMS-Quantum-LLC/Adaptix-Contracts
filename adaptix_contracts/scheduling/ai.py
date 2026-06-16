@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+
 class SchedulingAIAssessment(BaseModel):
     """Full AI assessment output — advisory only, never auto-approves."""
 
@@ -28,6 +29,7 @@ class SchedulingAIAssessment(BaseModel):
     created_at: datetime
     audit_event_id: UUID | None = None
 
+
 class StaffingShortageFinding(BaseModel):
     shift_id: UUID
     agency_type: str
@@ -39,6 +41,7 @@ class StaffingShortageFinding(BaseModel):
     risk_level: str = "high"
     explanation: str
 
+
 class CoverageRiskExplanation(BaseModel):
     area_type: str  # beat, zone, district, station, console
     area_id: UUID
@@ -48,6 +51,7 @@ class CoverageRiskExplanation(BaseModel):
     minimum_required: int
     explanation: str
     recommended_action: str
+
 
 class FatigueRiskScore(BaseModel):
     person_id: UUID
@@ -61,6 +65,7 @@ class FatigueRiskScore(BaseModel):
     explanation: str
     human_review_required: bool = True
 
+
 class OvertimeFairnessScore(BaseModel):
     person_id: UUID
     overtime_hours_ytd: float
@@ -69,6 +74,7 @@ class OvertimeFairnessScore(BaseModel):
     fairness_score: float  # 0.0 - 1.0 (1.0 = perfectly fair)
     rank_in_rotation: int
     explanation: str
+
 
 class SwapCompatibilityResult(BaseModel):
     requester_id: UUID
@@ -84,6 +90,7 @@ class SwapCompatibilityResult(BaseModel):
     explanation: str
     human_review_required: bool = True
 
+
 class BackfillRecommendation(BaseModel):
     shift_id: UUID
     vacancy_reason: str
@@ -96,6 +103,7 @@ class BackfillRecommendation(BaseModel):
     overtime_fairness_considered: bool = True
     human_review_required: bool = True
     explanation: str
+
 
 class HoldoverRecommendation(BaseModel):
     shift_id: UUID
@@ -110,6 +118,7 @@ class HoldoverRecommendation(BaseModel):
     supervisor_approval_required: bool = True
     explanation: str
 
+
 class PolicyViolationWarning(BaseModel):
     person_id: UUID
     shift_id: UUID
@@ -121,6 +130,7 @@ class PolicyViolationWarning(BaseModel):
     auto_override_forbidden: bool = True
     explanation: str
 
+
 class SeniorityRuleExplanation(BaseModel):
     person_id: UUID
     rule_key: str
@@ -129,6 +139,7 @@ class SeniorityRuleExplanation(BaseModel):
     applicable_rules: list[str] = Field(default_factory=list)
     explanation: str
     human_decision_required: bool = True
+
 
 class SupervisorDecisionSummary(BaseModel):
     shift_id: UUID
@@ -142,6 +153,7 @@ class SupervisorDecisionSummary(BaseModel):
     risk_level: str
     summary: str
     generated_at: datetime
+
 
 class StaffingCommandBriefing(BaseModel):
     schedule_id: UUID
@@ -161,6 +173,7 @@ class StaffingCommandBriefing(BaseModel):
     recommended_actions: list[str] = Field(default_factory=list)
     generated_at: datetime
     human_review_required: bool = True
+
 
 # AI Capability Keys
 SCHED_AI_STAFFING_SHORTAGE = "sched_ai.staffing_shortage"

@@ -18,6 +18,7 @@ from pydantic import BaseModel
 # Read contracts
 # ---------------------------------------------------------------------------
 
+
 class GraphEmailSummaryContract(BaseModel):
     """Summary of a single inbox email message."""
 
@@ -27,6 +28,7 @@ class GraphEmailSummaryContract(BaseModel):
     sender_name: str | None = None
     received_at: datetime
     is_read: bool
+
 
 class GraphEmailDetailContract(BaseModel):
     """Full detail for a single email message."""
@@ -40,6 +42,7 @@ class GraphEmailDetailContract(BaseModel):
     received_at: datetime
     is_read: bool
 
+
 class GraphDriveFileContract(BaseModel):
     """Metadata for a single OneDrive/SharePoint file."""
 
@@ -51,6 +54,7 @@ class GraphDriveFileContract(BaseModel):
     web_url: str | None = None
     mime_type: str | None = None
 
+
 class GraphCalendarEventContract(BaseModel):
     """A single calendar event from Microsoft Graph."""
 
@@ -61,11 +65,13 @@ class GraphCalendarEventContract(BaseModel):
     is_cancelled: bool = False
     attendees: list[str] = []
 
+
 class GraphAvailabilitySlotContract(BaseModel):
     """A free time slot returned by availability check."""
 
     start: datetime
     end: datetime
+
 
 class GraphServiceStatusContract(BaseModel):
     """Status of the Microsoft Graph integration configuration."""
@@ -73,9 +79,11 @@ class GraphServiceStatusContract(BaseModel):
     microsoft_graph_configured: bool
     status: str
 
+
 # ---------------------------------------------------------------------------
 # Request contracts
 # ---------------------------------------------------------------------------
+
 
 class GraphSendEmailRequest(BaseModel):
     """Request to send an email via Microsoft Graph."""
@@ -86,6 +94,7 @@ class GraphSendEmailRequest(BaseModel):
     body_type: str = "HTML"
     cc: list[str] = []
     bcc: list[str] = []
+
 
 class GraphCreateCalendarEventRequest(BaseModel):
     """Request to create a calendar event via Microsoft Graph."""

@@ -13,10 +13,12 @@ from pydantic import BaseModel, Field
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 class ScheduleStatus(str, Enum):
     DRAFT = "draft"
     PUBLISHED = "published"
     ARCHIVED = "archived"
+
 
 class ShiftStatus(str, Enum):
     OPEN = "open"
@@ -24,10 +26,12 @@ class ShiftStatus(str, Enum):
     CANCELLED = "cancelled"
     COMPLETED = "completed"
 
+
 class AssignmentStatus(str, Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
+
 
 class TimeOffStatus(str, Enum):
     PENDING = "pending"
@@ -35,11 +39,13 @@ class TimeOffStatus(str, Enum):
     DENIED = "denied"
     CANCELLED = "cancelled"
 
+
 class OvertimeStatus(str, Enum):
     OFFERED = "offered"
     ACCEPTED = "accepted"
     DECLINED = "declined"
     EXPIRED = "expired"
+
 
 class SwapStatus(str, Enum):
     REQUESTED = "requested"
@@ -47,11 +53,13 @@ class SwapStatus(str, Enum):
     DENIED = "denied"
     CANCELLED = "cancelled"
 
+
 class HoldoverStatus(str, Enum):
     PENDING = "pending"
     APPROVED = "approved"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+
 
 class RiskLevel(str, Enum):
     LOW = "low"
@@ -59,9 +67,11 @@ class RiskLevel(str, Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
+
 # ---------------------------------------------------------------------------
 # Core Scheduling Models
 # ---------------------------------------------------------------------------
+
 
 class Schedule(BaseModel):
     id: UUID
@@ -77,6 +87,7 @@ class Schedule(BaseModel):
     created_at: datetime
     updated_at: datetime
     correlation_id: str | None = None
+
 
 class ShiftTemplate(BaseModel):
     id: UUID
@@ -97,6 +108,7 @@ class ShiftTemplate(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class ShiftInstance(BaseModel):
     id: UUID
@@ -120,6 +132,7 @@ class ShiftInstance(BaseModel):
     correlation_id: str | None = None
     audit_event_id: UUID | None = None
 
+
 class ShiftAssignment(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -137,6 +150,7 @@ class ShiftAssignment(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class AvailabilityWindow(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -148,6 +162,7 @@ class AvailabilityWindow(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class TimeOffRequest(BaseModel):
     id: UUID
@@ -165,6 +180,7 @@ class TimeOffRequest(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class OvertimeOffer(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -181,6 +197,7 @@ class OvertimeOffer(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class OvertimeAcceptance(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -188,6 +205,7 @@ class OvertimeAcceptance(BaseModel):
     person_id: UUID
     accepted_at: datetime
     audit_event_id: UUID | None = None
+
 
 class ShiftSwapRequest(BaseModel):
     id: UUID
@@ -204,6 +222,7 @@ class ShiftSwapRequest(BaseModel):
     created_at: datetime
     updated_at: datetime
     audit_event_id: UUID | None = None
+
 
 class HoldoverOrder(BaseModel):
     id: UUID
@@ -223,6 +242,7 @@ class HoldoverOrder(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class StaffingRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -235,6 +255,7 @@ class StaffingRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class MinimumStaffingRule(BaseModel):
     id: UUID
@@ -249,6 +270,7 @@ class MinimumStaffingRule(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class RankCoverageRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -259,6 +281,7 @@ class RankCoverageRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class BeatCoverageRule(BaseModel):
     id: UUID
@@ -272,6 +295,7 @@ class BeatCoverageRule(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class ZoneCoverageRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -283,6 +307,7 @@ class ZoneCoverageRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class UnionRule(BaseModel):
     id: UUID
@@ -296,6 +321,7 @@ class UnionRule(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class SeniorityRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -306,6 +332,7 @@ class SeniorityRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class CourtAppearance(BaseModel):
     id: UUID
@@ -321,6 +348,7 @@ class CourtAppearance(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class TrainingAssignment(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -334,6 +362,7 @@ class TrainingAssignment(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class SpecialEvent(BaseModel):
     id: UUID
@@ -351,6 +380,7 @@ class SpecialEvent(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class SpecialDetail(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -364,6 +394,7 @@ class SpecialDetail(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class PatrolBeat(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -376,6 +407,7 @@ class PatrolBeat(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class PatrolZone(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -387,6 +419,7 @@ class PatrolZone(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class Squad(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -396,6 +429,7 @@ class Squad(BaseModel):
     active: bool = True
     created_at: datetime
     updated_at: datetime
+
 
 class Station(BaseModel):
     id: UUID
@@ -408,6 +442,7 @@ class Station(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class Apparatus(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -418,6 +453,7 @@ class Apparatus(BaseModel):
     active: bool = True
     created_at: datetime
     updated_at: datetime
+
 
 class VehicleAssignment(BaseModel):
     id: UUID
@@ -432,6 +468,7 @@ class VehicleAssignment(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class EquipmentAssignment(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -444,6 +481,7 @@ class EquipmentAssignment(BaseModel):
     created_at: datetime
     updated_at: datetime
     audit_event_id: UUID | None = None
+
 
 class ScheduleAuditEvent(BaseModel):
     id: UUID
@@ -460,6 +498,7 @@ class ScheduleAuditEvent(BaseModel):
     metadata: dict = Field(default_factory=dict)
     created_at: datetime
     correlation_id: str | None = None
+
 
 class ScheduleAIAssessment(BaseModel):
     id: UUID

@@ -9,17 +9,20 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+
 class PaymentFailureState(str, Enum):
     OPEN = "open"
     RETRYING = "retrying"
     RESOLVED = "resolved"
     WRITTEN_OFF = "written_off"
 
+
 class ChurnRisk(str, Enum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+
 
 class RevenueOverviewResponse(BaseModel):
     mrr: int  # cents
@@ -37,6 +40,7 @@ class RevenueOverviewResponse(BaseModel):
     payment_failure_count: int
     generated_at: datetime
 
+
 class PaymentFailureResponse(BaseModel):
     id: str
     tenant_id: str
@@ -53,6 +57,7 @@ class PaymentFailureResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class ChurnRiskScoreResponse(BaseModel):
     customer_id: str
     customer_name: str
@@ -62,6 +67,7 @@ class ChurnRiskScoreResponse(BaseModel):
     mrr_at_risk: int
     last_activity_at: datetime | None = None
 
+
 class RevenueForecastResponse(BaseModel):
     period: str
     projected_mrr: int
@@ -70,6 +76,7 @@ class RevenueForecastResponse(BaseModel):
     churn_risk_mrr: int
     expansion_opportunity_mrr: int
     generated_at: datetime
+
 
 class RetryPaymentResponse(BaseModel):
     failure: PaymentFailureResponse

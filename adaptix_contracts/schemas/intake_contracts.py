@@ -27,6 +27,7 @@ from pydantic import BaseModel, EmailStr, Field
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 class IntakeSegment(str, enum.Enum):
     EMS_AGENCY = "ems_agency"
     FIRE_AGENCY = "fire_agency"
@@ -36,11 +37,13 @@ class IntakeSegment(str, enum.Enum):
     PARTNER = "partner"
     GOVERNMENT_PUBLIC_SAFETY = "government_public_safety"
 
+
 class LeadTemperature(str, enum.Enum):
     HOT = "hot"
     WARM = "warm"
     COOL = "cool"
     COLD = "cold"
+
 
 class OnboardingStepStatus(str, enum.Enum):
     NOT_STARTED = "not_started"
@@ -48,6 +51,7 @@ class OnboardingStepStatus(str, enum.Enum):
     BLOCKED = "blocked"
     COMPLETED = "completed"
     FAILED = "failed"
+
 
 class ContractSignatureState(str, enum.Enum):
     NOT_REQUIRED = "not_required"
@@ -57,6 +61,7 @@ class ContractSignatureState(str, enum.Enum):
     SIGNED = "signed"
     DECLINED = "declined"
     EXPIRED = "expired"
+
 
 class BillingReadinessState(str, enum.Enum):
     BILLING_NOT_STARTED = "billing_not_started"
@@ -68,6 +73,7 @@ class BillingReadinessState(str, enum.Enum):
     READY_FOR_PRODUCTION_CLAIMS = "ready_for_production_claims"
     BLOCKED = "blocked"
 
+
 class GrowthPostStatus(str, enum.Enum):
     DRAFT = "draft"
     APPROVED = "approved"
@@ -76,6 +82,7 @@ class GrowthPostStatus(str, enum.Enum):
     FAILED = "failed"
     REJECTED = "rejected"
 
+
 class GrowthPostChannel(str, enum.Enum):
     FOUNDER_INTERNAL = "founder_internal"
     LINKEDIN = "linkedin"
@@ -83,6 +90,7 @@ class GrowthPostChannel(str, enum.Enum):
     EMAIL_UPDATE = "email_update"
     INVESTOR_UPDATE = "investor_update"
     CAMPAIGN_UPDATE = "campaign_update"
+
 
 class AdaptixModule(str, enum.Enum):
     CAD = "Adaptix CAD"
@@ -96,9 +104,11 @@ class AdaptixModule(str, enum.Enum):
     AIR_PILOT = "Adaptix Air Pilot"
     WORKFORCE = "Adaptix Workforce"
 
+
 # ---------------------------------------------------------------------------
 # Shared event envelope
 # ---------------------------------------------------------------------------
+
 
 class _EventBase(BaseModel):
     """Shared envelope fields enforced on every cross-service event."""
@@ -124,108 +134,140 @@ class _EventBase(BaseModel):
     occurred_at: datetime
     payload: dict[str, Any] = Field(default_factory=dict)
 
+
 # ---------------------------------------------------------------------------
 # Intake / CRM events (1-4)
 # ---------------------------------------------------------------------------
 
+
 class IntakeSubmittedEvent(_EventBase):
     event_type: Literal["IntakeSubmitted"] = "IntakeSubmitted"
+
 
 class IntakeClassifiedEvent(_EventBase):
     event_type: Literal["IntakeClassified"] = "IntakeClassified"
 
+
 class LeadScoredEvent(_EventBase):
     event_type: Literal["LeadScored"] = "LeadScored"
 
+
 class CrmContactCreatedEvent(_EventBase):
     event_type: Literal["CrmContactCreated"] = "CrmContactCreated"
+
 
 # ---------------------------------------------------------------------------
 # Onboarding events (5-8)
 # ---------------------------------------------------------------------------
 
+
 class OnboardingSessionCreatedEvent(_EventBase):
     event_type: Literal["OnboardingSessionCreated"] = "OnboardingSessionCreated"
+
 
 class OnboardingStepStartedEvent(_EventBase):
     event_type: Literal["OnboardingStepStarted"] = "OnboardingStepStarted"
 
+
 class OnboardingStepCompletedEvent(_EventBase):
     event_type: Literal["OnboardingStepCompleted"] = "OnboardingStepCompleted"
+
 
 class OnboardingStepBlockedEvent(_EventBase):
     event_type: Literal["OnboardingStepBlocked"] = "OnboardingStepBlocked"
 
+
 # ---------------------------------------------------------------------------
 # Contract / signature events (9-10)
 # ---------------------------------------------------------------------------
+
 
 class ContractSignaturePacketCreatedEvent(_EventBase):
     event_type: Literal["ContractSignaturePacketCreated"] = (
         "ContractSignaturePacketCreated"
     )
 
+
 class ContractSignatureCompletedEvent(_EventBase):
     event_type: Literal["ContractSignatureCompleted"] = "ContractSignatureCompleted"
+
 
 # ---------------------------------------------------------------------------
 # Provisioning + agency lifecycle events (11-15)
 # ---------------------------------------------------------------------------
 
+
 class TenantProvisionedEvent(_EventBase):
     event_type: Literal["TenantProvisioned"] = "TenantProvisioned"
+
 
 class AgencyModuleSelectionUpdatedEvent(_EventBase):
     event_type: Literal["AgencyModuleSelectionUpdated"] = "AgencyModuleSelectionUpdated"
 
+
 class AgencyUnitCreatedEvent(_EventBase):
     event_type: Literal["AgencyUnitCreated"] = "AgencyUnitCreated"
+
 
 class AgencyUserInvitedEvent(_EventBase):
     event_type: Literal["AgencyUserInvited"] = "AgencyUserInvited"
 
+
 class BillingProfileCompletedEvent(_EventBase):
     event_type: Literal["BillingProfileCompleted"] = "BillingProfileCompleted"
+
 
 # ---------------------------------------------------------------------------
 # Training / sandbox / go-live events (16-19)
 # ---------------------------------------------------------------------------
 
+
 class TrainingBookedEvent(_EventBase):
     event_type: Literal["TrainingBooked"] = "TrainingBooked"
+
 
 class SandboxLaunchedEvent(_EventBase):
     event_type: Literal["SandboxLaunched"] = "SandboxLaunched"
 
+
 class GoLiveReadinessCalculatedEvent(_EventBase):
     event_type: Literal["GoLiveReadinessCalculated"] = "GoLiveReadinessCalculated"
 
+
 class GoLiveRequestedEvent(_EventBase):
     event_type: Literal["GoLiveRequested"] = "GoLiveRequested"
+
 
 # ---------------------------------------------------------------------------
 # Growth Post Engine events (20-22)
 # ---------------------------------------------------------------------------
 
+
 class GrowthPostDraftedEvent(_EventBase):
     event_type: Literal["GrowthPostDrafted"] = "GrowthPostDrafted"
+
 
 class GrowthPostApprovedEvent(_EventBase):
     event_type: Literal["GrowthPostApproved"] = "GrowthPostApproved"
 
+
 class GrowthPostPublishedEvent(_EventBase):
     event_type: Literal["GrowthPostPublished"] = "GrowthPostPublished"
+
 
 # ---------------------------------------------------------------------------
 # Founder action event (23)
 # ---------------------------------------------------------------------------
 
+
 class FounderNextActionCreatedEvent(_EventBase):
     event_type: Literal["FounderNextActionCreated"] = "FounderNextActionCreated"
+
 
 # ---------------------------------------------------------------------------
 # Public-API DTOs (intake initialize)
 # ---------------------------------------------------------------------------
+
 
 class ConditionalEmsFireFields(BaseModel):
     number_of_units: int | None = Field(default=None, ge=0)
@@ -237,6 +279,7 @@ class ConditionalEmsFireFields(BaseModel):
     needs_baa: bool | None = None
     requested_modules: list[AdaptixModule] = Field(default_factory=list)
 
+
 class ConditionalBillingCompanyFields(BaseModel):
     monthly_claim_volume: int | None = Field(default=None, ge=0)
     current_clearinghouse: str | None = None
@@ -245,6 +288,7 @@ class ConditionalBillingCompanyFields(BaseModel):
     migration_needed: bool | None = None
     office_ally_status: str | None = None
 
+
 class ConditionalInvestorFields(BaseModel):
     investor_type: str | None = None
     check_size_range: str | None = None
@@ -252,11 +296,13 @@ class ConditionalInvestorFields(BaseModel):
     funding_timeline: str | None = None
     wants_demo: bool | None = None
 
+
 class ConditionalDeveloperFields(BaseModel):
     integration_type: str | None = None
     technical_stack: str | None = None
     expected_api_use: str | None = None
     sandbox_needed: bool | None = None
+
 
 class IntakeInitializeRequest(BaseModel):
     """Request body for ``POST /api/v1/intake/initialize``."""
@@ -278,6 +324,7 @@ class IntakeInitializeRequest(BaseModel):
     investor: ConditionalInvestorFields | None = None
     developer: ConditionalDeveloperFields | None = None
 
+
 class IntakeInitializeResponse(BaseModel):
     """Response body for ``POST /api/v1/intake/initialize``."""
 
@@ -294,9 +341,11 @@ class IntakeInitializeResponse(BaseModel):
     required_next_step: str | None = None
     founder_action_required: bool
 
+
 # ---------------------------------------------------------------------------
 # Billing defaults DTOs (Slice 2)
 # ---------------------------------------------------------------------------
+
 
 class ClearinghouseProvider(str, enum.Enum):
     OFFICE_ALLY = "office_ally"
@@ -306,11 +355,13 @@ class ClearinghouseProvider(str, enum.Enum):
     OTHER = "other"
     NONE_YET = "none_yet"
 
+
 class BillingModelChoice(str, enum.Enum):
     IN_HOUSE = "in_house"
     OUTSOURCED = "outsourced"
     HYBRID = "hybrid"
     NOT_YET_DECIDED = "not_yet_decided"
+
 
 class PayerType(str, enum.Enum):
     MEDICARE = "medicare"
@@ -319,6 +370,7 @@ class PayerType(str, enum.Enum):
     COMMERCIAL = "commercial"
     SELF_PAY = "self_pay"
     WORKERS_COMP = "workers_comp"
+
 
 class BillingDefaultsRequest(BaseModel):
     """Request body for ``POST /api/v1/intake/{intake_id}/billing-defaults``.
@@ -364,6 +416,7 @@ class BillingDefaultsRequest(BaseModel):
     )
     wants_migration_support: bool = Field(default=False)
 
+
 class BillingDefaultsResponse(BaseModel):
     """Response body for billing-defaults POST and GET."""
 
@@ -380,6 +433,7 @@ class BillingDefaultsResponse(BaseModel):
     average_monthly_transport_volume: int | None = None
     wants_migration_support: bool
     profile_complete: bool
+
 
 __all__ = [
     "IntakeSegment",

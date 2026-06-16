@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime, timezone
 
+
 class AdaptixErrorCode(str, Enum):
     """Canonical error codes for Adaptix platform."""
 
@@ -69,6 +70,7 @@ class AdaptixErrorCode(str, Enum):
     AUDIT_WRITE_FAILED = "audit_write_failed"
     PHI_ACCESS_DENIED = "phi_access_denied"
 
+
 class AdaptixValidationErrorDetail(BaseModel):
     """Detail for a single field validation failure."""
 
@@ -76,6 +78,7 @@ class AdaptixValidationErrorDetail(BaseModel):
     message: str
     value: Any | None = None
     code: str = "invalid_value"
+
 
 class AdaptixProviderErrorDetail(BaseModel):
     """Detail for a provider integration failure."""
@@ -85,6 +88,7 @@ class AdaptixProviderErrorDetail(BaseModel):
     message: str
     provider_code: str | None = None
     retryable: bool = False
+
 
 class AdaptixTraceContext(BaseModel):
     """Trace context for correlating errors across services."""
@@ -97,6 +101,7 @@ class AdaptixTraceContext(BaseModel):
     service_name: str | None = None
     route: str | None = None
     duration_ms: float | None = None
+
 
 class AdaptixErrorEnvelope(BaseModel):
     """

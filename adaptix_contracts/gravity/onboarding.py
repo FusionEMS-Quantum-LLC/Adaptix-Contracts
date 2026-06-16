@@ -9,6 +9,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+
 class OnboardingStepState(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -16,11 +17,13 @@ class OnboardingStepState(str, Enum):
     BLOCKED = "blocked"
     SKIPPED = "skipped"
 
+
 class OnboardingSessionState(str, Enum):
     IN_PROGRESS = "in_progress"
     READY_FOR_GO_LIVE = "ready_for_go_live"
     COMPLETE = "complete"
     BLOCKED = "blocked"
+
 
 class OnboardingStepResponse(BaseModel):
     id: str
@@ -34,6 +37,7 @@ class OnboardingStepResponse(BaseModel):
     completed_at: datetime | None = None
     blocker_reason: str | None = None
 
+
 class OnboardingBlockerResponse(BaseModel):
     id: str
     step_key: str
@@ -41,6 +45,7 @@ class OnboardingBlockerResponse(BaseModel):
     severity: str
     resolved: bool
     created_at: datetime
+
 
 class OnboardingSessionResponse(BaseModel):
     id: str
@@ -52,10 +57,12 @@ class OnboardingSessionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class OnboardingCompleteStepResponse(BaseModel):
     step: OnboardingStepResponse
     session_readiness_score: float
     audit_event_id: str
+
 
 class OnboardingCreateBlockerRequest(BaseModel):
     step_key: str

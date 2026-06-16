@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+
 class DispatchConsoleAssignment(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -23,6 +24,7 @@ class DispatchConsoleAssignment(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class CallTakerCoverageRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -32,6 +34,7 @@ class CallTakerCoverageRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class DispatcherCoverageRule(BaseModel):
     id: UUID
@@ -43,6 +46,7 @@ class DispatcherCoverageRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class RadioChannelAssignment(BaseModel):
     id: UUID
@@ -58,6 +62,7 @@ class RadioChannelAssignment(BaseModel):
     updated_at: datetime
     audit_event_id: UUID | None = None
 
+
 class DispatchSupervisorCoverage(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -69,6 +74,7 @@ class DispatchSupervisorCoverage(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
 class MandatoryBreakCoverageRule(BaseModel):
     id: UUID
     tenant_id: UUID
@@ -78,6 +84,7 @@ class MandatoryBreakCoverageRule(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
 
 class HighVolumeForecastWindow(BaseModel):
     id: UUID

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime, timezone
 
+
 class AdaptixEventEnvelope(BaseModel):
     """
     Canonical event envelope for ALL Adaptix domain events.
