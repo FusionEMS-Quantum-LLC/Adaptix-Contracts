@@ -756,7 +756,6 @@ class InventoryDiscrepancyFlaggedEvent(BaseModel):
     counted_items: int
     discrepancy_count: int
     notes: str | None
-    is_controlled_substance: bool
     witness_user_id: uuid.UUID | None
     witness_affirmed_at: datetime | None
     created_at: datetime
