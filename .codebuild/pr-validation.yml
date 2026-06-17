@@ -1,0 +1,74 @@
+# pr-validation — canonical Python-service gate for Adaptix-Core-Service.
+#
+# Fires on: PULL_REQUEST_CREATED | PULL_REQUEST_UPDATED | PULL_REQUEST_REOPENED
+# Owns:     lint + format + typecheck + fast unit tests
+# Slow tests, integration suites, deploy gates → other buildspecs.
+#
+# Provisioned by terraform/environments/prod/codebuild_core_service_gates.tf
+# via the codebuild_repo_gates module. Renaming this file requires a Terraform
+# update — keep the buildspec key in sync.
+
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PYTHONDONTWRITEBYTECODE: "1"
+    PYTHONUNBUFFERED: "1"
+    # CodeBuild provides a clean checkout; secrets/deps/install are handled
+    # by the install phase below, so skip those local-ci.sh stages here.
+    ADAPTIX_CI_SKIP: "secrets,deps,install"
+    # Run pytest with -n auto (pytest-xdist) to parallelise across all vCPUs.
+    # Cuts 2 800-test suite from ~18 min to ~4 min on a 4-vCPU standard:7.0
+    # instance. main-validation intentionally omits this flag so the full
+    # sequential run remains the authoritative pre-deploy signal.
+    ADAPTIX_CI_PARALLEL: "1"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - python --version
+      - pip install --quiet --upgrade pip
+      # Tooling + common platform test deps. aiosqlite + httpx are used by
+      # async test suites across every service and are frequently declared
+      # under a [dev] extra rather than [test], so install them explicitly
+      # to guarantee pytest's clean-container imports resolve.
+      - pip install --quiet ruff mypy pytest pytest-asyncio pytest-cov pytest-xdist aiosqlite httpx
+      - |
+        # Install the backend package + its test/dev extras so pytest's full
+        # dependency set is present in CodeBuild's clean container. Repos vary
+        # ([test] vs [dev]); try both — an absent extra is fine, but a genuine
+        # package build failure surfaces (no blanket mask on the base install).
+        for BD in core/backend backend .; do
+          if [ -f "$BD/pyproject.toml" ]; then
+            pip install --quiet -e "$BD"
+            pip install --quiet -e "$BD[test]" 2>/dev/null || true
+            pip install --quiet -e "$BD[dev]"  2>/dev/null || true
+            break
+          fi
+        done
+      - |
+        # Any requirements files (dev/test) the repo ships.
+        for f in $(find . -maxdepth 3 -name "requirements*.txt" -not -path "*/node_modules/*" -not -path "*/.git/*"); do
+          pip install --quiet -r "$f" || true
+        done
+
+  pre_build:
+    commands:
+      - echo "=== Repo state ==="
+      - git rev-parse HEAD
+      - git status --short
+
+  build:
+    commands:
+      - chmod +x scripts/local-ci.sh
+      - bash scripts/local-ci.sh python
+
+cache:
+  paths:
+    - "/root/.cache/pip/**/*"
+    - ".mypy_cache/**/*"
+    - ".ruff_cache/**/*"
