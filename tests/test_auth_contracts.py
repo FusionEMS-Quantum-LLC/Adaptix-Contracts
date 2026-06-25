@@ -11,6 +11,11 @@ Tests verify that:
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
+import json
+import time
 from uuid import uuid4
 
 import pytest
@@ -271,3 +276,258 @@ def test_from_token_payload_accepts_trusted_tenant_match() -> None:
     )
 
     assert context.tenant_id == tenant_id
+
+
+# ---------------------------------------------------------------------------
+# F-24: gateway HMAC signature verification tests.
+#
+# The signer below reproduces the gateway producer
+# (Adaptix-Core-Service/adaptix-gateway/backend/app/services/auth_context.py
+#  -> sign_context) byte-for-byte so a "valid" context here is what the real
+# gateway would emit, and a "tampered" one is what an attacker would produce.
+# ---------------------------------------------------------------------------
+
+_F24_SECRET = "f24-test-shared-secret"  # noqa: S105 — test-only fixture, not a real secret
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def _sign_gateway_context(
+    *,
+    user_id: str,
+    tenant_id: str,
+    secret: str = _F24_SECRET,
+    iat: int | None = None,
+    exp: int | None = None,
+    iss: str = "adaptix-gateway",
+    aud: str = "adaptix-core",
+    email: str = "user@example.test",
+    roles: list[str] | None = None,
+) -> tuple[str, str]:
+    """Produce (context_b64, signature_hex) exactly like the gateway producer."""
+    now = int(time.time())
+    payload = {
+        "sub": user_id,
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "agency_id": "",
+        "email": email,
+        "roles": list(roles or []),
+        "scopes": [],
+        "iss": iss,
+        "aud": aud,
+        "iat": now if iat is None else iat,
+        "exp": (now + 60) if exp is None else exp,
+        "jti": str(uuid4()),
+    }
+    serialized = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+    context_b64 = _b64url_encode(serialized)
+    sig = hmac.new(
+        secret.encode("utf-8"), context_b64.encode("ascii"), hashlib.sha256
+    ).hexdigest()
+    return context_b64, sig
+
+
+@pytest.fixture()
+def _gateway_secret(monkeypatch: pytest.MonkeyPatch) -> str:
+    monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _F24_SECRET)
+    # Ensure enforcement is OFF by default for these tests unless set explicitly.
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
+    return _F24_SECRET
+
+
+def test_f24_valid_signature_with_secret_passes(_gateway_secret: str) -> None:
+    """Valid gateway signature + secret -> passes, correct AuthContext."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_email="user@example.test",
+            x_user_roles="paramedic",
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+    assert "paramedic" in auth.roles
+
+
+def test_f24_tampered_signature_with_secret_rejected(_gateway_secret: str) -> None:
+    """Invalid/tampered signature + secret -> 401."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
+    tampered_sig = ("0" if sig[0] != "0" else "1") + sig[1:]
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=tampered_sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_f24_absent_signature_enforce_false_passes_unchanged() -> None:
+    """THE non-breaking proof: absent signature + enforce unset -> passes.
+
+    No signature headers, no enforcement flag. Must return the SAME
+    AuthContext as the pre-F-24 behavior (no 401). Secret may or may not be
+    set — does not matter when no signature is present.
+    """
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_email="user@example.test",
+            x_user_roles="billing_admin,user",
+            x_is_founder="false",
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+    assert auth.email == "user@example.test"
+    assert "billing_admin" in auth.roles
+    assert "user" in auth.roles
+    assert auth.is_founder is False
+
+
+def test_f24_absent_signature_enforce_true_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Absent signature + enforce=true -> 401."""
+    monkeypatch.setenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", "true")
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_f24_expired_signature_rejected(_gateway_secret: str) -> None:
+    """Expired timestamp (replay window exceeded) -> 401."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    now = int(time.time())
+    # exp well outside the 5s clock-skew tolerance.
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        iat=now - 120,
+        exp=now - 60,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_f24_signed_identity_mismatch_rejected(_gateway_secret: str) -> None:
+    """Valid signature over a DIFFERENT identity than the headers -> 401."""
+    header_user = uuid4()
+    header_tenant = uuid4()
+    # Signature is valid but signs a different user than the injected header.
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(uuid4()), tenant_id=str(header_tenant)
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(header_user),
+                x_tenant_id=str(header_tenant),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_f24_present_signature_no_secret_allows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Signature present but no shared secret configured -> allow (cannot verify)."""
+    monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+
+
+def test_f24_audience_pin_mismatch_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When ADAPTIX_GATEWAY_EXPECTED_AUDIENCE is set, wrong aud -> 401."""
+    monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _F24_SECRET)
+    monkeypatch.setenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", "adaptix-epcr")
+    user_id = uuid4()
+    tenant_id = uuid4()
+    # Context signed for adaptix-core but this service expects adaptix-epcr.
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id), tenant_id=str(tenant_id), aud="adaptix-core"
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
