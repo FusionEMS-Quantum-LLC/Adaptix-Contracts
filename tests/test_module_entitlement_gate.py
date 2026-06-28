@@ -83,7 +83,11 @@ def _sign_gateway_context(
 
 def _bearer_with_claims(**claims) -> str:
     """Unsigned-decodable bearer (gate decodes with verify_signature=False)."""
-    return pyjwt.encode(claims, "irrelevant", algorithm="HS256")
+    return pyjwt.encode(
+        claims,
+        "irrelevant-but-long-enough-test-secret-123456",
+        algorithm="HS256",
+    )
 
 
 @pytest.fixture

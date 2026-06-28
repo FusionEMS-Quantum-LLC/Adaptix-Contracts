@@ -1,6 +1,6 @@
 # Adaptix Contracts
 
-**Version:** 1.0.2
+**Version:** 1.3.0
 
 Canonical shared cross-domain schema definitions for the Adaptix polyrepo platform.
 
@@ -28,15 +28,18 @@ adaptix_contracts/
     ├── core_contracts.py
     ├── crewlink_contracts.py
     ├── communications_contracts.py
+    ├── contract_onboarding_contracts.py
     ├── epcr_contracts.py
     ├── feature_flag_contracts.py
     ├── field_contracts.py
     ├── fire_contracts.py
+    ├── legal_execution_contracts.py
     ├── metrics_contracts.py
     ├── nemsis_exports.py
     ├── ocr_contracts.py
     ├── patient_portal_contracts.py
     ├── search_contracts.py
+    ├── signature_compliance_contracts.py
     ├── transport_contracts.py
     ├── voice_contracts.py
     └── workflow_contracts.py
@@ -44,7 +47,9 @@ adaptix_contracts/
 
 ## Domain Coverage
 
-This package provides complete schema coverage for **28 domains**:
+This package provides schema coverage across the core platform foundation plus
+operational, legal, signature, and onboarding domains. The authoritative
+inventory is the validator output from `python validate_contracts.py --json`.
 
 ### Core Infrastructure
 - **core** - Base event contracts and auth context
@@ -215,11 +220,14 @@ python validate_contracts.py --json
 ```
 
 This validates:
-- All 558 exports are importable
-- All 461 models are Pydantic v2 compatible
-- All 103 enums are properly defined
-- All expected domains are covered
+- All exported schemas are importable
+- All models are Pydantic v2 compatible
+- All enums are properly defined
+- All expected domains are covered, with any additional domains reported
 - Sample models can be instantiated
+
+The current validator report on this branch emits 638 public exports, 505
+models, and 125 enums.
 
 Run the automated regression suite for export integrity, schema serialization,
 and representative validation failures:
