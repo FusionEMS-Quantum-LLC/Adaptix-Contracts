@@ -34,15 +34,23 @@ class ContractStatus(str, Enum):
     Tracks the state of a contract through its lifecycle.
     """
 
+    DRAFT = "draft"
+    READY_FOR_REVIEW = "ready_for_review"
+    READY_FOR_SIGNATURE = "ready_for_signature"
     PENDING = "pending"
     SENT = "sent"
     VIEWED = "viewed"
     SIGNED = "signed"
+    SIGNED_BY_COUNTERPARTY = "signed_by_counterparty"
+    COUNTERSIGNED = "countersigned"
     COMPLETED = "completed"
+    EXECUTED = "executed"
     DECLINED = "declined"
     EXPIRED = "expired"
     CANCELED = "canceled"
     VOIDED = "voided"
+    SUPERSEDED = "superseded"
+    ARCHIVED = "archived"
 
 
 class TenantContractStatusMap(BaseModel):
@@ -70,6 +78,30 @@ class ContractSignatureEvent(BaseModel):
     signer_name: str = Field(..., description="Name of the signer")
     timestamp: datetime = Field(..., description="Timestamp of the signature")
     contract_id: str = Field(..., description="ID of the contract document")
+    signature_provider: str | None = Field(
+        None, description="Canonical signature provider used for this execution"
+    )
+    signature_request_id: str | None = Field(
+        None, description="Provider request identifier for the signature packet"
+    )
+    verification_id: str | None = Field(
+        None, description="Verification identifier for post-execution audits"
+    )
+    contract_version: str | None = Field(
+        None, description="Executed document version identifier"
+    )
+    template_version: str | None = Field(
+        None, description="Template version used to render the signed artifact"
+    )
+    signed_document_hash: str | None = Field(
+        None, description="Stable hash of the finalized signed document"
+    )
+    signer_ip_address: str | None = Field(
+        None, description="Signer source IP captured at execution time"
+    )
+    signer_user_agent: str | None = Field(
+        None, description="Signer user agent captured at execution time"
+    )
     metadata: dict[str, str] | None = Field(None, description="Additional metadata")
 
 

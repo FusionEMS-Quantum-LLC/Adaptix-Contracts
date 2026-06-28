@@ -105,6 +105,9 @@ def test_contract_onboarding_surface_is_exported() -> None:
         "ContractLifecycleStatus",
         "ContractIntakeRequest",
         "ContractRecord",
+        "TrustSignExecutionRequest",
+        "TrustSignExecutionResponse",
+        "TrustSignCallbackEvent",
         "DropboxSignExecutionRequest",
         "DropboxSignExecutionResponse",
         "DropboxSignCallbackEvent",
@@ -131,3 +134,34 @@ def test_legal_execution_surface_is_exported() -> None:
         assert name in schemas.__all__
         assert hasattr(schemas, name)
         assert getattr(adaptix_contracts, name) is getattr(schemas, name)
+
+
+def test_legal_execution_statuses_cover_execution_lifecycle() -> None:
+    required_statuses = {
+        "draft",
+        "ready_for_review",
+        "ready_for_signature",
+        "signed_by_counterparty",
+        "countersigned",
+        "executed",
+        "superseded",
+        "archived",
+    }
+    actual = {status.value for status in schemas.ContractStatus}
+    assert required_statuses.issubset(actual)
+
+
+def test_contract_onboarding_statuses_cover_signature_lifecycle() -> None:
+    required_statuses = {
+        "draft",
+        "sent_for_signature",
+        "viewed",
+        "signed_by_counterparty",
+        "countersigned",
+        "executed",
+        "voided",
+        "superseded",
+        "archived",
+    }
+    actual = {status.value for status in schemas.ContractLifecycleStatus}
+    assert required_statuses.issubset(actual)

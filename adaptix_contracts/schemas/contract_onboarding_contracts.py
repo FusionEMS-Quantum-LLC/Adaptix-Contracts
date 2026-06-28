@@ -1,9 +1,9 @@
 """Contract onboarding lifecycle contracts for Adaptix Contracts.
 
-Adaptix Contracts is the system of record for contract onboarding. Dropbox
-Sign is only the embedded signature provider. These schemas define the shared
-contract intake, status, signature callback, activation, and audit events used
-by Web, Billing, Core provisioning, and Founder workflows.
+Adaptix Contracts is the system of record for contract onboarding. TrustSign is
+the canonical signature provider. Legacy ``DropboxSign*`` schema names remain
+for backward compatibility, but new producers and consumers should use the
+provider-neutral / TrustSign-named DTOs.
 """
 
 from __future__ import annotations
@@ -20,12 +20,19 @@ class ContractLifecycleStatus(str, Enum):
     PENDING_REVIEW = "pending_review"
     READY_FOR_SIGNATURE = "ready_for_signature"
     SENT_FOR_SIGNATURE = "sent_for_signature"
+    VIEWED = "viewed"
     SIGNED = "signed"
+    SIGNED_BY_COUNTERPARTY = "signed_by_counterparty"
+    COUNTERSIGNED = "countersigned"
+    EXECUTED = "executed"
     REJECTED = "rejected"
     EXPIRED = "expired"
     ACTIVATED = "activated"
     AMENDED = "amended"
     CANCELED = "canceled"
+    VOIDED = "voided"
+    SUPERSEDED = "superseded"
+    ARCHIVED = "archived"
     RENEWAL_PENDING = "renewal_pending"
 
 
@@ -91,36 +98,71 @@ class ContractRecord(BaseModel):
     billing_rules: ContractBillingRules
     module_terms: ContractModuleTerms
     dropbox_signature_request_id: str | None = None
+    signature_provider: str | None = Field(default=None, max_length=64)
+    signature_request_id: str | None = Field(default=None, max_length=255)
+    trustsign_request_id: str | None = Field(default=None, max_length=255)
+    verification_id: str | None = Field(default=None, max_length=255)
+    template_id: str | None = Field(default=None, max_length=128)
+    template_version: str | None = Field(default=None, max_length=64)
+    document_version: str | None = Field(default=None, max_length=64)
+    signed_document_hash: str | None = Field(default=None, max_length=255)
     signed_artifact_url: str | None = None
     created_at: datetime
     updated_at: datetime
     activated_at: datetime | None = None
 
 
-class DropboxSignExecutionRequest(BaseModel):
+class TrustSignExecutionRequest(BaseModel):
     contract_id: UUID
     embedded_signing: bool = True
     signer_name: str = Field(..., min_length=1)
     signer_email: EmailStr
+    signer_title: str | None = Field(default=None, min_length=1, max_length=255)
+    signer_role: str | None = Field(default=None, min_length=1, max_length=255)
+    template_id: str | None = Field(default=None, min_length=1, max_length=128)
+    template_version: str | None = Field(default=None, min_length=1, max_length=64)
 
 
-class DropboxSignExecutionResponse(BaseModel):
+class TrustSignExecutionResponse(BaseModel):
     contract_id: UUID
     status: ContractLifecycleStatus
-    provider: str = "dropbox_sign"
+    provider: str = "trustsign"
     signature_request_id: str | None = None
+    verification_id: str | None = None
+    template_id: str | None = None
+    template_version: str | None = None
+    document_version: str | None = None
     signature_request_hash: str | None = None
+    signed_document_hash: str | None = None
     sign_url: str | None = None
     unavailable_reason: str | None = None
 
 
-class DropboxSignCallbackEvent(BaseModel):
+class TrustSignCallbackEvent(BaseModel):
     event_type: str
     event_hash: str
     event_time: str
     signature_request_id: str
     signer_email: EmailStr | None = None
+    verification_id: str | None = None
+    signed_document_hash: str | None = None
+    signer_ip_address: str | None = None
+    signer_user_agent: str | None = None
     signed_artifact_url: str | None = None
+
+
+class DropboxSignExecutionRequest(TrustSignExecutionRequest):
+    """Legacy compatibility alias for older Dropbox Sign consumers."""
+
+
+class DropboxSignExecutionResponse(TrustSignExecutionResponse):
+    """Legacy compatibility alias for older Dropbox Sign consumers."""
+
+    provider: str = "dropbox_sign"
+
+
+class DropboxSignCallbackEvent(TrustSignCallbackEvent):
+    """Legacy compatibility alias for older Dropbox Sign consumers."""
 
 
 class ContractActivationRequest(BaseModel):
@@ -145,5 +187,10 @@ class ContractStatusChangedEvent(BaseModel):
     tenant_id: UUID | None = None
     old_status: ContractLifecycleStatus
     new_status: ContractLifecycleStatus
+    signature_provider: str | None = Field(default=None, max_length=64)
+    verification_id: str | None = Field(default=None, max_length=255)
+    template_version: str | None = Field(default=None, max_length=64)
+    document_version: str | None = Field(default=None, max_length=64)
+    signed_document_hash: str | None = Field(default=None, max_length=255)
     correlation_id: str | None = None
     occurred_at: datetime

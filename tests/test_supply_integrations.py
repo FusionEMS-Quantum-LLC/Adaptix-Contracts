@@ -13,9 +13,16 @@ import pytest
 import httpx
 from datetime import datetime, timezone
 from uuid import uuid4
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 pytest_plugins = ("pytest_asyncio",)
+
+
+def _mock_success_response(payload: dict | None = None) -> Mock:
+    response = Mock()
+    response.raise_for_status = Mock()
+    response.json = Mock(return_value=payload or {})
+    return response
 
 
 @pytest.mark.asyncio
@@ -25,14 +32,12 @@ async def test_notification_client_low_stock_alert():
 
     tenant_id = uuid4()
 
-    with patch("httpx.AsyncClient.post") as mock_post:
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
-        mock_response.json = AsyncMock(return_value={"id": "notif-123"})
+    with patch("httpx.AsyncClient") as mock_client_class:
+        mock_client = AsyncMock()
+        mock_response = _mock_success_response({"id": "notif-123"})
 
-        mock_post.return_value.__aenter__.return_value.post = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value = mock_client
 
         result = await NotificationClient.send_low_stock_alert(
             tenant_id=tenant_id,
@@ -58,8 +63,7 @@ async def test_notification_client_expiration_alert():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -85,8 +89,7 @@ async def test_notification_client_recall_alert():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -112,8 +115,7 @@ async def test_notification_client_discrepancy_alert():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -139,8 +141,7 @@ async def test_search_client_index_inventory_item():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -169,8 +170,7 @@ async def test_search_client_index_medication_lot():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -197,8 +197,7 @@ async def test_search_client_index_narcotic_vial():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -226,8 +225,7 @@ async def test_analytics_client_publish_usage_event():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -253,8 +251,7 @@ async def test_analytics_client_publish_waste_event():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -279,8 +276,7 @@ async def test_analytics_client_publish_risk_event():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -305,8 +301,7 @@ async def test_audit_client_log_mutation():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client
@@ -334,8 +329,7 @@ async def test_audit_client_log_approval():
 
     with patch("httpx.AsyncClient") as mock_client_class:
         mock_client = AsyncMock()
-        mock_response = AsyncMock()
-        mock_response.raise_for_status = AsyncMock()
+        mock_response = _mock_success_response()
 
         mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
         mock_client_class.return_value = mock_client

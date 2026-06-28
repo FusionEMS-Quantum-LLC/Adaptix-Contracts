@@ -20,6 +20,7 @@ from adaptix_contracts.schemas import (
     ClaimStatus,
     ClearinghouseProvider,
     DomainEvent,
+    TrustSignExecutionResponse,
     UserAuthContext,
     WorkflowContext,
     WorkflowExecution,
@@ -186,3 +187,26 @@ def test_claim_created_event_accepts_supported_clearinghouse_enum_values() -> No
     """Keep enum serialization stable for downstream event consumers."""
 
     assert ClearinghouseProvider.OFFICE_ALLY.value == "office_ally"
+
+
+def test_trustsign_execution_response_round_trip_with_evidence_fields() -> None:
+    payload = TrustSignExecutionResponse(
+        contract_id=uuid4(),
+        status="signed",
+        signature_request_id="req_123",
+        verification_id="verify_123",
+        template_id="msa_v2",
+        template_version="2.1",
+        document_version="2026-06-27",
+        signature_request_hash="req_hash",
+        signed_document_hash="sha256:abc123",
+        sign_url="https://api.adaptixcore.com/api/v1/trustsign/sign/token",
+    )
+
+    restored = TrustSignExecutionResponse.model_validate(
+        payload.model_dump(mode="json")
+    )
+
+    assert restored.provider == "trustsign"
+    assert restored.verification_id == "verify_123"
+    assert restored.signed_document_hash == "sha256:abc123"
