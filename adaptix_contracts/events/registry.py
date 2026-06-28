@@ -8,6 +8,9 @@ from adaptix_contracts.scheduling.events import (
     ALL_SCHEDULING_EVENTS,
 )
 
+BILLING_CLAIM_UPDATED: Final[str] = "billing.claim.updated"
+EPCR_CHART_UPDATED: Final[str] = "epcr.chart.updated"
+
 FIRE_INCIDENT_CREATED: Final[str] = "fire.incident.created"
 FIRE_INCIDENT_UPDATED: Final[str] = "fire.incident.updated"
 FIRE_INCIDENT_CANCELLED: Final[str] = "fire.incident.cancelled"
@@ -60,6 +63,8 @@ SCHEDULING_EVENTS = ALL_SCHEDULING_EVENTS
 # Full Registry
 # ---------------------------------------------------------------------------
 ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
+    BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
+    EPCR_CHART_UPDATED: {"version": "1.0", "source_service": "epcr"},
     FIRE_INCIDENT_CREATED: {"version": "1.0", "source_service": "adaptix-fire"},
     FIRE_INCIDENT_UPDATED: {"version": "1.0", "source_service": "adaptix-fire"},
     FIRE_INCIDENT_CANCELLED: {"version": "1.0", "source_service": "adaptix-fire"},
@@ -143,6 +148,8 @@ def get_all_events() -> list:
 __all__ = [
     "ALL_EVENTS",
     "ALL_REGISTERED_EVENTS",
+    "BILLING_CLAIM_UPDATED",
+    "EPCR_CHART_UPDATED",
     "FIRE_BENCHMARK_TIMELINE_UPDATED",
     "FIRE_INCIDENT_STATUS_UPDATED",
     "FIRE_INVESTIGATION_READINESS_UPDATED",
