@@ -305,6 +305,7 @@ def _sign_gateway_context(
     aud: str = "adaptix-core",
     email: str = "user@example.test",
     roles: list[str] | None = None,
+    is_founder: bool = False,
 ) -> tuple[str, str]:
     """Produce (context_b64, signature_hex) exactly like the gateway producer."""
     now = int(time.time())
@@ -316,6 +317,7 @@ def _sign_gateway_context(
         "email": email,
         "roles": list(roles or []),
         "scopes": [],
+        "is_founder": bool(is_founder),
         "iss": iss,
         "aud": aud,
         "iat": now if iat is None else iat,
@@ -342,10 +344,13 @@ def _gateway_secret(monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 def test_f24_valid_signature_with_secret_passes(_gateway_secret: str) -> None:
-    """Valid gateway signature + secret -> passes, correct AuthContext."""
+    """Valid gateway signature + secret -> passes; signed roles are authoritative."""
     user_id = uuid4()
     tenant_id = uuid4()
-    ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
+    # The signed context carries the role; the header agrees with it.
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id), tenant_id=str(tenant_id), roles=["paramedic"]
+    )
 
     auth = asyncio.run(
         get_auth_context(
@@ -362,6 +367,97 @@ def test_f24_valid_signature_with_secret_passes(_gateway_secret: str) -> None:
     assert auth.user_id == user_id
     assert auth.tenant_id == tenant_id
     assert "paramedic" in auth.roles
+
+
+def test_f24_signed_roles_authoritative_over_spoofed_headers(
+    _gateway_secret: str,
+) -> None:
+    """A verified signature makes signed roles/founder authoritative.
+
+    Security invariant: with a valid gateway signature present, the spoofable
+    X-User-Roles / X-Is-Founder headers MUST be ignored. An in-VPC actor who
+    replays a valid signature for their OWN (non-founder) identity cannot add
+    'founder' or extra roles by also sending spoofed headers.
+    """
+    user_id = uuid4()
+    tenant_id = uuid4()
+    # Signed context grants only 'paramedic' and is NOT founder.
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        roles=["paramedic"],
+        is_founder=False,
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            # Spoofed escalation attempt via unsigned headers:
+            x_user_roles="founder,billing_admin",
+            x_is_founder="true",
+            x_user_email="attacker@evil.test",
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    # Authoritative signed claims win; spoofed header escalation is dropped.
+    assert auth.roles == ["paramedic"]
+    assert auth.is_founder is False
+    assert "founder" not in {r.lower() for r in auth.roles}
+    assert "billing_admin" not in auth.roles
+    assert auth.email == "user@example.test"  # signed email, not the spoofed one
+
+
+def test_f24_signed_is_founder_claim_honored(_gateway_secret: str) -> None:
+    """A signed is_founder=True claim yields is_founder + 'founder' role."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        roles=["admin"],
+        is_founder=True,
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_is_founder="false",  # header says NOT founder; signed claim wins
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.is_founder is True
+    assert "founder" in {r.lower() for r in auth.roles}
+    assert "admin" in auth.roles
+
+
+def test_f24_signed_founder_role_sets_is_founder(_gateway_secret: str) -> None:
+    """'founder' present in signed roles sets is_founder even if claim omitted."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id), tenant_id=str(tenant_id), roles=["founder", "super_admin"]
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.is_founder is True
+    assert "founder" in {r.lower() for r in auth.roles}
 
 
 def test_f24_tampered_signature_with_secret_rejected(_gateway_secret: str) -> None:
