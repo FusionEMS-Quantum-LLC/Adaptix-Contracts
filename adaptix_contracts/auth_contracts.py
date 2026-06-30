@@ -27,9 +27,14 @@ request as ``X-Adaptix-Auth-Context`` + ``X-Adaptix-Auth-Signature`` (see
 ``Adaptix-Core-Service/adaptix-gateway/.../app/services/auth_context.py``).
 ``get_auth_context`` now verifies that signature when present, so an in-VPC
 actor that reaches a service directly cannot forge identity / tenant / founder.
-Verification is NON-BREAKING by default: an absent signature is allowed
-(byte-for-byte unchanged behavior) unless ``ADAPTIX_GATEWAY_HMAC_ENFORCE`` is
-set to ``"true"``. See the F-24 block in ``get_auth_context`` for details.
+When the signature verifies, the signed payload is AUTHORITATIVE for
+``roles`` / ``email`` / ``is_founder`` — the individually spoofable
+``X-User-Roles`` / ``X-Is-Founder`` / ``X-User-Email`` headers are ignored, so a
+holder of a valid signature for their own identity cannot escalate roles or
+founder status via unsigned headers. Verification is NON-BREAKING by default:
+an absent signature is allowed (byte-for-byte unchanged behavior, headers used)
+unless ``ADAPTIX_GATEWAY_HMAC_ENFORCE`` is set to ``"true"``. See the F-24 block
+in ``get_auth_context`` for details.
 
 The RS256 gateway-context JWT mode that appeared in prior versions of this
 module has been removed. Services that reference ``build_gateway_context_jwt``
@@ -209,6 +214,12 @@ async def get_auth_context(
     # is explicitly turned on.
     # ------------------------------------------------------------------
     global _warned_absent_signature, _warned_missing_secret
+    # Holds the verified gateway payload when (and only when) a present signature
+    # was successfully verified against the configured shared secret. When set,
+    # it is the AUTHORITATIVE source for roles / email / founder status — the
+    # individually spoofable X-User-Roles / X-Is-Founder / X-User-Email headers
+    # are then ignored.
+    verified_payload: dict | None = None
     signature_present = has_gateway_signature(
         context_b64=x_adaptix_auth_context,
         signature_hex=x_adaptix_auth_signature,
@@ -254,6 +265,9 @@ async def get_auth_context(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Gateway auth context does not match identity headers.",
                 )
+            # Verification + identity-match succeeded: the signed payload is now
+            # the authoritative source for roles / email / founder status.
+            verified_payload = verified
         else:
             # Behavior 3: signature present but no secret to verify with.
             # Cannot verify -> allow as before, warn once.
@@ -286,19 +300,45 @@ async def get_auth_context(
             )
             _warned_absent_signature = True
 
-    roles = _parse_roles(x_user_roles)
-    is_founder_flag = (x_is_founder or "false").strip().lower() in ("true", "1", "yes")
-    # If the X-Is-Founder flag is set, ensure "founder" is in roles.
-    if is_founder_flag and "founder" not in {r.lower() for r in roles}:
-        roles = ["founder", *roles]
-    # Conversely, if "founder" is in roles, set is_founder.
-    if "founder" in {r.lower() for r in roles}:
-        is_founder_flag = True
+    if verified_payload is not None:
+        # Authoritative path: derive roles / email / founder from the verified
+        # signed context. Spoofable X-User-Roles / X-Is-Founder / X-User-Email
+        # headers are ignored so an in-VPC actor cannot escalate without a
+        # signature over those exact claims.
+        signed_roles = verified_payload.get("roles")
+        roles = (
+            [str(r).strip() for r in signed_roles if str(r).strip()]
+            if isinstance(signed_roles, list)
+            else []
+        )
+        email = str(verified_payload.get("email") or "").strip()
+        is_founder_flag = bool(verified_payload.get("is_founder")) or (
+            "founder" in {r.lower() for r in roles}
+        )
+        if is_founder_flag and "founder" not in {r.lower() for r in roles}:
+            roles = ["founder", *roles]
+    else:
+        # Unsigned / legacy path (no verifiable signature): trust the injected
+        # headers exactly as before. Reachable only when the absent-signature
+        # path is allowed (enforcement off) or no shared secret is configured.
+        roles = _parse_roles(x_user_roles)
+        email = (x_user_email or "").strip()
+        is_founder_flag = (x_is_founder or "false").strip().lower() in (
+            "true",
+            "1",
+            "yes",
+        )
+        # If the X-Is-Founder flag is set, ensure "founder" is in roles.
+        if is_founder_flag and "founder" not in {r.lower() for r in roles}:
+            roles = ["founder", *roles]
+        # Conversely, if "founder" is in roles, set is_founder.
+        if "founder" in {r.lower() for r in roles}:
+            is_founder_flag = True
 
     return AuthContext(
         user_id=user_uuid,
         tenant_id=tenant_uuid,
-        email=(x_user_email or "").strip(),
+        email=email,
         roles=roles,
         is_founder=is_founder_flag,
     )
