@@ -4,6 +4,59 @@ All notable changes to `adaptix-contracts` are recorded in this file.
 
 The format follows Keep a Changelog principles and uses semantic versioning.
 
+Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
+after the changelog fell behind the `__version__` / `pyproject.toml` version.
+Each item below is attributed to the PR that introduced it. The current
+package version is `1.3.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [1.3.0] - unreleased (accumulated on the 1.3.0 line)
+
+`__version__` was bumped to `1.3.0` in #24. The changes below all landed on the
+1.3.0 line without a further version bump; they are grouped here for consumers.
+
+### Added
+- Canonical TrustSign HTTP client in the shared package (#24).
+- New domain schemas: narcotics, RBAC, supply-integrations, and `asyncio_mode` (#26).
+- `require_module_entitlement` shared gate for module-services (#35).
+- `require_any_module_entitlement(*slugs)` multi-slug entitlement gate.
+- `ClaimStatusUpdatedEvent` enriched for the ePCR back-channel (#33, #39).
+- `NarcoticAccessType` expanded with `ADMINISTER` / `WASTE` / `TRANSFER_OUT` / `TRANSFER_IN`.
+- Canonical event registry entries `billing.claim.updated` and `epcr.chart.updated` (#76).
+
+### Changed
+- **Auth trust model:** replaced the custom HMAC/RS256 gateway-context proof with
+  the AWS API Gateway injected-header contract (`X-User-Id` / `X-Tenant-Id` /
+  `X-User-Roles` / `X-Is-Founder`), with `build_gateway_context_jwt` retained as a
+  loud-failing shim (#45, #46).
+- Modernized typing to PEP 604/585 and replaced `datetime.utcnow` with
+  timezone-aware `datetime.now(timezone.utc)` (#37).
+
+### Security
+- **F-24:** `get_auth_context` now verifies the gateway HMAC signature
+  (`X-Adaptix-Auth-Context` + `X-Adaptix-Auth-Signature`) when present. A present
+  signature that fails verification returns 401. Behavior is **non-breaking and
+  default-off**: an absent signature is allowed unless
+  `ADAPTIX_GATEWAY_HMAC_ENFORCE=true` (#74).
+- When a gateway signature verifies, the signed payload is **authoritative** for
+  `roles` / `email` / `is_founder`; the individually spoofable `X-User-Roles` /
+  `X-Is-Founder` / `X-User-Email` headers are ignored so a holder of a valid
+  signature for their own identity cannot escalate roles or founder status (#79).
+- `module_entitlement_gate` trusts gateway-verified identity (non-breaking) (#75).
+- SEC-004: fixed an undefined `Optional` and restored green canonical CI (#58).
+
+## [1.2.0] - 2026-05
+
+### Added
+- Dispatch, platform event bus, and audit domain action schemas (#20).
+
+## [1.1.0] - 2026-05
+
+### Added
+- Finance and ledger domain contracts, bringing 15 services into compliance (#13).
+
+### Fixed
+- Aligned `__version__` with `pyproject.toml` at 1.1.0 (#13).
+
 ## [1.0.2] - 2026-05-08
 
 ### Added
