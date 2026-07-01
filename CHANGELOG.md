@@ -7,7 +7,40 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `1.3.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `1.4.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [1.4.0] - unreleased
+
+### Security (BREAKING default in production — coordinate fleet rollout)
+- **APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST:** `get_auth_context` is now
+  **fail-closed by default in production** for UNSIGNED requests. Previously,
+  with `ADAPTIX_GATEWAY_HMAC_ENFORCE` unset, forged `X-User-Id` / `X-Tenant-Id`
+  / `X-Is-Founder` headers on an unsigned request were trusted — live-exploitable
+  on ALB-direct routes that bypass the gateway. Now, when `ENVIRONMENT` is
+  `production`/`prod`, an absent gateway signature returns **401** unless
+  `ADAPTIX_GATEWAY_HMAC_ENFORCE` is EXPLICITLY set to a false-y value
+  (`false`/`0`/`no`) as a migration opt-out. Non-production keeps the previous
+  default (absent signature allowed) for dev/test ergonomics. An explicit
+  `true`/`1`/`yes` forces enforcement in any environment.
+- **Behavior 3 fail-closed in production:** a gateway signature that is PRESENT
+  but cannot be verified because the service has no `ADAPTIX_GATEWAY_SHARED_SECRET`
+  configured now returns **503** in production instead of allow-with-warning. A
+  signed request that cannot be verified must not be trusted. Non-production
+  keeps allow-with-warning.
+- **Audience pinning** on the verified (B1) path is unchanged and remains
+  additive: when `ADAPTIX_GATEWAY_EXPECTED_AUDIENCE` is set, the verified signed
+  context's `aud` must match (401 on mismatch); no-op when unset. Enforced by
+  `verify_gateway_signature`.
+- **Unchanged:** the verified-signature path (present signature + configured
+  secret → HMAC verify, replay window, identity-match, signed payload
+  authoritative for roles/email/founder) and the tampered/expired/identity-
+  mismatch → 401 behaviors are untouched.
+
+**Rollout warning:** this is a fleet-wide behavior change. Before the fleet
+re-pins this Contracts version, every domain service that has a legitimate
+UNSIGNED intra-VPC caller MUST set `ADAPTIX_GATEWAY_HMAC_ENFORCE=false`
+explicitly, or it will begin returning 401 in production. Coordinate via the
+platform orchestrator; do not blind-merge and fleet-deploy.
 
 ## [1.3.0] - unreleased (accumulated on the 1.3.0 line)
 

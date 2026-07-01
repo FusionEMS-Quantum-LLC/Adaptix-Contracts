@@ -31,10 +31,19 @@ When the signature verifies, the signed payload is AUTHORITATIVE for
 ``roles`` / ``email`` / ``is_founder`` — the individually spoofable
 ``X-User-Roles`` / ``X-Is-Founder`` / ``X-User-Email`` headers are ignored, so a
 holder of a valid signature for their own identity cannot escalate roles or
-founder status via unsigned headers. Verification is NON-BREAKING by default:
-an absent signature is allowed (byte-for-byte unchanged behavior, headers used)
-unless ``ADAPTIX_GATEWAY_HMAC_ENFORCE`` is set to ``"true"``. See the F-24 block
-in ``get_auth_context`` for details.
+founder status via unsigned headers.
+
+Fail-closed-by-default in production (APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST)
+----------------------------------------------------------------------------
+In production (``ENVIRONMENT`` in {``production``, ``prod``}) an UNSIGNED request
+is REJECTED by default (401): an ALB-direct / in-VPC actor cannot reach a service
+and have forged ``X-User-Id`` / ``X-Tenant-Id`` / ``X-Is-Founder`` headers
+trusted. A service that still has a legitimate UNSIGNED intra-VPC caller opts OUT
+explicitly by setting ``ADAPTIX_GATEWAY_HMAC_ENFORCE=false`` (migration escape
+hatch). Outside production the default stays OFF so local development and test
+suites work without a full gateway. Likewise, in production a signature that is
+PRESENT but cannot be verified (no shared secret configured) is REJECTED
+(fail-closed) rather than trusted. See the F-24 block in ``get_auth_context``.
 
 The RS256 gateway-context JWT mode that appeared in prior versions of this
 module has been removed. Services that reference ``build_gateway_context_jwt``
@@ -65,26 +74,34 @@ logger = logging.getLogger(__name__)
 # is then disabled so every request MUST arrive via API Gateway.
 _ENV_VAR = "ENVIRONMENT"
 
-# Forensic fix F-24 — gateway HMAC verification of injected identity headers.
+# Forensic fix F-24 / APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST — gateway HMAC
+# verification of injected identity headers.
 #
-# Background: ``get_auth_context`` trusts X-User-Id / X-Tenant-Id / X-Is-Founder
+# Background: ``get_auth_context`` trusted X-User-Id / X-Tenant-Id / X-Is-Founder
 # WITHOUT verifying the gateway's HMAC signature. Any in-VPC actor that reaches
-# a service directly can spoof identity / tenant / founder. The gateway DOES
-# sign every authenticated request (X-Adaptix-Auth-Context + -Signature). This
-# adds CONSUMER-side verification with three behaviors:
+# a service directly (e.g. ALB-direct device / voice routes that bypass the
+# gateway) can spoof identity / tenant / founder. The gateway DOES sign every
+# authenticated request (X-Adaptix-Auth-Context + -Signature). This adds
+# CONSUMER-side verification with three behaviors:
 #
 #   1. Signature PRESENT + shared secret configured -> VERIFY (HMAC-SHA256 over
 #      the gateway's signed context, with replay window). Failure -> 401. This
 #      closes the "forge a valid signature" path.
-#   2. Signature ABSENT -> behavior gated by ``ADAPTIX_GATEWAY_HMAC_ENFORCE``
-#      (default "false"). Default/false -> ALLOW exactly as before (warn once).
-#      "true" -> 401 (later founder-gated ops flip, after every caller signs).
-#   3. No shared secret configured -> ALLOW as before (cannot verify) + warn.
-#      Never hard-crash on a missing secret.
+#   2. Signature ABSENT -> behavior gated by ``ADAPTIX_GATEWAY_HMAC_ENFORCE``.
+#      In PRODUCTION the default is fail-closed: an absent signature is REJECTED
+#      (401) unless ``ADAPTIX_GATEWAY_HMAC_ENFORCE`` is EXPLICITLY set to a
+#      false-y value (opt-out migration escape hatch for a service with a legit
+#      unsigned intra-VPC caller). Outside production the default stays OFF ->
+#      ALLOW exactly as before (warn once) so dev/test work without a gateway.
+#      An explicit "true"/"1"/"yes" forces enforcement in any environment.
+#   3. Signature PRESENT but no shared secret configured -> in PRODUCTION this is
+#      fail-closed (503): a signed request that cannot be verified must not be
+#      trusted. Outside production it is ALLOW + warn (cannot verify) as before.
+#      Never hard-crash on a missing secret in non-production.
 #
-# Default runtime behavior after merge is byte-for-byte identical to before for
-# both signed-and-valid and unsigned requests (see test_auth_contracts.py
-# F-24 cases). Enforcement is opt-in via the env flag below.
+# The prod default is fail-closed on unsigned requests. Before the fleet re-pins
+# this version, each service with a legitimate UNSIGNED intra-VPC caller must set
+# ``ADAPTIX_GATEWAY_HMAC_ENFORCE=false`` explicitly (see PR rollout warning).
 _GATEWAY_HMAC_ENFORCE_ENV = "ADAPTIX_GATEWAY_HMAC_ENFORCE"
 
 # One-shot guards so the absent-signature / missing-secret warnings do not
@@ -93,12 +110,34 @@ _warned_absent_signature = False
 _warned_missing_secret = False
 
 
+_TRUEY = ("true", "1", "yes")
+_FALSEY = ("false", "0", "no")
+
+
 def _gateway_hmac_enforce() -> bool:
-    return os.getenv(_GATEWAY_HMAC_ENFORCE_ENV, "").strip().lower() in (
-        "true",
-        "1",
-        "yes",
-    )
+    """Whether an ABSENT gateway signature must be rejected (fail-closed).
+
+    Resolution order (safe-by-default in production):
+
+    * ``ADAPTIX_GATEWAY_HMAC_ENFORCE`` explicitly true-y (``true``/``1``/``yes``)
+      -> ``True`` in any environment (force enforcement).
+    * ``ADAPTIX_GATEWAY_HMAC_ENFORCE`` explicitly false-y (``false``/``0``/``no``)
+      -> ``False`` in any environment. This is the opt-out migration escape
+      hatch for a service that still has a legitimate UNSIGNED intra-VPC caller.
+    * Unset / blank / unrecognized -> environment default: ``True`` in
+      production (``ENVIRONMENT`` in {``production``, ``prod``}), else ``False``.
+
+    The production default is fail-closed: an unsigned request is rejected unless
+    a service explicitly opts out. This closes the forged-header trust path on
+    ALB-direct / in-VPC routes that bypass the gateway.
+    """
+    raw = os.getenv(_GATEWAY_HMAC_ENFORCE_ENV, "").strip().lower()
+    if raw in _TRUEY:
+        return True
+    if raw in _FALSEY:
+        return False
+    # Unset / blank / unrecognized: fail-closed in production, off elsewhere.
+    return _is_production()
 
 
 class AuthContext(BaseModel):
@@ -229,6 +268,11 @@ async def get_auth_context(
     if signature_present:
         if secret is not None:
             # Behavior 1: present + secret -> verify. Failure -> 401.
+            # ``verify_gateway_signature`` also enforces audience pinning on this
+            # verified path when ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` is set
+            # (string-equal or list-membership); it is a no-op when unset. That
+            # is the only place audience is (or should be) checked — an unsigned
+            # request has no trustworthy audience to pin.
             try:
                 verified = verify_gateway_signature(
                     context_b64=x_adaptix_auth_context or "",
@@ -270,12 +314,28 @@ async def get_auth_context(
             verified_payload = verified
         else:
             # Behavior 3: signature present but no secret to verify with.
-            # Cannot verify -> allow as before, warn once.
+            # A signed request that cannot be verified must not be trusted.
+            # Production: fail-closed (503 — misconfiguration, not the caller's
+            # fault, but we refuse to trust an unverifiable signed context).
+            # Non-production: allow as before, warn once (dev ergonomics).
+            if _is_production():
+                logger.error(
+                    "gateway signature present but ADAPTIX_GATEWAY_SHARED_SECRET "
+                    "is not configured in production; refusing to trust an "
+                    "unverifiable signed context (fail-closed)."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "Gateway auth context signature present but the service "
+                        "shared secret is not configured; cannot verify."
+                    ),
+                )
             if not _warned_missing_secret:
                 logger.warning(
                     "gateway signature present but ADAPTIX_GATEWAY_SHARED_SECRET "
                     "is not configured; cannot verify. Allowing request "
-                    "(configure the secret to enable verification)."
+                    "(non-production; configure the secret to enable verification)."
                 )
                 _warned_missing_secret = True
     else:
@@ -386,7 +446,9 @@ __all__ = [
 ]
 
 # Env flag (re-exported for ops/tests) controlling absent-signature rejection.
-# Default false: absent signature is allowed (unchanged behavior). Set "true"
-# only after every caller is confirmed to sign requests via the gateway.
+# Production default: fail-closed (absent signature -> 401) unless this is
+# EXPLICITLY set to a false-y value (``false``/``0``/``no``) to opt a service
+# with a legitimate unsigned intra-VPC caller out during migration. Outside
+# production the default is off (absent signature allowed) for dev/test.
 ADAPTIX_GATEWAY_HMAC_ENFORCE_ENV = _GATEWAY_HMAC_ENFORCE_ENV
 __all__.append("ADAPTIX_GATEWAY_HMAC_ENFORCE_ENV")
