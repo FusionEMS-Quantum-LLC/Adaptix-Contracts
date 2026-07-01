@@ -27,6 +27,27 @@ from adaptix_contracts.auth_contracts import (
 from adaptix_contracts.auth.context import AdaptixAuthContext
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_gateway_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin a deterministic non-production baseline for every test.
+
+    ``get_auth_context`` now fail-closes on UNSIGNED requests when
+    ``ENVIRONMENT`` is ``production``/``prod`` (APPSEC-CONTRACTS-UNSIGNED-HEADER-
+    TRUST). Without this fixture, a CI runner that sets ``ENVIRONMENT=production``
+    in the ambient environment would flip the unsigned happy-path tests to 401,
+    making the suite environment-dependent and flaky.
+
+    Clearing these vars before each test makes the default baseline explicit:
+    non-production, enforcement off, no shared secret, no audience pin. Tests
+    that need production / a secret / an audience pin set them explicitly with
+    ``monkeypatch.setenv`` inside the test, which overrides this baseline.
+    """
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
+
+
 # ---------------------------------------------------------------------------
 # Happy-path tests
 # ---------------------------------------------------------------------------
@@ -481,13 +502,19 @@ def test_f24_tampered_signature_with_secret_rejected(_gateway_secret: str) -> No
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_f24_absent_signature_enforce_false_passes_unchanged() -> None:
-    """THE non-breaking proof: absent signature + enforce unset -> passes.
+def test_f24_absent_signature_enforce_false_passes_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-production default: absent signature + enforce unset -> passes.
 
-    No signature headers, no enforcement flag. Must return the SAME
-    AuthContext as the pre-F-24 behavior (no 401). Secret may or may not be
-    set — does not matter when no signature is present.
+    No signature headers, no enforcement flag, NON-production environment.
+    Must return the SAME AuthContext as the pre-F-24 behavior (no 401). This is
+    the dev/test ergonomics path: outside production an unsigned request is
+    still allowed by default. ``ENVIRONMENT`` is cleared explicitly so the test
+    is deterministic regardless of any ambient CI ``ENVIRONMENT`` value.
     """
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
     user_id = uuid4()
     tenant_id = uuid4()
 
@@ -581,7 +608,13 @@ def test_f24_signed_identity_mismatch_rejected(_gateway_secret: str) -> None:
 def test_f24_present_signature_no_secret_allows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Signature present but no shared secret configured -> allow (cannot verify)."""
+    """Non-production: signature present but no secret -> allow (cannot verify).
+
+    ``ENVIRONMENT`` is cleared so this exercises the non-production allow+warn
+    branch of Behavior 3. The production counterpart (fail-closed 503) is
+    covered by ``test_f24_present_signature_no_secret_production_fail_closed``.
+    """
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
     monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
     monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
     user_id = uuid4()
@@ -627,3 +660,325 @@ def test_f24_audience_pin_mismatch_rejected(
         )
 
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# ---------------------------------------------------------------------------
+# APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST: fail-closed-by-default in production.
+#
+# The CONFIRMED-EXPLOITABLE issue: with ADAPTIX_GATEWAY_HMAC_ENFORCE unset,
+# get_auth_context trusted forged X-User-Id / X-Tenant-Id / X-Is-Founder on
+# UNSIGNED requests (live-exploitable on ALB-direct device/voice routes that
+# bypass the gateway). These tests pin the new safe-by-default behavior:
+#   (a) production + unsigned + no flag           -> 401 (exploit closed)
+#   (b) production + unsigned + ENFORCE=false     -> allowed (opt-out escape)
+#   (c) non-production + unsigned                 -> allowed (dev default)
+#   (d) production + valid signed context         -> allowed, signed authoritative
+#   (e) production + signed + no secret           -> fail-closed (503)
+#   (f) production + audience mismatch (pinned)   -> 401
+# ---------------------------------------------------------------------------
+
+
+def test_appsec_production_unsigned_no_flag_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(a) Production + unsigned + no explicit flag -> 401.
+
+    This is the exploit being closed: forged identity headers on an unsigned,
+    ALB-direct request are no longer trusted in production by default.
+    """
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    # A shared secret being present or not is irrelevant when no signature is
+    # sent; clear it to prove the rejection comes from the absent-signature path.
+    monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(uuid4()),
+                x_tenant_id=str(uuid4()),
+                # Forged escalation headers an attacker would send:
+                x_user_roles="founder,super_admin",
+                x_is_founder="true",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert "signature" in str(exc_info.value.detail).lower()
+
+
+def test_appsec_production_prod_alias_unsigned_no_flag_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(a') The short ``prod`` alias for ENVIRONMENT is also fail-closed."""
+    monkeypatch.setenv("ENVIRONMENT", "prod")
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(uuid4()),
+                x_tenant_id=str(uuid4()),
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_appsec_production_unsigned_optout_false_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(b) Production + unsigned + ENFORCE=false (opt-out) -> allowed.
+
+    The migration escape hatch: a service with a legitimate UNSIGNED intra-VPC
+    caller explicitly opts out and keeps the legacy header-trust behavior.
+    """
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", "false")
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_email="user@example.test",
+            x_user_roles="billing_admin,user",
+            x_is_founder="false",
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+    assert "billing_admin" in auth.roles
+    assert auth.is_founder is False
+
+
+def test_appsec_production_unsigned_optout_zero_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(b') ``0`` is also a valid false-y opt-out value in production."""
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", "0")
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+
+
+def test_appsec_non_production_unsigned_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(c) Non-production + unsigned -> allowed (dev default, no flag needed)."""
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_roles="user",
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+    assert "user" in auth.roles
+
+
+def test_appsec_non_production_staging_value_unsigned_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(c') A non-production ENVIRONMENT value (e.g. ``staging``) allows unsigned."""
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+
+
+def test_appsec_production_valid_signed_allowed_signed_authoritative(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(d) Production + valid signed context -> allowed; signed payload wins.
+
+    Proves the intended production path: a real gateway-signed request passes
+    even with fail-closed defaults, and the signed roles / founder claim are
+    authoritative over spoofed unsigned headers.
+    """
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _F24_SECRET)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+    # Signed context: non-founder paramedic. Headers try to escalate.
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        roles=["paramedic"],
+        is_founder=False,
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_roles="founder,billing_admin",
+            x_is_founder="true",
+            x_user_email="attacker@evil.test",
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert auth.tenant_id == tenant_id
+    # Signed claims are authoritative; spoofed escalation is dropped.
+    assert auth.roles == ["paramedic"]
+    assert auth.is_founder is False
+    assert auth.email == "user@example.test"
+
+
+def test_appsec_production_signed_no_secret_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(e) Production + signature present + no shared secret -> fail-closed (503).
+
+    A signed request that cannot be verified must not be trusted in production.
+    """
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+    # A well-formed signature (signed with the test secret) is present, but the
+    # SERVICE has no secret configured, so it cannot verify it.
+    ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+def test_appsec_production_signed_no_secret_enforce_true_still_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(e') Even with ENFORCE=true, a present-but-unverifiable signature in
+    production is fail-closed (the missing-secret branch owns present sigs)."""
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", "true")
+    monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+def test_appsec_production_audience_mismatch_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(f) Production + audience pin set + wrong aud -> 401.
+
+    Additive defense-in-depth: when ADAPTIX_GATEWAY_EXPECTED_AUDIENCE is set the
+    verified signed context's ``aud`` must match. Enforced on the verified (B1)
+    path by ``verify_gateway_signature``.
+    """
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _F24_SECRET)
+    monkeypatch.setenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", "adaptix-device")
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+    # Signed for adaptix-core but this service pins adaptix-device.
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id), tenant_id=str(tenant_id), aud="adaptix-core"
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_appsec_production_audience_match_allowed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """(f') Production + audience pin set + matching aud -> allowed.
+
+    Confirms the audience pin is not over-broad: the correct audience passes.
+    """
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _F24_SECRET)
+    monkeypatch.setenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", "adaptix-device")
+    monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        aud="adaptix-device",
+        roles=["device"],
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.user_id == user_id
+    assert "device" in auth.roles
