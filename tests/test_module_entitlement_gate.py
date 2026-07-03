@@ -204,9 +204,11 @@ def test_no_identity_at_all_is_401_missing_bearer(client: TestClient) -> None:
 def test_gateway_signature_present_but_no_secret_falls_back_to_bearer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # When the shared secret is unset, an unverifiable gateway context falls back
-    # to the bearer path (fail-open to legacy), so a missing bearer is 401.
+    # NON-PRODUCTION: when the shared secret is unset, an unverifiable gateway
+    # context falls back to the bearer path (fail-open to legacy), so a missing
+    # bearer is 401.
     monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
     app = FastAPI()
 
     @app.get(
@@ -223,3 +225,61 @@ def test_gateway_signature_present_but_no_secret_falls_back_to_bearer(
     resp = c.get("/api/v1/billing/thing", headers=_gw_headers(ctx, sig))
     assert resp.status_code == 401, resp.text
     assert resp.json()["detail"]["code"] == "missing_bearer_token"
+
+
+def test_gateway_signature_present_but_no_secret_is_503_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # PRODUCTION: a signed request that cannot be verified must not be trusted
+    # and must not silently fall back to the unverified-bearer path — 503
+    # fail-closed (same posture as get_auth_context behavior 3).
+    monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    app = FastAPI()
+
+    @app.get(
+        "/api/v1/billing/thing",
+        dependencies=[Depends(require_module_entitlement("billing"))],
+    )
+    def _thing() -> dict:
+        return {"ok": True}
+
+    c = TestClient(app)
+    ctx, sig = _sign_gateway_context(
+        user_id=str(uuid4()), tenant_id=_SYSTEM_PRINCIPAL_TENANT_ID, roles=["system"]
+    )
+    resp = c.get("/api/v1/billing/thing", headers=_gw_headers(ctx, sig))
+    assert resp.status_code == 503, resp.text
+    assert resp.json()["detail"]["code"] == "gateway_secret_not_configured"
+    # Even a bearer alongside the unverifiable signature must not rescue it:
+    # the signed context takes precedence and verification is impossible.
+    bearer = _bearer_with_claims(
+        module_entitlements=["billing"], tenant_id=str(uuid4())
+    )
+    resp2 = c.get(
+        "/api/v1/billing/thing",
+        headers={**_gw_headers(ctx, sig), "Authorization": f"Bearer {bearer}"},
+    )
+    assert resp2.status_code == 503, resp2.text
+
+
+def test_prod_503_missing_secret_does_not_affect_absent_signature_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # PRODUCTION + no secret + NO signature headers: unchanged legacy behavior
+    # (the 503 applies only when a signature is PRESENT but unverifiable).
+    monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    app = FastAPI()
+
+    @app.get(
+        "/api/v1/billing/thing",
+        dependencies=[Depends(require_module_entitlement("billing"))],
+    )
+    def _thing() -> dict:
+        return {"ok": True}
+
+    c = TestClient(app)
+    token = _bearer_with_claims(module_entitlements=["billing"], tenant_id=str(uuid4()))
+    resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200, resp.text
