@@ -1,5 +1,9 @@
 # Adaptix-Contracts Production Readiness
 
+> **HISTORICAL (2026-05 / 1.0.x era)** — superseded by CHANGELOG.md and TEST_EVIDENCE.md.
+> The auth trust model changed materially in 1.3.0–1.4.0 (gateway HMAC verification,
+> production fail-closed defaults); statements below predate that and are not current claims.
+
 Date: 2026-05-08
 Classification: PASS
 
