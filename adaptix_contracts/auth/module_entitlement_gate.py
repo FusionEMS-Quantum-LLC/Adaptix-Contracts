@@ -55,6 +55,15 @@ logger = logging.getLogger(__name__)
 
 AUDIT_ACTION = "billing.module_not_entitled"
 
+# Matches auth_contracts._is_production: the production fail-closed posture is
+# keyed off the same ENVIRONMENT variable across the shared auth surface.
+_ENV_VAR = "ENVIRONMENT"
+
+
+def _is_production() -> bool:
+    return os.environ.get(_ENV_VAR, "").strip().lower() in ("production", "prod")
+
+
 # Gateway-stamped signed-context headers (producer:
 # adaptix-gateway .../services/auth_context.py). When a request carries a
 # VALID gateway signature, the gate trusts that already-verified identity for
@@ -93,9 +102,12 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
       path when a tampered signature is present).
     * absent -> returns ``None`` (caller falls back to the legacy bearer path,
       keeping existing direct-bearer callers unaffected = non-breaking).
-    * present but no shared secret configured -> returns ``None`` (fail-open to
-      the legacy path; a CRITICAL is logged so the gap is loud) so a
-      mis-provisioned downstream does not hard-fail every gated route.
+    * present but no shared secret configured -> PRODUCTION: 503 fail-closed
+      (a signed request that cannot be verified must not be trusted — same
+      posture as ``get_auth_context`` behavior 3). NON-PRODUCTION: returns
+      ``None`` (fail-open to the legacy path; a CRITICAL is logged so the gap
+      is loud) so a mis-provisioned dev/test downstream does not hard-fail
+      every gated route.
     """
     headers = request.headers
     ctx_b64 = headers.get(_HEADER_AUTH_CONTEXT)
@@ -105,10 +117,28 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
 
     secret = gateway_shared_secret()
     if not secret:
+        if _is_production():
+            logger.error(
+                "module_entitlement_gate: gateway signature present but "
+                "ADAPTIX_GATEWAY_SHARED_SECRET is not configured in production; "
+                "refusing to trust an unverifiable signed context (fail-closed). "
+                "Inject the shared secret via Secrets Manager."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "gateway_secret_not_configured",
+                    "message": (
+                        "Gateway auth context signature present but the service "
+                        "shared secret is not configured; cannot verify."
+                    ),
+                },
+            )
         logger.critical(
             "module_entitlement_gate: gateway signature present but "
             "ADAPTIX_GATEWAY_SHARED_SECRET is unset — cannot verify; falling "
-            "back to bearer path. Inject the shared secret via Secrets Manager."
+            "back to bearer path (non-production only). Inject the shared "
+            "secret via Secrets Manager."
         )
         return None
 
