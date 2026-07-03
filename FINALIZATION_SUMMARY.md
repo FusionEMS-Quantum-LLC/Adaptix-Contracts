@@ -1,5 +1,9 @@
 # Adaptix Contracts Finalization Summary
 
+> **HISTORICAL (2026-05 / 1.0.x era)** — superseded by CHANGELOG.md and TEST_EVIDENCE.md.
+> The auth trust model changed materially in 1.3.0–1.4.0 (gateway HMAC verification,
+> production fail-closed defaults); statements below predate that and are not current claims.
+
 Historical note: this document records a 2026-04-17 milestone. Current release truth now lives in `PRODUCTION_READINESS.md`, `TEST_EVIDENCE.md`, and `MARKET_READY_LEDGER.md`.
 
 ## Completion Report

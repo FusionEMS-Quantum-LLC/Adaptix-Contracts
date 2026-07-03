@@ -1,4 +1,4 @@
-# pr-validation — canonical Python-service gate for Adaptix-Core-Service.
+# pr-validation — canonical Python-service gate for Adaptix-Contracts.
 #
 # Fires on: PULL_REQUEST_CREATED | PULL_REQUEST_UPDATED | PULL_REQUEST_REOPENED
 # Owns:     lint + format + typecheck + fast unit tests

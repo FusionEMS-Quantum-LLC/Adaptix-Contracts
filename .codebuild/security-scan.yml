@@ -1,4 +1,4 @@
-# security-scan — canonical Python-service gate for Adaptix-Core-Service.
+# security-scan — canonical Python-service gate for Adaptix-Contracts.
 #
 # Fires on: PULL_REQUEST_* | PUSH on main
 # Owns:     gitleaks (secrets), bandit (python security lint), pip-audit (deps).

@@ -2,9 +2,10 @@
 
 AWS API Gateway validates the caller's JWT at the edge using the Lambda JWT
 authorizer, then injects verified identity headers before forwarding to the
-downstream service. Services read and trust these headers — the gateway is
-the single trust boundary. No custom HMAC, no JWT re-validation, no Cognito
-calls at the service layer.
+downstream service. The gateway is the primary trust boundary; downstream,
+``get_auth_context`` additionally verifies the gateway's HMAC-signed context
+(see the F-24 section below). No JWT re-validation and no Cognito calls at
+the service layer.
 
 Production header contract (injected by Lambda JWT authorizer):
   X-User-Id      — authenticated user UUID (JWT ``sub`` claim)
@@ -14,10 +15,12 @@ Production header contract (injected by Lambda JWT authorizer):
   X-Is-Founder   — "true" or "false"
   X-Request-Id   — request correlation UUID
 
-Development / test fallback (only when ENVIRONMENT != "production"):
-  When X-User-Id is absent the request falls back to bearer JWT validation
-  so local development and test suites continue to work without running a
-  full API Gateway stack.
+Development / test behavior (ENVIRONMENT != "production"):
+  There is NO bearer-JWT fallback: a request without X-User-Id / X-Tenant-Id
+  is rejected with 401 in every environment. What relaxes outside production
+  is signature enforcement — an ABSENT gateway signature is allowed by
+  default (see ``ADAPTIX_GATEWAY_HMAC_ENFORCE`` below) so local development
+  and test suites work without a running gateway.
 
 Gateway HMAC signature verification (forensic fix F-24)
 -------------------------------------------------------
