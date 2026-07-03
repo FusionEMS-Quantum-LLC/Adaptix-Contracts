@@ -29,9 +29,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/joshuawendorf21310/Adaptix-Contracts"
-Repository = "https://github.com/joshuawendorf21310/Adaptix-Contracts"
-Changelog = "https://github.com/joshuawendorf21310/Adaptix-Contracts/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts"
+Repository = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts"
+Changelog = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
