@@ -10,25 +10,24 @@
 #
 # Any PR touching these paths requires @joshuawendorf21310 approval before merge.
 # Auto-merge is suspended for that PR until the founder approves.
+#
+# NOTE: paths below match THIS repo's real layout (a shared Python contracts
+# package — there is no backend/, Dockerfile, or docker-compose here).
 
-# CI/CD workflows — prevent AI from modifying its own guardrails
-.github/workflows/           @joshuawendorf21310
-.github/actions/             @joshuawendorf21310
-.github/CODEOWNERS           @joshuawendorf21310
+# Shared auth trust boundary — the platform's most sensitive shared code.
+/adaptix_contracts/auth_contracts.py      @joshuawendorf21310
+/adaptix_contracts/gateway_signature.py   @joshuawendorf21310
+/adaptix_contracts/auth/                  @joshuawendorf21310
+/adaptix_contracts/security/              @joshuawendorf21310
 
-# Docker and deployment artifacts
-Dockerfile                   @joshuawendorf21310
-Dockerfile.*                 @joshuawendorf21310
-docker-compose*.yml          @joshuawendorf21310
+# CI/CD gates and guardrails — prevent AI from modifying its own guardrails.
+/.codebuild/                              @joshuawendorf21310
+/.github/                                 @joshuawendorf21310
+/.githooks/                               @joshuawendorf21310
+/scripts/local-ci.sh                      @joshuawendorf21310
 
-# Database migrations — never auto-merge schema changes
-backend/migrations/          @joshuawendorf21310
-backend/alembic.ini          @joshuawendorf21310
+# Packaging + release surface (version, dependency pins consumed fleet-wide).
+/pyproject.toml                           @joshuawendorf21310
 
-# Auth, RBAC, billing, security — high-sensitivity code paths
-backend/**/auth*/            @joshuawendorf21310
-backend/**/security*/        @joshuawendorf21310
-backend/**/rbac*/            @joshuawendorf21310
-backend/**/billing*/         @joshuawendorf21310
-backend/**/trustsign*/       @joshuawendorf21310
-backend/**/secrets*/         @joshuawendorf21310
+# Deprecation/compat policy governing downstream breakage.
+/DEPRECATION_POLICY.md                    @joshuawendorf21310
