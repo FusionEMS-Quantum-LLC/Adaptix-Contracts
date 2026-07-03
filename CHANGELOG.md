@@ -9,7 +9,66 @@ after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
 package version is `1.4.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
-## [1.4.0] - unreleased
+## [1.4.0] - 2026-07-03
+
+### Security — entitlement gate fail-closed (production)
+- **module_entitlement_gate:** a gateway signature that is PRESENT but cannot be
+  verified because `ADAPTIX_GATEWAY_SHARED_SECRET` is not configured now returns
+  **503 `gateway_secret_not_configured`** in production instead of silently
+  falling back to the unverified-bearer legacy path — same posture as
+  `get_auth_context` behavior 3. Non-production keeps fail-open + CRITICAL log
+  (#86). Absent-signature bearer path, verified path, and tampered→401 are
+  unchanged.
+
+### Deprecated (import paths preserved until 2.0.0; emit DeprecationWarning)
+- `adaptix_contracts.security.auth_context` (`TenantAuthContext`,
+  `RolePermissionDecision`) — parallel auth-context model with zero consumers.
+  Replacement: `auth_contracts.AuthContext` (gateway edge) or
+  `auth.context.AdaptixAuthContext` (JWT-payload model) (#87).
+- `adaptix_contracts.auth.rbac_dependencies` — never adopt: its
+  `Depends()`-on-a-pydantic-model pattern sources identity from request data;
+  its `require_module_entitlement` conflicts with the real gate; its
+  `rbac_decorator` enforces nothing. Replacement: `get_auth_context` +
+  `auth.module_entitlement_gate` + service-side RBAC (#87). README gains a
+  "Canonical auth surfaces" section (#87).
+
+### Governance / packaging
+- CODEOWNERS rewritten to this repo's real layout — the shared auth trust files
+  are now founder-review-protected once branch protection is enabled (#82).
+- Removed the committed salvaged-branch git bundle (content verified merged) (#83).
+- `uv.lock` synced to 1.4.0; `[project.urls]` repointed to the canonical
+  `FusionEMS-Quantum-LLC` org repo (#84).
+- Fixed `auth_contracts.py` module-docstring drift (no dev bearer-JWT fallback
+  exists); refreshed TEST_EVIDENCE (coverage 67%); buildspec/env-example
+  de-templating; historical status docs marked HISTORICAL (#85).
+
+### Verified fleet rollout status (live ECS matrix, 2026-07-03)
+The fail-closed default keys off `ENVIRONMENT` ∈ {`production`, `prod`}.
+Live `aws ecs describe-task-definition` sweep of the `adaptix-production`
+cluster on 2026-07-03 showed:
+
+- **Arms on next rebuild (ENVIRONMENT set):** ai, air-pilot, assetops, bedrock,
+  billing, communications, core, epcr, field, fire, gateway, hl7, hospital,
+  telephony, voice. All of these carry `ADAPTIX_GATEWAY_SHARED_SECRET`
+  **except air-pilot** (owner: air lane — wire the secret with the pending
+  gateway route/CloudMap work or its first ≥1.4.0 rebuild 503s signed traffic).
+- **fire** already runs `ADAPTIX_GATEWAY_HMAC_ENFORCE=true` (enforcement live);
+  `fire_taskdef.tf` `ignore_changes` protects it from TF reverts.
+- **investor** lacks the shared secret (inert today — ENVIRONMENT unset).
+- **~45 other production services do NOT set `ENVIRONMENT`** — this package
+  treats them as non-production (previous fail-open behavior) until each sets
+  it. Fleet-wide `ENVIRONMENT=production` is a tracked follow-up hardening
+  program; flipping it arms enforcement and must be per-service verified.
+
+**Per-service rebuild checklist (run at each service's first deploy on ≥1.4.0):**
+1. Real user path through the gateway → 200.
+2. Forged `X-Is-Founder`/`X-User-Id`/`X-Tenant-Id` direct to the service (no
+   signature) → 401.
+3. Logs: no unexpected `Missing gateway auth context signature` 401s from
+   legitimate callers, and no `503 … shared secret is not configured`.
+4. If a legitimate unsigned intra-VPC caller surfaces: set
+   `ADAPTIX_GATEWAY_HMAC_ENFORCE=false` for that service, file the caller for
+   gateway-fronting, and re-verify.
 
 ### Security (BREAKING default in production — coordinate fleet rollout)
 - **APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST:** `get_auth_context` is now
