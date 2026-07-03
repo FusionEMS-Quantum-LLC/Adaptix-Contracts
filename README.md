@@ -185,6 +185,23 @@ except ValueError:
     print("Invalid status value")
 ```
 
+## Canonical auth surfaces
+
+There is exactly ONE canonical surface per auth layer. Anything else in this
+package that looks auth-shaped is deprecated — do not adopt it.
+
+| Layer | Canonical surface | Notes |
+|---|---|---|
+| Service-edge identity (every inbound request) | `adaptix_contracts.auth_contracts.get_auth_context` → `AuthContext` | Gateway header contract (`X-User-Id`/`X-Tenant-Id`/…) + HMAC-signed context verification (`X-Adaptix-Auth-Context`/`-Signature`). Production default is fail-closed for unsigned requests (`ADAPTIX_GATEWAY_HMAC_ENFORCE`). |
+| Signed-context crypto | `adaptix_contracts.gateway_signature` | Byte-compatible with the gateway producer in Adaptix-Core-Service. Do not reimplement. |
+| Module entitlement (402 gate) | `adaptix_contracts.auth.module_entitlement_gate.require_module_entitlement` / `require_any_module_entitlement` | Verifies the gateway-signed context first; production fails closed when a present signature cannot be verified. |
+| Rich JWT-payload model (service auth dependencies) | `adaptix_contracts.auth.context.AdaptixAuthContext` (+ `AdaptixRole`, `AdaptixRoleSet`, `AdaptixTenantContext`) | Built FROM an already-verified token payload via `from_token_payload`. It performs no verification itself. |
+
+Deprecated (import paths preserved until 2.0.0, emit `DeprecationWarning`):
+
+- `adaptix_contracts.security.auth_context` (`TenantAuthContext`, `RolePermissionDecision`) — third parallel context model, zero consumers.
+- `adaptix_contracts.auth.rbac_dependencies` — never adopt: its `Depends()`-on-a-pydantic-model pattern sources identity from request data, its `require_module_entitlement` conflicts with the real gate, and `rbac_decorator` enforces nothing.
+
 ## Contract Principles
 
 This package adheres to strict contract-only boundaries:

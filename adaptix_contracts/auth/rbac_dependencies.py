@@ -1,15 +1,32 @@
-"""
-RBAC Auth Dependencies
-======================
-FastAPI dependency utilities for role-based access control on all routes.
+"""DEPRECATED — do not adopt. Scheduled for removal in adaptix-contracts 2.0.0.
 
-Every protected route in Inventory/Medications/Narcotics services must use
-one of these decorators to enforce tenant isolation and role-based permissions.
+RBAC Auth Dependencies (legacy, unused)
+=======================================
+Audit 2026-07-03: no service in the Adaptix polyrepo imports this module, and
+it must not be adopted as-is because:
+
+1. ``auth: AdaptixAuthContext = Depends()`` makes FastAPI construct the auth
+   model from REQUEST DATA (query parameters), not from any verified
+   dependency — an attacker-controllable identity source.
+2. ``require_module_entitlement`` here conflicts with the real, enforced gate
+   in ``adaptix_contracts.auth.module_entitlement_gate`` (the 402 gate that
+   verifies the gateway-signed context).
+3. ``rbac_decorator`` is a no-op marker that enforces nothing.
+
+Replacement path (see CHANGELOG and README "Canonical auth surfaces"):
+* Service-edge identity: ``adaptix_contracts.auth_contracts.get_auth_context``
+  (gateway header contract + HMAC-signed context verification).
+* Module entitlement: ``adaptix_contracts.auth.module_entitlement_gate``.
+* Role/permission checks: service-side logic over the verified AuthContext.
+
+Per DEPRECATION_POLICY.md the import path is preserved (with a
+DeprecationWarning) until the next major version.
 """
 
 from __future__ import annotations
 
 import logging
+import warnings
 from functools import wraps
 
 from collections.abc import Callable
@@ -23,6 +40,14 @@ from adaptix_contracts.rbac_contracts import (
     compute_inventory_permissions,
     compute_medications_permissions,
     compute_narcotics_permissions,
+)
+
+warnings.warn(
+    "adaptix_contracts.auth.rbac_dependencies is deprecated and will be removed "
+    "in adaptix-contracts 2.0.0. Use auth_contracts.get_auth_context + "
+    "auth.module_entitlement_gate instead (see module docstring).",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 logger = logging.getLogger(__name__)
