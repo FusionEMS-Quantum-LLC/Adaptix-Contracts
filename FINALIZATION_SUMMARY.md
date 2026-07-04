@@ -9,7 +9,7 @@ Historical note: this document records a 2026-04-17 milestone. Current release t
 ## Completion Report
 
 Date: 2026-04-17
-Repository: joshuawendorf21310/adaptix-contracts
+Repository: FusionEMS-Quantum-LLC/Adaptix-Contracts
 Branch: claude/finalize-shared-contracts-schema
 
 ---

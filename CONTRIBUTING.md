@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the Adaptix Contracts package!
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/joshuawendorf21310/Adaptix-Contracts.git
+   git clone https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts.git
    cd Adaptix-Contracts
    ```
 
