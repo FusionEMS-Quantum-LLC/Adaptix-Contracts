@@ -71,6 +71,10 @@ from .audit_contracts import (
     ComplianceReviewOpenedEvent,
     AuditDomainAction,
     AuditEntry,
+    AuditExportFormat,
+    AuditEvent,
+    AuditSearchQuery,
+    AuditExportRequest,
 )
 
 # Billing
@@ -268,6 +272,115 @@ from .sagemaker_contracts import (
 from .gateway_contracts import (
     GatewayRouteRegistryEntry,
     ForwardedRequestContext,
+)
+
+# Notification (shared service)
+from .notification_contracts import (
+    NotificationChannel,
+    NotificationStatus,
+    NotificationDeliveryStatus,
+    NotificationPreference,
+    NotificationTemplate,
+)
+
+# Facility (shared service)
+from .facility_contracts import (
+    FacilityType,
+    FacilityStatus,
+    FacilityContact,
+    FacilityAlias,
+    FacilityMapping,
+    FacilityRecord,
+)
+
+# Geo (shared service)
+from .geo_contracts import (
+    GeoCoordinate,
+    GeocodeRequest,
+    GeocodeResult,
+    DistanceResult,
+    RouteEstimate,
+    ServiceArea,
+)
+
+# SignalCore (shared service)
+from .signalcore_contracts import (
+    EventDeliveryStatus,
+    SignalCoreEvent,
+    SignalCoreTrigger,
+)
+
+# Forms (shared service)
+from .forms_contracts import (
+    FormFieldType,
+    FormStatus,
+    FormValidationRule,
+    FormFieldDefinition,
+    FormSchema,
+    FormVersion,
+    FormTemplate,
+)
+
+# Reference Data (shared service)
+from .reference_data_contracts import (
+    ReferenceDataItem,
+    ReferenceDataList,
+)
+
+# Payment (shared service — Stripe subscriptions)
+from .payment_contracts import (
+    SubscriptionStatus,
+    InvoiceStatus,
+    PaymentEventType,
+    StripeCustomerRef,
+    SubscriptionRef,
+    InvoiceRef,
+    CheckoutSessionRequest,
+    CheckoutSessionResponse,
+    PortalSessionRequest,
+    PortalSessionResponse,
+    PaymentEvent,
+)
+
+# Mailroom (shared service — PostGrid)
+from .mailroom_contracts import (
+    MailStatus,
+    MailClass,
+    MailReturnReason,
+    MailRecipient,
+    MailSender,
+    MailPacket,
+    MailDeliveryStatus,
+    MailReturnStatus,
+)
+
+# RTC (shared service)
+from .rtc_contracts import (
+    RTCRoomStatus,
+    RTCSession,
+    RTCParticipantToken,
+)
+
+# Office Ally (shared service)
+from .officeally_contracts import (
+    OfficeAllyEnrollmentStatus,
+    OfficeAllyEnrollment,
+    OfficeAllySubmission,
+    OfficeAllyResponse,
+)
+
+# Device (shared service)
+from .device_contracts import (
+    DevicePlatform,
+    DeviceStatus,
+    DeviceRegistration,
+)
+
+# App Access (shared service)
+from .app_access_contracts import (
+    AppAccessEffect,
+    AppAccessPolicy,
+    AppAccessDecision,
 )
 
 # Continuity
@@ -1568,4 +1681,82 @@ __all__ = [
     # Gateway (separated service)
     "GatewayRouteRegistryEntry",
     "ForwardedRequestContext",
+    # Audit (shared service)
+    "AuditExportFormat",
+    "AuditEvent",
+    "AuditSearchQuery",
+    "AuditExportRequest",
+    # Notification (shared service)
+    "NotificationChannel",
+    "NotificationStatus",
+    "NotificationDeliveryStatus",
+    "NotificationPreference",
+    "NotificationTemplate",
+    # Facility (shared service)
+    "FacilityType",
+    "FacilityStatus",
+    "FacilityContact",
+    "FacilityAlias",
+    "FacilityMapping",
+    "FacilityRecord",
+    # Geo (shared service)
+    "GeoCoordinate",
+    "GeocodeRequest",
+    "GeocodeResult",
+    "DistanceResult",
+    "RouteEstimate",
+    "ServiceArea",
+    # SignalCore (shared service)
+    "EventDeliveryStatus",
+    "SignalCoreEvent",
+    "SignalCoreTrigger",
+    # Forms (shared service)
+    "FormFieldType",
+    "FormStatus",
+    "FormValidationRule",
+    "FormFieldDefinition",
+    "FormSchema",
+    "FormVersion",
+    "FormTemplate",
+    # Reference Data (shared service)
+    "ReferenceDataItem",
+    "ReferenceDataList",
+    # Payment (shared service — Stripe subscriptions)
+    "SubscriptionStatus",
+    "InvoiceStatus",
+    "PaymentEventType",
+    "StripeCustomerRef",
+    "SubscriptionRef",
+    "InvoiceRef",
+    "CheckoutSessionRequest",
+    "CheckoutSessionResponse",
+    "PortalSessionRequest",
+    "PortalSessionResponse",
+    "PaymentEvent",
+    # Mailroom (shared service — PostGrid)
+    "MailStatus",
+    "MailClass",
+    "MailReturnReason",
+    "MailRecipient",
+    "MailSender",
+    "MailPacket",
+    "MailDeliveryStatus",
+    "MailReturnStatus",
+    # RTC (shared service)
+    "RTCRoomStatus",
+    "RTCSession",
+    "RTCParticipantToken",
+    # Office Ally (shared service)
+    "OfficeAllyEnrollmentStatus",
+    "OfficeAllyEnrollment",
+    "OfficeAllySubmission",
+    "OfficeAllyResponse",
+    # Device (shared service)
+    "DevicePlatform",
+    "DeviceStatus",
+    "DeviceRegistration",
+    # App Access (shared service)
+    "AppAccessEffect",
+    "AppAccessPolicy",
+    "AppAccessDecision",
 ]
