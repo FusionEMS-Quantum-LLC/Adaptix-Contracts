@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -104,3 +105,142 @@ class ServiceArea(BaseModel):
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Reverse Geocoding & Autocomplete
+# ---------------------------------------------------------------------------
+
+
+class ReverseGeocodeRequest(BaseModel):
+    """Request to resolve coordinates back to a formatted address."""
+
+    tenant_id: UUID
+    correlation_id: Optional[str] = None
+    coordinate: GeoCoordinate
+
+
+class AutocompleteRequest(BaseModel):
+    """Request for address autocomplete suggestions."""
+
+    tenant_id: UUID
+    correlation_id: Optional[str] = None
+    query: str = Field(..., min_length=1, max_length=500)
+    country: str = Field("US", min_length=2, max_length=2)
+    limit: int = Field(5, ge=1, le=25)
+
+
+class AddressSuggestion(BaseModel):
+    """A single address autocomplete suggestion."""
+
+    formatted_address: str
+    coordinate: Optional[GeoCoordinate] = None
+    place_id: Optional[str] = None
+    provider: Optional[str] = None
+
+
+class AutocompleteResult(BaseModel):
+    """Ordered set of address autocomplete suggestions."""
+
+    suggestions: list[AddressSuggestion] = Field(default_factory=list)
+    provider: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Route & Distance Requests
+# ---------------------------------------------------------------------------
+
+
+class RouteRequest(BaseModel):
+    """Request for a driving route/ETA between two coordinates."""
+
+    tenant_id: UUID
+    correlation_id: Optional[str] = None
+    origin: GeoCoordinate
+    destination: GeoCoordinate
+    include_polyline: bool = True
+
+
+class DistanceRequest(BaseModel):
+    """Request for the distance between two coordinates."""
+
+    tenant_id: UUID
+    correlation_id: Optional[str] = None
+    origin: GeoCoordinate
+    destination: GeoCoordinate
+
+
+# ---------------------------------------------------------------------------
+# Consumer Client Helper
+# ---------------------------------------------------------------------------
+
+
+class GeoClient:
+    """Thin async HTTP client for the AdaptixCore Geo service.
+
+    Wraps the ``/api/v1/geo`` endpoints and returns the canonical Geo DTOs so
+    consumers (CAD, EPCR, Hospital, Transport) call one typed client instead
+    of duplicating a Stadia Maps / haversine integration. The caller owns the
+    ``httpx.AsyncClient`` lifecycle when one is supplied; otherwise a client is
+    created per call.
+
+    Example::
+
+        client = GeoClient("http://adaptix-geo:8000", token=service_jwt)
+        result = await client.geocode(
+            GeocodeRequest(tenant_id=tid, address="123 Main St")
+        )
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        token: Optional[str] = None,
+        timeout: float = 8.0,
+        client: Optional[httpx.AsyncClient] = None,
+    ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._timeout = timeout
+        self._client = client
+        self._headers: dict[str, str] = {}
+        if token:
+            self._headers["Authorization"] = f"Bearer {token}"
+
+    async def _post(self, path: str, payload: BaseModel) -> httpx.Response:
+        url = f"{self._base_url}/api/v1/geo{path}"
+        body = payload.model_dump(mode="json")
+        if self._client is not None:
+            return await self._client.post(url, json=body, headers=self._headers)
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            return await client.post(url, json=body, headers=self._headers)
+
+    async def geocode(self, request: GeocodeRequest) -> GeocodeResult:
+        """Resolve an address to coordinates."""
+        response = await self._post("/geocode", request)
+        response.raise_for_status()
+        return GeocodeResult.model_validate(response.json())
+
+    async def reverse_geocode(self, request: ReverseGeocodeRequest) -> GeocodeResult:
+        """Resolve coordinates back to a formatted address."""
+        response = await self._post("/reverse-geocode", request)
+        response.raise_for_status()
+        return GeocodeResult.model_validate(response.json())
+
+    async def autocomplete(self, request: AutocompleteRequest) -> AutocompleteResult:
+        """Return address autocomplete suggestions."""
+        response = await self._post("/autocomplete", request)
+        response.raise_for_status()
+        return AutocompleteResult.model_validate(response.json())
+
+    async def route(self, request: RouteRequest) -> RouteEstimate:
+        """Return a driving route/ETA between two coordinates."""
+        response = await self._post("/route", request)
+        response.raise_for_status()
+        return RouteEstimate.model_validate(response.json())
+
+    async def distance(self, request: DistanceRequest) -> DistanceResult:
+        """Return the distance between two coordinates."""
+        response = await self._post("/distance", request)
+        response.raise_for_status()
+        return DistanceResult.model_validate(response.json())

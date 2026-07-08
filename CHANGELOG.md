@@ -7,11 +7,73 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `1.4.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `1.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
 ## [Unreleased]
 
-### Added — service-separation contracts (additive only)
+## [1.5.0] - 2026-07-08
+
+### Added — shared-service contract consolidation (additive only)
+
+Makes the six shared-service contract modules the canonical, versioned surface
+the shared services import (so service builds don't re-duplicate or drift).
+Every change is additive; no existing field, model, or enum member was removed
+or repointed.
+
+- **audit_contracts (schemas):** completed the standalone Audit service surface
+  with `AuditIngestRequest`, `AuditIngestResponse`, `AuditSearchResponse`,
+  `AuditExportStatus`, `AuditExportResponse` (ingest/search/export
+  request-response DTOs to sit alongside `AuditEvent`, `AuditSearchQuery`,
+  `AuditExportRequest` and the four `audit.*` events).
+- **audit_contracts (top-level direct-write client):** deprecated
+  `adaptix_contracts.audit_contracts` (`AuditServiceClient`, `AuditLogEntry`)
+  in favour of the Audit service surface above. Import path and behaviour are
+  **preserved** (live consumers: Adaptix-CAD-Service `cad_app/audit_service.py`
+  + migration `019_add_audit_log_entries`; Adaptix-Fire-Service
+  `fire_app/audit_service.py`). Removal is deferred to 2.0.0.
+- **notification_contracts:** `NotificationSendRequest` (typed canonical send
+  request), `NotificationPreferenceSet` (Core per-category/per-channel + quiet
+  hours shape), and `notification.*` events `NotificationQueuedEvent`,
+  `NotificationSentEvent`, `NotificationReadEvent`. The str-typed
+  `communications_contracts.NotificationRequest` and its
+  `communications.notification.*` delivered/failed events are left unchanged and
+  documented as the dispatcher shape — the two are versioned side by side, not
+  merged.
+- **reference_data_contracts:** canonical `PayerType` (union superset),
+  `ServiceLevel`, and `StateCode` enums; CRUD/query/publish DTOs
+  (`ReferenceDataListCreateRequest`, `ReferenceDataListUpdateRequest`,
+  `ReferenceDataItemUpsertRequest`, `ReferenceDataQuery`,
+  `ReferenceDataListResponse`, `ReferenceDataPublishRequest`,
+  `ReferenceDataPublishResponse`); and `reference_data.*` events
+  (`ReferenceDataListPublishedEvent`, `ReferenceDataListUpdatedEvent`).
+  Exported at the package root as `ReferenceDataPayerType` to avoid shadowing
+  the existing `billing_contracts.PayerType` export.
+- **geo_contracts:** `ReverseGeocodeRequest`, `AutocompleteRequest`,
+  `AddressSuggestion`, `AutocompleteResult`, `RouteRequest`, `DistanceRequest`,
+  and an async `GeoClient` httpx helper wrapping `/api/v1/geo`.
+- **forms_contracts:** `FormSubmission`, `FormValidationError`, create/update
+  requests (`FormTemplateCreateRequest`, `FormTemplateUpdateRequest`,
+  `FormVersionCreateRequest`, `FormSubmissionCreateRequest`), paged response
+  wrappers (`FormTemplateListResponse`, `FormSubmissionListResponse`), and
+  `form.*` events (`FormPublishedEvent`, `FormSubmittedEvent`).
+- **facility_contracts:** `FacilityCapability` (+ optional `capabilities` on
+  `FacilityRecord`), directory search (`FacilitySearchRequest`,
+  `FacilitySearchResponse`), create/update (`FacilityCreateRequest`,
+  `FacilityUpdateRequest`), alias/mapping upsert (`FacilityAliasCreateRequest`,
+  `FacilityMappingUpsertRequest`), CMS/NPI sync (`CmsNpiSyncRequest`,
+  `CmsNpiSyncResult`), and `facility.*` events (`FacilityRegisteredEvent`,
+  `FacilityUpdatedEvent`, `FacilityMergedEvent`).
+
+### Field-identity divergence — versioned, not unified (requires founder call)
+- **PayerType** has real member divergence across domains:
+  `billing_contracts.PayerType` = {MEDICARE, MEDICAID, COMMERCIAL, SELF_PAY,
+  OTHER}; `intake_contracts.PayerType` = {MEDICARE, MEDICAID, TRICARE,
+  COMMERCIAL, SELF_PAY, WORKERS_COMP}. The new canonical
+  `reference_data_contracts.PayerType` is the union superset. The two domain
+  enums are intentionally **not** repointed to it — selecting one authoritative
+  set for billing/intake to import is a founder/billing decision.
+
+### Added — service-separation contracts (additive only, from #94)
 - **cortex_contracts:** `RecommendationRequest`, `RecommendationResponse` for the
   separated Cortex recommendation service.
 - **trustsign_contracts:** `SignaturePackageCreateRequest`,
