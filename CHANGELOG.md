@@ -9,6 +9,22 @@ after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
 package version is `1.4.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
+## [Unreleased]
+
+### Added — service-separation contracts (additive only)
+- **cortex_contracts:** `RecommendationRequest`, `RecommendationResponse` for the
+  separated Cortex recommendation service.
+- **trustsign_contracts:** `SignaturePackageCreateRequest`,
+  `SignaturePackageResponse` for the separated TrustSign signing service.
+- **docuseal_contracts:** `DocuSealPackageCreateRequest`,
+  `DocuSealPackageResponse` for the separated DocuSeal signing integration.
+- **sagemaker_contracts:** `PredictionRequest`, `PredictionResponse` for the
+  separated SageMaker prediction service.
+- **gateway_contracts:** `GatewayRouteRegistryEntry`, `ForwardedRequestContext`
+  for the separated Adaptix Core gateway.
+- All ten models are re-exported through `adaptix_contracts.schemas.__all__` and
+  the package root. No existing contract was modified or removed.
+
 ## [1.4.0] - 2026-07-03
 
 ### Security — entitlement gate fail-closed (production)

@@ -240,6 +240,36 @@ from .legal_execution_contracts import (
     ContractAccessCheckResponse,
 )
 
+# Cortex (separated service)
+from .cortex_contracts import (
+    RecommendationRequest,
+    RecommendationResponse,
+)
+
+# TrustSign (separated service)
+from .trustsign_contracts import (
+    SignaturePackageCreateRequest,
+    SignaturePackageResponse,
+)
+
+# DocuSeal (separated service)
+from .docuseal_contracts import (
+    DocuSealPackageCreateRequest,
+    DocuSealPackageResponse,
+)
+
+# SageMaker (separated service)
+from .sagemaker_contracts import (
+    PredictionRequest,
+    PredictionResponse,
+)
+
+# Gateway (separated service)
+from .gateway_contracts import (
+    GatewayRouteRegistryEntry,
+    ForwardedRequestContext,
+)
+
 # Continuity
 from .continuity_contracts import (
     ClientDeviceIdentity,
@@ -1523,4 +1553,19 @@ __all__ = [
     # Audit (extended domain actions)
     "AuditDomainAction",
     "AuditEntry",
+    # Cortex (separated service)
+    "RecommendationRequest",
+    "RecommendationResponse",
+    # TrustSign (separated service)
+    "SignaturePackageCreateRequest",
+    "SignaturePackageResponse",
+    # DocuSeal (separated service)
+    "DocuSealPackageCreateRequest",
+    "DocuSealPackageResponse",
+    # SageMaker (separated service)
+    "PredictionRequest",
+    "PredictionResponse",
+    # Gateway (separated service)
+    "GatewayRouteRegistryEntry",
+    "ForwardedRequestContext",
 ]
