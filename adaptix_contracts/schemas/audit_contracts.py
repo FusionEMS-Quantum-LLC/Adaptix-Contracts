@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuditActorType(str, Enum):
@@ -276,3 +277,64 @@ class AuditEntry(BaseModel):
     tenant_id: Optional[str] = None
     ip_address: Optional[str] = None
     timestamp: datetime
+
+
+# ---------------------------------------------------------------------------
+# Audit Service Contracts (shared AdaptixCore Audit service)
+# ---------------------------------------------------------------------------
+
+
+class AuditExportFormat(str, Enum):
+    """Serialization format for an audit export."""
+
+    CSV = "csv"
+    JSON = "json"
+    NDJSON = "ndjson"
+
+
+class AuditEvent(BaseModel):
+    """Immutable audit event for the shared AdaptixCore Audit service.
+
+    ``resource_id`` is typed as ``str`` because audited resources span every
+    domain and their identifier types vary. ``action`` is a free-form action
+    code (services may pass an ``AuditDomainAction`` value or a custom code).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    event_id: Optional[UUID] = None
+    tenant_id: UUID
+    actor_user_id: Optional[UUID] = None
+    actor_type: AuditActorType = AuditActorType.USER
+    action: str = Field(..., min_length=1, max_length=160)
+    resource_type: str = Field(..., min_length=1, max_length=120)
+    resource_id: Optional[str] = Field(None, max_length=255)
+    correlation_id: Optional[str] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    occurred_at: datetime
+
+
+class AuditSearchQuery(BaseModel):
+    """Query parameters for searching immutable audit events."""
+
+    tenant_id: UUID
+    actor_user_id: Optional[UUID] = None
+    action: Optional[str] = Field(None, max_length=160)
+    resource_type: Optional[str] = Field(None, max_length=120)
+    resource_id: Optional[str] = Field(None, max_length=255)
+    correlation_id: Optional[str] = None
+    occurred_after: Optional[datetime] = None
+    occurred_before: Optional[datetime] = None
+    limit: int = Field(50, ge=1, le=1000)
+    offset: int = Field(0, ge=0)
+
+
+class AuditExportRequest(BaseModel):
+    """Request to export a set of audit events matching a query."""
+
+    tenant_id: UUID
+    query: AuditSearchQuery
+    export_format: AuditExportFormat = AuditExportFormat.CSV
+    requested_by: Optional[UUID] = None
+    correlation_id: Optional[str] = None
+    requested_at: datetime
