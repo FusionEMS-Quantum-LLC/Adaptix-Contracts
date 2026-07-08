@@ -214,7 +214,7 @@ SEARCH_SERVICE = ServiceDefinition(
 FOUNDER_SERVICE = ServiceDefinition(
     name="Adaptix-Founder-Service",
     slug="founder",
-    route_prefix="/api/v1/founder",
+    route_prefix="/api/v1/founder-command",
     port=8016,
     description="Founder dashboard, command views, platform status summaries",
 )
