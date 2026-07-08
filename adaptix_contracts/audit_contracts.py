@@ -1,5 +1,26 @@
 """Adaptix platform audit service client contract.
 
+.. deprecated:: 1.5.0
+    This module is the legacy **direct-write** audit client: it embeds
+    persistence in every caller (each domain service writes to its own
+    ``audit_log_entries`` table via its own session, no network call). That
+    architecture predates the standalone AdaptixCore Audit service and is
+    superseded by the canonical service surface in
+    :mod:`adaptix_contracts.schemas.audit_contracts`
+    (``AuditEvent`` + ``AuditIngestRequest``/``AuditIngestResponse`` +
+    ``AuditSearchQuery``/``AuditSearchResponse`` +
+    ``AuditExportRequest``/``AuditExportResponse`` + the four ``audit.*``
+    events). New services must emit through the Audit service, not this
+    client.
+
+    This module is retained for backward compatibility only — it is still
+    imported by live consumers (Adaptix-CAD-Service ``cad_app/audit_service.py``
+    and migration ``019_add_audit_log_entries``; Adaptix-Fire-Service
+    ``fire_app/audit_service.py``). Per the deprecation policy the import path
+    and behaviour are preserved and will be removed only in the next major
+    version, after those consumers migrate to the Audit service. Do not add
+    new callers.
+
 Provides a canonical AuditServiceClient used by all domain services to
 write structured, tenant-scoped audit records into the Core audit log
 table. All domain-level mutations must record actor, tenant, prior/new
@@ -150,5 +171,9 @@ class AuditServiceClient:
         )
         return entry
 
+
+# Deprecated in 1.5.0 in favour of adaptix_contracts.schemas.audit_contracts
+# (the standalone Audit service surface). Retained for backward compatibility.
+__deprecated__ = True
 
 __all__ = ["AuditServiceClient", "AuditLogEntry"]

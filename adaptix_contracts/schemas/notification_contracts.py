@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -114,3 +114,118 @@ class NotificationTemplate(BaseModel):
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Send Request (canonical, typed)
+#
+# FIELD-IDENTITY NOTE: ``communications_contracts.NotificationRequest`` is the
+# real dispatcher's request and uses str-typed ``tenant_id``/``recipient_id``/
+# ``channel`` with a single ``body``. It is preserved as-is. This
+# ``NotificationSendRequest`` is the canonical, strongly-typed send shape for
+# the consolidated Notification service (UUID ids, ``NotificationChannel`` enum,
+# category + template + idempotency). The two shapes are intentionally NOT
+# merged — they are versioned side by side until the dispatcher migrates.
+# ---------------------------------------------------------------------------
+
+
+class NotificationSendRequest(BaseModel):
+    """Typed request to send a notification via the Notification service."""
+
+    tenant_id: UUID
+    recipient_id: UUID
+    channel: NotificationChannel
+    category: str = Field(..., min_length=1, max_length=100)
+    subject: Optional[str] = Field(None, max_length=500)
+    body: str = Field(..., min_length=1)
+    template_key: Optional[str] = Field(None, max_length=160)
+    correlation_id: Optional[str] = None
+    idempotency_key: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Dedup key; a retry with the same key must not double-send.",
+    )
+    reference_type: Optional[str] = Field(None, max_length=64)
+    reference_id: Optional[str] = Field(None, max_length=255)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Preference Set (per-user, per-category, per-channel booleans)
+#
+# FIELD-IDENTITY NOTE: ``NotificationPreference`` above models a single
+# (channel, category) opt-in row. ``NotificationPreferenceSet`` models the
+# Core notification_preferences shape — one row per category carrying a boolean
+# per channel plus quiet hours + timezone. Both are retained; consumers pick
+# the shape that matches their storage. They are NOT unified.
+# ---------------------------------------------------------------------------
+
+
+class NotificationPreferenceSet(BaseModel):
+    """Per-user, per-category notification preferences across all channels."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    tenant_id: UUID
+    user_id: UUID
+    category: str = Field(..., min_length=1, max_length=100)
+    email_enabled: bool = True
+    sms_enabled: bool = False
+    in_app_enabled: bool = True
+    push_enabled: bool = False
+    quiet_hours_start: Optional[str] = Field(
+        None, max_length=5, description="Local start time HH:MM, 24-hour."
+    )
+    quiet_hours_end: Optional[str] = Field(
+        None, max_length=5, description="Local end time HH:MM, 24-hour."
+    )
+    timezone: str = Field("UTC", max_length=64)
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# notification.* Events
+#
+# The delivered/failed lifecycle events already exist in
+# ``communications_contracts`` under the ``communications.notification.*``
+# namespace (the dispatcher owns them). These add the queued/sent/read
+# lifecycle points the Notification service emits under ``notification.*``.
+# ---------------------------------------------------------------------------
+
+
+class NotificationQueuedEvent(BaseModel):
+    """Published when a notification is accepted and queued for delivery."""
+
+    event_type: str = "notification.queued"
+
+    notification_id: UUID
+    tenant_id: UUID
+    recipient_id: UUID
+    channel: NotificationChannel
+    category: str
+    correlation_id: Optional[str] = None
+    queued_at: datetime
+
+
+class NotificationSentEvent(BaseModel):
+    """Published when a notification is handed to the delivery provider."""
+
+    event_type: str = "notification.sent"
+
+    notification_id: UUID
+    tenant_id: UUID
+    recipient_id: UUID
+    channel: NotificationChannel
+    provider_message_id: Optional[str] = None
+    sent_at: datetime
+
+
+class NotificationReadEvent(BaseModel):
+    """Published when a recipient reads an in-app notification."""
+
+    event_type: str = "notification.read"
+
+    notification_id: UUID
+    tenant_id: UUID
+    recipient_id: UUID
+    read_at: datetime

@@ -338,3 +338,83 @@ class AuditExportRequest(BaseModel):
     requested_by: Optional[UUID] = None
     correlation_id: Optional[str] = None
     requested_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Ingest / Search / Export Request-Response DTOs
+#
+# These complete the canonical Audit *service* surface: the shared Audit
+# service accepts events via the ingest request, returns paged results for a
+# search query, and reports on an export request. They supersede the direct-
+# write client in ``adaptix_contracts.audit_contracts`` (deprecated), which
+# embedded persistence in each caller instead of going through the service.
+# ---------------------------------------------------------------------------
+
+
+class AuditIngestRequest(BaseModel):
+    """Request to append one audit event to the shared Audit service.
+
+    Ingest is append-only and idempotent: the service deduplicates on the
+    (``tenant_id``, ``action``, ``resource_id``, ``idempotency_key``) tuple
+    when ``idempotency_key`` is provided, so a producer may safely retry.
+    """
+
+    tenant_id: UUID
+    actor_user_id: Optional[UUID] = None
+    actor_type: AuditActorType = AuditActorType.USER
+    action: str = Field(..., min_length=1, max_length=160)
+    resource_type: str = Field(..., min_length=1, max_length=120)
+    resource_id: Optional[str] = Field(None, max_length=255)
+    severity: AuditSeverity = AuditSeverity.LOW
+    success: bool = True
+    correlation_id: Optional[str] = None
+    idempotency_key: Optional[str] = Field(None, max_length=255)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    occurred_at: datetime
+
+
+class AuditIngestResponse(BaseModel):
+    """Result of an audit ingest request."""
+
+    event_id: UUID
+    accepted: bool = True
+    duplicate: bool = Field(
+        False, description="True when idempotency matched an existing event."
+    )
+    occurred_at: datetime
+
+
+class AuditSearchResponse(BaseModel):
+    """Paginated result set for an :class:`AuditSearchQuery`."""
+
+    events: list[AuditEvent] = Field(default_factory=list)
+    total: int = Field(0, ge=0)
+    limit: int = Field(50, ge=1, le=1000)
+    offset: int = Field(0, ge=0)
+
+
+class AuditExportStatus(str, Enum):
+    """Lifecycle state of an audit export job."""
+
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AuditExportResponse(BaseModel):
+    """Status and location of a requested audit export."""
+
+    export_id: UUID
+    tenant_id: UUID
+    export_format: AuditExportFormat
+    status: AuditExportStatus = AuditExportStatus.PENDING
+    record_count: Optional[int] = Field(None, ge=0)
+    location: Optional[str] = Field(
+        None,
+        max_length=1024,
+        description="Object-store URI (e.g. s3://...) of the exported evidence set.",
+    )
+    error_reason: Optional[str] = None
+    requested_at: datetime
+    completed_at: Optional[datetime] = None

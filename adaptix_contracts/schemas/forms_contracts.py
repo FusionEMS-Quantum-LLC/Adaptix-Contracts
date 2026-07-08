@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -126,3 +126,123 @@ class FormTemplate(BaseModel):
     latest_version: Optional[FormVersion] = None
     created_at: datetime
     updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Submissions
+# ---------------------------------------------------------------------------
+
+
+class FormValidationError(BaseModel):
+    """A single field-level validation failure on a submission."""
+
+    field_key: str = Field(..., min_length=1, max_length=160)
+    message: str = Field(..., min_length=1, max_length=500)
+    rule_type: Optional[str] = Field(None, max_length=64)
+
+
+class FormSubmission(BaseModel):
+    """A submitted set of values against a specific form version."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    tenant_id: UUID
+    template_id: UUID
+    version_id: UUID
+    version: int = Field(..., ge=1)
+    submitted_by: Optional[UUID] = None
+    values: dict[str, Any] = Field(default_factory=dict)
+    is_valid: bool = True
+    validation_errors: list[FormValidationError] = Field(default_factory=list)
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Create / Update Requests
+# ---------------------------------------------------------------------------
+
+
+class FormTemplateCreateRequest(BaseModel):
+    """Request to create a new form template (with its first draft version)."""
+
+    key: str = Field(..., min_length=1, max_length=160)
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=2000)
+    form_schema: FormSchema
+
+
+class FormTemplateUpdateRequest(BaseModel):
+    """Partial update of a form template's metadata / lifecycle status."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=2000)
+    status: Optional[FormStatus] = None
+
+
+class FormVersionCreateRequest(BaseModel):
+    """Request to create a new immutable version of a form's schema."""
+
+    form_schema: FormSchema
+    created_by: Optional[UUID] = None
+
+
+class FormSubmissionCreateRequest(BaseModel):
+    """Request to validate and persist a submission for a form."""
+
+    values: dict[str, Any] = Field(default_factory=dict)
+    submitted_by: Optional[UUID] = None
+    idempotency_key: Optional[str] = Field(None, max_length=255)
+
+
+# ---------------------------------------------------------------------------
+# Paged Response Wrappers
+# ---------------------------------------------------------------------------
+
+
+class FormTemplateListResponse(BaseModel):
+    """Paginated set of form templates."""
+
+    templates: list[FormTemplate] = Field(default_factory=list)
+    total: int = Field(0, ge=0)
+    limit: int = Field(50, ge=1, le=500)
+    offset: int = Field(0, ge=0)
+
+
+class FormSubmissionListResponse(BaseModel):
+    """Paginated set of form submissions."""
+
+    submissions: list[FormSubmission] = Field(default_factory=list)
+    total: int = Field(0, ge=0)
+    limit: int = Field(50, ge=1, le=500)
+    offset: int = Field(0, ge=0)
+
+
+# ---------------------------------------------------------------------------
+# form.* Events
+# ---------------------------------------------------------------------------
+
+
+class FormPublishedEvent(BaseModel):
+    """Published when a form version transitions to published."""
+
+    event_type: str = "form.published"
+
+    template_id: UUID
+    tenant_id: UUID
+    key: str
+    version: int = Field(..., ge=1)
+    published_at: datetime
+
+
+class FormSubmittedEvent(BaseModel):
+    """Published when a submission is accepted for a form."""
+
+    event_type: str = "form.submitted"
+
+    submission_id: UUID
+    template_id: UUID
+    tenant_id: UUID
+    version: int = Field(..., ge=1)
+    is_valid: bool
+    submitted_at: datetime
