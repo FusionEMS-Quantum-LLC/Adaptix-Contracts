@@ -25,6 +25,7 @@ class AdaptixRole(str, Enum):
     DISPATCHER = "dispatcher"
     PARAMEDIC = "paramedic"
     EMT = "emt"
+    MEDICAL_DIRECTOR = "medical_director"
     FIREFIGHTER = "firefighter"
     PILOT = "pilot"
     CREW_MEMBER = "crew_member"
@@ -59,6 +60,10 @@ class AdaptixRoleSet(BaseModel):
 
     def is_agency_admin(self) -> bool:
         return AdaptixRole.AGENCY_ADMIN in self.roles
+
+    def is_medical_director(self) -> bool:
+        """Clinical authority who owns/signs the agency protocol library (MD module gate)."""
+        return AdaptixRole.MEDICAL_DIRECTOR in self.roles
 
     def is_service_account(self) -> bool:
         return AdaptixRole.SERVICE_ACCOUNT in self.roles
