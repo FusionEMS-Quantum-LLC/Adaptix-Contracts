@@ -55,6 +55,7 @@ or ``GATEWAY_PUBLIC_KEY_ENV`` should be updated to use the new header contract.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Annotated
@@ -173,9 +174,35 @@ def _is_production() -> bool:
 
 
 def _parse_roles(raw: str | None) -> list[str]:
+    """Parse the unsigned/legacy ``X-User-Roles`` header into a role list.
+
+    Forensic audit finding, fixed 2026-07-05 (discovered while wiring
+    Adaptix-Imports-Service to this dependency): the gateway's Cognito auth
+    middleware (``adaptix-gateway/backend/app/middleware/cognito_auth.py``,
+    ``_parse_roles_for_signing``) forwards the raw ``custom:adaptix_roles``
+    Cognito claim into the legacy ``X-User-Roles`` header UNCHANGED — Cognito
+    stores that claim as a JSON-array string (e.g. ``'["admin","operator"]'``,
+    default ``"[]"``), not a comma-delimited string. This function previously
+    only comma-split the value, so a real JSON-array header produced a single
+    garbage role of literal text (e.g. ``'["admin"]'``) instead of
+    ``["admin"]`` on the unsigned/legacy path (reachable whenever the gateway
+    HMAC signature is absent or unverifiable — the default outside
+    production). Every downstream role/permission check driven by
+    ``AuthContext.roles`` on that path silently failed. This now mirrors the
+    gateway producer's own ``_parse_roles_for_signing`` convention: JSON-array
+    first, comma-delimited fallback for legacy/manually-set values.
+    """
     if not raw:
         return []
-    return [r.strip() for r in raw.split(",") if r.strip()]
+    stripped = raw.strip()
+    if stripped.startswith("[") and stripped.endswith("]"):
+        try:
+            parsed = json.loads(stripped)
+            if isinstance(parsed, list):
+                return [str(r).strip() for r in parsed if str(r).strip()]
+        except json.JSONDecodeError:
+            pass
+    return [r.strip() for r in stripped.split(",") if r.strip()]
 
 
 async def get_auth_context(
