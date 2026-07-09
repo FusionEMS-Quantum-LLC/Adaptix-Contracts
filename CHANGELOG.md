@@ -11,6 +11,40 @@ package version is `1.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-09
+
+### Added — ACIN (AdaptixCore Clinical Intelligence Narrative) shared contracts (additive only)
+
+New standalone subpackage `adaptix_contracts.acin` defining the canonical,
+versioned ACIN record surface consumed by EPCR, NEMSIS, Billing,
+Medical-Necessity, QA/QI, Legal, CMS-audit, AI-review, and Clinical-Decision-
+Support. Additive only — no existing field, model, or enum member was removed or
+repointed, and the `schemas` surface is unchanged.
+
+- **acin.enums:** `ACINSection` (A-C-I-N-E-L-S, each with a `.letter`),
+  `ACINRecordStatus`, `ACINClaimReviewState`, `ACINReviewType`,
+  `ACINReviewStatus`, `ACINReviewSeverity`.
+- **acin.provenance:** `ACINSourceRef` (grounding primitive mirroring
+  `ai.capabilities.AISourceField`), `ACINProvenanceMixin`, and `ACINClaimDTO`.
+  `ACINClaimDTO` fails closed — an `ai_generated` claim with zero
+  `source_field_refs` is invalid (no fabrication).
+- **acin.sections:** the seven section DTOs `ACINActivationDTO`,
+  `ACINClinicalPictureDTO`, `ACINIntelligenceDTO`, `ACINNarrativeDTO`,
+  `ACINEvidenceDTO`, `ACINLogicDTO`, `ACINSummaryDTO`, plus sub-DTOs
+  `ACINTimelineEntryDTO`, `ACINWitnessStatementDTO`, `ACINContradictionFlagDTO`
+  (flagged, never resolved), `ACINConditionFlagsDTO`, `ACINDifferentialDTO`.
+- **acin.scores:** `ACINScoreSetDTO` — the 10 model-attributed scores
+  (8 bounded 0-100 + contradictions/missing-elements counts).
+- **acin.reviews:** `ACINReviewDTO` and `ACINReviewFindingDTO` for the four
+  Cortex review lenses (clinical/billing/qa/legal); reviews record
+  `failed_unavailable` truthfully rather than stubbing completion.
+- **acin.record:** `ACINRecordDTO` — the full aggregation (7 sections + scores +
+  reviews) with `overall_ai_generated`/`requires_human_review` advisory guards.
+
+Contract-enforced non-negotiables: generated claims are grounded; AI content
+always requires human review; contradictions are flagged not resolved;
+narrative/summary are never authoritative truth.
+
 ## [1.5.0] - 2026-07-08
 
 ### Added — shared-service contract consolidation (additive only)
