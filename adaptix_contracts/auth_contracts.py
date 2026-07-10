@@ -158,6 +158,14 @@ class AuthContext(BaseModel):
         roles: Comma-split role list (from X-User-Roles).
         is_founder: True when the X-Is-Founder header equals "true" or the
             ``founder`` role is present in ``roles``.
+        scopes: Fine-grained permission scopes minted by Core (the JWT
+            ``permissions`` claim, e.g. ``["narcotic.vault.read"]``) and carried
+            through the gateway's signed context ``scopes`` field. Populated
+            ONLY from a VERIFIED signed context — the unsigned/legacy header path
+            has no scopes header, so it stays ``[]`` there. Services that gate on
+            fine-grained ``require_permission("<scope>")`` read this alongside
+            ``roles``; without it every such gate 403s because only role NAMES
+            reach the service.
     """
 
     user_id: UUID
@@ -165,6 +173,7 @@ class AuthContext(BaseModel):
     email: str = ""
     roles: list[str] = []
     is_founder: bool = False
+    scopes: list[str] = []
 
     model_config = {"frozen": True}
 
@@ -407,11 +416,22 @@ async def get_auth_context(
         )
         if is_founder_flag and "founder" not in {r.lower() for r in roles}:
             roles = ["founder", *roles]
+        # Fine-grained permission scopes from the VERIFIED signed context. The
+        # gateway signs the Core-minted ``permissions`` claim into ``scopes``.
+        # Case preserved for exact downstream ``require_permission`` matching.
+        signed_scopes = verified_payload.get("scopes")
+        scopes = (
+            [str(s).strip() for s in signed_scopes if str(s).strip()]
+            if isinstance(signed_scopes, list)
+            else []
+        )
     else:
         # Unsigned / legacy path (no verifiable signature): trust the injected
         # headers exactly as before. Reachable only when the absent-signature
         # path is allowed (enforcement off) or no shared secret is configured.
+        # There is no unsigned scopes header, so scopes stay empty on this path.
         roles = _parse_roles(x_user_roles)
+        scopes = []
         email = (x_user_email or "").strip()
         is_founder_flag = (x_is_founder or "false").strip().lower() in (
             "true",
@@ -431,6 +451,7 @@ async def get_auth_context(
         email=email,
         roles=roles,
         is_founder=is_founder_flag,
+        scopes=scopes,
     )
 
 

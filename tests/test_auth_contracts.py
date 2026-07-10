@@ -326,6 +326,7 @@ def _sign_gateway_context(
     aud: str = "adaptix-core",
     email: str = "user@example.test",
     roles: list[str] | None = None,
+    scopes: list[str] | None = None,
     is_founder: bool = False,
 ) -> tuple[str, str]:
     """Produce (context_b64, signature_hex) exactly like the gateway producer."""
@@ -337,7 +338,7 @@ def _sign_gateway_context(
         "agency_id": "",
         "email": email,
         "roles": list(roles or []),
-        "scopes": [],
+        "scopes": list(scopes or []),
         "is_founder": bool(is_founder),
         "iss": iss,
         "aud": aud,
@@ -388,6 +389,66 @@ def test_f24_valid_signature_with_secret_passes(_gateway_secret: str) -> None:
     assert auth.user_id == user_id
     assert auth.tenant_id == tenant_id
     assert "paramedic" in auth.roles
+
+
+def test_signed_scopes_surface_on_auth_context_and_pass_require_permission(
+    _gateway_secret: str,
+) -> None:
+    """PAIRED CONTRACT TEST — gateway → downstream permission propagation.
+
+    The gateway signs Core-minted fine-grained permissions into the context
+    ``scopes`` field. ``get_auth_context`` must surface them on
+    ``AuthContext.scopes`` so a service's ``require_permission`` gate
+    (roles + scopes) passes. Before this fix ``AuthContext`` dropped ``scopes``
+    entirely and narcotics /vaults 403'd for EVERY user despite a valid token
+    carrying ``narcotic.vault.read``.
+    """
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        roles=["agency_admin"],
+        scopes=["narcotic.vault.read"],
+        aud="adaptix-narcotics",
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_roles="agency_admin",
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    # The fine-grained scope survived onto the AuthContext.
+    assert "narcotic.vault.read" in auth.scopes
+    assert auth.roles == ["agency_admin"]
+
+    # Reproduce the downstream require_permission gate (roles + scopes).
+    permissions = list(auth.roles) + list(auth.scopes)
+    assert "narcotic.vault.read" in permissions  # gate PASSES (pre-fix: 403)
+    assert "narcotic.vault.delete" not in permissions  # no over-grant
+
+
+def test_unsigned_path_has_empty_scopes() -> None:
+    """Regression: the unsigned/legacy header path carries no scopes header, so
+    ``AuthContext.scopes`` stays empty (no accidental scope grant)."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_roles="agency_admin",
+        )
+    )
+
+    assert auth.scopes == []
 
 
 def test_f24_signed_roles_authoritative_over_spoofed_headers(
