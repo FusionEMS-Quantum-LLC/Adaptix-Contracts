@@ -11,6 +11,30 @@ package version is `1.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-12
+
+### Removed — BREAKING: `TransactionSource.PLAID` enum member
+
+Founder decision: Plaid is removed from the platform and replaced by SimpleFIN
+as the bank-feed ingestion provider. The `PLAID = "plaid"` member of
+`adaptix_contracts.schemas.finance_contracts.TransactionSource` is deleted.
+
+- **Enum:** `TransactionSource` now accepts only `CSV`, `MANUAL`, `STRIPE`.
+- **Why major:** Per `DEPRECATION_POLICY.md`, deleting an enum member requires a
+  major release, even though a workspace-wide consumer scan found **zero** code
+  consumers of this Contracts member. (`Adaptix-Finance-Service` defines its own
+  separate local `TransactionSource` enum in
+  `finance_app/ledger_v2/schemas.py` and does not import this one; the Web-App
+  `TransactionSource` is an independent hand-maintained TypeScript literal type.
+  None of these are affected by this removal.)
+- **Replacement path:** A SimpleFIN-backed transaction source is the founder-
+  designated replacement. It is intentionally **not** added in this release —
+  introducing a new `SIMPLEFIN` member is a separate additive (minor) change to
+  be coordinated with the Finance/SimpleFIN ingestion work.
+- **Downstream:** Consumers pinning `adaptix-contracts` must re-pin to `>=2.0.0`
+  to pick up this change. No consumer code changes are required, because the
+  removed member had no importers of this contract.
+
 ## [1.6.0] - 2026-07-09
 
 ### Added — ACIN (AdaptixCore Clinical Intelligence Narrative) shared contracts (additive only)
