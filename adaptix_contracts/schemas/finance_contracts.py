@@ -37,7 +37,6 @@ class AccountType(str, Enum):
 class TransactionSource(str, Enum):
     """Origin of a ledger transaction."""
 
-    PLAID = "plaid"
     CSV = "csv"
     MANUAL = "manual"
     STRIPE = "stripe"
