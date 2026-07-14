@@ -909,6 +909,19 @@ from .telnyx_contracts import (
     TelnyxTranscriptionCompletedEvent,
 )
 
+# Telephony platform (provider-agnostic Call/Voicemail/Queue/Presence)
+from .telephony_contracts import (
+    DestinationType,
+    CallStatus,
+    VoicemailStatus,
+    QueueStatus,
+    TelephonyEventType,
+    Call,
+    Voicemail,
+    Queue,
+    UserPresence,
+)
+
 # Workforce
 from .workforce_contracts import (
     ShiftStatus as WorkforceShiftStatus,
@@ -1661,6 +1674,16 @@ __all__ = [
     "TelnyxWebhookEventContract",
     "TelnyxCallCreatedEvent",
     "TelnyxTranscriptionCompletedEvent",
+    # Telephony platform
+    "DestinationType",
+    "CallStatus",
+    "VoicemailStatus",
+    "QueueStatus",
+    "TelephonyEventType",
+    "Call",
+    "Voicemail",
+    "Queue",
+    "UserPresence",
     # Workforce
     "WorkforceShiftStatus",
     "AvailabilityType",

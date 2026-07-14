@@ -11,6 +11,32 @@ package version is `1.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-07-14
+
+### Added — Telephony platform contracts (additive only)
+
+New shared module `adaptix_contracts.schemas.telephony_contracts` so
+`Adaptix-Telephony-Service`, `Adaptix-Web-App`, and `Adaptix-Founder-Service`
+agree on the provider-agnostic telephony wire shapes and realtime event types.
+
+- **Enums:** `DestinationType` (user/team/queue/department/workspace/
+  cortex_agent/voicemail_box/external_number/on_call_policy), `CallStatus`
+  (new/ringing/ai_active/queued/offered/answered/on_hold/transferring/voicemail/
+  completed/abandoned/failed), `VoicemailStatus` (new/unread/listened/in_review/
+  assigned/callback_required/callback_completed/archived/deleted/
+  failed_processing), `QueueStatus` (open/closed/paused/degraded).
+- **Realtime event-type constants:** `TelephonyEventType` covering
+  `telephony.call.{ringing,offered,answered,held,resumed,transferred,completed,
+  failed}`, `telephony.voicemail.{created,transcribed,processing_failed}`,
+  `telephony.queue.updated`, and `telephony.presence.updated`.
+- **Entity contracts:** `Call`, `Voicemail`, `Queue`, `UserPresence` (each
+  `from_attributes=True`), matching the directive field lists.
+- **Why minor:** Purely additive new module + exports; no existing contract
+  changed. Existing provider-specific `telnyx_contracts` are untouched and map
+  INTO these platform shapes. Consumers opt in by re-pinning `>=2.1.0`.
+- **Surface:** All nine symbols re-exported from `adaptix_contracts.schemas`
+  and the package root; `__version__` and `pyproject.toml` bumped to `2.1.0`.
+
 ## [2.0.0] - 2026-07-12
 
 ### Removed — BREAKING: `TransactionSource.PLAID` enum member
