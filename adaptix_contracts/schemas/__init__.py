@@ -419,6 +419,18 @@ from .terminology_contracts import (
     TerminologyEventEnvelope,
 )
 
+# Concept Intelligence — terminology concept event contracts (SignalCore-based, v1.0)
+# NOTE: this module's enum is named ``TerminologyEventType`` (publisher vocabulary)
+# but is re-exported here aliased to avoid colliding with the pre-existing broader
+# ``terminology_contracts.TerminologyEventType`` already on the package surface —
+# same pattern as ``PayerType as ReferenceDataPayerType`` above.
+from .terminology_event_contracts import (
+    TerminologyEventType as TerminologyConceptEventType,
+    TerminologyConceptEventPayload,
+    build_terminology_event,
+    validate_terminology_event,
+)
+
 from .payment_contracts import (
     SubscriptionStatus,
     InvoiceStatus,
@@ -1119,6 +1131,11 @@ __all__ = [
     "GraphRelationship",
     "GraphRelationshipExplanation",
     "TerminologyEventEnvelope",
+    # Concept Intelligence — terminology concept event contracts (SignalCore-based)
+    "TerminologyConceptEventType",
+    "TerminologyConceptEventPayload",
+    "build_terminology_event",
+    "validate_terminology_event",
     # Event infrastructure contracts
     "EventSchema",
     "EventMetadata",
