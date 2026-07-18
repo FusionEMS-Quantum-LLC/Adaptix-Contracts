@@ -224,3 +224,65 @@ def verify_service_token(
         )
 
     return ServiceTokenClaims(**raw)
+
+
+def verify_service_token_with_keyset(
+    token: str,
+    *,
+    trusted_keys: dict[str, str],
+    expected_issuer: str,
+    expected_audience: str,
+    expected_subject: str,
+    required_scope: str,
+    expected_tenant_id: str | None = None,
+    leeway_seconds: int = LEEWAY_SECONDS,
+) -> ServiceTokenClaims:
+    """Verify a service token against a trusted ``{kid: public_key_pem}`` keyset.
+
+    Canonical downstream (CAD/Air) verifier. Enforces an unforgeable, required key
+    selection so a caller can never influence which key validates a token, and the
+    verifier never tries every key until one happens to pass:
+
+    - header ``alg`` MUST be the approved algorithm (RS256), else 401;
+    - header MUST carry a non-empty ``kid``, else 401 (KID_MISSING);
+    - ``kid`` MUST resolve to exactly one key in the LOCAL ``trusted_keys`` map,
+      else 401 (KID_UNKNOWN). Keys are supplied by the service (active + previous
+      during rotation) and NEVER fetched from a token-controlled URL (no
+      jku/x5u/JWKS-by-URL) — SSRF-safe by construction;
+    - the resolved key then runs full claim verification via ``verify_service_token``.
+
+    Raises ``ServiceTokenError`` (-> 401) for missing/unknown key, wrong algorithm,
+    malformed/bad-signature/expired/untrusted-issuer; ``ServiceTokenAuthzError``
+    (-> 403) for audience/subject/scope/tenant failures.
+    """
+    if not token or not token.strip():
+        raise ServiceTokenError("SERVICE_TOKEN_MISSING")
+    if not trusted_keys:
+        raise ServiceTokenError("SERVICE_TOKEN_KEYSET_EMPTY")
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.InvalidTokenError as exc:
+        raise ServiceTokenError("SERVICE_TOKEN_MALFORMED") from exc
+
+    alg = header.get("alg")
+    if alg != _ALGORITHM:
+        raise ServiceTokenError(f"SERVICE_TOKEN_ALGORITHM_REJECTED: {alg!r}")
+
+    kid = header.get("kid")
+    if not kid or not str(kid).strip():
+        raise ServiceTokenError("SERVICE_TOKEN_KID_MISSING")
+
+    public_key = trusted_keys.get(str(kid))
+    if not public_key:
+        raise ServiceTokenError("SERVICE_TOKEN_KID_UNKNOWN")
+
+    return verify_service_token(
+        token,
+        public_key_pem=public_key,
+        expected_issuer=expected_issuer,
+        expected_audience=expected_audience,
+        expected_subject=expected_subject,
+        required_scope=required_scope,
+        expected_tenant_id=expected_tenant_id,
+        leeway_seconds=leeway_seconds,
+    )

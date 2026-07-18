@@ -19,6 +19,7 @@ from adaptix_contracts.auth.service_token import (
     ServiceTokenError,
     issue_service_token,
     verify_service_token,
+    verify_service_token_with_keyset,
 )
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     # Canonical S2S service-identity token (Operations -> CAD/Air).
     "issue_service_token",
     "verify_service_token",
+    "verify_service_token_with_keyset",
     "ServiceTokenClaims",
     "ServiceTokenError",
     "ServiceTokenAuthzError",
