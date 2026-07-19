@@ -41,7 +41,7 @@ from adaptix_contracts.event_contracts import (
     LocalEventConsumerRegistry as LocalEventConsumerRegistry,
 )
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 
 # Re-export all schema symbols at package level for convenience.
 __all__ = list(_schemas.__all__)
