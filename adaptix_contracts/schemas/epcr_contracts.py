@@ -35,6 +35,18 @@ class EpcrChartFinalizedEvent(BaseModel):
 
     missing_fields: list[str] = Field(default_factory=list)
 
+    # Test-record isolation. True for a non-production ePCR (e.g. a Founder
+    # WARDS Lab record), which must never enter billing, patient-identity
+    # matching, production NEMSIS/WARDS submission, notifications, or
+    # analytics. EPCR is the authoritative chokepoint and does not emit this
+    # event for test charts at all; the flag exists so every consumer can
+    # additionally defend itself instead of trusting upstream filtering.
+    #
+    # Defaults to False so existing producers and persisted events remain
+    # valid, and so an omitted value fails CLOSED toward production semantics
+    # (a real encounter is never silently dropped from billing).
+    is_test: bool = False
+
 
 class EpcrChartContract(BaseModel):
     """Read-only ePCR chart contract for cross-domain consumption."""
@@ -167,6 +179,15 @@ class EpcrBillingHandoffPayload(BaseModel):
     chart_id: str
     tenant_id: str
     call_number: str
+
+    # Test-record isolation. True for a non-production ePCR (e.g. a Founder
+    # WARDS Lab record). A consumer MUST NOT create a Claim, ClaimIntakeRecord,
+    # or any payer-facing artifact from a payload where this is True.
+    #
+    # Defaults to False so existing producers stay valid and an omitted value
+    # fails CLOSED toward production (a real encounter is never silently
+    # dropped from billing).
+    is_test: bool = False
 
     # Patient demographics from ePCR
     patient_first_name: Optional[str] = None
