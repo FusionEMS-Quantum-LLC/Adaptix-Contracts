@@ -100,6 +100,10 @@ def evaluate_signature_compliance(
         allowed_methods.append(SignatureCaptureMethod.ELECTRONIC)
     if "handwritten" in policy or "handwritten_required" in policy:
         allowed_methods.append(SignatureCaptureMethod.HANDWRITTEN)
+    if "verbal" in policy:
+        allowed_methods.append(SignatureCaptureMethod.VERBAL)
+    if "on_file" in policy:
+        allowed_methods.append(SignatureCaptureMethod.ON_FILE)
     if not allowed_methods:
         allowed_methods = [
             SignatureCaptureMethod.ELECTRONIC,
@@ -152,9 +156,21 @@ def evaluate_signature_compliance(
     else:
         retention_requirements = ["signature_artifact_retain_3_years"]
 
+    submitted_method = request.signature_method.strip().lower()
+    method_supported = submitted_method in {m.value for m in allowed_methods}
+
     if missing:
         decision = ComplianceDecision.BLOCKED_MISSING_SIGNER
         why = f"Signature compliance blocked: missing required fields: {', '.join(missing)}."
+        billing_effect = BillingReadinessEffect.BLOCKED.value
+        chart_effect = ChartCompletionEffect.INCOMPLETE.value
+    elif not method_supported:
+        decision = ComplianceDecision.BLOCKED_UNSUPPORTED_METHOD
+        why = (
+            f"Signature capture method '{request.signature_method}' is not permitted "
+            f"under policy '{request.workflow_policy}'. Allowed methods: "
+            f"{', '.join(m.value for m in allowed_methods)}."
+        )
         billing_effect = BillingReadinessEffect.BLOCKED.value
         chart_effect = ChartCompletionEffect.INCOMPLETE.value
     elif (
@@ -184,6 +200,7 @@ def evaluate_signature_compliance(
         "missing_fields": missing,
         "required_documents": required_docs,
         "allowed_methods": [m.value for m in allowed_methods],
+        "submitted_method": submitted_method,
         "decision": decision.value,
     }
 
