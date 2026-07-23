@@ -343,15 +343,15 @@ def test_legacy_enum_value_sets_are_unchanged() -> None:
     change. This test fails loudly if that collapse is attempted in a minor
     release.
     """
-    from adaptix_contracts.scheduling.models import (
-        AssignmentStatus as CanonicalAssignmentStatus,
-        RiskLevel,
-        ShiftStatus as CanonicalShiftStatus,
-        SwapStatus as CanonicalSwapStatus,
-        TimeOffStatus as CanonicalTimeOffStatus,
-    )
+    from adaptix_contracts.scheduling import models as canonical
     from adaptix_contracts.schemas import labor_contracts, workforce_contracts
     from adaptix_contracts.workforce import models as workforce_models
+
+    RiskLevel = canonical.RiskLevel
+    CanonicalShiftStatus = canonical.ShiftStatus
+    CanonicalAssignmentStatus = canonical.AssignmentStatus
+    CanonicalSwapStatus = canonical.SwapStatus
+    CanonicalTimeOffStatus = canonical.TimeOffStatus
 
     def values(enum_cls) -> set[str]:
         return {member.value for member in enum_cls}
