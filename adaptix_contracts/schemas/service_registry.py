@@ -159,6 +159,29 @@ AIR_SERVICE = ServiceDefinition(
     description="Air transport operations",
 )
 
+# Workforce scheduling domain. Registered here because 27 ``schedule.*`` events in
+# ``adaptix_contracts.events.registry`` already declare
+# ``source_service="adaptix-scheduling"``; without this entry those events name a
+# service that does not resolve (see
+# ``tests/test_scheduling_service_registration.py``).
+#
+# Runtime note (verified 2026-07-23 against
+# Adaptix-Gateway/backend/app/config/routes.py:1830-1842): the ``/api/v1/scheduling``
+# prefix is currently proxied to Labor-Service with audience ``adaptix-labor``. No
+# standalone Adaptix-Scheduling-Service repository or ECS service exists yet. This
+# definition declares the canonical contract-level owner of the scheduling domain
+# per SCHEDULING_ARCHITECTURE_LOCK.md; it does not assert a deployed service.
+SCHEDULING_SERVICE = ServiceDefinition(
+    name="Adaptix-Scheduling-Service",
+    slug="scheduling",
+    route_prefix="/api/v1/scheduling",
+    port=8046,
+    description=(
+        "Workforce scheduling: schedules, shift templates/instances, assignments, "
+        "availability, time off, overtime, swaps, holdovers, coverage rules"
+    ),
+)
+
 # ============================================================================
 # NEW DOMAIN SERVICES (Option A expansion)
 # ============================================================================
@@ -427,6 +450,7 @@ ALL_SERVICES: list[ServiceDefinition] = [
     LABOR_SERVICE,
     GRAPH_SERVICE,
     AIR_SERVICE,
+    SCHEDULING_SERVICE,
     # New domain services
     CRM_SERVICE,
     INVESTOR_SERVICE,

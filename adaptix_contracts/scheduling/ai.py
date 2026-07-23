@@ -54,6 +54,21 @@ class CoverageRiskExplanation(BaseModel):
 
 
 class FatigueRiskScore(BaseModel):
+    """Canonical fatigue risk output for the scheduling domain.
+
+    Consolidation target for ``adaptix_contracts.workforce.models.FatigueAssessment``
+    per SCHEDULING_ARCHITECTURE_LOCK.md section 3.3. ``risk_factors``,
+    ``ai_generated`` and ``supervisor_review_flag`` were carried over from
+    ``FatigueAssessment`` (workforce/models.py:49-54) so this model is a superset
+    of the fatigue surface. They are optional with safe defaults, so existing
+    producers and payloads are unaffected.
+
+    ``risk_level`` remains ``str`` rather than
+    ``adaptix_contracts.scheduling.models.RiskLevel`` because narrowing an
+    accepted-value set is a major-version change under DEPRECATION_POLICY.md.
+    Producers should emit ``RiskLevel`` values ("low"/"medium"/"high"/"critical").
+    """
+
     person_id: UUID
     shift_id: UUID
     hours_worked_last_24h: float
@@ -64,6 +79,10 @@ class FatigueRiskScore(BaseModel):
     risk_level: str  # low, medium, high, critical
     explanation: str
     human_review_required: bool = True
+    # Carried over from workforce.models.FatigueAssessment (additive, optional).
+    risk_factors: list[str] = Field(default_factory=list)
+    ai_generated: bool = False
+    supervisor_review_flag: bool = False
 
 
 class OvertimeFairnessScore(BaseModel):

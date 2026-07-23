@@ -5,8 +5,23 @@ shift scheduling, assignment decisions, open-shift marketplace,
 leave/trade requests, fatigue scoring, compliance enforcement,
 compensation resolution, and payroll export events.
 
-These contracts are the authoritative source for all labor domain
-data exchanged across Adaptix services.
+SCOPE CORRECTION (SCHEDULING_ARCHITECTURE_LOCK.md section 3.3)
+-------------------------------------------------------------
+This module is NO LONGER the authoritative source for the shift / assignment /
+trade / leave domain. ``adaptix_contracts.scheduling.models`` is the single
+source of truth. The canonical models are re-exported below so downstream code
+can adopt the canonical names from this module path.
+
+The genuinely payroll-only surface — ``PayrollExportStatus``,
+``LaborPayrollExportSubmittedEvent`` and ``LaborExternalSyncCompletedEvent`` —
+is KEPT here and is not part of the scheduling consolidation.
+
+The legacy ``Labor*Contract`` models and the ``ShiftStatus`` / ``AssignmentStatus``
+/ ``TradeStatus`` / ``LeaveStatus`` enums below are RETAINED, not deleted:
+replacing them is a major-version change under DEPRECATION_POLICY.md because the
+shapes and enum value sets are not interchangeable. See
+``DEPRECATED_MODEL_REPLACEMENTS`` / ``DEPRECATED_ENUM_REPLACEMENTS`` and the
+per-class notes for the exact incompatibilities.
 """
 
 from __future__ import annotations
@@ -16,6 +31,42 @@ from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel
+
+# Canonical scheduling domain models — re-exported so callers can adopt the
+# single-truth names from this legacy module path. Additive: nothing below is
+# shadowed or replaced.
+from adaptix_contracts.scheduling.models import (  # noqa: F401
+    AssignmentStatus as CanonicalAssignmentStatus,
+    RiskLevel,
+    ShiftAssignment,
+    ShiftInstance,
+    ShiftStatus as CanonicalShiftStatus,
+    ShiftSwapRequest,
+    SwapStatus as CanonicalSwapStatus,
+    TimeOffRequest,
+    TimeOffStatus as CanonicalTimeOffStatus,
+)
+
+#: Legacy model -> canonical replacement in ``adaptix_contracts.scheduling.models``.
+DEPRECATED_MODEL_REPLACEMENTS: dict[str, str] = {
+    "LaborShiftContract": "adaptix_contracts.scheduling.models.ShiftInstance",
+    "LaborAssignmentContract": "adaptix_contracts.scheduling.models.ShiftAssignment",
+}
+
+#: Legacy enum -> canonical replacement. NOT value-compatible; see per-enum notes.
+DEPRECATED_ENUM_REPLACEMENTS: dict[str, str] = {
+    "ShiftStatus": "adaptix_contracts.scheduling.models.ShiftStatus",
+    "AssignmentStatus": "adaptix_contracts.scheduling.models.AssignmentStatus",
+    "TradeStatus": "adaptix_contracts.scheduling.models.SwapStatus",
+    "LeaveStatus": "adaptix_contracts.scheduling.models.TimeOffStatus",
+}
+
+#: Payroll-only surface that deliberately STAYS in the labor domain.
+PAYROLL_ONLY_SURFACE: tuple[str, ...] = (
+    "PayrollExportStatus",
+    "LaborPayrollExportSubmittedEvent",
+    "LaborExternalSyncCompletedEvent",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -44,7 +95,12 @@ class LaborDomain(str, Enum):
 
 
 class ShiftStatus(str, Enum):
-    """Lifecycle status of a labor shift."""
+    """DEPRECATED — use ``adaptix_contracts.scheduling.models.ShiftStatus``.
+
+    NOT value-compatible. This enum: draft/published/locked/open/in_progress/
+    completed/cancelled. Canonical: open/assigned/cancelled/completed. Collapsing
+    would delete "draft", "published", "locked" and "in_progress".
+    """
 
     DRAFT = "draft"
     PUBLISHED = "published"
@@ -56,7 +112,12 @@ class ShiftStatus(str, Enum):
 
 
 class AssignmentStatus(str, Enum):
-    """Status of a shift assignment."""
+    """DEPRECATED — use ``adaptix_contracts.scheduling.models.AssignmentStatus``.
+
+    NOT value-compatible. This enum adds "overridden", which the canonical enum
+    (pending/confirmed/cancelled) does not define. Collapsing would reject every
+    persisted or in-flight assignment carrying status="overridden".
+    """
 
     PENDING = "pending"
     CONFIRMED = "confirmed"
@@ -65,7 +126,13 @@ class AssignmentStatus(str, Enum):
 
 
 class TradeStatus(str, Enum):
-    """Status of a shift trade proposal."""
+    """DEPRECATED — canonical target is
+    ``adaptix_contracts.scheduling.models.SwapStatus``.
+
+    NOT value-compatible. This enum: proposed/accepted/denied/cancelled/completed.
+    SwapStatus: requested/approved/denied/cancelled. Only "denied" and "cancelled"
+    overlap; "proposed", "accepted" and "completed" have no canonical equivalent.
+    """
 
     PROPOSED = "proposed"
     ACCEPTED = "accepted"
@@ -75,7 +142,11 @@ class TradeStatus(str, Enum):
 
 
 class LeaveStatus(str, Enum):
-    """Status of a leave request."""
+    """DEPRECATED — use ``adaptix_contracts.scheduling.models.TimeOffStatus``.
+
+    Value-compatible: both are pending/approved/denied/cancelled. Retained only
+    because deleting the name would break the import path in a minor release.
+    """
 
     PENDING = "pending"
     APPROVED = "approved"
@@ -104,7 +175,10 @@ class CommandPosture(str, Enum):
 
 
 class PayrollExportStatus(str, Enum):
-    """Status of a payroll export run."""
+    """Status of a payroll export run.
+
+    KEPT — genuinely payroll-only. Not part of the scheduling consolidation.
+    """
 
     DRAFT = "draft"
     SUBMITTED = "submitted"
@@ -127,7 +201,13 @@ class PolicyStatus(str, Enum):
 
 
 class LaborShiftContract(BaseModel):
-    """Cross-domain read contract for a scheduled labor shift."""
+    """DEPRECATED — use ``adaptix_contracts.scheduling.models.ShiftInstance``.
+
+    NOT shape-compatible: identifiers are ``str`` here and ``UUID`` in the
+    canonical model; ``start_time``/``end_time`` are "HH:MM" strings here and
+    ``datetime`` there; ``shift_date`` is ``date`` here and ``datetime`` there;
+    ``domain``/``minimum_staffing``/``is_locked`` have no canonical counterpart.
+    """
 
     shift_id: str
     tenant_id: str
@@ -144,7 +224,13 @@ class LaborShiftContract(BaseModel):
 
 
 class LaborAssignmentContract(BaseModel):
-    """Cross-domain read contract for a shift assignment."""
+    """DEPRECATED — use ``adaptix_contracts.scheduling.models.ShiftAssignment``.
+
+    NOT shape-compatible: identifiers are ``str`` here and ``UUID`` in the
+    canonical model; ``employee_id`` maps to ``person_id``; ``slot_id`` and
+    ``override_reason`` have no canonical counterpart; the canonical model
+    requires ``person_name``, ``created_at`` and ``updated_at``.
+    """
 
     assignment_id: str
     tenant_id: str
@@ -158,7 +244,12 @@ class LaborAssignmentContract(BaseModel):
 
 
 class LaborEmployeeReadinessContract(BaseModel):
-    """Cross-domain read contract for an employee readiness snapshot."""
+    """RETAINED — no canonical equivalent exists.
+
+    ``adaptix_contracts.scheduling.models`` defines no employee-readiness model,
+    so there is nothing to re-point this contract at. Left in place pending the
+    Readiness Twin work (SCHEDULING_ARCHITECTURE_LOCK.md phase 3).
+    """
 
     employee_id: str
     tenant_id: str
@@ -297,7 +388,10 @@ class LaborFatigueRestrictionAppliedEvent(BaseModel):
 
 
 class LaborPayrollExportSubmittedEvent(BaseModel):
-    """Published when a payroll export run is submitted to an external system."""
+    """Published when a payroll export run is submitted to an external system.
+
+    KEPT — genuinely payroll-only. Not part of the scheduling consolidation.
+    """
 
     event_type: str = "labor.payroll_export.submitted"
 
@@ -312,7 +406,11 @@ class LaborPayrollExportSubmittedEvent(BaseModel):
 
 
 class LaborExternalSyncCompletedEvent(BaseModel):
-    """Published when an external system integration sync job completes."""
+    """Published when an external system integration sync job completes.
+
+    KEPT — genuinely payroll/integration-only. Not part of the scheduling
+    consolidation.
+    """
 
     event_type: str = "labor.external_sync.completed"
 
