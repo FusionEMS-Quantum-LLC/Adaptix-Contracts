@@ -36,7 +36,19 @@ phases:
       # async test suites across every service and are frequently declared
       # under a [dev] extra rather than [test], so install them explicitly
       # to guarantee pytest's clean-container imports resolve.
-      - pip install --quiet ruff mypy pytest pytest-asyncio pytest-cov pytest-xdist aiosqlite httpx
+      #
+      # ruff is PINNED. It was previously unpinned, so ruff 0.16.0 (published
+      # 2026-07-23T19:10Z) landed mid-flight and expanded the default rule set
+      # (I001/UP045/BLE001/FLY002/RUF022 now fire by default). Measured with a
+      # clean `ruff==0.16.0` venv and --no-cache, `ruff check .` reports 1606
+      # violations on main @23d631d itself — i.e. an upstream release broke
+      # every open PR in this repo overnight without a single line of repo code
+      # changing. 0.15.22 (published 2026-07-16) is the last version before that
+      # change and is the version the last green build (PR #111, 2026-07-19)
+      # ran on, so this pin restores the exact previously-enforced gate rather
+      # than relaxing it. Bump deliberately, with the rule-set delta reviewed
+      # and the resulting violations fixed in their own PR.
+      - pip install --quiet 'ruff==0.15.22' mypy pytest pytest-asyncio pytest-cov pytest-xdist aiosqlite httpx
       - |
         # Install the backend package + its test/dev extras so pytest's full
         # dependency set is present in CodeBuild's clean container. Repos vary
