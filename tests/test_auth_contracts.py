@@ -328,6 +328,7 @@ def _sign_gateway_context(
     roles: list[str] | None = None,
     scopes: list[str] | None = None,
     is_founder: bool = False,
+    mfa_verified: bool = False,
 ) -> tuple[str, str]:
     """Produce (context_b64, signature_hex) exactly like the gateway producer."""
     now = int(time.time())
@@ -340,6 +341,7 @@ def _sign_gateway_context(
         "roles": list(roles or []),
         "scopes": list(scopes or []),
         "is_founder": bool(is_founder),
+        "mfa_verified": bool(mfa_verified),
         "iss": iss,
         "aud": aud,
         "iat": now if iat is None else iat,
@@ -432,6 +434,29 @@ def test_signed_scopes_surface_on_auth_context_and_pass_require_permission(
     permissions = list(auth.roles) + list(auth.scopes)
     assert "narcotic.vault.read" in permissions  # gate PASSES (pre-fix: 403)
     assert "narcotic.vault.delete" not in permissions  # no over-grant
+
+
+def test_signed_mfa_claim_surfaces_on_auth_context(_gateway_secret: str) -> None:
+    """A verified boolean MFA claim is available to downstream DEA gates."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        mfa_verified=True,
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.mfa_verified is True
 
 
 def test_unsigned_path_has_empty_scopes() -> None:
