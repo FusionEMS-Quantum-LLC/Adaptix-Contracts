@@ -11,6 +11,111 @@ package version is `1.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__
 
 ## [Unreleased]
 
+### Added — `SCHEDULING_SERVICE` registration (additive only)
+
+Phase 1 of the Workforce Scheduling directive, driven by
+`SCHEDULING_ARCHITECTURE_LOCK.md` section 3.3 (Adaptix-Governance).
+
+- **`adaptix_contracts.schemas.service_registry.SCHEDULING_SERVICE`** — new
+  `ServiceDefinition` (name `Adaptix-Scheduling-Service`, slug `scheduling`,
+  route_prefix `/api/v1/scheduling`, port `8046`), appended to `ALL_SERVICES` and
+  therefore present in `SERVICE_BY_SLUG`. Closes the gap where 27 `schedule.*`
+  events in `events/registry.py:128-131` declared
+  `source_service="adaptix-scheduling"` with no service to resolve to.
+  **Runtime reality:** `/api/v1/scheduling` is currently proxied to Labor-Service
+  (`Adaptix-Gateway/backend/app/config/routes.py:1830-1842`, audience
+  `adaptix-labor`). No `Adaptix-Scheduling-Service` repository or ECS service
+  exists. This entry declares contract-level ownership only.
+- **`adaptix_contracts/platform/ownership_manifest.json`** — new `scheduling`
+  entry with `api_prefixes: ["/api/v1/scheduling"]` and all 27 `schedule.*`
+  events in `owned_events`; `status: "declared_not_deployed"` with the runtime
+  caveat recorded in `notes`.
+- **`adaptix_contracts.scheduling.ai.FatigueRiskScore`** — gains optional
+  `risk_factors: list[str] = []`, `ai_generated: bool = False` and
+  `supervisor_review_flag: bool = False`, carried over from
+  `workforce.models.FatigueAssessment:49-54`. All optional with safe defaults, so
+  existing producers and payloads are unaffected.
+- **Canonical re-exports.** `adaptix_contracts.scheduling.models` symbols are now
+  importable from the three duplicate modules so callers can adopt the
+  single-truth names before the shapes move:
+  `schemas/workforce_contracts.py` re-exports `ShiftInstance`, `ShiftAssignment`,
+  `AvailabilityWindow`, `TimeOffRequest`, `RiskLevel` (plus
+  `Canonical{Shift,Assignment,TimeOff}Status`); `schemas/labor_contracts.py`
+  re-exports `ShiftInstance`, `ShiftAssignment`, `ShiftSwapRequest`,
+  `TimeOffRequest`, `RiskLevel` (plus `Canonical{Shift,Assignment,TimeOff,Swap}Status`);
+  `workforce/models.py` re-exports `RiskLevel`.
+- **Machine-readable deprecation maps.** `DEPRECATED_MODEL_REPLACEMENTS` /
+  `DEPRECATED_ENUM_REPLACEMENTS` (workforce_contracts, labor_contracts),
+  `DEPRECATED_REPLACEMENTS` (workforce/models), and `PAYROLL_ONLY_SURFACE`
+  (labor_contracts, naming the payroll surface that deliberately stays put).
+- **Tests** — `tests/test_scheduling_service_registration.py` (19 tests):
+  every `source_service` in `ALL_EVENTS` resolves to a registered
+  `ServiceDefinition`; `service_registry` route prefixes match
+  `ownership_manifest` `api_prefixes` per slug; deprecated names and their
+  canonical replacements both resolve; legacy enum value sets are frozen.
+
+### Fixed — stale `narcotics` api_prefix in the ownership manifest
+
+`ownership_manifest.json` listed only the singular `/api/v1/narcotic`. The
+gateway boundary-matches the **plural** `/api/v1/narcotics`
+(`Adaptix-Gateway/backend/app/config/routes.py:1849`), which is precisely why
+`Adaptix-Narcotics-Service/backend/core_app/main.py:40-62` aliases every singular
+router onto the plural namespace. `api_prefixes` is now
+`["/api/v1/narcotics", "/api/v1/narcotic"]` — plural first as the canonical
+externally routable prefix, singular retained because the service still serves
+it natively. No code change; manifest data only.
+
+### Known drift — recorded, not papered over
+
+- **`crew`** — `CREW_SERVICE` (slug `crew`, `/api/v1/crew`) has **no**
+  `ownership_manifest.json` entry. The nearest entry, `crewlink`, declares
+  `/api/v1/crewlink` and `canonical_repo: Adaptix-Crew-Service`, but the gateway
+  routes `/api/v1/crewlink` to **CAD-Service** and comments that the
+  `adaptix-crewlink` upstream "has no ECS service backing it"
+  (`routes.py:1438-1460`), while `/api/v1/crew` is a separate live route to
+  `crew_service_url` (`routes.py:1788-1793`). Correct repo / ECS service /
+  schema for a `crew` entry, and the crewlink ownership contradiction, are not
+  derivable from this repository. Tracked by an `xfail(strict=True)` test that
+  will fail the moment it is fixed, forcing the marker's removal.
+- **33 registered slugs have no manifest entry** (`crew`, `transport`,
+  `telephony`, `labor`, and 29 newer domain services). Frozen in
+  `_SLUGS_WITHOUT_MANIFEST_ENTRY` so the gap cannot grow silently.
+
+### BLOCKED — the model/enum consolidation itself is a major-version change
+
+`SCHEDULING_ARCHITECTURE_LOCK.md` section 3.3 calls for deleting the duplicate
+models/enums in `schemas/workforce_contracts.py`, `schemas/labor_contracts.py`
+and `workforce/models.py` and re-exporting `scheduling.models` in their place.
+**Not shipped.** Re-exporting preserves the *import path* but not the *shape*, and
+these shapes are not interchangeable. Under this repository's own
+`DEPRECATION_POLICY.md` ("Major releases are required for removing fields,
+renaming fields, changing field meaning, narrowing accepted values, or deleting
+enum members") every substitution below requires a major release plus a
+downstream data migration:
+
+| Legacy | Canonical | Incompatibility |
+|---|---|---|
+| `workforce_contracts.FatigueLevel` | `RiskLevel` | deletes `none`, `moderate`; adds `medium` |
+| `workforce.models.FatigueRiskLevel` | `RiskLevel` | deletes `moderate`; adds `medium` |
+| `workforce_contracts.ShiftStatus` | `ShiftStatus` | deletes `draft`, `published`, `in_progress` |
+| `labor_contracts.ShiftStatus` | `ShiftStatus` | deletes `draft`, `published`, `locked`, `in_progress` |
+| `labor_contracts.AssignmentStatus` | `AssignmentStatus` | deletes `overridden` |
+| `labor_contracts.TradeStatus` | `SwapStatus` | deletes `proposed`, `accepted`, `completed` |
+| `WorkforceShiftContract` | `ShiftInstance` | drops `name`, `location`; adds 4 required fields |
+| `WorkforceShiftAssignmentContract` | `ShiftAssignment` | `user_id`→`person_id`; drops `role`; adds 4 required fields |
+| `WorkforceAvailabilityContract` | `AvailabilityWindow` | recurring `day_of_week`+`time` cannot be expressed as an absolute `datetime` window |
+| `WorkforceTimeOffContract` | `TimeOffRequest` | `user_id`→`person_id`; `date`→`datetime`; adds 2 required fields |
+| `LaborShiftContract` | `ShiftInstance` | `str`→`UUID` ids; `"HH:MM"` str→`datetime` |
+| `LaborAssignmentContract` | `ShiftAssignment` | `str`→`UUID` ids; drops `slot_id`, `override_reason` |
+
+`WorkforceReadinessContract` and `LaborEmployeeReadinessContract` have **no**
+canonical counterpart in `scheduling/models.py` and cannot be re-pointed at all.
+
+Every legacy name is therefore retained and marked deprecated in code, with the
+canonical target recorded in the machine-readable maps above. Unblocking
+requires a founder decision on a `3.0.0` major release plus a coordinated
+downstream migration.
+
 ## [2.1.0] - 2026-07-14
 
 ### Added — Telephony platform contracts (additive only)

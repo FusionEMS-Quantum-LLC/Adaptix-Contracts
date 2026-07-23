@@ -1,4 +1,16 @@
-"""Workforce contracts for Adaptix platform."""
+"""Workforce contracts for Adaptix platform.
+
+FATIGUE SEVERITY CONSOLIDATION (SCHEDULING_ARCHITECTURE_LOCK.md section 3.3)
+---------------------------------------------------------------------------
+``adaptix_contracts.scheduling.models.RiskLevel`` is the canonical severity enum
+and ``adaptix_contracts.scheduling.ai.FatigueRiskScore`` is the canonical fatigue
+model. ``RiskLevel`` is re-exported from this module so callers can adopt the
+canonical name from this module path.
+
+``FatigueRiskLevel`` and ``FatigueAssessment`` are RETAINED, not deleted — see
+their docstrings for the exact value-set incompatibility that makes the swap a
+major-version change under DEPRECATION_POLICY.md.
+"""
 
 from __future__ import annotations
 from datetime import datetime
@@ -6,8 +18,26 @@ from enum import Enum
 from typing import Optional
 from pydantic import BaseModel
 
+# Canonical severity enum — re-exported (additive; does not shadow FatigueRiskLevel).
+from adaptix_contracts.scheduling.models import RiskLevel  # noqa: F401
+
+#: Legacy name -> canonical replacement.
+DEPRECATED_REPLACEMENTS: dict[str, str] = {
+    "FatigueRiskLevel": "adaptix_contracts.scheduling.models.RiskLevel",
+    "FatigueAssessment": "adaptix_contracts.scheduling.ai.FatigueRiskScore",
+}
+
 
 class FatigueRiskLevel(str, Enum):
+    """DEPRECATED — canonical target is
+    ``adaptix_contracts.scheduling.models.RiskLevel``.
+
+    NOT value-compatible. This enum: low/moderate/high/critical. RiskLevel:
+    low/medium/high/critical. Aliasing this name to ``RiskLevel`` would delete
+    the "moderate" member and reject every persisted or in-flight payload
+    carrying it — a major-version change under DEPRECATION_POLICY.md.
+    """
+
     LOW = "low"
     MODERATE = "moderate"
     HIGH = "high"
@@ -37,7 +67,17 @@ class StaffProfile(BaseModel):
 
 
 class FatigueAssessment(BaseModel):
-    """Fatigue risk assessment for a staff member."""
+    """DEPRECATED — canonical target is
+    ``adaptix_contracts.scheduling.ai.FatigueRiskScore``.
+
+    ``FatigueRiskScore`` now carries this model's ``risk_factors``,
+    ``ai_generated`` and ``supervisor_review_flag`` fields, so the canonical model
+    is a superset of this one on those axes. Folding this model away is still
+    blocked on the ``FatigueRiskLevel`` -> ``RiskLevel`` value-set
+    incompatibility documented above, plus the ``str`` vs ``UUID`` identifier
+    difference (``staff_id``/``tenant_id`` here vs ``person_id``/``shift_id``
+    ``UUID`` there).
+    """
 
     assessment_id: str
     staff_id: str
