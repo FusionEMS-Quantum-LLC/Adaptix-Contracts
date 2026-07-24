@@ -35,6 +35,8 @@ from typing import Any, Final
 
 from pydantic import BaseModel, Field, field_validator
 
+from adaptix_contracts.events.registry import is_registered
+
 #: Current operational-envelope contract version. Bump on any breaking change to
 #: the required field set or the meaning of an existing field.
 SCHEMA_VERSION: Final[str] = "1.0"
@@ -52,6 +54,11 @@ REQUIRED_ENVELOPE_FIELDS: Final[tuple[str, ...]] = (
     "event_type",
     "schema_version",
 )
+
+
+def _new_uuid() -> str:
+    """Return a fresh UUID4 string (default factory for the id fields)."""
+    return str(uuid.uuid4())
 
 
 def _to_iso_utc(value: str | datetime) -> str:
@@ -87,6 +94,9 @@ class OperationalEventEnvelope(BaseModel):
     * ``tenant_id`` is always set — every backbone event is tenant-scoped;
     * ``source_version`` is the optimistic-concurrency version of the source row
       at the moment the event was produced (>= 1).
+
+    Construct it directly with keyword arguments; ``observed_at`` / ``effective_at``
+    accept a ``datetime`` or an ISO-8601 string and are normalised to UTC ISO-8601.
     """
 
     schema_version: str = Field(
@@ -96,8 +106,7 @@ class OperationalEventEnvelope(BaseModel):
         ..., min_length=1, description="Canonical event type name from the registry"
     )
     event_id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Unique event instance id",
+        default_factory=_new_uuid, description="Unique event instance id"
     )
     tenant_id: str = Field(
         ..., min_length=1, description="Tenant scope — required for every event"
@@ -111,9 +120,7 @@ class OperationalEventEnvelope(BaseModel):
         ..., min_length=1, description="Primary key of the source record"
     )
     source_version: int = Field(
-        ...,
-        ge=1,
-        description="Optimistic-concurrency version of the source record",
+        ..., ge=1, description="Optimistic-concurrency version of the source record"
     )
     observed_at: str = Field(
         ..., description="ISO-8601 UTC instant the source recorded the change"
@@ -122,12 +129,10 @@ class OperationalEventEnvelope(BaseModel):
         ..., description="ISO-8601 UTC instant the change takes effect"
     )
     correlation_id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Trace id shared across related events",
+        default_factory=_new_uuid, description="Trace id shared across related events"
     )
     idempotency_key: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        description="Stable key for dedupe on retry/replay",
+        default_factory=_new_uuid, description="Stable key for dedupe on retry/replay"
     )
     payload: dict[str, Any] = Field(
         default_factory=dict, description="Event-specific data"
@@ -138,55 +143,13 @@ class OperationalEventEnvelope(BaseModel):
     def _normalise_timestamp(cls, value: str | datetime) -> str:
         return _to_iso_utc(value)
 
-    @classmethod
-    def create(
-        cls,
-        *,
-        event_type: str,
-        tenant_id: str,
-        source_service: str,
-        source_record_id: str,
-        source_version: int,
-        observed_at: str | datetime,
-        effective_at: str | datetime,
-        idempotency_key: str,
-        payload: dict[str, Any] | None = None,
-        correlation_id: str | None = None,
-        event_id: str | None = None,
-    ) -> OperationalEventEnvelope:
-        """Construct a fully-formed operational event envelope.
-
-        ``idempotency_key`` is mandatory here (unlike the field default) because
-        the backbone's producer-side dedupe requires a deterministic key derived
-        from the source state — never a random one.
-        """
-        return cls(
-            event_type=event_type,
-            tenant_id=tenant_id,
-            source_service=source_service,
-            source_record_id=source_record_id,
-            source_version=source_version,
-            observed_at=observed_at,  # type: ignore[arg-type]
-            effective_at=effective_at,  # type: ignore[arg-type]
-            idempotency_key=idempotency_key,
-            payload=payload or {},
-            correlation_id=correlation_id or str(uuid.uuid4()),
-            event_id=event_id or str(uuid.uuid4()),
-        )
-
     def to_detail_json(self) -> str:
         """Serialise to the JSON string used as the EventBridge ``Detail``."""
         return self.model_dump_json()
 
 
 def assert_event_type_registered(envelope: OperationalEventEnvelope) -> None:
-    """Raise ``ValueError`` if the envelope's ``event_type`` is not registered.
-
-    The registry is imported lazily so this module stays import-cheap and free of
-    any registry import-order coupling.
-    """
-    from adaptix_contracts.events.registry import is_registered
-
+    """Raise ``ValueError`` if the envelope's ``event_type`` is not registered."""
     if not is_registered(envelope.event_type):
         raise ValueError(f"event_type is not registered: {envelope.event_type!r}")
 
