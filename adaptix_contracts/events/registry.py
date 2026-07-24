@@ -11,6 +11,17 @@ from adaptix_contracts.scheduling.events import (
 BILLING_CLAIM_UPDATED: Final[str] = "billing.claim.updated"
 EPCR_CHART_UPDATED: Final[str] = "epcr.chart.updated"
 
+# ---------------------------------------------------------------------------
+# Workforce operational events (EventBridge backbone, Phase 1)
+# ---------------------------------------------------------------------------
+# Emitted by Adaptix-Workforce-Service (service registry slug ``workforce``) when
+# a shift is cancelled — i.e. the shift is vacated / the staff assignment is
+# removed. ``source_service="workforce"`` resolves via SERVICE_BY_SLUG, so this
+# event is NOT one of the 27 ``schedule.*`` events that carry the
+# ``adaptix-scheduling`` source; it is a workforce-owned event whose producer is
+# the live Workforce service. See tests/test_workforce_event_backbone.py.
+WORKFORCE_SHIFT_CANCELLED: Final[str] = "workforce.shift.cancelled"
+
 FIRE_INCIDENT_CREATED: Final[str] = "fire.incident.created"
 FIRE_INCIDENT_UPDATED: Final[str] = "fire.incident.updated"
 FIRE_INCIDENT_CANCELLED: Final[str] = "fire.incident.cancelled"
@@ -65,6 +76,7 @@ SCHEDULING_EVENTS = ALL_SCHEDULING_EVENTS
 ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
     EPCR_CHART_UPDATED: {"version": "1.0", "source_service": "epcr"},
+    WORKFORCE_SHIFT_CANCELLED: {"version": "1.0", "source_service": "workforce"},
     FIRE_INCIDENT_CREATED: {"version": "1.0", "source_service": "adaptix-fire"},
     FIRE_INCIDENT_UPDATED: {"version": "1.0", "source_service": "adaptix-fire"},
     FIRE_INCIDENT_CANCELLED: {"version": "1.0", "source_service": "adaptix-fire"},
@@ -157,6 +169,7 @@ __all__ = [
     "NERIS_NORMALIZATION_COMPLETED",
     "NERIS_SCHEMA_ASSET_REFRESHED",
     "NERIS_VALIDATION_COMPLETED",
+    "WORKFORCE_SHIFT_CANCELLED",
     "get_all_events",
     "is_registered",
 ]
