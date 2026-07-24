@@ -65,3 +65,16 @@ ignore_missing_imports = true
 # mypy plugin cannot model on the synthesized __init__; excluding tests scopes
 # strict typing to shipped code without hiding any source/production error.
 exclude = "(^|/)tests/"
+
+[tool.ruff.lint]
+# Pin the lint rule set to ruff's historical default (E4/E7/E9/F) so the
+# enforced ruleset is deterministic across ruff versions and identical between
+# the pinned CodeBuild gate (ruff==0.15.22, see .codebuild/pr-validation.yml)
+# and any newer ruff that CI/Codacy may run. Without this, ruff 0.16.0 (which
+# expanded the default set to include I/UP/B/RUF... e.g. UP045 on Optional[X])
+# flags pre-existing repo style (the package consistently uses typing.Optional)
+# that the pinned gate accepts, breaking local==remote. This re-declares the
+# existing default (a no-op under 0.15.22); it does not silence a real defect.
+# A deliberate rule-set expansion should bump the pin and fix the delta in its
+# own PR. Matches Adaptix-Terminology-Service backend/pyproject.toml.
+select = ["E4", "E7", "E9", "F"]
