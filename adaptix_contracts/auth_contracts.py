@@ -166,6 +166,8 @@ class AuthContext(BaseModel):
             fine-grained ``require_permission("<scope>")`` read this alongside
             ``roles``; without it every such gate 403s because only role NAMES
             reach the service.
+        mfa_verified: Verified MFA evidence carried only from a signed gateway
+            context. Unsigned/legacy identity headers never grant MFA status.
     """
 
     user_id: UUID
@@ -174,6 +176,7 @@ class AuthContext(BaseModel):
     roles: list[str] = []
     is_founder: bool = False
     scopes: list[str] = []
+    mfa_verified: bool = False
 
     model_config = {"frozen": True}
 
@@ -425,6 +428,7 @@ async def get_auth_context(
             if isinstance(signed_scopes, list)
             else []
         )
+        mfa_verified = verified_payload.get("mfa_verified") is True
     else:
         # Unsigned / legacy path (no verifiable signature): trust the injected
         # headers exactly as before. Reachable only when the absent-signature
@@ -432,6 +436,7 @@ async def get_auth_context(
         # There is no unsigned scopes header, so scopes stay empty on this path.
         roles = _parse_roles(x_user_roles)
         scopes = []
+        mfa_verified = False
         email = (x_user_email or "").strip()
         is_founder_flag = (x_is_founder or "false").strip().lower() in (
             "true",
@@ -452,6 +457,7 @@ async def get_auth_context(
         roles=roles,
         is_founder=is_founder_flag,
         scopes=scopes,
+        mfa_verified=mfa_verified,
     )
 
 
