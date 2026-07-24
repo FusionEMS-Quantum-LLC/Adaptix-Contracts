@@ -552,6 +552,20 @@ from .epcr_contracts import (
     EpcrNemsissComplianceContract,
 )
 
+# ePCR <-> MAR Medication Reconciliation
+from .epcr_reconciliation_contracts import (
+    EpcrReconciliationStatus,
+    EpcrDiscrepancyType,
+    EpcrResolutionAction,
+    EpcrMedItem,
+    EpcrReconciliationCreateRequest,
+    EpcrReconciliationResolveRequest,
+    EpcrFieldDiff,
+    EpcrReconciliationDiscrepancy,
+    EpcrReconciliationResponse,
+    EpcrReconciliationListResponse,
+)
+
 # Feature Flags
 from .feature_flag_contracts import (
     FeatureFlagStatus,
@@ -1372,6 +1386,17 @@ __all__ = [
     "EpcrMedicationAdministrationContract",
     "EpcrSignatureArtifactContract",
     "EpcrNemsissComplianceContract",
+    # ePCR <-> MAR Medication Reconciliation
+    "EpcrReconciliationStatus",
+    "EpcrDiscrepancyType",
+    "EpcrResolutionAction",
+    "EpcrMedItem",
+    "EpcrReconciliationCreateRequest",
+    "EpcrReconciliationResolveRequest",
+    "EpcrFieldDiff",
+    "EpcrReconciliationDiscrepancy",
+    "EpcrReconciliationResponse",
+    "EpcrReconciliationListResponse",
     # Feature Flags
     "FeatureFlagStatus",
     "TargetType",
