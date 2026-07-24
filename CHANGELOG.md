@@ -7,7 +7,7 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `1.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.2.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
 ## [Unreleased]
 
