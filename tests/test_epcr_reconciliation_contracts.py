@@ -152,19 +152,39 @@ def _discrepancy_serialized_row() -> dict:
         {
             "reconciliation_status": "discrepancy",
             "medications_from_epcr": [
-                {"name": "Aspirin", "rxnorm_code": "1191", "dose": "324 mg", "route": "PO"},
+                {
+                    "name": "Aspirin",
+                    "rxnorm_code": "1191",
+                    "dose": "324 mg",
+                    "route": "PO",
+                },
                 {"name": "Fentanyl", "dose": "50 mcg", "route": "IV"},
             ],
             "medications_from_mar": [
-                {"name": "Aspirin", "rxnorm_code": "1191", "dose": "81 mg", "route": "PO"}
+                {
+                    "name": "Aspirin",
+                    "rxnorm_code": "1191",
+                    "dose": "81 mg",
+                    "route": "PO",
+                }
             ],
             "has_discrepancies": True,
             "discrepancies": [
                 {
                     "type": "dose_mismatch",
                     "identity_key": "rxnorm:1191",
-                    "epcr": {"name": "Aspirin", "rxnorm_code": "1191", "dose": "324 mg", "route": "PO"},
-                    "mar": {"name": "Aspirin", "rxnorm_code": "1191", "dose": "81 mg", "route": "PO"},
+                    "epcr": {
+                        "name": "Aspirin",
+                        "rxnorm_code": "1191",
+                        "dose": "324 mg",
+                        "route": "PO",
+                    },
+                    "mar": {
+                        "name": "Aspirin",
+                        "rxnorm_code": "1191",
+                        "dose": "81 mg",
+                        "route": "PO",
+                    },
                     "field_diffs": {"dose": {"epcr": "324 mg", "mar": "81 mg"}},
                 },
                 {
@@ -236,4 +256,7 @@ def test_list_response_round_trip() -> None:
     listed = EpcrReconciliationListResponse.model_validate(payload)
     assert listed.tenant_id == "tenant-1"
     assert len(listed.reconciliations) == 2
-    assert listed.reconciliations[1].reconciliation_status is EpcrReconciliationStatus.DISCREPANCY
+    assert (
+        listed.reconciliations[1].reconciliation_status
+        is EpcrReconciliationStatus.DISCREPANCY
+    )

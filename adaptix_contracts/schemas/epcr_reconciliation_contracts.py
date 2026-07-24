@@ -88,7 +88,9 @@ class EpcrMedItem(BaseModel):
     route: Optional[str] = Field(default=None, max_length=50)
     frequency: Optional[str] = Field(default=None, max_length=100)
     administered_at: Optional[str] = Field(
-        default=None, max_length=64, description="ISO-8601 administration time, if known."
+        default=None,
+        max_length=64,
+        description="ISO-8601 administration time, if known.",
     )
 
 
