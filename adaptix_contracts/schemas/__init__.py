@@ -131,6 +131,21 @@ from .billing_clearinghouse_contracts import (
     ClaimSubmittedToClearinghouseEvent,
     ClearinghouseAckReceivedEvent,
     RemittanceIngestedEvent,
+    # Stedi inbound webhook (POST /api/v1/billing/webhooks/stedi, PR #541)
+    StediWebhookEventType,
+    StediWebhookRequest,
+    StediWebhookAcceptedResponse,
+    StediWebhookDuplicateResponse,
+    StediWebhookRejectedResponse,
+    # Clearinghouse retry-eligibility + operator fallback (PR #539)
+    ClaimTransmissionState,
+    ClaimRetryReasonCode,
+    ClaimRetryEligibilityResponse,
+    ClaimOperatorFallbackRequest,
+    ClaimOperatorFallbackResponse,
+    OperatorFallbackRefusedReasonCode,
+    ClaimOperatorFallbackRefusedError,
+    ClaimOperatorFallbackTargetFailedError,
 )
 
 # Billing Eligibility
@@ -1243,6 +1258,21 @@ __all__ = [
     "RemittanceIngestResponse",
     "ClaimSubmittedToClearinghouseEvent",
     "RemittanceIngestedEvent",
+    # Billing Clearinghouse — Stedi inbound webhook (PR #541)
+    "StediWebhookEventType",
+    "StediWebhookRequest",
+    "StediWebhookAcceptedResponse",
+    "StediWebhookDuplicateResponse",
+    "StediWebhookRejectedResponse",
+    # Billing Clearinghouse — retry-eligibility + operator fallback (PR #539)
+    "ClaimTransmissionState",
+    "ClaimRetryReasonCode",
+    "ClaimRetryEligibilityResponse",
+    "ClaimOperatorFallbackRequest",
+    "ClaimOperatorFallbackResponse",
+    "OperatorFallbackRefusedReasonCode",
+    "ClaimOperatorFallbackRefusedError",
+    "ClaimOperatorFallbackTargetFailedError",
     # Billing Eligibility
     "EligibilityStatus",
     "CoverageLevel",

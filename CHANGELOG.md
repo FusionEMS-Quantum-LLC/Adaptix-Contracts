@@ -11,6 +11,44 @@ package version is `2.2.0` (see `pyproject.toml` and `adaptix_contracts/__init__
 
 ## [Unreleased]
 
+### Added — Billing clearinghouse: Stedi webhook + retry-eligibility + operator-fallback (additive only)
+
+Closes cross-repo contract drift from the merged billing/Stedi work by adding
+the request/response/enum contracts for three real endpoints in
+`Adaptix-Billing-Service`. Every model mirrors the service source exactly;
+paths, status codes, and value sets are cited in-line in
+`adaptix_contracts/schemas/billing_clearinghouse_contracts.py`.
+
+- **`POST /api/v1/billing/webhooks/stedi`** (service source
+  `backend/billing_app/api/webhooks_stedi.py`, commit `9ba5c6e2`, PR #541):
+  - `StediWebhookEventType` — KNOWN `detail-type` set
+    (`transaction.processed.v2`, `file.delivered.v2`, `file.failed.v2`).
+  - `StediWebhookRequest` — EventBridge-shaped inbound envelope (`id` required,
+    `detail-type` read, extra fields persisted verbatim). Bearer auth is
+    out-of-band, not a body field.
+  - `StediWebhookAcceptedResponse` (202 new), `StediWebhookDuplicateResponse`
+    (202 idempotent duplicate), `StediWebhookRejectedResponse`
+    (400/401/413/503, `status`+`reason`).
+- **`GET /api/v1/billing/clearinghouse/claims/{claim_id}/retry-eligibility`** and
+  **`POST /api/v1/billing/clearinghouse/claims/{claim_id}/operator-fallback`**
+  (service source `backend/billing_app/api/clearinghouse_router_routes.py`,
+  commit `9dc57abf`, PR #539; value sets from `clearinghouse/base.py` and
+  `clearinghouse/router.py`). Both require `founder`/`billing_admin` role +
+  `billing` entitlement and are tenant-scoped.
+  - `ClaimTransmissionState` (`not_transmitted`/`unknown`/`transmitted`),
+    `ClaimRetryReasonCode`
+    (`no_prior_attempt`/`proven_not_transmitted`/`already_accepted`/`unknown_transmission`),
+    `ClaimRetryEligibilityResponse`.
+  - `ClaimOperatorFallbackRequest` (with source field constraints),
+    `ClaimOperatorFallbackResponse`, `OperatorFallbackRefusedReasonCode`
+    (six 409 codes), `ClaimOperatorFallbackRefusedError` (409 detail),
+    `ClaimOperatorFallbackTargetFailedError` (503 detail).
+- **Note (observed, not changed):** these service routes return status+reason
+  bodies and FastAPI `{"detail": ...}` payloads rather than the repo's
+  `common/error_envelope.py::ErrorEnvelope`. Recorded here as a known
+  cross-repo error-envelope divergence for follow-up; no service behavior was
+  altered by this contracts change.
+
 ### Added — `SCHEDULING_SERVICE` registration (additive only)
 
 Phase 1 of the Workforce Scheduling directive, driven by
