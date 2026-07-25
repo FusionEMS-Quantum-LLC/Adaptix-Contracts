@@ -1,6 +1,6 @@
 # Adaptix Contracts
 
-**Version:** 1.3.0
+**Version:** 2.2.0
 
 Canonical shared cross-domain schema definitions for the Adaptix polyrepo platform.
 
@@ -243,8 +243,8 @@ This validates:
 - All expected domains are covered, with any additional domains reported
 - Sample models can be instantiated
 
-The current validator report on this branch emits 638 public exports, 505
-models, and 125 enums.
+The current validator report on this branch emits 813 public exports, 633
+models, and 169 enums.
 
 Run the automated regression suite for export integrity, schema serialization,
 and representative validation failures:

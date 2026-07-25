@@ -131,6 +131,21 @@ from .billing_clearinghouse_contracts import (
     ClaimSubmittedToClearinghouseEvent,
     ClearinghouseAckReceivedEvent,
     RemittanceIngestedEvent,
+    # Stedi inbound webhook (POST /api/v1/billing/webhooks/stedi, PR #541)
+    StediWebhookEventType,
+    StediWebhookRequest,
+    StediWebhookAcceptedResponse,
+    StediWebhookDuplicateResponse,
+    StediWebhookRejectedResponse,
+    # Clearinghouse retry-eligibility + operator fallback (PR #539)
+    ClaimTransmissionState,
+    ClaimRetryReasonCode,
+    ClaimRetryEligibilityResponse,
+    ClaimOperatorFallbackRequest,
+    ClaimOperatorFallbackResponse,
+    OperatorFallbackRefusedReasonCode,
+    ClaimOperatorFallbackRefusedError,
+    ClaimOperatorFallbackTargetFailedError,
 )
 
 # Billing Eligibility
@@ -550,6 +565,20 @@ from .epcr_contracts import (
     EpcrMedicationAdministrationContract,
     EpcrSignatureArtifactContract,
     EpcrNemsissComplianceContract,
+)
+
+# ePCR <-> MAR Medication Reconciliation
+from .epcr_reconciliation_contracts import (
+    EpcrReconciliationStatus,
+    EpcrDiscrepancyType,
+    EpcrResolutionAction,
+    EpcrMedItem,
+    EpcrReconciliationCreateRequest,
+    EpcrReconciliationResolveRequest,
+    EpcrFieldDiff,
+    EpcrReconciliationDiscrepancy,
+    EpcrReconciliationResponse,
+    EpcrReconciliationListResponse,
 )
 
 # Feature Flags
@@ -1229,6 +1258,21 @@ __all__ = [
     "RemittanceIngestResponse",
     "ClaimSubmittedToClearinghouseEvent",
     "RemittanceIngestedEvent",
+    # Billing Clearinghouse — Stedi inbound webhook (PR #541)
+    "StediWebhookEventType",
+    "StediWebhookRequest",
+    "StediWebhookAcceptedResponse",
+    "StediWebhookDuplicateResponse",
+    "StediWebhookRejectedResponse",
+    # Billing Clearinghouse — retry-eligibility + operator fallback (PR #539)
+    "ClaimTransmissionState",
+    "ClaimRetryReasonCode",
+    "ClaimRetryEligibilityResponse",
+    "ClaimOperatorFallbackRequest",
+    "ClaimOperatorFallbackResponse",
+    "OperatorFallbackRefusedReasonCode",
+    "ClaimOperatorFallbackRefusedError",
+    "ClaimOperatorFallbackTargetFailedError",
     # Billing Eligibility
     "EligibilityStatus",
     "CoverageLevel",
@@ -1372,6 +1416,17 @@ __all__ = [
     "EpcrMedicationAdministrationContract",
     "EpcrSignatureArtifactContract",
     "EpcrNemsissComplianceContract",
+    # ePCR <-> MAR Medication Reconciliation
+    "EpcrReconciliationStatus",
+    "EpcrDiscrepancyType",
+    "EpcrResolutionAction",
+    "EpcrMedItem",
+    "EpcrReconciliationCreateRequest",
+    "EpcrReconciliationResolveRequest",
+    "EpcrFieldDiff",
+    "EpcrReconciliationDiscrepancy",
+    "EpcrReconciliationResponse",
+    "EpcrReconciliationListResponse",
     # Feature Flags
     "FeatureFlagStatus",
     "TargetType",
