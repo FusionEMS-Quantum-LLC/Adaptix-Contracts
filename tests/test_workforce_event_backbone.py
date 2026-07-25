@@ -101,9 +101,7 @@ def test_envelope_declares_all_required_fields() -> None:
 
 
 def test_envelope_roundtrips_losslessly() -> None:
-    env = OperationalEventEnvelope.create(
-        **_valid_kwargs(), payload={"old": "scheduled"}
-    )
+    env = OperationalEventEnvelope(**_valid_kwargs(), payload={"old": "scheduled"})
     detail = env.to_detail_json()
     restored = OperationalEventEnvelope.model_validate_json(detail)
     assert restored == env
@@ -115,28 +113,28 @@ def test_envelope_requires_tenant_id() -> None:
     kwargs = _valid_kwargs()
     kwargs["tenant_id"] = ""
     with pytest.raises(ValidationError):
-        OperationalEventEnvelope.create(**kwargs)
+        OperationalEventEnvelope(**kwargs)
 
 
 def test_envelope_requires_source_record_id() -> None:
     kwargs = _valid_kwargs()
     kwargs["source_record_id"] = ""
     with pytest.raises(ValidationError):
-        OperationalEventEnvelope.create(**kwargs)
+        OperationalEventEnvelope(**kwargs)
 
 
 def test_source_version_must_be_positive() -> None:
     kwargs = _valid_kwargs()
     kwargs["source_version"] = 0
     with pytest.raises(ValidationError):
-        OperationalEventEnvelope.create(**kwargs)
+        OperationalEventEnvelope(**kwargs)
 
 
 def test_timestamps_normalised_to_utc_iso() -> None:
     kwargs = _valid_kwargs()
     kwargs["observed_at"] = datetime(2026, 7, 24, 20, 0, 0, tzinfo=timezone.utc)
     kwargs["effective_at"] = "2026-07-24T20:00:00Z"
-    env = OperationalEventEnvelope.create(**kwargs)
+    env = OperationalEventEnvelope(**kwargs)
     assert env.observed_at == "2026-07-24T20:00:00+00:00"
     assert env.effective_at == "2026-07-24T20:00:00+00:00"
 
@@ -145,25 +143,25 @@ def test_bad_timestamp_rejected() -> None:
     kwargs = _valid_kwargs()
     kwargs["observed_at"] = "not-a-timestamp"
     with pytest.raises(ValidationError):
-        OperationalEventEnvelope.create(**kwargs)
+        OperationalEventEnvelope(**kwargs)
 
 
 def test_schema_version_defaults_to_current() -> None:
-    env = OperationalEventEnvelope.create(**_valid_kwargs())
+    env = OperationalEventEnvelope(**_valid_kwargs())
     assert env.schema_version == SCHEMA_VERSION == "1.0"
 
 
 def test_idempotency_key_preserved() -> None:
-    env = OperationalEventEnvelope.create(**_valid_kwargs())
+    env = OperationalEventEnvelope(**_valid_kwargs())
     assert env.idempotency_key == "workforce.shift.cancelled:tenant-123:shift-abc:2"
 
 
 def test_assert_event_type_registered() -> None:
-    env = OperationalEventEnvelope.create(**_valid_kwargs())
+    env = OperationalEventEnvelope(**_valid_kwargs())
     assert_event_type_registered(env)  # registered — no raise
 
     kwargs = _valid_kwargs()
     kwargs["event_type"] = "workforce.shift.teleported"
-    bogus = OperationalEventEnvelope.create(**kwargs)
+    bogus = OperationalEventEnvelope(**kwargs)
     with pytest.raises(ValueError):
         assert_event_type_registered(bogus)
