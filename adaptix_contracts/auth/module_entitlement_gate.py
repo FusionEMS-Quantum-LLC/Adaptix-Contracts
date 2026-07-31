@@ -38,12 +38,14 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
+from functools import lru_cache
 from typing import Annotated, Optional
 from collections.abc import Callable
 
 import jwt as pyjwt
 from fastapi import Header, HTTPException, Request, status
 
+from adaptix_contracts.auth.cognito import AdaptixCognitoConfig
 from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
     gateway_shared_secret,
@@ -235,11 +237,144 @@ def _claims_module_entitlements(claims: dict) -> list[str]:
     return []
 
 
-def _decode_claims_for_gate(token: str) -> dict:
+# Pinned signing algorithm for Cognito user-pool JWTs. Cognito signs both access
+# and id tokens with RS256 (asymmetric). We never accept a symmetric algorithm
+# here, so a token whose header claims HS256 (the classic "sign the token with
+# the RSA public key as an HMAC secret" confusion attack) is rejected by PyJWT's
+# algorithm allow-list before any signature check runs.
+_COGNITO_ALGORITHMS = ("RS256",)
+
+
+def _bearer_unauthorized(code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"code": code, "message": message},
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+@lru_cache(maxsize=8)
+def _jwks_client(jwks_url: str) -> "pyjwt.PyJWKClient":
+    """Cache one JWKS client per pool URL so keys are not re-fetched per request.
+
+    ``PyJWKClient`` caches the signing keys for its own lifetime, so we keep the
+    client instance alive across requests keyed by the (static) pool JWKS URL.
+    """
+    return pyjwt.PyJWKClient(jwks_url)
+
+
+def _cognito_signing_key(token: str, config: AdaptixCognitoConfig):
+    """Resolve the RSA public signing key for a Cognito JWT from the pool JWKS.
+
+    Isolated in its own function so tests can inject a key without a network
+    call. The JWKS client fetches (and caches) the keys published at
+    ``config.jwks_url`` and selects the one matching the token header ``kid`` —
+    the token cannot point verification at an attacker-controlled key source
+    (there is no ``jku`` / ``x5u`` following).
+    """
+    return _jwks_client(config.jwks_url).get_signing_key_from_jwt(token).key
+
+
+def _verify_direct_bearer_claims(token: str) -> dict:
+    """Return VERIFIED claims for a direct (non-gateway) bearer, or fail closed.
+
+    The direct-service path (a caller that did not arrive through the gateway,
+    so no HMAC-signed ``X-Adaptix-Auth-Context`` is present) must still prove its
+    identity cryptographically. The bearer is verified as an Amazon Cognito
+    user-pool JWT using the canonical :class:`AdaptixCognitoConfig`:
+
+    * signature via the pool JWKS, pinned to RS256;
+    * issuer == the configured pool issuer;
+    * ``exp`` / ``iat`` presence and expiry (with the configured clock skew);
+    * an accepted ``token_use`` (access|id);
+    * audience / app-client binding to the configured client id.
+
+    Fail-closed contract: if the pool is not configured, or verification fails
+    for ANY reason, raise 401 — an unverifiable bearer is NEVER trusted for the
+    founder-bypass / entitlement decision. This closes the prior hole where the
+    gate decoded the bearer with ``verify_signature=False`` and would trust a
+    forged ``is_founder`` / ``module_entitlements`` on any direct-service call.
+    """
+    config = AdaptixCognitoConfig.from_env()
+    if not config.is_configured:
+        logger.error(
+            "module_entitlement_gate: a direct (non-gateway) bearer was presented "
+            "but Cognito is not configured for this service "
+            "(COGNITO_USER_POOL_ID / COGNITO_CLIENT_ID / COGNITO_ISSUER / "
+            "COGNITO_JWKS_URL); refusing to trust an unverifiable bearer "
+            "(fail-closed). Route this caller through the gateway (signed "
+            "auth-context) or configure Cognito for direct verification."
+        )
+        raise _bearer_unauthorized(
+            "bearer_verifier_not_configured",
+            "Bearer token cannot be verified: identity provider is not configured.",
+        )
+
     try:
-        return pyjwt.decode(token, options={"verify_signature": False})
-    except Exception:  # pragma: no cover
-        return {}
+        signing_key = _cognito_signing_key(token, config)
+        claims = pyjwt.decode(
+            token,
+            signing_key,
+            algorithms=list(_COGNITO_ALGORITHMS),
+            issuer=config.issuer,
+            leeway=config.clock_skew_seconds,
+            options={
+                "require": ["exp", "iat", "sub", "token_use"],
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_iat": True,
+                "verify_iss": True,
+                # Cognito ACCESS tokens carry no `aud`; the audience / app-client
+                # binding is enforced explicitly below against `token_use`.
+                "verify_aud": False,
+            },
+        )
+    except pyjwt.PyJWTError as exc:
+        logger.warning(
+            "module_entitlement_gate: rejecting unverifiable direct bearer (%s)",
+            type(exc).__name__,
+        )
+        raise _bearer_unauthorized(
+            "invalid_bearer_token",
+            "Authorization bearer token could not be verified.",
+        ) from exc
+
+    token_use = str(claims.get("token_use") or "").strip().lower()
+    accepted_uses = {u.strip().lower() for u in config.allowed_token_use_values}
+    if token_use not in accepted_uses:
+        logger.warning(
+            "module_entitlement_gate: rejecting bearer with unaccepted token_use=%r",
+            token_use,
+        )
+        raise _bearer_unauthorized(
+            "invalid_bearer_token",
+            "Authorization bearer token could not be verified.",
+        )
+
+    # Bind the token to THIS pool's app client. Cognito id tokens carry the
+    # client in `aud`; access tokens carry it in `client_id`. Reject any token
+    # minted for a different client even if it is otherwise validly signed by
+    # the same pool.
+    allowed_clients = {a for a in config.allowed_audiences if a}
+    if allowed_clients:
+        if token_use == "id":
+            presented = claims.get("aud")
+            presented_values = (
+                set(presented) if isinstance(presented, list) else {presented}
+            )
+        else:  # access token
+            presented_values = {claims.get("client_id")}
+        if not (allowed_clients & {p for p in presented_values if p}):
+            logger.warning(
+                "module_entitlement_gate: rejecting bearer whose audience/client "
+                "does not match the configured Cognito app client."
+            )
+            raise _bearer_unauthorized(
+                "invalid_bearer_token",
+                "Authorization bearer token could not be verified.",
+            )
+
+    return claims
 
 
 def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
@@ -266,9 +401,11 @@ def _resolve_gate_claims(
        wrong. Returns ``(claims, is_platform_principal)``.
     2. **Gateway-signed context present but signature invalid** -> 401
        (tampered context; never fall through to the unverified-bearer path).
-    3. **No gateway context** -> legacy path: require a raw bearer and decode it
-       (unverified, as before) for the entitlement claims. Existing
-       direct-bearer callers are unaffected.
+    3. **No gateway context** -> direct-service path: require a raw bearer and
+       cryptographically VERIFY it (Cognito user-pool JWT: JWKS signature +
+       pinned RS256 + issuer + audience/app-client + expiry) before using its
+       claims. A verification failure OR an unconfigured verifier -> 401 (fail
+       closed); a forged bearer is never trusted.
     4. **Neither** -> 401 ``missing_bearer_token`` (unchanged).
 
     Raises:
@@ -291,7 +428,10 @@ def _resolve_gate_claims(
     if gw_claims is not None:
         return gw_claims, _is_platform_principal(gw_claims)
 
-    # ── Legacy direct-bearer path (unchanged behaviour) ───────────────────────
+    # ── Direct-bearer path: cryptographically VERIFY before trusting ──────────
+    # No gateway-signed context is present, so this is a direct-to-service call.
+    # The bearer must be verified (Cognito user-pool JWT) before its claims can
+    # drive the founder-bypass / entitlement decision. Fail closed otherwise.
     token = _extract_bearer_token(authorization)
     if not token:
         raise HTTPException(
@@ -302,7 +442,7 @@ def _resolve_gate_claims(
             },
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return _decode_claims_for_gate(token), False
+    return _verify_direct_bearer_claims(token), False
 
 
 def require_module_entitlement(module_slug: str) -> Callable:
