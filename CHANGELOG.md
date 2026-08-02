@@ -23,6 +23,32 @@ package version is `2.2.0` (see `pyproject.toml` and `adaptix_contracts/__init__
   conflicting payload reuse is rejected by the producer.
 - Added regression coverage for schema generation, additive response fields,
   identifier equality, and idempotency-key validation.
+### Added — Canonical product/module identifier registry (`adaptix_contracts.module_registry`)
+
+Single source of truth for Adaptix module ids. Five vocabularies for the same
+products had drifted while the runtime entitlement gate does exact normalized
+string matching, so a tenant could pay for a module and still be denied it
+(e.g. Core `signup_pricing.py` sells `billing_automation`, but
+`Adaptix-Billing-Service/backend/billing_app/main.py:968` gates on `billing`).
+
+- `ModuleDefinition` — canonical id, display name, `aliases` (exact synonyms of
+  the same product), `implies` (a purchase that additionally grants a different
+  module), `purchasable`, `audience`, and a `source` citation per entry.
+- `MODULE_REGISTRY` / `ALIAS_INDEX` / `RUNTIME_GATE_SLUGS` — validated at import
+  time (no duplicate canonical ids, no alias shadowing a canonical id, no
+  dangling or self-referential `implies`, every live gate slug canonical).
+- `resolve_module_id`, `require_module_id`, `expand_entitlements`,
+  `is_module_entitled`, `is_any_module_entitled`, `normalize_module_id`,
+  `canonical_module_ids`, `purchasable_module_ids`.
+
+Canonical ids are the slugs the runtime already enforces — nothing
+customer-visible is renamed. Resolution is strictly additive: `expand_entitlements`
+returns the caller's own normalized ids plus canonical plus implied, and passes
+unregistered ids through untouched, so anything entitled today stays entitled.
+
+Covered by `tests/test_module_registry.py` (140 tests), which proves
+purchased => allowed and unpurchased => denied for every purchasable module id
+and every one of its sold spellings.
 
 ### Added — Billing clearinghouse: Stedi webhook + retry-eligibility + operator-fallback (additive only)
 
