@@ -65,7 +65,7 @@ def test_idempotency_key_contract_accepts_supported_opaque_keys(key: str) -> Non
     assert SIGNUP_IDEMPOTENCY_HEADER == "Idempotency-Key"
 
 
-@pytest.mark.parametrize("key", ["short", "contains spaces in key", "!invalid-prefix-value"])
+@pytest.mark.parametrize(\n    "key", ["short", "contains spaces in key", "!invalid-prefix-value"]\n)
 def test_idempotency_key_contract_rejects_unsafe_values(key: str) -> None:
     with pytest.raises(ValidationError):
         TypeAdapter(SignupIdempotencyKey).validate_python(key)
