@@ -254,6 +254,15 @@ from .contract_onboarding_contracts import (
     ContractStatusChangedEvent,
 )
 
+# Signup application creation
+from .signup_contracts import (
+    SIGNUP_IDEMPOTENCY_HEADER,
+    SignupAgencyAddress,
+    SignupApplicationCreateRequest,
+    SignupApplicationCreateResponse,
+    SignupIdempotencyKey,
+)
+
 # Legal execution
 from .legal_execution_contracts import (
     ContractType,
@@ -1358,6 +1367,12 @@ __all__ = [
     "ContractActivationRequest",
     "ContractActivationResponse",
     "ContractStatusChangedEvent",
+    # Signup application creation
+    "SIGNUP_IDEMPOTENCY_HEADER",
+    "SignupAgencyAddress",
+    "SignupApplicationCreateRequest",
+    "SignupApplicationCreateResponse",
+    "SignupIdempotencyKey",
     # Legal execution
     "ContractType",
     "ContractStatus",

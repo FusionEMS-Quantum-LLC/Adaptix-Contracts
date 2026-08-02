@@ -11,6 +11,18 @@ package version is `2.2.0` (see `pyproject.toml` and `adaptix_contracts/__init__
 
 ## [Unreleased]
 
+### Added — canonical signup application-creation contract
+
+- Added SignupApplicationCreateRequest and SignupApplicationCreateResponse for
+  POST /api/v1/signup/applications.
+- Made application_id the canonical response identifier while retaining id as
+  a required, equality-checked compatibility alias for rolling Web/Core
+  deployment.
+- Added the constrained SignupIdempotencyKey type and canonical
+  Idempotency-Key header constant. Exact retries reuse the same opaque key;
+  conflicting payload reuse is rejected by the producer.
+- Added regression coverage for schema generation, additive response fields,
+  identifier equality, and idempotency-key validation.
 ### Added — Canonical product/module identifier registry (`adaptix_contracts.module_registry`)
 
 Single source of truth for Adaptix module ids. Five vocabularies for the same
