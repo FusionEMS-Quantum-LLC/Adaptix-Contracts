@@ -37,7 +37,14 @@ SignupIdempotencyKey = Annotated[
 ]
 
 
-class SignupAgencyAddress(BaseModel):
+# pylint too-few-public-methods (R0903) is disabled per class below. These are
+# declarative Pydantic schemas — pure data carriers whose entire contract is
+# their field set, exactly the shape pylint already exempts for @dataclass. The
+# rule's intent (a class doing so little it should be a function or a tuple)
+# cannot apply to a validated wire contract, so it is a false positive here.
+# The disables are per class, never module-wide, so a future non-schema class
+# added to this module is still checked.
+class SignupAgencyAddress(BaseModel):  # pylint: disable=too-few-public-methods
     """Optional physical address captured during agency-profile creation."""
 
     model_config = ConfigDict(extra="ignore")
@@ -49,7 +56,7 @@ class SignupAgencyAddress(BaseModel):
     zip_code: str | None = Field(default=None, max_length=10)
 
 
-class SignupApplicationCreateRequest(BaseModel):
+class SignupApplicationCreateRequest(BaseModel):  # pylint: disable=too-few-public-methods
     """Canonical body for POST /api/v1/signup/applications."""
 
     model_config = ConfigDict(extra="ignore")
@@ -65,7 +72,7 @@ class SignupApplicationCreateRequest(BaseModel):
     agency_address: SignupAgencyAddress | None = None
 
 
-class SignupApplicationCreateResponse(BaseModel):
+class SignupApplicationCreateResponse(BaseModel):  # pylint: disable=too-few-public-methods
     """Canonical response for application creation and exact replays.
 
     Extra fields remain allowed because Core returns a richer application
@@ -76,7 +83,15 @@ class SignupApplicationCreateResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     application_id: UUID
-    id: UUID = Field(
+    # pylint invalid-name (C0103) is a false positive here: ``id`` is not a
+    # naming choice this module is free to make. It is the literal JSON key
+    # Adaptix-Core already returns and Adaptix-Web-App already reads during the
+    # rolling deployment, and it is pinned as a required property by
+    # tests/test_signup_contracts.py::test_json_schema_pins_load_bearing_response_fields.
+    # A minimum-identifier-length convention cannot govern an externally fixed
+    # wire field name; renaming it would break the compatibility alias this
+    # contract exists to guarantee.
+    id: UUID = Field(  # pylint: disable=invalid-name
         ...,
         description="Deprecated compatibility alias; must equal application_id.",
     )
@@ -86,15 +101,21 @@ class SignupApplicationCreateResponse(BaseModel):
 
     @model_validator(mode="after")
     def identifiers_must_match(self) -> "SignupApplicationCreateResponse":
+        """Reject a response whose compatibility alias has drifted.
+
+        ``id`` is a temporary duplicate of ``application_id``. If the two ever
+        disagree, a caller keyed on one of them would correlate later signup
+        steps to the wrong application, so the mismatch is rejected at the
+        contract boundary rather than allowed to propagate.
+        """
         if self.id != self.application_id:
             raise ValueError("id must equal application_id")
         return self
 
 
-__all__ = [
-    "SIGNUP_IDEMPOTENCY_HEADER",
-    "SignupAgencyAddress",
-    "SignupApplicationCreateRequest",
-    "SignupApplicationCreateResponse",
-    "SignupIdempotencyKey",
-]
+# No module-level ``__all__``: the export list lived here AND verbatim in
+# adaptix_contracts/schemas/__init__.py, which is the duplication pylint
+# reported (R0801). The package __init__ is the single owner of the public
+# surface — 71 of the 75 schema modules already define no ``__all__``, and
+# tests/test_contract_surface.py asserts against ``schemas.__all__``, never a
+# submodule's. Removing the copy here leaves exactly one source of truth.
