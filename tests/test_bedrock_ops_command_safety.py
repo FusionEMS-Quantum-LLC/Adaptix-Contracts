@@ -275,11 +275,96 @@ def test_every_subprocess_run_call_passes_a_literal_argv() -> None:
         for element in argv.elts[1:]:
             if isinstance(element, ast.Constant) and isinstance(element.value, str):
                 continue
-            # The single permitted non-literal element is this module's own
-            # patch-artifact path — a module constant no caller can influence.
-            assert isinstance(element, ast.Call), ast.dump(element)
-            assert isinstance(element.func, ast.Name) and element.func.id == "str"
-            assert (
-                isinstance(element.args[0], ast.Name)
-                and element.args[0].id == "PATCH_ARTIFACT"
-            ), ast.dump(element)
+            # The single permitted non-literal element is the patch-artifact
+            # path bound by the two ``git apply`` runner builders. It can only
+            # ever be fed from ``_PATCH_ARTIFACT_ARGS`` — a module constant no
+            # caller can influence — which
+            # ``test_git_apply_runners_only_carry_the_module_patch_artifact``
+            # asserts at runtime.
+            assert isinstance(element, ast.Name), ast.dump(element)
+            assert element.id == "patch", ast.dump(element)
+
+
+def test_every_subprocess_run_call_states_check_and_inherits_no_shell() -> None:
+    """Each spawn states its own failure mode and inherits the no-shell pin.
+
+    ``check`` is asserted at every call site because leaving it implicit makes
+    the spawn's failure mode unreadable there. ``shell`` is asserted once on
+    ``_SPAWN_IO`` plus the requirement that every call site unpacks it, which
+    covers every spawn without restating the flag fifteen times.
+    """
+    assert bedrock_ops._SPAWN_IO["shell"] is False
+
+    tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "subprocess"
+        ):
+            continue
+
+        check = {kw.arg: kw.value for kw in node.keywords}.get("check")
+        assert check is not None, f"line {node.lineno}: check not set explicitly"
+        assert isinstance(check, ast.Constant) and check.value is False, (
+            f"line {node.lineno}: check must be the literal False"
+        )
+
+        unpacked = [
+            kw.value.id
+            for kw in node.keywords
+            if kw.arg is None and isinstance(kw.value, ast.Name)
+        ]
+        assert "_SPAWN_IO" in unpacked, (
+            f"line {node.lineno}: spawn does not inherit _SPAWN_IO (no-shell pin)"
+        )
+
+
+def test_each_runner_spawns_exactly_the_argv_it_is_keyed_by(monkeypatch) -> None:
+    """The catalogue key and the literal argv at the sink cannot drift apart.
+
+    Every entry states its argv twice — as the dict key and as the literal
+    handed to ``subprocess.run``. This drives every runner and proves the two
+    agree, so a typo in either copy fails the suite instead of silently
+    executing a different command than the one that was validated.
+    """
+    captured: list[object] = []
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _fake_run(argv, **kwargs):
+        captured.append(argv)
+        return _Proc()
+
+    monkeypatch.setattr(bedrock_ops.subprocess, "run", _fake_run)
+
+    for key, runner in bedrock_ops._COMMAND_RUNNERS.items():
+        captured.clear()
+        runner(300)
+        assert captured == [list(key)], f"{key} spawned {captured}"
+
+
+def test_git_apply_runners_only_carry_the_module_patch_artifact() -> None:
+    """No ``git apply`` entry can name a file other than this module's patch."""
+    permitted = set(bedrock_ops._PATCH_ARTIFACT_ARGS)
+    assert permitted == {
+        str(bedrock_ops.PATCH_ARTIFACT),
+        bedrock_ops.PATCH_ARTIFACT.name,
+    }
+
+    apply_keys = [
+        key for key in bedrock_ops.ALLOWED_COMMANDS if key[:2] == ("git", "apply")
+    ]
+    assert len(apply_keys) == 4
+    for key in apply_keys:
+        assert key[-1] in permitted, key
+
+
+def test_allowlists_are_derived_from_the_runner_table() -> None:
+    """A command can be validated if and only if a runner exists for it."""
+    assert bedrock_ops.ALLOWED_COMMANDS == frozenset(bedrock_ops._COMMAND_RUNNERS)

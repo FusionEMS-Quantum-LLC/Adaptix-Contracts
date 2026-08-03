@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -64,39 +65,100 @@ ALLOWED_MODEL_PREFIXES = (
 # the two name the same file.
 _PATCH_ARTIFACT_ARGS = (str(PATCH_ARTIFACT), PATCH_ARTIFACT.name)
 
-ALLOWED_COMMANDS: frozenset[tuple[str, ...]] = frozenset(
-    {
-        ("git", "ls-files"),
-        ("git", "status", "--short"),
-        ("git", "diff", "--name-only"),
-        ("python", "-m", "compileall", "."),
-        ("ruff", "check", "."),
-        ("ruff", "check", ".", "--fix"),
-        ("ruff", "format", "--check", "."),
-        ("ruff", "format", "."),
-        ("pytest", "-q"),
-        ("npm", "run", "lint", "--if-present"),
-        ("npm", "run", "typecheck", "--if-present"),
-        ("npm", "test", "--if-present", "--", "--runInBand"),
-        ("npm", "run", "build", "--if-present"),
-    }
-    | {("git", "apply", "--check", patch) for patch in _PATCH_ARTIFACT_ARGS}
-    | {("git", "apply", patch) for patch in _PATCH_ARTIFACT_ARGS}
-)
-
-# Derived from the catalogue so the two can never drift apart.
-ALLOWED_EXECUTABLES = frozenset(command[0] for command in ALLOWED_COMMANDS)
-
-# Spawn options shared by every ``subprocess.run`` call site in this module.
-# ``shell=False`` is explicit: no argument is ever handed to a shell to reparse.
-_SPAWN_OPTIONS: dict[str, Any] = {
+# I/O options shared by every ``subprocess.run`` call site below. ``shell`` is
+# pinned here rather than restated 15 times, so no spawn in this module can hand
+# an argument to a shell to reparse. ``check`` is deliberately NOT in here: it is
+# passed explicitly at every call site so the spawn's failure mode is readable
+# where it happens.
+_SPAWN_IO: dict[str, Any] = {
     "cwd": ROOT,
     "text": True,
-    "stdout": subprocess.PIPE,
-    "stderr": subprocess.PIPE,
-    "check": False,
+    "capture_output": True,
     "shell": False,
 }
+
+_Runner = Callable[[int], "subprocess.CompletedProcess[str]"]
+
+
+def _git_apply(patch: str) -> _Runner:
+    """Build the runner for ``git apply <patch>``."""
+    return lambda t: subprocess.run(
+        ["git", "apply", patch], **_SPAWN_IO, timeout=t, check=False
+    )
+
+
+def _git_apply_check(patch: str) -> _Runner:
+    """Build the runner for ``git apply --check <patch>``."""
+    return lambda t: subprocess.run(
+        ["git", "apply", "--check", patch], **_SPAWN_IO, timeout=t, check=False
+    )
+
+
+# The complete catalogue: every command line this module may execute, mapped to
+# the runner that executes it.
+#
+# The argv appears twice per entry - once as the key and once as the literal
+# passed to ``subprocess.run``. That duplication is deliberate and load-bearing:
+# the key is what ``validated_argv`` matches against, and the literal is what
+# reaches the spawn, so no runtime-assembled value is ever handed to
+# ``subprocess.run``. A test drives every runner and asserts the two agree.
+_COMMAND_RUNNERS: dict[tuple[str, ...], _Runner] = {
+    ("git", "ls-files"): lambda t: subprocess.run(
+        ["git", "ls-files"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("git", "status", "--short"): lambda t: subprocess.run(
+        ["git", "status", "--short"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("git", "diff", "--name-only"): lambda t: subprocess.run(
+        ["git", "diff", "--name-only"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("python", "-m", "compileall", "."): lambda t: subprocess.run(
+        ["python", "-m", "compileall", "."], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("ruff", "check", "."): lambda t: subprocess.run(
+        ["ruff", "check", "."], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("ruff", "check", ".", "--fix"): lambda t: subprocess.run(
+        ["ruff", "check", ".", "--fix"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("ruff", "format", "--check", "."): lambda t: subprocess.run(
+        ["ruff", "format", "--check", "."], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("ruff", "format", "."): lambda t: subprocess.run(
+        ["ruff", "format", "."], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("pytest", "-q"): lambda t: subprocess.run(
+        ["pytest", "-q"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("npm", "run", "lint", "--if-present"): lambda t: subprocess.run(
+        ["npm", "run", "lint", "--if-present"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("npm", "run", "typecheck", "--if-present"): lambda t: subprocess.run(
+        ["npm", "run", "typecheck", "--if-present"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    ("npm", "test", "--if-present", "--", "--runInBand"): lambda t: subprocess.run(
+        ["npm", "test", "--if-present", "--", "--runInBand"],
+        **_SPAWN_IO,
+        timeout=t,
+        check=False,
+    ),
+    ("npm", "run", "build", "--if-present"): lambda t: subprocess.run(
+        ["npm", "run", "build", "--if-present"], **_SPAWN_IO, timeout=t, check=False
+    ),
+    # ``git apply`` accepts either the absolute artifact path (the form this
+    # module issues) or the bare filename; every spawn runs with ``cwd=ROOT``,
+    # so the two name the same file.
+    **{("git", "apply", p): _git_apply(p) for p in _PATCH_ARTIFACT_ARGS},
+    **{
+        ("git", "apply", "--check", p): _git_apply_check(p)
+        for p in _PATCH_ARTIFACT_ARGS
+    },
+}
+
+# Both allowlists are derived from the runner table, so the set of commands that
+# validate and the set that can actually be spawned can never drift apart.
+ALLOWED_COMMANDS: frozenset[tuple[str, ...]] = frozenset(_COMMAND_RUNNERS)
+ALLOWED_EXECUTABLES = frozenset(command[0] for command in ALLOWED_COMMANDS)
 
 
 @dataclass
@@ -138,91 +200,19 @@ def validated_argv(command: list[str]) -> list[str]:
     return argv
 
 
-def _spawn_git(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    """Spawn one of the catalogued ``git`` command lines."""
-    if argv == ["git", "ls-files"]:
-        return subprocess.run(["git", "ls-files"], **_SPAWN_OPTIONS, timeout=timeout)
-    if argv == ["git", "status", "--short"]:
-        return subprocess.run(
-            ["git", "status", "--short"], **_SPAWN_OPTIONS, timeout=timeout
-        )
-    if argv == ["git", "diff", "--name-only"]:
-        return subprocess.run(
-            ["git", "diff", "--name-only"], **_SPAWN_OPTIONS, timeout=timeout
-        )
-    if "--check" in argv:
-        return subprocess.run(
-            ["git", "apply", "--check", str(PATCH_ARTIFACT)],
-            **_SPAWN_OPTIONS,
-            timeout=timeout,
-        )
-    return subprocess.run(
-        ["git", "apply", str(PATCH_ARTIFACT)], **_SPAWN_OPTIONS, timeout=timeout
-    )
-
-
-def _spawn_npm(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    """Spawn one of the catalogued ``npm`` command lines."""
-    if argv == ["npm", "run", "lint", "--if-present"]:
-        return subprocess.run(
-            ["npm", "run", "lint", "--if-present"], **_SPAWN_OPTIONS, timeout=timeout
-        )
-    if argv == ["npm", "run", "typecheck", "--if-present"]:
-        return subprocess.run(
-            ["npm", "run", "typecheck", "--if-present"],
-            **_SPAWN_OPTIONS,
-            timeout=timeout,
-        )
-    if argv == ["npm", "test", "--if-present", "--", "--runInBand"]:
-        return subprocess.run(
-            ["npm", "test", "--if-present", "--", "--runInBand"],
-            **_SPAWN_OPTIONS,
-            timeout=timeout,
-        )
-    return subprocess.run(
-        ["npm", "run", "build", "--if-present"], **_SPAWN_OPTIONS, timeout=timeout
-    )
-
-
-def _spawn_python_toolchain(
-    argv: list[str], timeout: int
-) -> subprocess.CompletedProcess[str]:
-    """Spawn one of the catalogued ``python`` / ``ruff`` / ``pytest`` lines."""
-    if argv == ["python", "-m", "compileall", "."]:
-        return subprocess.run(
-            ["python", "-m", "compileall", "."], **_SPAWN_OPTIONS, timeout=timeout
-        )
-    if argv == ["pytest", "-q"]:
-        return subprocess.run(["pytest", "-q"], **_SPAWN_OPTIONS, timeout=timeout)
-    if argv == ["ruff", "check", "."]:
-        return subprocess.run(["ruff", "check", "."], **_SPAWN_OPTIONS, timeout=timeout)
-    if argv == ["ruff", "check", ".", "--fix"]:
-        return subprocess.run(
-            ["ruff", "check", ".", "--fix"], **_SPAWN_OPTIONS, timeout=timeout
-        )
-    if argv == ["ruff", "format", "--check", "."]:
-        return subprocess.run(
-            ["ruff", "format", "--check", "."], **_SPAWN_OPTIONS, timeout=timeout
-        )
-    return subprocess.run(["ruff", "format", "."], **_SPAWN_OPTIONS, timeout=timeout)
-
-
 def _spawn(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    """Dispatch a validated argv to a ``subprocess.run`` call with literal argv.
+    """Dispatch a validated argv to its runner, which spawns a *literal* argv.
 
-    :func:`run` has already proven ``argv`` is in :data:`ALLOWED_COMMANDS`; this
-    re-checks rather than trusting its caller, then hands ``subprocess.run`` a
-    *literal* argv. Nothing assembled at runtime reaches the spawn sink, so
-    there is no value an attacker could influence even if a future caller were
-    compromised.
+    :func:`run` has already proven ``argv`` is in :data:`ALLOWED_COMMANDS`; the
+    table lookup below re-checks rather than trusting its caller. Because the
+    argv handed to ``subprocess.run`` is a literal inside the selected runner,
+    nothing assembled at runtime reaches the spawn sink — there is no value an
+    attacker could influence even if a future caller were compromised.
     """
-    if tuple(argv) not in ALLOWED_COMMANDS:  # defensive: ``run`` validates first
+    runner = _COMMAND_RUNNERS.get(tuple(argv))
+    if runner is None:  # defensive: ``run`` validates first
         raise RuntimeError(f"Refusing to execute unvalidated command: {argv!r}")
-    if argv[0] == "git":
-        return _spawn_git(argv, timeout)
-    if argv[0] == "npm":
-        return _spawn_npm(argv, timeout)
-    return _spawn_python_toolchain(argv, timeout)
+    return runner(timeout)
 
 
 def run(command: list[str], timeout: int = 300) -> CommandResult:
