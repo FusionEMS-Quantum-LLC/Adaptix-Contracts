@@ -65,6 +65,7 @@ from fastapi import Header, HTTPException, status
 from pydantic import BaseModel
 
 from adaptix_contracts.gateway_signature import (
+    GATEWAY_SHARED_SECRET_ENV,
     GatewaySignatureError,
     gateway_shared_secret,
     has_gateway_signature,
@@ -467,7 +468,12 @@ async def get_auth_context(
 # silently at runtime.
 # ---------------------------------------------------------------------------
 
-GATEWAY_SHARED_SECRET_ENV = "ADAPTIX_GATEWAY_SHARED_SECRET"
+# ``GATEWAY_SHARED_SECRET_ENV`` is imported from ``gateway_signature`` at the top
+# of this module and re-exported here via ``__all__``. It is deliberately NOT
+# re-declared: the environment-variable NAME now has exactly one definition in
+# the package. Two independent literals could drift apart, which would silently
+# point signature verification at a different environment variable than the one
+# operations actually configures.
 GATEWAY_PUBLIC_KEY_ENV = "ADAPTIX_GATEWAY_PUBLIC_KEY"
 GATEWAY_SIGNATURE_MAX_AGE_SECONDS = 300
 GATEWAY_JWT_CONTEXT_HEADER = "X-Adaptix-Gateway-Context"

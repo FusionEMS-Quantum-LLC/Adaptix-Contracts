@@ -4,6 +4,7 @@ import argparse
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -46,6 +47,21 @@ ALLOWED_MODEL_PREFIXES = (
     "amazon.",
 )
 
+# Executables this module is permitted to launch. ``run`` is a generic,
+# list-typed executor, so on its own it offers no guarantee about WHAT gets
+# executed — only that no shell is involved. This allowlist closes that gap:
+# even if a future caller builds a command from repository content, Bedrock
+# model output, or environment input, only these binaries can ever be started.
+ALLOWED_EXECUTABLES = frozenset(
+    {
+        "git",
+        "npm",
+        "pytest",
+        "python",
+        "ruff",
+    }
+)
+
 
 @dataclass
 class CommandResult:
@@ -55,19 +71,45 @@ class CommandResult:
     stderr: str
 
 
+def validated_argv(command: list[str]) -> list[str]:
+    """Return ``command`` as an argv list, or raise if it is not permitted.
+
+    Enforces two properties at the single point where this module executes
+    anything:
+
+    * the command is a real argv sequence (never a shell string), and
+    * ``command[0]`` is on :data:`ALLOWED_EXECUTABLES`.
+
+    Raises ``RuntimeError`` on violation so a rejected command fails loudly in
+    the workflow log instead of silently doing something unexpected.
+    """
+    if not isinstance(command, (list, tuple)) or not command:
+        raise RuntimeError(f"Refusing to execute non-argv command: {command!r}")
+    argv = [str(part) for part in command]
+    executable = argv[0]
+    if executable not in ALLOWED_EXECUTABLES:
+        allowed = ", ".join(sorted(ALLOWED_EXECUTABLES))
+        raise RuntimeError(
+            f"Refusing to execute {executable!r}; allowed executables: {allowed}"
+        )
+    return argv
+
+
 def run(command: list[str], timeout: int = 300) -> CommandResult:
+    argv = validated_argv(command)
     proc = subprocess.run(
-        command,
+        argv,
         cwd=ROOT,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=timeout,
         check=False,
+        shell=False,
     )
-    result = CommandResult(command, proc.returncode, proc.stdout, proc.stderr)
+    result = CommandResult(argv, proc.returncode, proc.stdout, proc.stderr)
     with VALIDATION_LOG.open("a", encoding="utf-8") as log:
-        log.write(f"$ {' '.join(command)}\n")
+        log.write(f"$ {' '.join(argv)}\n")
         log.write(f"exit={result.returncode}\n")
         if result.stdout:
             log.write("STDOUT:\n")
@@ -82,14 +124,15 @@ def run(command: list[str], timeout: int = 300) -> CommandResult:
 
 
 def command_exists(name: str) -> bool:
-    return (
-        subprocess.run(
-            ["bash", "-lc", f"command -v {name} >/dev/null 2>&1"],
-            cwd=ROOT,
-            check=False,
-        ).returncode
-        == 0
-    )
+    """True when ``name`` resolves to an executable on PATH.
+
+    Uses ``shutil.which`` instead of ``bash -lc "command -v <name>"``: no shell
+    is spawned, so no value is ever interpolated into a shell command string.
+    It also resolves against the SAME PATH that ``subprocess.run(argv)`` uses in
+    :func:`run`, so a command reported present here is actually launchable there
+    (a login shell can see binaries this process cannot).
+    """
+    return shutil.which(name) is not None
 
 
 def require_env(name: str) -> str:
