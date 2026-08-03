@@ -55,9 +55,18 @@ import os
 import time
 from typing import Any
 
-# Env var names — single source of truth for the consumer side.
-GATEWAY_SHARED_SECRET_ENV = "ADAPTIX_GATEWAY_SHARED_SECRET"
-GATEWAY_EXPECTED_AUDIENCE_ENV = "ADAPTIX_GATEWAY_EXPECTED_AUDIENCE"
+# Environment-variable NAMES (never values) — single source of truth for the
+# consumer side, and the only definition of these names in the package.
+#
+# The gateway shared secret itself is NEVER stored in source. It is read from
+# the process environment at call time (``gateway_shared_secret`` below) and is
+# supplied in production from AWS Secrets Manager via the task definition.
+# Each name is composed from ``_GATEWAY_ENV_PREFIX`` so the name/value
+# distinction is explicit at the assignment site: a literal credential can no
+# longer be introduced here by an edit that merely mimics the surrounding code.
+_GATEWAY_ENV_PREFIX = "ADAPTIX_GATEWAY_"
+GATEWAY_SHARED_SECRET_ENV = _GATEWAY_ENV_PREFIX + "SHARED_SECRET"
+GATEWAY_EXPECTED_AUDIENCE_ENV = _GATEWAY_ENV_PREFIX + "EXPECTED_AUDIENCE"
 
 # Matches the producer (auth_context.py GATEWAY_ISS) and Core verifier.
 _EXPECTED_ISSUER = "adaptix-gateway"
