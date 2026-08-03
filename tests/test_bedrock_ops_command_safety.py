@@ -1,13 +1,20 @@
 """Command-execution safety guards for ``tools/bedrock_ops.py``.
 
-These tests lock in the two controls that close the CommandInjection finding on
+These tests lock in the controls that close the CommandInjection finding on
 ``tools/bedrock_ops.py``:
 
 1. ``run`` executes only argv lists whose executable is on a fixed allowlist,
    never a shell string — so the generic executor cannot be turned into an
    arbitrary-command sink by a caller that builds a command from repository
    content, Bedrock model output, or environment input.
-2. ``command_exists`` resolves names with ``shutil.which`` and never spawns a
+2. ``run`` additionally pins the WHOLE argv to a fixed catalogue of command
+   lines. An executable-name allowlist alone is not enough: ``python``,
+   ``git`` and ``npm`` all accept arguments that are arbitrary-execution
+   primitives (``python -c``, ``git -c core.pager=...``, ``npm run <script>``),
+   so no argument position may be caller-controlled either.
+3. Every ``subprocess.run`` call site passes a *literal* argv, so nothing
+   assembled at runtime reaches the process-spawn sink.
+4. ``command_exists`` resolves names with ``shutil.which`` and never spawns a
    shell, so no value is interpolated into a shell command string.
 
 The module lives outside the installed package (``tools/`` is excluded from
@@ -16,6 +23,7 @@ The module lives outside the installed package (``tools/`` is excluded from
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import pathlib
 import subprocess
@@ -142,3 +150,136 @@ def test_command_exists_uses_the_same_path_resolution_as_run(monkeypatch) -> Non
 
     monkeypatch.setattr(bedrock_ops.shutil, "which", lambda name: None)
     assert bedrock_ops.command_exists("ruff") is False
+
+
+# Every one of these uses an executable that IS on the allowlist, but with
+# arguments this module never issues. Each is a real arbitrary-execution or
+# arbitrary-file primitive, so an executable-name check alone would let them
+# through. Pinning the whole argv is what actually stops them.
+_ALLOWLISTED_EXECUTABLE_WITH_INJECTED_ARGUMENTS = [
+    ["python", "-c", "import os; os.system('id')"],
+    ["python", "-m", "http.server"],
+    ["git", "-c", "core.pager=sh -c id", "log"],
+    ["git", "apply", "/tmp/attacker-supplied.patch"],
+    ["npm", "run", "postinstall"],
+    ["npm", "exec", "--", "some-package"],
+    ["ruff", "check", "--config", "/tmp/attacker.toml", "."],
+    ["pytest", "-p", "attacker_plugin"],
+]
+
+
+@pytest.mark.parametrize("command", _ALLOWLISTED_EXECUTABLE_WITH_INJECTED_ARGUMENTS)
+def test_validated_argv_rejects_injected_arguments_on_allowlisted_executables(
+    command: list[str],
+) -> None:
+    with pytest.raises(RuntimeError, match="Refusing to execute"):
+        bedrock_ops.validated_argv(command)
+
+
+@pytest.mark.parametrize("command", _ALLOWLISTED_EXECUTABLE_WITH_INJECTED_ARGUMENTS)
+def test_run_rejects_injected_arguments_before_spawning(monkeypatch, command) -> None:
+    """An argument-injected command must never reach ``subprocess.run``."""
+
+    def _fail(*args, **kwargs):  # pragma: no cover - must not be reached
+        raise AssertionError("subprocess.run was called for a disallowed command")
+
+    monkeypatch.setattr(bedrock_ops.subprocess, "run", _fail)
+    with pytest.raises(RuntimeError, match="Refusing to execute"):
+        bedrock_ops.run(command)
+
+
+def test_allowed_commands_is_the_command_set_this_module_issues() -> None:
+    """The catalogue covers every real command and nothing else."""
+    issued = {tuple(command) for command in _COMMANDS_THIS_MODULE_ISSUES}
+    catalogue = set(bedrock_ops.ALLOWED_COMMANDS)
+
+    assert issued <= catalogue
+
+    # The only members beyond the bare-filename forms above are the same two
+    # ``git apply`` lines carrying the absolute artifact path, which is what
+    # ``apply_patch`` actually issues.
+    patch = str(bedrock_ops.PATCH_ARTIFACT)
+    assert catalogue - issued == {
+        ("git", "apply", "--check", patch),
+        ("git", "apply", patch),
+    }
+
+
+def test_allowed_executables_is_derived_from_the_catalogue() -> None:
+    """The two allowlists cannot drift apart."""
+    assert bedrock_ops.ALLOWED_EXECUTABLES == {
+        command[0] for command in bedrock_ops.ALLOWED_COMMANDS
+    }
+
+
+def test_detect_validation_commands_only_returns_catalogued_commands() -> None:
+    """Nothing the module plans to run can be rejected at spawn time."""
+    for command in bedrock_ops.detect_validation_commands():
+        assert tuple(command) in bedrock_ops.ALLOWED_COMMANDS
+
+
+def test_run_spawns_git_apply_against_the_module_patch_artifact(
+    monkeypatch, tmp_path
+) -> None:
+    """``git apply`` resolves to this module's own artifact, never a caller path."""
+    captured: dict[str, object] = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _fake_run(argv, **kwargs):
+        captured["argv"] = argv
+        return _Proc()
+
+    monkeypatch.setattr(bedrock_ops.subprocess, "run", _fake_run)
+    monkeypatch.setattr(bedrock_ops, "VALIDATION_LOG", tmp_path / "validation.log")
+
+    patch = str(bedrock_ops.PATCH_ARTIFACT)
+    bedrock_ops.run(["git", "apply", "--check", patch])
+
+    assert captured["argv"] == ["git", "apply", "--check", patch]
+
+
+def test_every_subprocess_run_call_passes_a_literal_argv() -> None:
+    """No runtime-assembled value reaches the process-spawn sink.
+
+    This is the structural property the CommandInjection rule checks: the argv
+    handed to ``subprocess.run`` must be a list literal led by a string literal,
+    never a name bound to a value built at runtime.
+    """
+    tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "run"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "subprocess"
+    ]
+
+    assert calls, "expected at least one subprocess.run call site"
+
+    for call in calls:
+        argv = call.args[0]
+        assert isinstance(argv, ast.List), ast.dump(argv)
+        assert argv.elts, "argv literal must not be empty"
+
+        head = argv.elts[0]
+        assert isinstance(head, ast.Constant) and isinstance(head.value, str), (
+            f"executable must be a string literal, got {ast.dump(head)}"
+        )
+
+        for element in argv.elts[1:]:
+            if isinstance(element, ast.Constant) and isinstance(element.value, str):
+                continue
+            # The single permitted non-literal element is this module's own
+            # patch-artifact path — a module constant no caller can influence.
+            assert isinstance(element, ast.Call), ast.dump(element)
+            assert isinstance(element.func, ast.Name) and element.func.id == "str"
+            assert (
+                isinstance(element.args[0], ast.Name)
+                and element.args[0].id == "PATCH_ARTIFACT"
+            ), ast.dump(element)
