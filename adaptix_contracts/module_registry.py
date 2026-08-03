@@ -510,6 +510,69 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         source="Core _MODULE_TO_AUDIENCE",
     ),
     _m("workspace", "Workspace", source="Core MODULE_CATALOG"),
+    # -----------------------------------------------------------------
+    # Routed-but-unregistered surfaces (added 2026-08-03).
+    #
+    # Each of these has a live RouteEntry in the gateway ROUTE_TABLE and a
+    # real <ModuleGateBoundary> in the web app, but existed in no backend
+    # vocabulary. That combination is not "misconfigured", it is
+    # unreachable: provisioning only ever writes canonical ids and Core's
+    # admin toggle 422s on unknown ones, so nothing could put these into
+    # module_entitlements and every one of those routes was
+    # permanently dark for every non-founder tenant. It went unseen
+    # because useModuleEntitlements returns True unconditionally for a
+    # founder, so no amount of founder click-through could surface it.
+    #
+    # Registered from the gateway ROUTE_TABLE — the routing source of
+    # truth — rather than from the web spelling, and deliberately NOT as
+    # aliases of an existing module: aliasing would hand these routes to
+    # every tenant already holding the aliased module, granting access
+    # under an entitlement they may never have bought. As separate
+    # canonical ids they start ungranted for everyone, so this change
+    # takes nothing away and gives nothing away; it only makes them
+    # grantable.
+    #
+    # purchasable stays False: none appears in the signup wizard, the
+    # signup pricing catalog, or a Stripe product map, so granting is an
+    # explicit admin action rather than something a plan silently confers.
+    # audience is None for the four that ride Core's adaptix-core
+    # audience -- per the ModuleDefinition contract, None means "no
+    # DEDICATED upstream audience" (same case as scheduling riding
+    # adaptix-labor). Only integration and training have their
+    # own upstream service and audience.
+    # -----------------------------------------------------------------
+    _m(
+        "intelligence",
+        "Cortex Intelligence",
+        source="Gateway ROUTE_TABLE /api/v1/intelligence; Web-App app/workspace/intelligence",
+    ),
+    _m(
+        "ai-infrastructure",
+        "AI Infrastructure",
+        source="Gateway ROUTE_TABLE /api/v1/ai-infrastructure; Web-App app/ai-infrastructure",
+    ),
+    _m(
+        "command-intelligence",
+        "Command Intelligence",
+        source="Gateway ROUTE_TABLE /api/v1/command-intelligence; Web-App app/command-intelligence",
+    ),
+    _m(
+        "interoperability",
+        "Interoperability",
+        source="Gateway ROUTE_TABLE /api/v1/interoperability; Web-App app/interoperability",
+    ),
+    _m(
+        "integration",
+        "Integrations",
+        audience="adaptix-integrations",
+        source="Gateway ROUTE_TABLE /api/v1/integrations; Web-App app/workspace/integrations",
+    ),
+    _m(
+        "training",
+        "Training",
+        audience="adaptix-training",
+        source="Gateway ROUTE_TABLE /api/v1/training; Web-App app/workspace/training",
+    ),
 )
 
 
