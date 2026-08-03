@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from typing import Any
 
 import boto3
 import yaml
@@ -47,20 +48,55 @@ ALLOWED_MODEL_PREFIXES = (
     "amazon.",
 )
 
-# Executables this module is permitted to launch. ``run`` is a generic,
-# list-typed executor, so on its own it offers no guarantee about WHAT gets
-# executed — only that no shell is involved. This allowlist closes that gap:
-# even if a future caller builds a command from repository content, Bedrock
-# model output, or environment input, only these binaries can ever be started.
-ALLOWED_EXECUTABLES = frozenset(
+# The complete catalogue of command lines this module is permitted to execute.
+#
+# Allowlisting only ``argv[0]`` is not sufficient. Every executable this module
+# needs also accepts arguments that are themselves arbitrary-execution
+# primitives — ``python -c '<code>'``, ``git -c core.pager='sh -c <code>' log``,
+# ``npm run <arbitrary-script>`` — so a caller that assembled a command from
+# repository content, Bedrock model output, or environment input could still
+# reach a process-spawn sink while passing an executable-name check. Pinning the
+# WHOLE argv removes that flow: no argument position is caller-controlled, so
+# there is nothing left to inject into.
+#
+# ``git apply`` is listed with both the absolute artifact path (the form this
+# module issues) and the bare filename. Every spawn runs with ``cwd=ROOT``, so
+# the two name the same file.
+_PATCH_ARTIFACT_ARGS = (str(PATCH_ARTIFACT), PATCH_ARTIFACT.name)
+
+ALLOWED_COMMANDS: frozenset[tuple[str, ...]] = frozenset(
     {
-        "git",
-        "npm",
-        "pytest",
-        "python",
-        "ruff",
+        ("git", "ls-files"),
+        ("git", "status", "--short"),
+        ("git", "diff", "--name-only"),
+        ("python", "-m", "compileall", "."),
+        ("ruff", "check", "."),
+        ("ruff", "check", ".", "--fix"),
+        ("ruff", "format", "--check", "."),
+        ("ruff", "format", "."),
+        ("pytest", "-q"),
+        ("npm", "run", "lint", "--if-present"),
+        ("npm", "run", "typecheck", "--if-present"),
+        ("npm", "test", "--if-present", "--", "--runInBand"),
+        ("npm", "run", "build", "--if-present"),
     }
+    | {("git", "apply", "--check", patch) for patch in _PATCH_ARTIFACT_ARGS}
+    | {("git", "apply", patch) for patch in _PATCH_ARTIFACT_ARGS}
 )
+
+# Derived from the catalogue so the two can never drift apart.
+ALLOWED_EXECUTABLES = frozenset(command[0] for command in ALLOWED_COMMANDS)
+
+# Spawn options shared by every ``subprocess.run`` call site in this module.
+# ``shell=False`` is explicit: no argument is ever handed to a shell to reparse.
+_SPAWN_OPTIONS: dict[str, Any] = {
+    "cwd": ROOT,
+    "text": True,
+    "stdout": subprocess.PIPE,
+    "stderr": subprocess.PIPE,
+    "check": False,
+    "shell": False,
+}
 
 
 @dataclass
@@ -74,11 +110,13 @@ class CommandResult:
 def validated_argv(command: list[str]) -> list[str]:
     """Return ``command`` as an argv list, or raise if it is not permitted.
 
-    Enforces two properties at the single point where this module executes
-    anything:
+    Enforces three properties at the single point where this module decides what
+    may be executed:
 
-    * the command is a real argv sequence (never a shell string), and
-    * ``command[0]`` is on :data:`ALLOWED_EXECUTABLES`.
+    * the command is a real argv sequence (never a shell string),
+    * ``command[0]`` is on :data:`ALLOWED_EXECUTABLES`, and
+    * the WHOLE argv is one of :data:`ALLOWED_COMMANDS`, so no argument position
+      is caller-controlled.
 
     Raises ``RuntimeError`` on violation so a rejected command fails loudly in
     the workflow log instead of silently doing something unexpected.
@@ -92,21 +130,104 @@ def validated_argv(command: list[str]) -> list[str]:
         raise RuntimeError(
             f"Refusing to execute {executable!r}; allowed executables: {allowed}"
         )
+    if tuple(argv) not in ALLOWED_COMMANDS:
+        raise RuntimeError(
+            f"Refusing to execute {argv!r}; it is not one of the "
+            f"{len(ALLOWED_COMMANDS)} command lines this module may run."
+        )
     return argv
+
+
+def _spawn_git(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    """Spawn one of the catalogued ``git`` command lines."""
+    if argv == ["git", "ls-files"]:
+        return subprocess.run(["git", "ls-files"], **_SPAWN_OPTIONS, timeout=timeout)
+    if argv == ["git", "status", "--short"]:
+        return subprocess.run(
+            ["git", "status", "--short"], **_SPAWN_OPTIONS, timeout=timeout
+        )
+    if argv == ["git", "diff", "--name-only"]:
+        return subprocess.run(
+            ["git", "diff", "--name-only"], **_SPAWN_OPTIONS, timeout=timeout
+        )
+    if "--check" in argv:
+        return subprocess.run(
+            ["git", "apply", "--check", str(PATCH_ARTIFACT)],
+            **_SPAWN_OPTIONS,
+            timeout=timeout,
+        )
+    return subprocess.run(
+        ["git", "apply", str(PATCH_ARTIFACT)], **_SPAWN_OPTIONS, timeout=timeout
+    )
+
+
+def _spawn_npm(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    """Spawn one of the catalogued ``npm`` command lines."""
+    if argv == ["npm", "run", "lint", "--if-present"]:
+        return subprocess.run(
+            ["npm", "run", "lint", "--if-present"], **_SPAWN_OPTIONS, timeout=timeout
+        )
+    if argv == ["npm", "run", "typecheck", "--if-present"]:
+        return subprocess.run(
+            ["npm", "run", "typecheck", "--if-present"],
+            **_SPAWN_OPTIONS,
+            timeout=timeout,
+        )
+    if argv == ["npm", "test", "--if-present", "--", "--runInBand"]:
+        return subprocess.run(
+            ["npm", "test", "--if-present", "--", "--runInBand"],
+            **_SPAWN_OPTIONS,
+            timeout=timeout,
+        )
+    return subprocess.run(
+        ["npm", "run", "build", "--if-present"], **_SPAWN_OPTIONS, timeout=timeout
+    )
+
+
+def _spawn_python_toolchain(
+    argv: list[str], timeout: int
+) -> subprocess.CompletedProcess[str]:
+    """Spawn one of the catalogued ``python`` / ``ruff`` / ``pytest`` lines."""
+    if argv == ["python", "-m", "compileall", "."]:
+        return subprocess.run(
+            ["python", "-m", "compileall", "."], **_SPAWN_OPTIONS, timeout=timeout
+        )
+    if argv == ["pytest", "-q"]:
+        return subprocess.run(["pytest", "-q"], **_SPAWN_OPTIONS, timeout=timeout)
+    if argv == ["ruff", "check", "."]:
+        return subprocess.run(["ruff", "check", "."], **_SPAWN_OPTIONS, timeout=timeout)
+    if argv == ["ruff", "check", ".", "--fix"]:
+        return subprocess.run(
+            ["ruff", "check", ".", "--fix"], **_SPAWN_OPTIONS, timeout=timeout
+        )
+    if argv == ["ruff", "format", "--check", "."]:
+        return subprocess.run(
+            ["ruff", "format", "--check", "."], **_SPAWN_OPTIONS, timeout=timeout
+        )
+    return subprocess.run(["ruff", "format", "."], **_SPAWN_OPTIONS, timeout=timeout)
+
+
+def _spawn(argv: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    """Dispatch a validated argv to a ``subprocess.run`` call with literal argv.
+
+    :func:`run` has already proven ``argv`` is in :data:`ALLOWED_COMMANDS`; this
+    re-checks rather than trusting its caller, then hands ``subprocess.run`` a
+    *literal* argv. Nothing assembled at runtime reaches the spawn sink, so
+    there is no value an attacker could influence even if a future caller were
+    compromised.
+    """
+    if tuple(argv) not in ALLOWED_COMMANDS:  # defensive: ``run`` validates first
+        raise RuntimeError(f"Refusing to execute unvalidated command: {argv!r}")
+    if argv[0] == "git":
+        return _spawn_git(argv, timeout)
+    if argv[0] == "npm":
+        return _spawn_npm(argv, timeout)
+    return _spawn_python_toolchain(argv, timeout)
 
 
 def run(command: list[str], timeout: int = 300) -> CommandResult:
     argv = validated_argv(command)
-    proc = subprocess.run(
-        argv,
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=timeout,
-        check=False,
-        shell=False,
-    )
+    proc = _spawn(argv, timeout)
     result = CommandResult(argv, proc.returncode, proc.stdout, proc.stderr)
     with VALIDATION_LOG.open("a", encoding="utf-8") as log:
         log.write(f"$ {' '.join(argv)}\n")
