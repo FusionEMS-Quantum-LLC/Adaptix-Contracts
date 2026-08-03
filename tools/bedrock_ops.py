@@ -80,17 +80,45 @@ _SPAWN_IO: dict[str, Any] = {
 _Runner = Callable[[int], "subprocess.CompletedProcess[str]"]
 
 
+def _exe(name: str) -> str:
+    """Resolve the literal executable ``name`` to an absolute path for argv[0].
+
+    ``name`` is always a literal written into the catalogue below - never a
+    caller-supplied value - so this resolution cannot be steered by input and
+    the argv reaching ``subprocess.run`` stays fully literal.
+
+    Pinning argv[0] to an absolute path closes a PATH-hijack primitive. Without
+    it every spawn re-resolves a bare name like ``git`` through ``PATH`` in the
+    child at exec time, so any directory an attacker can write to that precedes
+    the real tool turns every spawn in this module into arbitrary code
+    execution. That matters here specifically: this module runs holding AWS
+    credentials assumed through OIDC, which is exactly what a hijack would take.
+
+    It also removes a second ambiguity. Every spawn sets ``cwd=ROOT``, so a
+    relative ``PATH`` entry would be resolved by the child against a directory
+    chosen after this process handed over the argv. An absolute path cannot be
+    re-interpreted that way.
+
+    Falling back to the bare name when ``shutil.which`` finds nothing preserves
+    today's failure mode exactly - ``subprocess.run`` raises
+    ``FileNotFoundError`` for a missing tool - instead of inventing a different
+    error for the callers (``git``, ``python``) that do not gate on
+    :func:`command_exists`.
+    """
+    return shutil.which(name) or name
+
+
 def _git_apply(patch: str) -> _Runner:
     """Build the runner for ``git apply <patch>``."""
     return lambda t: subprocess.run(
-        ["git", "apply", patch], **_SPAWN_IO, timeout=t, check=False
+        [_exe("git"), "apply", patch], **_SPAWN_IO, timeout=t, check=False
     )
 
 
 def _git_apply_check(patch: str) -> _Runner:
     """Build the runner for ``git apply --check <patch>``."""
     return lambda t: subprocess.run(
-        ["git", "apply", "--check", patch], **_SPAWN_IO, timeout=t, check=False
+        [_exe("git"), "apply", "--check", patch], **_SPAWN_IO, timeout=t, check=False
     )
 
 
@@ -102,48 +130,62 @@ def _git_apply_check(patch: str) -> _Runner:
 # the key is what ``validated_argv`` matches against, and the literal is what
 # reaches the spawn, so no runtime-assembled value is ever handed to
 # ``subprocess.run``. A test drives every runner and asserts the two agree.
+#
+# argv[0] is written as ``_exe("<name>")`` rather than a bare name, so the
+# executable is pinned to an absolute path instead of being re-resolved through
+# ``PATH`` by the child at exec time. The name handed to ``_exe`` is still a
+# literal, so the key and the spawned command still name the same tool.
 _COMMAND_RUNNERS: dict[tuple[str, ...], _Runner] = {
     ("git", "ls-files"): lambda t: subprocess.run(
-        ["git", "ls-files"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("git"), "ls-files"], **_SPAWN_IO, timeout=t, check=False
     ),
     ("git", "status", "--short"): lambda t: subprocess.run(
-        ["git", "status", "--short"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("git"), "status", "--short"], **_SPAWN_IO, timeout=t, check=False
     ),
     ("git", "diff", "--name-only"): lambda t: subprocess.run(
-        ["git", "diff", "--name-only"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("git"), "diff", "--name-only"], **_SPAWN_IO, timeout=t, check=False
     ),
     ("python", "-m", "compileall", "."): lambda t: subprocess.run(
-        ["python", "-m", "compileall", "."], **_SPAWN_IO, timeout=t, check=False
+        [_exe("python"), "-m", "compileall", "."], **_SPAWN_IO, timeout=t, check=False
     ),
     ("ruff", "check", "."): lambda t: subprocess.run(
-        ["ruff", "check", "."], **_SPAWN_IO, timeout=t, check=False
+        [_exe("ruff"), "check", "."], **_SPAWN_IO, timeout=t, check=False
     ),
     ("ruff", "check", ".", "--fix"): lambda t: subprocess.run(
-        ["ruff", "check", ".", "--fix"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("ruff"), "check", ".", "--fix"], **_SPAWN_IO, timeout=t, check=False
     ),
     ("ruff", "format", "--check", "."): lambda t: subprocess.run(
-        ["ruff", "format", "--check", "."], **_SPAWN_IO, timeout=t, check=False
+        [_exe("ruff"), "format", "--check", "."], **_SPAWN_IO, timeout=t, check=False
     ),
     ("ruff", "format", "."): lambda t: subprocess.run(
-        ["ruff", "format", "."], **_SPAWN_IO, timeout=t, check=False
+        [_exe("ruff"), "format", "."], **_SPAWN_IO, timeout=t, check=False
     ),
     ("pytest", "-q"): lambda t: subprocess.run(
-        ["pytest", "-q"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("pytest"), "-q"], **_SPAWN_IO, timeout=t, check=False
     ),
     ("npm", "run", "lint", "--if-present"): lambda t: subprocess.run(
-        ["npm", "run", "lint", "--if-present"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("npm"), "run", "lint", "--if-present"],
+        **_SPAWN_IO,
+        timeout=t,
+        check=False,
     ),
     ("npm", "run", "typecheck", "--if-present"): lambda t: subprocess.run(
-        ["npm", "run", "typecheck", "--if-present"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("npm"), "run", "typecheck", "--if-present"],
+        **_SPAWN_IO,
+        timeout=t,
+        check=False,
     ),
     ("npm", "test", "--if-present", "--", "--runInBand"): lambda t: subprocess.run(
-        ["npm", "test", "--if-present", "--", "--runInBand"],
+        [_exe("npm"), "test", "--if-present", "--", "--runInBand"],
         **_SPAWN_IO,
         timeout=t,
         check=False,
     ),
     ("npm", "run", "build", "--if-present"): lambda t: subprocess.run(
-        ["npm", "run", "build", "--if-present"], **_SPAWN_IO, timeout=t, check=False
+        [_exe("npm"), "run", "build", "--if-present"],
+        **_SPAWN_IO,
+        timeout=t,
+        check=False,
     ),
     # ``git apply`` accepts either the absolute artifact path (the form this
     # module issues) or the bare filename; every spawn runs with ``cwd=ROOT``,
