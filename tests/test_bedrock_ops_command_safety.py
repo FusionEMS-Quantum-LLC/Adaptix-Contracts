@@ -16,6 +16,10 @@ These tests lock in the controls that close the CommandInjection finding on
    assembled at runtime reaches the process-spawn sink.
 4. ``command_exists`` resolves names with ``shutil.which`` and never spawns a
    shell, so no value is interpolated into a shell command string.
+5. Every spawn pins argv[0] to the absolute path of its executable. A bare
+   name is re-resolved through ``PATH`` by the child at exec time, so any
+   writable directory preceding the real tool would be executed instead --
+   and this module runs holding AWS credentials assumed through OIDC.
 
 The module lives outside the installed package (``tools/`` is excluded from
 ``[tool.setuptools.packages.find]``), so it is loaded by path.
@@ -121,7 +125,7 @@ def test_run_passes_an_argv_list_and_never_a_shell(monkeypatch, tmp_path) -> Non
 
     result = bedrock_ops.run(["git", "status", "--short"])
 
-    assert captured["argv"] == ["git", "status", "--short"]
+    assert captured["argv"] == [bedrock_ops._exe("git"), "status", "--short"]
     assert isinstance(captured["argv"], list)
     assert captured["kwargs"]["shell"] is False
     assert result.command == ["git", "status", "--short"]
@@ -150,6 +154,44 @@ def test_command_exists_uses_the_same_path_resolution_as_run(monkeypatch) -> Non
 
     monkeypatch.setattr(bedrock_ops.shutil, "which", lambda name: None)
     assert bedrock_ops.command_exists("ruff") is False
+
+
+def test_exe_pins_argv0_to_the_absolute_resolved_path(monkeypatch) -> None:
+    """argv[0] is resolved to an absolute path before it reaches the spawn."""
+    monkeypatch.setattr(bedrock_ops.shutil, "which", lambda name: f"/usr/bin/{name}")
+    assert bedrock_ops._exe("git") == "/usr/bin/git"
+
+
+def test_exe_falls_back_to_the_bare_name_when_unresolvable(monkeypatch) -> None:
+    """An unresolvable tool keeps today's ``FileNotFoundError`` failure mode.
+
+    ``git`` and ``python`` are spawned without a :func:`command_exists` gate, so
+    the resolver must not convert "tool missing" into a different error.
+    """
+    monkeypatch.setattr(bedrock_ops.shutil, "which", lambda name: None)
+    assert bedrock_ops._exe("ruff") == "ruff"
+
+
+def test_every_runner_spawns_the_resolved_executable(monkeypatch) -> None:
+    """No spawn in the catalogue leaves argv[0] as a bare PATH-resolved name."""
+    resolved: list[str] = []
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def _fake_run(argv, **kwargs):
+        resolved.append(argv[0])
+        return _Proc()
+
+    monkeypatch.setattr(bedrock_ops.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(bedrock_ops.subprocess, "run", _fake_run)
+
+    for key, runner in bedrock_ops._COMMAND_RUNNERS.items():
+        resolved.clear()
+        runner(300)
+        assert resolved == [f"/usr/bin/{key[0]}"], key
 
 
 # Every one of these uses an executable that IS on the allowlist, but with
@@ -239,15 +281,19 @@ def test_run_spawns_git_apply_against_the_module_patch_artifact(
     patch = str(bedrock_ops.PATCH_ARTIFACT)
     bedrock_ops.run(["git", "apply", "--check", patch])
 
-    assert captured["argv"] == ["git", "apply", "--check", patch]
+    assert captured["argv"] == [bedrock_ops._exe("git"), "apply", "--check", patch]
 
 
 def test_every_subprocess_run_call_passes_a_literal_argv() -> None:
     """No runtime-assembled value reaches the process-spawn sink.
 
     This is the structural property the CommandInjection rule checks: the argv
-    handed to ``subprocess.run`` must be a list literal led by a string literal,
-    never a name bound to a value built at runtime.
+    handed to ``subprocess.run`` must be a list literal whose executable is
+    named by a string literal, never a name bound to a value built at runtime.
+
+    argv[0] is written as ``_exe("<name>")``. The executable is still named by
+    a literal; ``_exe`` only resolves that literal to an absolute path, so no
+    runtime-assembled value can reach the executable position either.
     """
     tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
     calls = [
@@ -268,9 +314,18 @@ def test_every_subprocess_run_call_passes_a_literal_argv() -> None:
         assert argv.elts, "argv literal must not be empty"
 
         head = argv.elts[0]
-        assert isinstance(head, ast.Constant) and isinstance(head.value, str), (
-            f"executable must be a string literal, got {ast.dump(head)}"
+        assert isinstance(head, ast.Call), (
+            f"executable must be pinned with _exe(...), got {ast.dump(head)}"
         )
+        assert isinstance(head.func, ast.Name) and head.func.id == "_exe", (
+            f"executable must be pinned with _exe(...), got {ast.dump(head)}"
+        )
+        assert len(head.args) == 1 and not head.keywords, ast.dump(head)
+        exe_name = head.args[0]
+        assert isinstance(exe_name, ast.Constant) and isinstance(exe_name.value, str), (
+            f"_exe must take a string literal, got {ast.dump(exe_name)}"
+        )
+        assert exe_name.value in bedrock_ops.ALLOWED_EXECUTABLES, exe_name.value
 
         for element in argv.elts[1:]:
             if isinstance(element, ast.Constant) and isinstance(element.value, str):
@@ -329,6 +384,9 @@ def test_each_runner_spawns_exactly_the_argv_it_is_keyed_by(monkeypatch) -> None
     handed to ``subprocess.run``. This drives every runner and proves the two
     agree, so a typo in either copy fails the suite instead of silently
     executing a different command than the one that was validated.
+
+    argv[0] is compared against its resolved form, since every spawn pins the
+    executable to an absolute path.
     """
     captured: list[object] = []
 
@@ -346,7 +404,8 @@ def test_each_runner_spawns_exactly_the_argv_it_is_keyed_by(monkeypatch) -> None
     for key, runner in bedrock_ops._COMMAND_RUNNERS.items():
         captured.clear()
         runner(300)
-        assert captured == [list(key)], f"{key} spawned {captured}"
+        expected = [bedrock_ops._exe(key[0]), *key[1:]]
+        assert captured == [expected], f"{key} spawned {captured}"
 
 
 def test_git_apply_runners_only_carry_the_module_patch_artifact() -> None:
