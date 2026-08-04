@@ -19,16 +19,20 @@ from adaptix_contracts.module_registry import (
     ALIAS_INDEX,
     MODULE_REGISTRY,
     RUNTIME_GATE_SLUGS,
+    SOLD_WITHOUT_SERVICE_MAPPING,
     UnknownModuleError,
+    audience_map,
     canonical_module_ids,
     expand_entitlements,
     is_any_module_entitled,
     is_module_entitled,
+    module_audiences,
     normalize_module_id,
     purchasable_module_ids,
     require_module_id,
     resolve_module_id,
 )
+from adaptix_contracts.service_audiences import KNOWN_SERVICE_AUDIENCES
 
 
 # ---------------------------------------------------------------------------
@@ -327,3 +331,153 @@ def test_require_module_id_rejects_unknown_ids() -> None:
     assert require_module_id("Billing_Automation") == "billing"
     with pytest.raises(UnknownModuleError):
         require_module_id("no_such_module")
+
+
+# ---------------------------------------------------------------------------
+# Billable-but-dark regression gate
+#
+# The defect class this guards against: a tenant pays for a module, Core mints
+# a JWT whose ``aud`` list does not cover that module's upstream service, and
+# the gateway answers 403 ``jwt_audience_mismatch`` on every request. The
+# module is billed and dark, and NOTHING fails — not a type check, not a unit
+# test, not a health check, not a dashboard.
+#
+# RUNTIME-PROVEN in production 2026-08-04T14:18:47Z with a real agency_admin
+# token for tenant 1460aa33 whose module_entitlements contained "scheduling":
+#
+#   GET /api/v1/workforce/shifts    -> 403 jwt_audience_mismatch
+#                                      expected "adaptix-labor"
+#   GET /api/v1/labor/shifts        -> 403 jwt_audience_mismatch
+#   GET /api/v1/cad/units/available -> 200  (same token, same minute)
+#
+# ``scheduling`` is included in every Core signup plan AND every live
+# /api/v1/billing/plans tier, so this hit 100% of paying agencies.
+# ---------------------------------------------------------------------------
+
+
+def test_every_purchasable_module_resolves_to_at_least_one_audience() -> None:
+    """A SKU a customer can buy MUST reach a service, or it is billed and dark.
+
+    Failing here means someone added or changed a purchasable module without
+    giving it an ``audience`` (or an ``implies`` that reaches one). Fix it by
+    setting the audience the module's gateway ``RouteEntry`` declares in
+    ``Adaptix-Gateway/backend/app/config/routes.py`` — never by inventing one,
+    and never by adding the id to ``SOLD_WITHOUT_SERVICE_MAPPING`` to silence
+    the test unless the owning service genuinely does not exist yet.
+    """
+    dark = {
+        module_id
+        for module_id in purchasable_module_ids()
+        if not module_audiences(module_id)
+    }
+    assert dark <= SOLD_WITHOUT_SERVICE_MAPPING, (
+        "purchasable modules that resolve to ZERO service audiences — a tenant "
+        f"can be billed for these and reach nothing: {sorted(dark - SOLD_WITHOUT_SERVICE_MAPPING)}"
+    )
+
+
+def test_every_sold_alias_resolves_to_the_same_audiences_as_its_canonical_id() -> None:
+    """The spelling a plan sells must reach exactly what the canonical id reaches.
+
+    ``signup_pricing`` persists ``billing_automation`` / ``fire_response`` /
+    ``field_app`` verbatim into ``metadata_json["module_entitlements"]``, so
+    the SOLD spelling is what Core resolves at token-mint time. An alias that
+    resolves to fewer audiences than its canonical id is the same
+    billed-and-dark defect wearing a different name.
+    """
+    for canonical_id, definition in MODULE_REGISTRY.items():
+        for alias in definition.aliases:
+            assert module_audiences(alias) == module_audiences(canonical_id), (
+                f"alias {alias!r} reaches {sorted(module_audiences(alias))} but "
+                f"canonical {canonical_id!r} reaches "
+                f"{sorted(module_audiences(canonical_id))}"
+            )
+
+
+def test_quarantined_modules_are_real_purchasable_ids_with_no_audience() -> None:
+    """``SOLD_WITHOUT_SERVICE_MAPPING`` must not accumulate stale entries.
+
+    Once a quarantined SKU is given its audience, this fails until the id is
+    removed from the set — so the quarantine list can only shrink, never rot.
+    """
+    for module_id in SOLD_WITHOUT_SERVICE_MAPPING:
+        assert module_id in MODULE_REGISTRY, (
+            f"{module_id!r} is quarantined but is not a registered module"
+        )
+        assert MODULE_REGISTRY[module_id].purchasable, (
+            f"{module_id!r} is quarantined but is not purchasable — the "
+            "quarantine is only for SKUs a customer can be charged for"
+        )
+        assert not module_audiences(module_id), (
+            f"{module_id!r} now resolves to "
+            f"{sorted(module_audiences(module_id))} — delete it from "
+            "SOLD_WITHOUT_SERVICE_MAPPING"
+        )
+
+
+def test_every_declared_audience_is_a_known_live_service_audience() -> None:
+    """An audience the gateway does not know is unroutable — 403 for everyone."""
+    unknown = sorted(set(audience_map().values()) - KNOWN_SERVICE_AUDIENCES)
+    assert not unknown, (
+        f"module audiences absent from KNOWN_SERVICE_AUDIENCES: {unknown}"
+    )
+
+
+def test_runtime_gated_modules_reach_the_service_that_gates_them() -> None:
+    """A slug a service gates on must also mint an audience reaching that service.
+
+    Otherwise the module gate can never even be evaluated: the gateway rejects
+    the request on audience before the service sees it. This is precisely the
+    ``scheduling`` failure — Core gated on the module while the gateway refused
+    the audience.
+    """
+    for slug in sorted(RUNTIME_GATE_SLUGS):
+        assert module_audiences(slug), (
+            f"{slug!r} is enforced by a live require_module_entitlement() call "
+            "but resolves to no audience — every request 403s at the gateway "
+            "before the gate runs"
+        )
+
+
+def test_scheduling_reaches_labor_service() -> None:
+    """Pinned regression for the exact production failure.
+
+    Gateway ``RouteEntry(prefix="/api/v1/scheduling", audience="adaptix-labor")``.
+    Holding ``scheduling`` must therefore mint ``adaptix-labor``, and must NOT
+    silently confer the separately-sold ``labor`` module entitlement.
+    """
+    assert "adaptix-labor" in module_audiences("scheduling")
+    assert "labor" not in expand_entitlements(["scheduling"])
+
+
+def test_field_app_and_crewlink_reach_cad_service() -> None:
+    """Both routers live inside Adaptix-CAD-Service, so both need adaptix-cad.
+
+    ``field_app`` is the spelling ``signup_pricing`` persists for the mobile
+    field product; it resolves to ``mdt``.
+    """
+    assert module_audiences("field_app") == {"adaptix-cad"}
+    assert module_audiences("mdt") == {"adaptix-cad"}
+    assert module_audiences("crewlink") == {"adaptix-cad"}
+    # Reaching CAD's audience must not confer the CAD module itself — CAD
+    # mounts /api/v1/cad and /api/v1/mdt under
+    # Depends(require_module_entitlement("cad")), which still applies.
+    assert "cad" not in expand_entitlements(["mdt"])
+    assert "cad" not in expand_entitlements(["crewlink"])
+
+
+def test_assetops_reaches_its_own_service() -> None:
+    """Live $29/vehicle/month SKU; gateway routes /api/v1/assetops to it."""
+    assert module_audiences("assetops") == {"adaptix-assetops"}
+
+
+def test_audience_map_is_consistent_with_the_registry() -> None:
+    """``audience_map()`` is what Core derives ``_MODULE_TO_AUDIENCE`` from."""
+    mapping = audience_map()
+    for module_id, audience in mapping.items():
+        assert MODULE_REGISTRY[module_id].audience == audience
+    for module_id, definition in MODULE_REGISTRY.items():
+        if definition.audience:
+            assert mapping[module_id] == definition.audience
+        else:
+            assert module_id not in mapping
