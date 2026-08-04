@@ -1,12 +1,19 @@
 """Integration tests for supply domain integrations.
 
-Tests the shared NotificationClient, SearchClient, AnalyticsClient, and AuditClient
-with mock services to verify:
-1. Correct HTTP calls to upstream services
-2. Proper retry and error handling
-3. Idempotency and correlation IDs
-4. Graceful degradation when services are unavailable
-5. Environment variable configuration
+Tests the shared NotificationClient, AnalyticsClient, and AuditClient with mock
+services.
+
+READ THIS BEFORE ADDING A TEST HERE. These tests patch httpx.AsyncClient, force a
+success response, and assert `result is True`. They assert nothing about the URL,
+the headers, or the request body. The deleted SearchClient tests were written the
+same way, and that is exactly why a client wrong on all three at once — wrong path,
+wrong auth header, wrong payload shape — passed this suite for its entire life
+without ever indexing a row. A test that mocks the transport and asserts only the
+return value measures nothing about the contract.
+
+If you extend this file, assert on the call arguments: `mock_post.call_args` gives
+you the URL, `headers=`, and `json=` actually sent. Compare them against the
+receiving service's route, its auth dependency, and its request model.
 """
 
 import pytest
@@ -127,90 +134,6 @@ async def test_notification_client_discrepancy_alert():
             missing_quantity=5,
             unit="vials",
             escalation_flag=True,
-        )
-
-        assert result is True
-
-
-@pytest.mark.asyncio
-async def test_search_client_index_inventory_item():
-    """Test indexing an inventory item."""
-    from adaptix_contracts.supply_integrations import SearchClient
-
-    tenant_id = uuid4()
-
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_response = _mock_success_response()
-
-        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value = mock_client
-
-        result = await SearchClient.index_inventory_item(
-            tenant_id=tenant_id,
-            item_id="item-123",
-            item_name="Saline 0.9%",
-            category="Fluids",
-            location="Storage A",
-            current_stock=15,
-            par_level=20,
-            cost=5.00,
-        )
-
-        assert result is True
-
-
-@pytest.mark.asyncio
-async def test_search_client_index_medication_lot():
-    """Test indexing a medication lot."""
-    from adaptix_contracts.supply_integrations import SearchClient
-
-    tenant_id = uuid4()
-    expiration_date = datetime.now(timezone.utc)
-
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_response = _mock_success_response()
-
-        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value = mock_client
-
-        result = await SearchClient.index_medication_lot(
-            tenant_id=tenant_id,
-            medication_id="med-123",
-            medication_name="Aspirin",
-            lot_id="LOT-001",
-            expiration_date=expiration_date,
-            current_stock=100,
-            storage_location="Pharmacy A",
-        )
-
-        assert result is True
-
-
-@pytest.mark.asyncio
-async def test_search_client_index_narcotic_vial():
-    """Test indexing a narcotic vial."""
-    from adaptix_contracts.supply_integrations import SearchClient
-
-    tenant_id = uuid4()
-
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_response = _mock_success_response()
-
-        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value = mock_client
-
-        result = await SearchClient.index_narcotic_vial(
-            tenant_id=tenant_id,
-            substance_id="subst-123",
-            substance_name="Fentanyl",
-            vial_id="vial-123",
-            lot_id="LOT-001",
-            unit_id="unit-123",
-            seal_status="sealed",
-            chain_of_custody_status="received",
         )
 
         assert result is True

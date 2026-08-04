@@ -257,48 +257,28 @@ await NotificationClient.send_discrepancy_alert(
 )
 ```
 
-### SearchClient
+### SearchClient — REMOVED
 
-Index items for full-text search:
+There is no SearchClient. One existed and was removed because it had never indexed a
+single row. Its six call sites across Inventory / Medications / Narcotics were all
+unreachable, and the client was wrong on three axes at once against
+Adaptix-Search-Service: it POSTed to `/api/v1/search/index/{index}` (not a route —
+the real one is `POST /api/v1/search/index`), authenticated with
+`Authorization: Bearer` instead of the required `X-Internal-Service-Key`, and sent a
+payload carrying none of `IndexEntityRequest`'s required
+`entity_type` / `entity_id` / `title` fields. `_index_document` caught the resulting
+exception and returned `False`, so none of it ever surfaced.
 
-```python
-from adaptix_contracts.supply_integrations import SearchClient
-
-# Index inventory item
-await SearchClient.index_inventory_item(
-    tenant_id=tenant_id,
-    item_id="item-123",
-    item_name="Saline 0.9%",
-    category="Fluids",
-    location="Storage A",
-    current_stock=15,
-    par_level=20,
-    cost=5.00,
-)
-
-# Index medication lot
-await SearchClient.index_medication_lot(
-    tenant_id=tenant_id,
-    medication_id="med-123",
-    medication_name="Aspirin",
-    lot_id="LOT-001",
-    expiration_date=datetime(...),
-    current_stock=100,
-    storage_location="Pharmacy A",
-)
-
-# Index narcotic vial
-await SearchClient.index_narcotic_vial(
-    tenant_id=tenant_id,
-    substance_id="subst-123",
-    substance_name="Fentanyl",
-    vial_id="vial-123",
-    lot_id="LOT-001",
-    unit_id="unit-123",
-    seal_status="sealed",
-    chain_of_custody_status="received",
-)
-```
+**Before reintroducing supply search, answer the role-gate question first.**
+`GET /api/v1/search` defaults to `scope=all`, which applies no `entity_type`
+predicate beyond a three-value deny-list — `SENSITIVE_ENTITY_TYPES = {patient,
+epcr_chart, billing_claim}` (`search_app/permissions.py:121-123`). `inventory_items`
+/ `medication_lots` / `narcotic_vials` are in neither that deny-list nor
+`VALID_SCOPES` (`search_app/schemas.py:249`), so indexed supply rows would be
+returned by the default global search box to **every** role — `viewer` and
+`dispatch` included. For narcotics that exposes `substance_name`, `vial_id`,
+`lot_id`, `unit_id`, `seal_status`, and `chain_of_custody_status`. Any
+reintroduction must land the supply entity types in the role gate in the same change.
 
 ### AnalyticsClient
 
@@ -628,14 +608,10 @@ NARCOTICS_ENABLE_NOTIFICATIONS=true
 ```
 
 ### Search Service
-```bash
-SEARCH_SERVICE_URL=http://search:8000
-SEARCH_SERVICE_TOKEN=<service-token>
-SEARCH_TIMEOUT_SECONDS=5
-INVENTORY_ENABLE_SEARCH=true
-MEDICATIONS_ENABLE_SEARCH=true
-NARCOTICS_ENABLE_SEARCH=true
-```
+
+None. `SEARCH_SERVICE_URL`, `SEARCH_SERVICE_TOKEN`, `SEARCH_TIMEOUT_SECONDS`, and
+the per-service `*_ENABLE_SEARCH` flags were removed along with SearchClient. Do not
+set them — nothing reads them.
 
 ### Analytics Service
 ```bash
