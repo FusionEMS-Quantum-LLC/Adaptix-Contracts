@@ -12,14 +12,29 @@ instead of the required X-Internal-Service-Key, and sent a payload carrying none
 IndexEntityRequest's required entity_type/entity_id/title fields. `_index_document`
 then caught the resulting exception and returned False, so none of it ever surfaced.
 
-Do not reintroduce a supply SearchClient without first answering the role-gate
-question: `GET /api/v1/search` defaults to scope=all, which applies no entity_type
-predicate beyond a three-value deny-list ({patient, epcr_chart, billing_claim}).
-inventory_items / medication_lots / narcotic_vials are in neither that deny-list nor
-VALID_SCOPES, so indexed supply rows would be returned by the default global search
-box to every role — `viewer` and `dispatch` included. For narcotics that exposes
-substance_name, vial_id, lot_id, unit_id, seal_status and chain_of_custody_status.
-Any reintroduction must land the role gate in permissions.py in the same change.
+The role-gate question this docstring used to leave open is now CLOSED upstream.
+Adaptix-Search-Service PR #118 (merge 63845f4, deployed as
+adaptix-production-search:138) inverted the `GET /api/v1/search` entity_type gate
+from a three-value deny-list ({patient, epcr_chart, billing_claim}, which returned
+every OTHER entity_type to every role including `viewer` and `dispatch`) to a
+positive allow-list in search_app/permissions.py. inventory_items /
+medication_lots / narcotic_vials are now classified there with entitlements copied
+from THIS module's sibling rbac_contracts matrix — narcotics:read,
+medications:read, inventory:read_items respectively — and a Search test asserts
+equality with those permission sets, so widening a read permission here widens
+search only deliberately and visibly.
+
+Consequences for a future supply SearchClient:
+
+* Indexing narcotic_vials no longer exposes substance_name / vial_id / lot_id /
+  unit_id / seal_status / chain_of_custody_status to `viewer` or `dispatch`.
+* An entity_type that is NOT classified in search_app.permissions is rejected at
+  the write path (IndexEntityRequest -> 422) and returns no rows to any
+  non-founder role. Use exactly the three registered strings above, or register
+  the new one in Search first.
+* The client must still POST /api/v1/search/index with the
+  X-Internal-Service-Key header and a full IndexEntityRequest body — the three
+  defects that made the removed client a no-op are unchanged.
 
 Usage:
     from adaptix_contracts.supply_integrations import NotificationClient, AnalyticsClient, AuditClient

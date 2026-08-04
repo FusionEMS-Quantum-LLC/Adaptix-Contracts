@@ -269,16 +269,44 @@ payload carrying none of `IndexEntityRequest`'s required
 `entity_type` / `entity_id` / `title` fields. `_index_document` caught the resulting
 exception and returned `False`, so none of it ever surfaced.
 
-**Before reintroducing supply search, answer the role-gate question first.**
-`GET /api/v1/search` defaults to `scope=all`, which applies no `entity_type`
-predicate beyond a three-value deny-list — `SENSITIVE_ENTITY_TYPES = {patient,
-epcr_chart, billing_claim}` (`search_app/permissions.py:121-123`). `inventory_items`
-/ `medication_lots` / `narcotic_vials` are in neither that deny-list nor
-`VALID_SCOPES` (`search_app/schemas.py:249`), so indexed supply rows would be
-returned by the default global search box to **every** role — `viewer` and
-`dispatch` included. For narcotics that exposes `substance_name`, `vial_id`,
-`lot_id`, `unit_id`, `seal_status`, and `chain_of_custody_status`. Any
-reintroduction must land the supply entity types in the role gate in the same change.
+**The role-gate blocker is CLOSED — the supply entity types are now gated.**
+
+This section previously warned that `GET /api/v1/search` applied no `entity_type`
+predicate beyond a three-value deny-list (`SENSITIVE_ENTITY_TYPES = {patient,
+epcr_chart, billing_claim}`), so `inventory_items` / `medication_lots` /
+`narcotic_vials` — in neither that deny-list nor `VALID_SCOPES` — would have been
+returned by the default global search box to **every** role, `viewer` and
+`dispatch` included.
+
+Adaptix-Search-Service PR #118 (merge `63845f4`, deployed as task definition
+`adaptix-production-search:138`) inverted that gate to a positive allow-list in
+`search_app/permissions.py`, and classified the three supply entity types with
+entitlements copied from this repo's own `adaptix_contracts/rbac_contracts.py`:
+
+| entity_type | entitled roles | source permission |
+|---|---|---|
+| `narcotic_vials` | `founder`, `agency_admin`, `operations_chief`, `narcotics_officer`, `medical_director`, `supervisor`, `paramedic`, `auditor`, `inspector` | `narcotics:read` |
+| `medication_lots` | `narcotics:read` set, minus `narcotics_officer`, plus `pharmacy_medication_manager` and `emt` | `medications:read` |
+| `inventory_items` | `founder`, `agency_admin`, `operations_chief`, `supply_officer`, `fleet_equipment_manager`, `supervisor`, `paramedic`, `emt`, `auditor`, `inspector` | `inventory:read_items` |
+
+`narcotic_vials` excludes `viewer`, `dispatch`, `emt` and `billing_operator`, so
+`substance_name` / `vial_id` / `lot_id` / `unit_id` / `seal_status` /
+`chain_of_custody_status` are no longer reachable by an unentitled role via the
+global search box or via autocomplete. A Search test asserts equality with the
+permission sets above, so changing a read permission in `rbac_contracts.py` fails
+Search CI rather than silently widening search visibility.
+
+**What a future supply SearchClient must still do:**
+
+1. Use exactly the three registered `entity_type` strings above. Any other value
+   is rejected on the write path (`IndexEntityRequest` -> HTTP 422) and would
+   return no rows to any non-founder role — the gate is fail-closed on an
+   unclassified type. Register a new type in `search_app/permissions.py` first.
+2. `POST /api/v1/search/index` (not `/index/{index}`), with the
+   `X-Internal-Service-Key` header (not `Authorization: Bearer`), and a full
+   `IndexEntityRequest` body including `entity_type` / `entity_id` / `title`.
+   Those three defects are what made the removed client a permanent no-op.
+3. Never put PHI in `title` — the title is what autocomplete returns.
 
 ### AnalyticsClient
 
