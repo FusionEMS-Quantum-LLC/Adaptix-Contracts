@@ -21,7 +21,7 @@ Three services (Inventory, Medications, Narcotics) publish real events to four e
    - `adaptix_contracts/narcotics_events.py` - Narcotics events
 
 2. **Integration Clients** (HTTP clients for each service):
-   - `adaptix_contracts/supply_integrations.py` - NotificationClient, SearchClient, AnalyticsClient, AuditClient
+   - `adaptix_contracts/supply_integrations.py` - NotificationClient, AnalyticsClient, AuditClient
 
 3. **Service Integration Code** (where to call the clients):
    - `Adaptix-Inventory-Service/backend/inventory_app/integrations.py`
@@ -49,12 +49,7 @@ INVENTORY_ENABLE_NOTIFICATIONS=true
 MEDICATIONS_ENABLE_NOTIFICATIONS=true
 NARCOTICS_ENABLE_NOTIFICATIONS=true
 
-# Search Service
-SEARCH_SERVICE_URL=http://search:8000
-SEARCH_SERVICE_TOKEN=REPLACE_WITH_SECRETS_MANAGER_REF
-INVENTORY_ENABLE_SEARCH=true
-MEDICATIONS_ENABLE_SEARCH=true
-NARCOTICS_ENABLE_SEARCH=true
+# Search Service: none. SearchClient was removed; these vars are read by nothing.
 
 # Analytics Service
 ANALYTICS_SERVICE_URL=http://analytics:8000
@@ -318,12 +313,9 @@ pip install /path/to/Adaptix-Contracts
 5. Check logs: `logger.warning("Failed to send notification: ...")` for details
 
 ### Issue: Search not indexing
-**Check**:
-1. `SEARCH_SERVICE_URL` configured
-2. `SEARCH_SERVICE_TOKEN` valid
-3. `INVENTORY_ENABLE_SEARCH=true`
-4. Search Service is running and health check passes
-5. Check logs for HTTP errors
+Supply search does not exist. SearchClient was removed because it had never indexed a
+row — see the "SearchClient — REMOVED" section of SUPPLY_DOMAIN_INTEGRATION_GUIDE.md,
+including the role-gate question that must be answered before it is rebuilt.
 
 ### Issue: Audit entries not created
 **Check**:
@@ -350,10 +342,12 @@ pip install /path/to/Adaptix-Contracts
 **Action**: Send alert to Narcotics Officer + Supervisor (escalate if >24h)
 **Code**: `NarcoticsIntegrationService.on_discrepancy_detected()`
 
-### Feature 494: Search Integration
-**What**: Index all items/lots/vials for full-text search
-**Where**: All mutations call `SearchClient.index_*()`
-**How**: Inventory/Medications/Narcotics all wire calls
+### Feature 494: Search Integration — NOT BUILT
+**What**: was intended to index items/lots/vials for full-text search
+**Status**: never worked. The SearchClient and its six call sites were removed; the
+call sites were unreachable and the client was wrong on path, auth header, and
+payload. Rebuilding it starts with the role-gate question in
+SUPPLY_DOMAIN_INTEGRATION_GUIDE.md, not with the client.
 
 ### Feature 495: Analytics Integration
 **What**: Real metrics for usage, waste, cost, risk

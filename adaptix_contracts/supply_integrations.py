@@ -1,10 +1,28 @@
 """Shared integration helpers for Inventory, Medications, and Narcotics services.
 
-Provides canonical clients for publishing to Notifications, Search, Analytics, and
-Audit services. These are used by all three domain services to maintain consistency.
+Provides canonical clients for publishing to Notifications, Analytics, and Audit
+services. These are used by all three domain services to maintain consistency.
+
+There is deliberately no SearchClient here. One existed and was removed because it
+had never indexed a single row: its six call sites across the three domain services
+were all unreachable, and the client itself was wrong on three axes at once against
+Adaptix-Search-Service — it POSTed to /api/v1/search/index/{index} (not a route; the
+real one is POST /api/v1/search/index), authenticated with `Authorization: Bearer`
+instead of the required X-Internal-Service-Key, and sent a payload carrying none of
+IndexEntityRequest's required entity_type/entity_id/title fields. `_index_document`
+then caught the resulting exception and returned False, so none of it ever surfaced.
+
+Do not reintroduce a supply SearchClient without first answering the role-gate
+question: `GET /api/v1/search` defaults to scope=all, which applies no entity_type
+predicate beyond a three-value deny-list ({patient, epcr_chart, billing_claim}).
+inventory_items / medication_lots / narcotic_vials are in neither that deny-list nor
+VALID_SCOPES, so indexed supply rows would be returned by the default global search
+box to every role — `viewer` and `dispatch` included. For narcotics that exposes
+substance_name, vial_id, lot_id, unit_id, seal_status and chain_of_custody_status.
+Any reintroduction must land the role gate in permissions.py in the same change.
 
 Usage:
-    from adaptix_contracts.supply_integrations import NotificationClient, SearchClient, AnalyticsClient, AuditClient
+    from adaptix_contracts.supply_integrations import NotificationClient, AnalyticsClient, AuditClient
 
     # Publish low-stock notification
     await NotificationClient.send_low_stock_alert(
@@ -13,14 +31,6 @@ Usage:
         item_name="Saline 0.9%",
         current_stock=5,
         par_level=20,
-    )
-
-    # Index item in search
-    await SearchClient.index_inventory_item(
-        tenant_id=tenant_id,
-        item_id=item_id,
-        item_name="Saline 0.9%",
-        category="Fluids",
     )
 
     # Publish analytics event
@@ -214,127 +224,6 @@ class NotificationClient:
             return True
         except Exception as exc:
             logger.warning("Failed to send notification: %s", exc)
-            return False
-
-
-class SearchClient:
-    """Client for indexing items in the Search Service."""
-
-    _BASE_URL = os.environ.get("SEARCH_SERVICE_URL", "http://search:8000").rstrip("/")
-    _TOKEN = os.environ.get("SEARCH_SERVICE_TOKEN", "")
-    _TIMEOUT = float(os.environ.get("SEARCH_TIMEOUT_SECONDS", "5"))
-
-    @classmethod
-    async def index_inventory_item(
-        cls,
-        *,
-        tenant_id: UUID,
-        item_id: str,
-        item_name: str,
-        category: str,
-        location: str,
-        current_stock: int,
-        par_level: int,
-        expiration_date: Optional[datetime] = None,
-        cost: Optional[float] = None,
-        status: str = "active",
-    ) -> bool:
-        """Index an inventory item in the Search Service."""
-        payload = {
-            "tenant_id": str(tenant_id),
-            "item_id": item_id,
-            "item_name": item_name,
-            "category": category,
-            "location": location,
-            "current_stock": current_stock,
-            "par_level": par_level,
-            "expiration_date": expiration_date.isoformat() if expiration_date else None,
-            "cost": cost,
-            "status": status,
-            "indexed_at": datetime.now(timezone.utc).isoformat(),
-        }
-        return await cls._index_document("inventory_items", payload)
-
-    @classmethod
-    async def index_medication_lot(
-        cls,
-        *,
-        tenant_id: UUID,
-        medication_id: str,
-        medication_name: str,
-        lot_id: str,
-        expiration_date: datetime,
-        current_stock: int,
-        storage_location: str,
-    ) -> bool:
-        """Index a medication lot in the Search Service."""
-        payload = {
-            "tenant_id": str(tenant_id),
-            "medication_id": medication_id,
-            "medication_name": medication_name,
-            "lot_id": lot_id,
-            "expiration_date": expiration_date.isoformat(),
-            "current_stock": current_stock,
-            "storage_location": storage_location,
-            "indexed_at": datetime.now(timezone.utc).isoformat(),
-        }
-        return await cls._index_document("medication_lots", payload)
-
-    @classmethod
-    async def index_narcotic_vial(
-        cls,
-        *,
-        tenant_id: UUID,
-        substance_id: str,
-        substance_name: str,
-        vial_id: str,
-        lot_id: str,
-        unit_id: str,
-        seal_status: str,
-        chain_of_custody_status: str,
-    ) -> bool:
-        """Index a narcotic vial in the Search Service."""
-        payload = {
-            "tenant_id": str(tenant_id),
-            "substance_id": substance_id,
-            "substance_name": substance_name,
-            "vial_id": vial_id,
-            "lot_id": lot_id,
-            "unit_id": unit_id,
-            "seal_status": seal_status,
-            "chain_of_custody_status": chain_of_custody_status,
-            "indexed_at": datetime.now(timezone.utc).isoformat(),
-        }
-        return await cls._index_document("narcotic_vials", payload)
-
-    @classmethod
-    async def _index_document(cls, index: str, document: dict[str, Any]) -> bool:
-        """POST document to Search Service for indexing."""
-        if not cls._BASE_URL:
-            logger.warning("Search Service not configured")
-            return False
-
-        headers = {
-            "Authorization": f"Bearer {cls._TOKEN}",
-            "Content-Type": "application/json",
-        }
-
-        try:
-            async with httpx.AsyncClient(timeout=cls._TIMEOUT) as client:
-                resp = await client.post(
-                    f"{cls._BASE_URL}/api/v1/search/index/{index}",
-                    json=document,
-                    headers=headers,
-                )
-            resp.raise_for_status()
-            logger.info(
-                "Document indexed in %s: %s",
-                index,
-                document.get("item_id") or document.get("vial_id"),
-            )
-            return True
-        except Exception as exc:
-            logger.warning("Failed to index document: %s", exc)
             return False
 
 
@@ -534,7 +423,6 @@ class AuditClient:
 
 __all__ = [
     "NotificationClient",
-    "SearchClient",
     "AnalyticsClient",
     "AuditClient",
 ]
