@@ -1,6 +1,7 @@
 # Adaptix-Contracts Runbook
 
 ## Validate
+
 Run the package validator, regression suite, and publishability checks.
 
 ```bash
@@ -19,8 +20,12 @@ python scripts/audit_workspace_contracts.py --workspace-root C:\Users\fusio\Desk
 ```
 
 ## Release
-Publish or pin a specific Git/package version. Do not rely on floating or local mock contract modules for production.
+
+Publish or pin a specific Git/package version. Do not rely on floating or local
+mock contract modules for production.
 
 ## Rollback
+
 Revert consumers to the previous known-good contract version, republish if needed,
-and rerun `validate_contracts.py`, `pytest`, artifact verification, and workspace audit.
+and rerun `validate_contracts.py`, `pytest`, artifact verification, and
+workspace audit.

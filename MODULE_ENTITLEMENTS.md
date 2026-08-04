@@ -3,7 +3,8 @@
 
 ## Commercial separation
 
-Adaptix sells modular subsystem access, but operational runtime must enforce capabilities rather than package names.
+Adaptix sells modular subsystem access, but operational runtime must enforce
+capabilities rather than package names.
 
 ## Rules
 

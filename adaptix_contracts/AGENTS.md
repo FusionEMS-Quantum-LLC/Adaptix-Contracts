@@ -6,7 +6,8 @@
 
 ## Inheritance
 
-This local contract inherits and may only strengthen the root governance law in `/AGENTS.md`.
+This local contract inherits and may only strengthen the root governance law in
+`/AGENTS.md`.
 
 ## Truth ownership
 

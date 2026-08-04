@@ -41,7 +41,8 @@ Any change made in this repository must complete the full Adaptix change lifecyc
 7. Merge only after required checks pass.
 8. Deploy to AWS where applicable.
 9. Monitor AWS deployment health.
-10. Monitor ECS tasks, services, logs, target groups, gateway/API behavior, and service health.
+10. Monitor ECS tasks, services, logs, target groups, gateway/API behavior, and
+    service health.
 11. Correct runtime failures.
 12. Redeploy if corrections are required.
 13. Repeat monitoring until stable.
@@ -49,7 +50,9 @@ Any change made in this repository must complete the full Adaptix change lifecyc
 
 A change is not complete because it was edited locally.
 
-A change is complete only when it is committed, pushed, conflict-checked, merged, deployed where applicable, monitored, corrected for failures, and verified stable with evidence.
+A change is complete only when it is committed, pushed, conflict-checked,
+merged, deployed where applicable, monitored, corrected for failures, and
+verified stable with evidence.
 
 ## First rollout restriction
 
@@ -65,4 +68,12 @@ Local rules may never weaken global rules.
 
 ## Bedrock Remote Repair And Deployment Rule
 
-All Bedrock audit, repair, validation, and deployment work must run through GitHub-hosted workflows and pull requests. Do not leave Bedrock-generated fixes, audit results, deployment changes, or conflict resolutions local-only. Every Bedrock-generated change must be pushed to a remote branch, checked for merge conflicts against main, validated by required CI/security checks, merged to main only after green checks, and deployed only through the approved AWS deployment workflow with recorded evidence. If a repository does not have the Bedrock workflow or required AWS/GitHub variables, report it as BLOCKED instead of claiming repair, deployment, or production readiness.
+All Bedrock audit, repair, validation, and deployment work must run through
+GitHub-hosted workflows and pull requests. Do not leave Bedrock-generated fixes,
+audit results, deployment changes, or conflict resolutions local-only. Every
+Bedrock-generated change must be pushed to a remote branch, checked for merge
+conflicts against main, validated by required CI/security checks, merged to main
+only after green checks, and deployed only through the approved AWS deployment
+workflow with recorded evidence. If a repository does not have the Bedrock
+workflow or required AWS/GitHub variables, report it as BLOCKED instead of
+claiming repair, deployment, or production readiness.
