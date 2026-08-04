@@ -2,9 +2,12 @@
 
 > **HISTORICAL (2026-05 / 1.0.x era)** — superseded by CHANGELOG.md and TEST_EVIDENCE.md.
 > The auth trust model changed materially in 1.3.0–1.4.0 (gateway HMAC verification,
-> production fail-closed defaults); statements below predate that and are not current claims.
+> production fail-closed defaults); statements below predate that and are not
+> current claims.
 
-Historical note: this document records a 2026-04-17 milestone. Current release truth now lives in `PRODUCTION_READINESS.md`, `TEST_EVIDENCE.md`, and `MARKET_READY_LEDGER.md`.
+Historical note: this document records a 2026-04-17 milestone. Current release
+truth now lives in `PRODUCTION_READINESS.md`, `TEST_EVIDENCE.md`, and
+`MARKET_READY_LEDGER.md`.
 
 ## Completion Report
 
@@ -16,13 +19,16 @@ Branch: claude/finalize-shared-contracts-schema
 
 ## Objective
 
-Bring the adaptix-contracts repository to a final, production-valid state as the single source of truth for cross-domain schema definitions used across the polyrepo.
+Bring the adaptix-contracts repository to a final, production-valid state as the
+single source of truth for cross-domain schema definitions used across the
+polyrepo.
 
 ## Work Completed
 
 ### 1. Critical Syntax Fixes ✅
 
 **Fixed blocking import errors:**
+
 - Removed empty import blocks with only comments in `schemas/__init__.py`
 - Fixed invalid enum member names (`999` → `ACK_999`, `277CA` → `ACK_277CA`)
 - Removed "File:" prefix from 6 contract files causing `__future__` import errors
@@ -31,14 +37,18 @@ Bring the adaptix-contracts repository to a final, production-valid state as the
 ### 2. Complete Schema Exports ✅
 
 **Completed all missing exports in `schemas/__init__.py`:**
+
 - Added exports for 15 previously incomplete modules
 - Total: 242 exported symbols across 26 domains
   - 197 Pydantic model classes
   - 45 enum classes
 
 **Domain coverage (26 modules):**
-- Core infrastructure (7): core, audit, metrics, search, communications, feature_flag, workflow
-- Billing (8): billing, billing_auth, billing_clearinghouse, billing_eligibility, billing_portal, billing_transport
+
+- Core infrastructure (7): core, audit, metrics, search, communications,
+  feature_flag, workflow
+- Billing (8): billing, billing_auth, billing_clearinghouse,
+  billing_eligibility, billing_portal, billing_transport
 - Clinical & Operations (4): epcr, nemsis, ocr, patient_portal
 - Dispatch & Field (3): cad, cad_transport, fire, field
 - Air Operations (2): air, air_pilot
@@ -48,11 +58,14 @@ Bring the adaptix-contracts repository to a final, production-valid state as the
 ### 3. Schema Normalization ✅
 
 **Removed duplication:**
-- Consolidated `ClearinghouseProvider` enum (was duplicated in billing_contracts and billing_clearinghouse_contracts)
+
+- Consolidated `ClearinghouseProvider` enum
+  (was duplicated in billing_contracts and billing_clearinghouse_contracts)
 - Now imported from billing_contracts (core module) into billing_clearinghouse_contracts
 - Zero remaining duplicate enum definitions
 
 **Verified consistency:**
+
 - All models use Pydantic v2 patterns
 - Consistent use of `Field()` for validation
 - Proper `Optional` typing throughout
@@ -61,6 +74,7 @@ Bring the adaptix-contracts repository to a final, production-valid state as the
 ### 4. Package Structure ✅
 
 **Updated package configuration:**
+
 - Enhanced root `__init__.py` with documentation and version
 - Verified `pyproject.toml` (Python 3.11+, Pydantic 2.6+)
 - Created `.gitignore` for build artifacts
@@ -69,13 +83,15 @@ Bring the adaptix-contracts repository to a final, production-valid state as the
 ### 5. Validation & Testing ✅
 
 **Created comprehensive validation (`validate_contracts.py`):**
+
 - Phase 1: Import validation (242 exports)
 - Phase 2: Model structure validation (197 models, 45 enums)
 - Phase 3: Sample instantiation tests
 - Phase 4: Domain coverage analysis (26 domains)
 
 **All validations passing:**
-```
+
+```text
 ✅ PASS - Import Validation
 ✅ PASS - Model Structure
 ✅ PASS - Model Instantiation
@@ -85,6 +101,7 @@ Bring the adaptix-contracts repository to a final, production-valid state as the
 ### 6. Documentation ✅
 
 **Created production-ready README.md:**
+
 - Complete domain coverage documentation
 - Installation instructions
 - Usage examples (import patterns, events, enums)
@@ -96,28 +113,35 @@ Bring the adaptix-contracts repository to a final, production-valid state as the
 ## Files Changed
 
 ### Created
+
 - `README.md` - Comprehensive package documentation
 - `.gitignore` - Build artifacts exclusion
 - `validate_contracts.py` - Validation test suite
 
 ### Modified
+
 - `adaptix_contracts/__init__.py` - Enhanced with documentation
 - `adaptix_contracts/schemas/__init__.py` - Complete exports for all 26 domains
-- `adaptix_contracts/schemas/billing_clearinghouse_contracts.py` - Removed duplicate enum, import from core
-- `adaptix_contracts/schemas/billing_portal_contracts.py` - Fixed __future__ import position
-- `adaptix_contracts/schemas/billing_transport_contracts.py` - Fixed __future__ import position
-- `adaptix_contracts/schemas/cad_transport_contracts.py` - Fixed __future__ import position
-- `adaptix_contracts/schemas/epcr_contracts.py` - Fixed __future__ import position
-- `adaptix_contracts/schemas/nemsis_exports.py` - Fixed __future__ import position
-- `adaptix_contracts/schemas/ocr_contracts.py` - Fixed __future__ import position
-- `adaptix_contracts/schemas/patient_portal_contracts.py` - Fixed __future__ import position
-- `adaptix_contracts/schemas/transport_contracts.py` - Fixed __future__ import position
+- `adaptix_contracts/schemas/billing_clearinghouse_contracts.py` - Removed
+  duplicate enum, import from core
+- `adaptix_contracts/schemas/billing_portal_contracts.py` - Fixed **future**
+  import position
+- `adaptix_contracts/schemas/billing_transport_contracts.py` - Fixed **future**
+  import position
+- `adaptix_contracts/schemas/cad_transport_contracts.py` - Fixed **future**
+  import position
+- `adaptix_contracts/schemas/epcr_contracts.py` - Fixed **future** import position
+- `adaptix_contracts/schemas/nemsis_exports.py` - Fixed **future** import position
+- `adaptix_contracts/schemas/ocr_contracts.py` - Fixed **future** import position
+- `adaptix_contracts/schemas/patient_portal_contracts.py` - Fixed **future**
+  import position
+- `adaptix_contracts/schemas/transport_contracts.py` - Fixed **future** import position
 
 ---
 
 ## Validation Results
 
-```
+```text
 Total Exports: 242
 ├─ Models: 197 (all Pydantic v2 compatible)
 ├─ Enums: 45 (zero duplicates)
@@ -134,6 +158,7 @@ Coverage Test: ✅ PASS
 ## Contract Boundaries Verified
 
 **This repo contains ONLY:**
+
 - ✅ Typed event contracts
 - ✅ Typed request/response contracts
 - ✅ Typed read models
@@ -141,6 +166,7 @@ Coverage Test: ✅ PASS
 - ✅ Schema-level validation
 
 **This repo does NOT contain:**
+
 - ❌ Business logic
 - ❌ Database models
 - ❌ Service logic
@@ -186,6 +212,7 @@ workflow = WorkflowExecution(...)  # ✅ Works
 ## Historical Milestone Status
 
 All objectives from the problem statement have been completed:
+
 - [x] Canonicalized package structure
 - [x] Enforced contract-only boundaries
 - [x] Completed schema coverage (26 domains)
@@ -196,4 +223,5 @@ All objectives from the problem statement have been completed:
 - [x] Eliminated structural drift
 - [x] Validated repo fully
 
-This milestone established the canonical shared contracts package, but it is not the authoritative current market-readiness verdict.
+This milestone established the canonical shared contracts package, but it is not
+the authoritative current market-readiness verdict.

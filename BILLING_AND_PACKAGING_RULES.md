@@ -14,4 +14,5 @@ Commercial packaging is modular; architecture remains shared.
 
 ## Runtime consequence
 
-The governance runtime denies edits that introduce hardcoded pricing logic in repos that are not permitted to hold it.
+The governance runtime denies edits that introduce hardcoded pricing logic in
+repos that are not permitted to hold it.

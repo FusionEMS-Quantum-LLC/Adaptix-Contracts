@@ -5,22 +5,26 @@ Thank you for your interest in contributing to the Adaptix Contracts package!
 ## Getting Started
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts.git
    cd Adaptix-Contracts
    ```
 
 2. Install in development mode:
+
    ```bash
    pip install -e .[dev]
    ```
 
 3. Run the test suite to make sure everything works:
+
    ```bash
    python -m pytest tests -q --tb=short
    ```
 
 4. Run the validation script:
+
    ```bash
    python validate_contracts.py
    ```
@@ -29,16 +33,21 @@ Thank you for your interest in contributing to the Adaptix Contracts package!
 
 When adding new contracts:
 
-1. **Create a new schema file** in `adaptix_contracts/schemas/` following the naming convention `{domain}_contracts.py`.
-2. **Define your models** using Pydantic v2 `BaseModel` with proper type annotations and `Field()` validation.
+1. **Create a new schema file** in `adaptix_contracts/schemas/` following the
+   naming convention `{domain}_contracts.py`.
+2. **Define your models** using Pydantic v2 `BaseModel` with proper type
+   annotations and `Field()` validation.
 3. **Export symbols** by adding imports and entries to `adaptix_contracts/schemas/__init__.py`:
    - Add the import block with all symbols from your new module.
-   - Add each symbol name to the `__all__` list in the appropriate alphabetical/domain section.
+   - Add each symbol name to the `__all__` list in the appropriate
+     alphabetical/domain section.
 4. **Run validation** to verify:
+
    ```bash
    python validate_contracts.py
    python -m pytest tests -q --tb=short
    ```
+
 5. **Follow existing naming conventions:**
    - Events: `{Domain}{Entity}{Action}Event`
    - Contracts: `{Domain}{Entity}Contract`
@@ -50,6 +59,7 @@ When adding new contracts:
 All contributions must follow these principles:
 
 ### What belongs here
+
 - Pydantic models for events, requests, and responses
 - Enums for canonical statuses and types
 - Type annotations for all fields
@@ -57,6 +67,7 @@ All contributions must follow these principles:
 - Shared contract definitions used across domains
 
 ### What does NOT belong here
+
 - Business logic or service implementation
 - Database models or ORM models
 - API routes or HTTP handlers
@@ -78,7 +89,8 @@ All contributions must follow these principles:
 2. Make your changes following the guidelines above.
 3. Ensure all tests pass (`python -m pytest tests -q --tb=short`).
 4. Ensure validation passes (`python validate_contracts.py`).
-5. Update `CHANGELOG.md` with a description of your changes under an `[Unreleased]` section.
+5. Update `CHANGELOG.md` with a description of your changes under an
+   `[Unreleased]` section.
 6. Submit a pull request with a clear description of what you added or changed.
 
 ## Versioning

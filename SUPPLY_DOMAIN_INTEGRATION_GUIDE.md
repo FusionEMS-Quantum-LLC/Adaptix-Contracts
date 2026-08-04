@@ -1,6 +1,7 @@
 # Supply Domain Integration Guide
 
-Complete integration specification for Inventory, Medications, and Narcotics services with Notifications, Search, Analytics, and Audit services.
+Complete integration specification for Inventory, Medications, and Narcotics
+services with Notifications, Search, Analytics, and Audit services.
 
 ## Table of Contents
 
@@ -16,9 +17,10 @@ Complete integration specification for Inventory, Medications, and Narcotics ser
 
 ## Architecture Overview
 
-The supply domain services (Inventory, Medications, Narcotics) integrate with four external services:
+The supply domain services (Inventory, Medications, Narcotics) integrate with
+four external services:
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────┐
 │ Inventory / Medications / Narcotics Services                 │
 └──────────────────────────────────────────────────────────────┘
@@ -47,7 +49,9 @@ The supply domain services (Inventory, Medications, Narcotics) integrate with fo
 All inventory events are defined in `adaptix_contracts.inventory_events`:
 
 #### InventoryLowStockAlert
+
 Fired when item drops below par level:
+
 ```python
 InventoryLowStockAlert(
     tenant_id=tenant_id,
@@ -62,7 +66,9 @@ InventoryLowStockAlert(
 ```
 
 #### InventoryExpirationAlert
+
 Fired when item is within 30 days of expiration:
+
 ```python
 InventoryExpirationAlert(
     tenant_id=tenant_id,
@@ -76,7 +82,9 @@ InventoryExpirationAlert(
 ```
 
 #### InventoryStockAdjustmentEvent
+
 Fired on every stock adjustment:
+
 ```python
 InventoryStockAdjustmentEvent(
     tenant_id=tenant_id,
@@ -94,7 +102,9 @@ InventoryStockAdjustmentEvent(
 All medication events are defined in `adaptix_contracts.medications_events`:
 
 #### MedicationLotEvent
+
 Fired on lot creation/update:
+
 ```python
 MedicationLotEvent(
     tenant_id=tenant_id,
@@ -108,7 +118,9 @@ MedicationLotEvent(
 ```
 
 #### MedicationAdministrationEvent
+
 Fired when medication is administered:
+
 ```python
 MedicationAdministrationEvent(
     tenant_id=tenant_id,
@@ -121,7 +133,9 @@ MedicationAdministrationEvent(
 ```
 
 #### MedicationWasteEvent
+
 Fired when medication is wasted/disposed:
+
 ```python
 MedicationWasteEvent(
     tenant_id=tenant_id,
@@ -135,7 +149,9 @@ MedicationWasteEvent(
 ```
 
 #### MedicationRecallAlert
+
 Fired when recall is detected:
+
 ```python
 MedicationRecallAlert(
     tenant_id=tenant_id,
@@ -152,7 +168,9 @@ MedicationRecallAlert(
 All narcotics events are defined in `adaptix_contracts.narcotics_events`:
 
 #### NarcoticsVialEvent
+
 Fired on vial creation/transfer/use/waste:
+
 ```python
 NarcoticsVialEvent(
     tenant_id=tenant_id,
@@ -169,7 +187,9 @@ NarcoticsVialEvent(
 ```
 
 #### NarcoticsChainOfCustodyEntry (IMMUTABLE LEDGER)
+
 Fired on every vial transfer/usage/waste - creates immutable ledger entry:
+
 ```python
 NarcoticsChainOfCustodyEntry(
     tenant_id=tenant_id,
@@ -186,10 +206,14 @@ NarcoticsChainOfCustodyEntry(
 )
 ```
 
-**IMPORTANT**: COC entries are immutable. Once created, they cannot be modified or deleted. They serve as the authoritative ledger for DEA Form 222/41 compliance.
+**IMPORTANT**: COC entries are immutable. Once created, they cannot be modified
+or deleted. They serve as the authoritative ledger for DEA Form 222/41
+compliance.
 
 #### NarcoticsDiscrepancyAlert
+
 Fired when discrepancy is opened:
+
 ```python
 NarcoticsDiscrepancyAlert(
     tenant_id=tenant_id,
@@ -259,12 +283,15 @@ await NotificationClient.send_discrepancy_alert(
 
 ### SearchClient — REMOVED
 
-There is no SearchClient. One existed and was removed because it had never indexed a
+There is no SearchClient. One existed and was removed because it had never
+indexed a
 single row. Its six call sites across Inventory / Medications / Narcotics were all
 unreachable, and the client was wrong on three axes at once against
-Adaptix-Search-Service: it POSTed to `/api/v1/search/index/{index}` (not a route —
+Adaptix-Search-Service: it POSTed to `/api/v1/search/index/{index}`
+(not a route —
 the real one is `POST /api/v1/search/index`), authenticated with
-`Authorization: Bearer` instead of the required `X-Internal-Service-Key`, and sent a
+`Authorization: Bearer` instead of the required `X-Internal-Service-Key`, and
+sent a
 payload carrying none of `IndexEntityRequest`'s required
 `entity_type` / `entity_id` / `title` fields. `_index_document` caught the resulting
 exception and returned `False`, so none of it ever surfaced.
@@ -407,7 +434,8 @@ The Inventory Service uses `InventoryIntegrationService` to publish events.
 5. **Restock Recording** (`on_restock_recorded`)
    - Publishes to Analytics
    - Logs to Audit
-   - **NOTE**: Controlled-substance restocks also emit to event bus for Narcotics service
+   - **NOTE**: Controlled-substance restocks also emit to event bus for
+     Narcotics service
 
 ### Usage in API Endpoints
 
@@ -584,7 +612,8 @@ await NarcoticsIntegrationService.on_chain_of_custody_entry(
 )
 ```
 
-This entry is written to the Audit Service and becomes immutable. It cannot be modified or deleted, only read for inspection.
+This entry is written to the Audit Service and becomes immutable. It cannot be
+modified or deleted, only read for inspection.
 
 ### Usage in API Endpoints
 
@@ -632,6 +661,7 @@ async def transfer_vial(vial_id: str, req: TransferRequest, session: AsyncSessio
 All services are configured via environment variables:
 
 ### Notifications Service
+
 ```bash
 NOTIFICATIONS_SERVICE_URL=http://notifications:8000
 NOTIFICATIONS_SERVICE_TOKEN=<service-token>
@@ -644,10 +674,12 @@ NARCOTICS_ENABLE_NOTIFICATIONS=true
 ### Search Service
 
 None. `SEARCH_SERVICE_URL`, `SEARCH_SERVICE_TOKEN`, `SEARCH_TIMEOUT_SECONDS`, and
-the per-service `*_ENABLE_SEARCH` flags were removed along with SearchClient. Do not
+the per-service `*_ENABLE_SEARCH` flags were removed along with SearchClient. Do
+not
 set them — nothing reads them.
 
 ### Analytics Service
+
 ```bash
 ANALYTICS_SERVICE_URL=http://analytics:8000
 ANALYTICS_SERVICE_TOKEN=<service-token>
@@ -658,6 +690,7 @@ NARCOTICS_ENABLE_ANALYTICS=true
 ```
 
 ### Audit Service
+
 ```bash
 AUDIT_SERVICE_URL=http://audit:8000
 AUDIT_SERVICE_TOKEN=<service-token>
@@ -672,6 +705,7 @@ NARCOTICS_ENABLE_AUDIT=true
 ### Unit Tests
 
 Run integration tests:
+
 ```bash
 pytest tests/test_supply_integrations.py -v
 ```
@@ -679,6 +713,7 @@ pytest tests/test_supply_integrations.py -v
 ### Integration Tests
 
 Create end-to-end test:
+
 ```python
 import pytest
 from uuid import uuid4
@@ -751,6 +786,7 @@ async def test_chain_of_custody_immutability():
 ### Deployment Steps
 
 1. **Deploy Contracts Update**
+
    ```bash
    cd Adaptix-Contracts
    git checkout -b feature/supply-integrations
@@ -763,6 +799,7 @@ async def test_chain_of_custody_immutability():
    ```
 
 2. **Deploy Inventory Service**
+
    ```bash
    cd Adaptix-Inventory-Service
    git checkout -b feature/notifications-integration
@@ -772,6 +809,7 @@ async def test_chain_of_custody_immutability():
    ```
 
 3. **Deploy Medications Service**
+
    ```bash
    cd Adaptix-Medications-Service
    git checkout -b feature/notifications-integration
@@ -781,6 +819,7 @@ async def test_chain_of_custody_immutability():
    ```
 
 4. **Deploy Narcotics Service**
+
    ```bash
    cd Adaptix-Narcotics-Service
    git checkout -b feature/notifications-integration
@@ -790,6 +829,7 @@ async def test_chain_of_custody_immutability():
    ```
 
 5. **Verify End-to-End**
+
    ```bash
    # Create test inventory item
    curl -X POST http://localhost:8000/api/v1/inventory/items \
@@ -815,7 +855,8 @@ async def test_chain_of_custody_immutability():
 
 ## Real Integrations
 
-All integrations are **production-ready with real notifications, real search, real analytics, and real audit trails**:
+All integrations are **production-ready with real notifications, real search,
+real analytics, and real audit trails**:
 
 - **Notifications**: SMS/email/push via Notifications Service
 - **Search**: Full-text search via Elasticsearch/OpenSearch

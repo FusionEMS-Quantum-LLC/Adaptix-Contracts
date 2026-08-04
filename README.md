@@ -6,7 +6,8 @@ Canonical shared cross-domain schema definitions for the Adaptix polyrepo platfo
 
 ## Overview
 
-This package provides typed Pydantic contract definitions for cross-domain communication across all Adaptix services. It is the single source of truth for:
+This package provides typed Pydantic contract definitions for cross-domain
+communication across all Adaptix services. It is the single source of truth for:
 
 - **Event contracts** - Domain events published across services
 - **Request/Response contracts** - API request and response schemas
@@ -15,7 +16,7 @@ This package provides typed Pydantic contract definitions for cross-domain commu
 
 ## Package Structure
 
-```
+```text
 adaptix_contracts/
 ├── __init__.py          # Package root with convenience exports
 └── schemas/             # All contract schema definitions
@@ -52,6 +53,7 @@ operational, legal, signature, and onboarding domains. The authoritative
 inventory is the validator output from `python validate_contracts.py --json`.
 
 ### Core Infrastructure
+
 - **core** - Base event contracts and auth context
 - **audit** - Audit logging, PHI access, security events
 - **metrics** - Service health, observability
@@ -61,6 +63,7 @@ inventory is the validator output from `python validate_contracts.py --json`.
 - **workflow** - Long-running workflows and orchestration
 
 ### Billing Domain (8 modules)
+
 - **billing** - Core claim lifecycle, payments, denials
 - **billing_auth** - Billing portal authentication
 - **billing_clearinghouse** - Clearinghouse integrations
@@ -69,6 +72,7 @@ inventory is the validator output from `python validate_contracts.py --json`.
 - **billing_transport** - Billing-transport readiness
 
 ### Clinical & Operations
+
 - **epcr** - Electronic patient care reports
 - **clinical_visual** - AR-assisted clinical overlays and structured findings
 - **nemsis** - NEMSIS export lifecycle
@@ -76,6 +80,7 @@ inventory is the validator output from `python validate_contracts.py --json`.
 - **patient_portal** - Patient-facing portal
 
 ### Dispatch & Field
+
 - **cad** - Computer-aided dispatch
 - **cad_transport** - CAD-transport integration
 - **fire** - Fire incident management
@@ -83,14 +88,17 @@ inventory is the validator output from `python validate_contracts.py --json`.
 - **inventory** - Inventory, replenishment, readiness, and cycle count contracts
 
 ### Air Operations
+
 - **air** - Air mission contracts
 - **air_pilot** - Pilot readiness and go/no-go
 
 ### Transport
+
 - **transport** - Transport request lifecycle
 - **crewlink** - Crew paging and rostering
 
 ### Voice
+
 - **voice** - Voice room management
 
 ## Installation
@@ -191,7 +199,7 @@ There is exactly ONE canonical surface per auth layer. Anything else in this
 package that looks auth-shaped is deprecated — do not adopt it.
 
 | Layer | Canonical surface | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Service-edge identity (every inbound request) | `adaptix_contracts.auth_contracts.get_auth_context` → `AuthContext` | Gateway header contract (`X-User-Id`/`X-Tenant-Id`/…) + HMAC-signed context verification (`X-Adaptix-Auth-Context`/`-Signature`). Production default is fail-closed for unsigned requests (`ADAPTIX_GATEWAY_HMAC_ENFORCE`). |
 | Signed-context crypto | `adaptix_contracts.gateway_signature` | Byte-compatible with the gateway producer in Adaptix-Core-Service. Do not reimplement. |
 | Module entitlement (402 gate) | `adaptix_contracts.auth.module_entitlement_gate.require_module_entitlement` / `require_any_module_entitlement` | Verifies the gateway-signed context first; production fails closed when a present signature cannot be verified. |
@@ -199,8 +207,13 @@ package that looks auth-shaped is deprecated — do not adopt it.
 
 Deprecated (import paths preserved until 2.0.0, emit `DeprecationWarning`):
 
-- `adaptix_contracts.security.auth_context` (`TenantAuthContext`, `RolePermissionDecision`) — third parallel context model, zero consumers.
-- `adaptix_contracts.auth.rbac_dependencies` — never adopt: its `Depends()`-on-a-pydantic-model pattern sources identity from request data, its `require_module_entitlement` conflicts with the real gate, and `rbac_decorator` enforces nothing.
+- `adaptix_contracts.security.auth_context`
+  (`TenantAuthContext`, `RolePermissionDecision`) — third parallel context
+  model, zero consumers.
+- `adaptix_contracts.auth.rbac_dependencies` — never adopt: its
+  `Depends()`-on-a-pydantic-model pattern sources identity from request data,
+  its `require_module_entitlement` conflicts with the real gate, and
+  `rbac_decorator` enforces nothing.
 
 ## Contract Principles
 
@@ -237,6 +250,7 @@ python validate_contracts.py --json
 ```
 
 This validates:
+
 - All exported schemas are importable
 - All models are Pydantic v2 compatible
 - All enums are properly defined
@@ -279,8 +293,10 @@ This package follows semantic versioning:
 Release governance artifacts:
 
 - [`CHANGELOG.md`](CHANGELOG.md) — authoritative release history
-- [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) — backward-compatibility and retirement rules
-- [`MARKET_READY_LEDGER.md`](MARKET_READY_LEDGER.md) — current proof ledger and market-readiness verdict
+- [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) — backward-compatibility and
+  retirement rules
+- [`MARKET_READY_LEDGER.md`](MARKET_READY_LEDGER.md) — current proof ledger and
+  market-readiness verdict
 
 Contract changes are not considered releasable until the changelog is updated,
 deprecation impact is documented for public surface changes, and the validation

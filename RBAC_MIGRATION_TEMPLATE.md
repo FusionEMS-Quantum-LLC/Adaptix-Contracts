@@ -1,6 +1,7 @@
 # RBAC Migration Template for Services
 
-This template shows how to add complete auth/RBAC/entitlement wiring to any service (Inventory, Medications, or Narcotics).
+This template shows how to add complete auth/RBAC/entitlement wiring to any
+service (Inventory, Medications, or Narcotics).
 
 ## Phase 1: Contracts Integration (15 min)
 
@@ -425,7 +426,8 @@ Before creating PR:
 - [ ] All `put` routes have permission dependency
 - [ ] All `delete` routes have permission dependency
 - [ ] Every SELECT query includes `Model.tenant_id == auth.tenant_id`
-- [ ] Every GET-by-ID includes tenant check: `or obj.tenant_id != auth.tenant_id: raise 404`
+- [ ] Every GET-by-ID includes tenant check:
+  `or obj.tenant_id != auth.tenant_id: raise 404`
 - [ ] Soft-delete queries exclude deleted: `.where(Model.deleted_at.is_(None))`
 - [ ] Cost reports gated to `require_billing_access`
 - [ ] Cross-tenant routes use explicit Founder check
@@ -441,7 +443,7 @@ Before creating PR:
 
 Create PR with title:
 
-```
+```text
 feat(auth): add complete RBAC and tenant isolation for [service]
 
 - Add RBAC permission matrix for 13+ roles

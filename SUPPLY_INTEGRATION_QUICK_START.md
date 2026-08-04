@@ -1,10 +1,12 @@
 # Supply Domain Integration Quick Start
 
-TL;DR: Wire notifications, search, analytics, and audit into Inventory, Medications, and Narcotics services.
+TL;DR: Wire notifications, search, analytics, and audit into Inventory,
+Medications, and Narcotics services.
 
 ## 30-Second Overview
 
-Three services (Inventory, Medications, Narcotics) publish real events to four external services:
+Three services (Inventory, Medications, Narcotics) publish real events to four
+external services:
 
 - **Notifications**: Real SMS/email/push alerts (low-stock, recalls, discrepancies)
 - **Search**: Full-text indexing of items/lots/vials for discoverability
@@ -21,7 +23,8 @@ Three services (Inventory, Medications, Narcotics) publish real events to four e
    - `adaptix_contracts/narcotics_events.py` - Narcotics events
 
 2. **Integration Clients** (HTTP clients for each service):
-   - `adaptix_contracts/supply_integrations.py` - NotificationClient, AnalyticsClient, AuditClient
+   - `adaptix_contracts/supply_integrations.py` - NotificationClient,
+     AnalyticsClient, AuditClient
 
 3. **Service Integration Code** (where to call the clients):
    - `Adaptix-Inventory-Service/backend/inventory_app/integrations.py`
@@ -75,6 +78,7 @@ pip install ./Adaptix-Contracts
 ```
 
 This gives them access to:
+
 - Event contracts (inventory_events, medications_events, narcotics_events)
 - Integration clients (supply_integrations)
 
@@ -120,7 +124,8 @@ await InventoryIntegrationService.on_restock_recorded(
 )
 ```
 
-**Pattern**: Call integration service method AFTER business logic succeeds, BEFORE returning response.
+**Pattern**: Call integration service method AFTER business logic succeeds,
+BEFORE returning response.
 
 ### Step 4: Wire Into Medications Service API
 
@@ -235,6 +240,7 @@ Expected: All tests pass ✅
 ### Step 7: Deploy
 
 #### Deploy Contracts
+
 ```bash
 cd Adaptix-Contracts
 git checkout -b feature/supply-integrations
@@ -245,6 +251,7 @@ git push origin feature/supply-integrations
 ```
 
 #### Deploy Inventory Service
+
 ```bash
 cd Adaptix-Inventory-Service
 git checkout -b feature/integrations
@@ -256,6 +263,7 @@ git push origin feature/integrations
 ```
 
 #### Deploy Medications Service
+
 ```bash
 cd Adaptix-Medications-Service
 git checkout -b feature/integrations
@@ -267,6 +275,7 @@ git push origin feature/integrations
 ```
 
 #### Deploy Narcotics Service
+
 ```bash
 cd Adaptix-Narcotics-Service
 git checkout -b feature/integrations
@@ -299,13 +308,17 @@ curl -X POST http://localhost:8000/api/v1/inventory/items/{id}/stock-adjustment 
 ## Common Issues
 
 ### Issue: "adaptix_contracts not available"
+
 **Solution**: Install contracts package in each service:
+
 ```bash
 pip install /path/to/Adaptix-Contracts
 ```
 
 ### Issue: Notifications not sending
+
 **Check**:
+
 1. `NOTIFICATIONS_SERVICE_URL` configured
 2. `NOTIFICATIONS_SERVICE_TOKEN` valid
 3. `INVENTORY_ENABLE_NOTIFICATIONS=true`
@@ -313,12 +326,16 @@ pip install /path/to/Adaptix-Contracts
 5. Check logs: `logger.warning("Failed to send notification: ...")` for details
 
 ### Issue: Search not indexing
-Supply search does not exist. SearchClient was removed because it had never indexed a
+
+Supply search does not exist. SearchClient was removed because it had never
+indexed a
 row — see the "SearchClient — REMOVED" section of SUPPLY_DOMAIN_INTEGRATION_GUIDE.md,
 including the role-gate question that must be answered before it is rebuilt.
 
 ### Issue: Audit entries not created
+
 **Check**:
+
 1. `AUDIT_SERVICE_URL` configured
 2. `AUDIT_SERVICE_TOKEN` valid
 3. `INVENTORY_ENABLE_AUDIT=true`
@@ -328,33 +345,40 @@ including the role-gate question that must be answered before it is rebuilt.
 ## Feature by Feature
 
 ### Feature 491: Low-Stock Alerts
+
 **Trigger**: Stock drops below par
 **Action**: Send alert to Supply Officer
 **Code**: `InventoryIntegrationService.on_stock_adjusted()`
 
 ### Feature 492: Medication Recalls
+
 **Trigger**: Recall detected/imported
 **Action**: Send alert to Pharmacy Manager
 **Code**: `MedicationsIntegrationService.on_recall_detected()`
 
 ### Feature 493: Narcotics Discrepancies
+
 **Trigger**: Discrepancy opened
 **Action**: Send alert to Narcotics Officer + Supervisor (escalate if >24h)
 **Code**: `NarcoticsIntegrationService.on_discrepancy_detected()`
 
 ### Feature 494: Search Integration — NOT BUILT
+
 **What**: was intended to index items/lots/vials for full-text search
-**Status**: never worked. The SearchClient and its six call sites were removed; the
+**Status**: never worked. The SearchClient and its six call sites were removed;
+the
 call sites were unreachable and the client was wrong on path, auth header, and
 payload. Rebuilding it starts with the role-gate question in
 SUPPLY_DOMAIN_INTEGRATION_GUIDE.md, not with the client.
 
 ### Feature 495: Analytics Integration
+
 **What**: Real metrics for usage, waste, cost, risk
 **Where**: All events call `AnalyticsClient.publish_*()`
 **How**: Usage/waste/risk events published to Analytics Service
 
 ### Feature 496: Audit Integration
+
 **What**: Immutable log of every mutation + immutable COC ledger for narcotics
 **Where**: All mutations call `AuditClient.log_mutation()`
 **How**: Every create/update/delete/transfer/use/waste logged
@@ -362,6 +386,7 @@ SUPPLY_DOMAIN_INTEGRATION_GUIDE.md, not with the client.
 ## Key Design Patterns
 
 ### Pattern 1: Graceful Degradation
+
 ```python
 # Integrations fail silently - business logic continues
 try:
@@ -372,6 +397,7 @@ except Exception as exc:
 ```
 
 ### Pattern 2: Best-Effort Async
+
 ```python
 # All calls are async, no blocking
 await InventoryIntegrationService.on_stock_adjusted(...)
@@ -379,6 +405,7 @@ await InventoryIntegrationService.on_stock_adjusted(...)
 ```
 
 ### Pattern 3: Immutable Audit
+
 ```python
 # Every mutation writes immutable audit record
 await AuditClient.log_mutation(
@@ -390,6 +417,7 @@ await AuditClient.log_mutation(
 ```
 
 ### Pattern 4: Immutable COC Ledger (Narcotics Only)
+
 ```python
 # Every transfer/use/waste creates permanent COC entry
 await NarcoticsIntegrationService.on_chain_of_custody_entry(

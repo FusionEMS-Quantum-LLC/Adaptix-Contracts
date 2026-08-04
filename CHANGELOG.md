@@ -23,6 +23,7 @@ package version is `2.2.0` (see `pyproject.toml` and `adaptix_contracts/__init__
   conflicting payload reuse is rejected by the producer.
 - Added regression coverage for schema generation, additive response fields,
   identifier equality, and idempotency-key validation.
+
 ### Added — Canonical product/module identifier registry (`adaptix_contracts.module_registry`)
 
 Single source of truth for Adaptix module ids. Five vocabularies for the same
@@ -171,7 +172,7 @@ enum members") every substitution below requires a major release plus a
 downstream data migration:
 
 | Legacy | Canonical | Incompatibility |
-|---|---|---|
+| --- | --- | --- |
 | `workforce_contracts.FatigueLevel` | `RiskLevel` | deletes `none`, `moderate`; adds `medium` |
 | `workforce.models.FatigueRiskLevel` | `RiskLevel` | deletes `moderate`; adds `medium` |
 | `workforce_contracts.ShiftStatus` | `ShiftStatus` | deletes `draft`, `published`, `in_progress` |
@@ -295,7 +296,7 @@ or repointed.
   `adaptix_contracts.audit_contracts` (`AuditServiceClient`, `AuditLogEntry`)
   in favour of the Audit service surface above. Import path and behaviour are
   **preserved** (live consumers: Adaptix-CAD-Service `cad_app/audit_service.py`
-  + migration `019_add_audit_log_entries`; Adaptix-Fire-Service
+  - migration `019_add_audit_log_entries`; Adaptix-Fire-Service
   `fire_app/audit_service.py`). Removal is deferred to 2.0.0.
 - **notification_contracts:** `NotificationSendRequest` (typed canonical send
   request), `NotificationPreferenceSet` (Core per-category/per-channel + quiet
@@ -331,6 +332,7 @@ or repointed.
   `FacilityUpdatedEvent`, `FacilityMergedEvent`).
 
 ### Field-identity divergence — versioned, not unified (requires founder call)
+
 - **PayerType** has real member divergence across domains:
   `billing_contracts.PayerType` = {MEDICARE, MEDICAID, COMMERCIAL, SELF_PAY,
   OTHER}; `intake_contracts.PayerType` = {MEDICARE, MEDICAID, TRICARE,
@@ -340,6 +342,7 @@ or repointed.
   set for billing/intake to import is a founder/billing decision.
 
 ### Added — service-separation contracts (additive only, from #94)
+
 - **cortex_contracts:** `RecommendationRequest`, `RecommendationResponse` for the
   separated Cortex recommendation service.
 - **trustsign_contracts:** `SignaturePackageCreateRequest`,
@@ -356,6 +359,7 @@ or repointed.
 ## [1.4.0] - 2026-07-03
 
 ### Security — entitlement gate fail-closed (production)
+
 - **module_entitlement_gate:** a gateway signature that is PRESENT but cannot be
   verified because `ADAPTIX_GATEWAY_SHARED_SECRET` is not configured now returns
   **503 `gateway_secret_not_configured`** in production instead of silently
@@ -365,6 +369,7 @@ or repointed.
   unchanged.
 
 ### Deprecated (import paths preserved until 2.0.0; emit DeprecationWarning)
+
 - `adaptix_contracts.security.auth_context` (`TenantAuthContext`,
   `RolePermissionDecision`) — parallel auth-context model with zero consumers.
   Replacement: `auth_contracts.AuthContext` (gateway edge) or
@@ -377,6 +382,7 @@ or repointed.
   "Canonical auth surfaces" section (#87).
 
 ### Governance / packaging
+
 - CODEOWNERS rewritten to this repo's real layout — the shared auth trust files
   are now founder-review-protected once branch protection is enabled (#82).
 - Removed the committed salvaged-branch git bundle (content verified merged) (#83).
@@ -387,6 +393,7 @@ or repointed.
   de-templating; historical status docs marked HISTORICAL (#85).
 
 ### Verified fleet rollout status (live ECS matrix, 2026-07-03)
+
 The fail-closed default keys off `ENVIRONMENT` ∈ {`production`, `prod`}.
 Live `aws ecs describe-task-definition` sweep of the `adaptix-production`
 cluster on 2026-07-03 showed:
@@ -405,6 +412,7 @@ cluster on 2026-07-03 showed:
   program; flipping it arms enforcement and must be per-service verified.
 
 **Per-service rebuild checklist (run at each service's first deploy on ≥1.4.0):**
+
 1. Real user path through the gateway → 200.
 2. Forged `X-Is-Founder`/`X-User-Id`/`X-Tenant-Id` direct to the service (no
    signature) → 401.
@@ -415,6 +423,7 @@ cluster on 2026-07-03 showed:
    gateway-fronting, and re-verify.
 
 ### Security (BREAKING default in production — coordinate fleet rollout)
+
 - **APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST:** `get_auth_context` is now
   **fail-closed by default in production** for UNSIGNED requests. Previously,
   with `ADAPTIX_GATEWAY_HMAC_ENFORCE` unset, forged `X-User-Id` / `X-Tenant-Id`
@@ -451,23 +460,28 @@ platform orchestrator; do not blind-merge and fleet-deploy.
 1.3.0 line without a further version bump; they are grouped here for consumers.
 
 ### Added
+
 - Canonical TrustSign HTTP client in the shared package (#24).
 - New domain schemas: narcotics, RBAC, supply-integrations, and `asyncio_mode` (#26).
 - `require_module_entitlement` shared gate for module-services (#35).
 - `require_any_module_entitlement(*slugs)` multi-slug entitlement gate.
 - `ClaimStatusUpdatedEvent` enriched for the ePCR back-channel (#33, #39).
 - `NarcoticAccessType` expanded with `ADMINISTER` / `WASTE` / `TRANSFER_OUT` / `TRANSFER_IN`.
-- Canonical event registry entries `billing.claim.updated` and `epcr.chart.updated` (#76).
+- Canonical event registry entries `billing.claim.updated` and
+  `epcr.chart.updated` (#76).
 
 ### Changed
+
 - **Auth trust model:** replaced the custom HMAC/RS256 gateway-context proof with
   the AWS API Gateway injected-header contract (`X-User-Id` / `X-Tenant-Id` /
-  `X-User-Roles` / `X-Is-Founder`), with `build_gateway_context_jwt` retained as a
+  `X-User-Roles` / `X-Is-Founder`), with `build_gateway_context_jwt` retained as
+  a
   loud-failing shim (#45, #46).
 - Modernized typing to PEP 604/585 and replaced `datetime.utcnow` with
   timezone-aware `datetime.now(timezone.utc)` (#37).
 
 ### Security
+
 - **F-24:** `get_auth_context` now verifies the gateway HMAC signature
   (`X-Adaptix-Auth-Context` + `X-Adaptix-Auth-Signature`) when present. A present
   signature that fails verification returns 401. Behavior is **non-breaking and
@@ -483,43 +497,66 @@ platform orchestrator; do not blind-merge and fleet-deploy.
 ## [1.2.0] - 2026-05
 
 ### Added
+
 - Dispatch, platform event bus, and audit domain action schemas (#20).
 
 ## [1.1.0] - 2026-05
 
 ### Added
+
 - Finance and ledger domain contracts, bringing 15 services into compliance (#13).
 
 ### Fixed
+
 - Aligned `__version__` with `pyproject.toml` at 1.1.0 (#13).
 
 ## [1.0.2] - 2026-05-08
 
 ### Added
-- Added machine-readable `--json` output to `validate_contracts.py` so release automation can consume structured validation proof.
-- Added `scripts/audit_workspace_contracts.py` to detect shadow `adaptix_contracts` trees across a polyrepo workspace.
-- Added `tests/test_release_readiness.py` to cover JSON validation output and workspace shadow-package auditing.
-- Added `.env.example` documenting `ADAPTIX_CONTRACTS_WORKSPACE_ROOT` for release audits.
-- Added `MARKET_READY_LEDGER.md` as the authoritative proof ledger for market-readiness status.
+
+- Added machine-readable `--json` output to `validate_contracts.py` so release
+  automation can consume structured validation proof.
+- Added `scripts/audit_workspace_contracts.py` to detect shadow
+  `adaptix_contracts` trees across a polyrepo workspace.
+- Added `tests/test_release_readiness.py` to cover JSON validation output and
+  workspace shadow-package auditing.
+- Added `.env.example` documenting `ADAPTIX_CONTRACTS_WORKSPACE_ROOT` for
+  release audits.
+- Added `MARKET_READY_LEDGER.md` as the authoritative proof ledger for
+  market-readiness status.
 
 ### Changed
-- Removed the repo's dependency on `pytest-asyncio` by converting async auth contract tests to synchronous `asyncio.run(...)` calls.
-- Extended CI to build wheel/sdist artifacts and run `twine check` on the generated distributions.
-- Updated readiness/runbook documentation to treat shadow-package detection as a hard release gate.
+
+- Removed the repo's dependency on `pytest-asyncio` by converting async auth
+  contract tests to synchronous `asyncio.run(...)` calls.
+- Extended CI to build wheel/sdist artifacts and run `twine check` on the
+  generated distributions.
+- Updated readiness/runbook documentation to treat shadow-package detection as a
+  hard release gate.
 
 ## [1.0.1] - 2026-04-21
 
 ### Added
-- Added a pytest regression suite for schema exports, enum integrity, JSON schema generation, serialization round-trips, and representative validation failures.
-- Added GitHub Actions validation for import checks, contract regression tests, and coverage reporting.
-- Added documented deprecation and backward-compatibility policy for downstream services.
+
+- Added a pytest regression suite for schema exports, enum integrity, JSON
+  schema generation, serialization round-trips, and representative validation
+  failures.
+- Added GitHub Actions validation for import checks, contract regression tests,
+  and coverage reporting.
+- Added documented deprecation and backward-compatibility policy for downstream
+  services.
 
 ### Changed
-- Fixed package-level symbol re-exports so `adaptix_contracts.<Symbol>` resolves consistently with `adaptix_contracts.schemas.<Symbol>`.
-- Hardened `validate_contracts.py` to resolve schema paths from the repository location instead of the process working directory.
-- Updated documented domain coverage from 26 to 28 to reflect `clinical_visual` and `inventory` contracts already present in the package.
+
+- Fixed package-level symbol re-exports so `adaptix_contracts.<Symbol>` resolves
+  consistently with `adaptix_contracts.schemas.<Symbol>`.
+- Hardened `validate_contracts.py` to resolve schema paths from the repository
+  location instead of the process working directory.
+- Updated documented domain coverage from 26 to 28 to reflect `clinical_visual`
+  and `inventory` contracts already present in the package.
 
 ## [1.0.0] - 2026-04-21
 
 ### Added
+
 - Initial published shared Adaptix contracts package with cross-domain schema coverage.
