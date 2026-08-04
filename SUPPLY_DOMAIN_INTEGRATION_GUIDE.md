@@ -271,30 +271,36 @@ exception and returned `False`, so none of it ever surfaced.
 
 **The role-gate blocker is CLOSED — the supply entity types are now gated.**
 
-This section previously warned that `GET /api/v1/search` applied no `entity_type`
-predicate beyond a three-value deny-list (`SENSITIVE_ENTITY_TYPES = {patient,
-epcr_chart, billing_claim}`), so `inventory_items` / `medication_lots` /
-`narcotic_vials` — in neither that deny-list nor `VALID_SCOPES` — would have been
-returned by the default global search box to **every** role, `viewer` and
-`dispatch` included.
+This section previously warned that `GET /api/v1/search` applied no
+`entity_type` predicate beyond a three-value deny-list
+(`SENSITIVE_ENTITY_TYPES = {patient, epcr_chart, billing_claim}`), so
+`inventory_items` / `medication_lots` / `narcotic_vials` — in neither that
+deny-list nor `VALID_SCOPES` — would have been returned by the default global
+search box to **every** role, `viewer` and `dispatch` included.
 
 Adaptix-Search-Service PR #118 (merge `63845f4`, deployed as task definition
 `adaptix-production-search:138`) inverted that gate to a positive allow-list in
 `search_app/permissions.py`, and classified the three supply entity types with
 entitlements copied from this repo's own `adaptix_contracts/rbac_contracts.py`:
 
-| entity_type | entitled roles | source permission |
-|---|---|---|
-| `narcotic_vials` | `founder`, `agency_admin`, `operations_chief`, `narcotics_officer`, `medical_director`, `supervisor`, `paramedic`, `auditor`, `inspector` | `narcotics:read` |
-| `medication_lots` | `narcotics:read` set, minus `narcotics_officer`, plus `pharmacy_medication_manager` and `emt` | `medications:read` |
-| `inventory_items` | `founder`, `agency_admin`, `operations_chief`, `supply_officer`, `fleet_equipment_manager`, `supervisor`, `paramedic`, `emt`, `auditor`, `inspector` | `inventory:read_items` |
+- `narcotic_vials` — entitled to the `narcotics:read` role set:
+  `founder`, `agency_admin`, `operations_chief`, `narcotics_officer`,
+  `medical_director`, `supervisor`, `paramedic`, `auditor`, `inspector`.
+- `medication_lots` — entitled to the `medications:read` role set:
+  `founder`, `agency_admin`, `operations_chief`,
+  `pharmacy_medication_manager`, `medical_director`, `supervisor`,
+  `paramedic`, `emt`, `auditor`, `inspector`.
+- `inventory_items` — entitled to the `inventory:read_items` role set:
+  `founder`, `agency_admin`, `operations_chief`, `supply_officer`,
+  `fleet_equipment_manager`, `supervisor`, `paramedic`, `emt`, `auditor`,
+  `inspector`.
 
 `narcotic_vials` excludes `viewer`, `dispatch`, `emt` and `billing_operator`, so
 `substance_name` / `vial_id` / `lot_id` / `unit_id` / `seal_status` /
 `chain_of_custody_status` are no longer reachable by an unentitled role via the
 global search box or via autocomplete. A Search test asserts equality with the
-permission sets above, so changing a read permission in `rbac_contracts.py` fails
-Search CI rather than silently widening search visibility.
+permission sets above, so changing a read permission in `rbac_contracts.py`
+fails Search CI rather than silently widening search visibility.
 
 **What a future supply SearchClient must still do:**
 
