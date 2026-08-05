@@ -1,9 +1,30 @@
 """Adaptix-native TrustSign HTTP client — canonical replacement for Dropbox Sign / HelloSign.
 
 This client lets every Adaptix service that needs digital signatures call
-the TrustSign engine exposed by ``Adaptix-Billing-Service`` at
-``/api/v1/trustsign/*``. It is the **only** authorized signature integration
-path going forward. There is no fallback to Dropbox Sign / HelloSign.
+the TrustSign engine at ``/api/v1/trustsign/*``. It is the **only**
+authorized signature integration path going forward. There is no fallback
+to Dropbox Sign / HelloSign.
+
+ROUTING REALITY (verified 2026-08-05): as of the 2026-07-15 cutover, the
+gateway (``Adaptix-Gateway/backend/app/config/routes.py``, the
+``/api/v1/trustsign`` and ``/api/v1/trustsign/sign`` ``RouteEntry`` rows)
+forwards ALL ``/api/v1/trustsign/*`` traffic to the standalone
+``Adaptix-TrustSign-Service`` engine — NOT to ``Adaptix-Billing-Service``.
+``Adaptix-Billing-Service`` still ships its own in-process mirror
+(``billing_app.trustsign.request_service`` / legacy
+``billing_app/api/trustsign_routes.py``) with an independently-migrated
+database of the same table names; that copy is no longer reachable via the
+gateway prefix this client calls. A caller anywhere in the fleet that mints
+a signing request through Billing's *internal* (non-HTTP) engine — as
+``Adaptix-Billing-Service``'s onboarding legal-packet dispatch
+(``billing_app.services.trustsign_legal_packet_service``) still does — will
+produce a magic-link token that this client (and the gateway-routed
+``/sign/{token}`` Web-App page) cannot resolve, because the standalone
+engine's database has never seen that token. See the confirmed BAA
+capture-and-persist journey gap logged 2026-08-05. This client itself only
+ever talks to the gateway/standalone engine, so it is not the broken hop —
+but do not assume every "TrustSign" caller in the fleet already goes
+through this client.
 
 Design rules (per founder directive 2026-05-25):
 
@@ -195,8 +216,10 @@ class TrustSignClientConfig:
     base_url: str
     """Absolute base URL for the TrustSign API. In production this is
     ``https://api.adaptixcore.com`` (the gateway), routing
-    ``/api/v1/trustsign/*`` to Billing-Service. In service-mesh
-    deployments may be ``http://adaptix-billing:8000`` directly."""
+    ``/api/v1/trustsign/*`` to the standalone Adaptix-TrustSign-Service
+    (cutover 2026-07-15 — this no longer forwards to Adaptix-Billing-Service).
+    In service-mesh deployments this may point directly at the standalone
+    engine's internal service DNS name instead."""
 
     bearer_token: str
     """The caller's Adaptix JWT (Cognito or Core RS256). Tenant scoping
@@ -354,7 +377,21 @@ class TrustSignClient:
         return RequestStatusResponse.model_validate(response.json())
 
     async def download_archive(self, request_id: str) -> bytes:
-        """Stream the archived signed PDF. Caller must persist or display it."""
+        """Stream the archived signed PDF. Caller must persist or display it.
+
+        NOT YET IMPLEMENTED on the standalone Adaptix-TrustSign-Service
+        (verified 2026-08-05: no matching route in
+        ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``). This
+        path exists only on Adaptix-Billing-Service's deprecated legacy
+        router (``billing_app/api/trustsign_routes.py``), which the gateway
+        no longer forwards ``/api/v1/trustsign/*`` traffic to. Calling this
+        against the real gateway-routed ``base_url`` today raises
+        ``TrustSignValidationError(404, ...)`` — a clean typed failure, not
+        a silent one, but the capability itself does not exist server-side
+        yet. Use ``Adaptix-TrustSign-Service``'s
+        ``/api/v1/verifications/signature/{verification_id}`` route for
+        verification instead until this is built.
+        """
         url = self._config.base_url.rstrip("/") + (
             f"/api/v1/trustsign/archives/by-request/{request_id}/download"
         )
@@ -377,7 +414,19 @@ class TrustSignClient:
         return response.content
 
     async def void_request(self, request_id: str, *, reason: str | None = None) -> None:
-        """Cancel a pending signing request."""
+        """Cancel a pending signing request.
+
+        NOT YET IMPLEMENTED on the standalone Adaptix-TrustSign-Service
+        (verified 2026-08-05: no matching route in
+        ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``). This
+        path exists only on Adaptix-Billing-Service's deprecated legacy
+        router (``billing_app/api/trustsign_routes.py``), which the gateway
+        no longer forwards ``/api/v1/trustsign/*`` traffic to. Calling this
+        against the real gateway-routed ``base_url`` today raises
+        ``TrustSignValidationError(404, ...)`` — a clean typed failure, not
+        a silent one, but the capability itself does not exist server-side
+        yet.
+        """
         body = {"reason": reason} if reason else {}
         await self._request(
             "POST",
@@ -388,7 +437,19 @@ class TrustSignClient:
     async def resend_request(
         self, request_id: str, *, expiration_days: int | None = None
     ) -> None:
-        """Re-issue the per-signer magic links (resets expiration)."""
+        """Re-issue the per-signer magic links (resets expiration).
+
+        NOT YET IMPLEMENTED on the standalone Adaptix-TrustSign-Service
+        (verified 2026-08-05: no matching route in
+        ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``). This
+        path exists only on Adaptix-Billing-Service's deprecated legacy
+        router (``billing_app/api/trustsign_routes.py``), which the gateway
+        no longer forwards ``/api/v1/trustsign/*`` traffic to. Calling this
+        against the real gateway-routed ``base_url`` today raises
+        ``TrustSignValidationError(404, ...)`` — a clean typed failure, not
+        a silent one, but the capability itself does not exist server-side
+        yet.
+        """
         body = (
             {"expiration_days": expiration_days} if expiration_days is not None else {}
         )
