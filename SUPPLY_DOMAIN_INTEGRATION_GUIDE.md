@@ -442,10 +442,11 @@ The Inventory Service uses `InventoryIntegrationService` to publish events.
 ```python
 from inventory_app.integrations import InventoryIntegrationService
 
+
 @router.post("/items")
 async def create_supply_item(req: CreateItemRequest, session: AsyncSession):
     item = await InventoryService.create_supply_item(...)
-    
+
     # Trigger integrations
     await InventoryIntegrationService.on_item_created(
         tenant_id=req.tenant_id,
@@ -456,14 +457,17 @@ async def create_supply_item(req: CreateItemRequest, session: AsyncSession):
         par_level=item.par_level,
         cost_per_unit=req.cost_per_unit,
     )
-    
+
     return item
 
+
 @router.post("/items/{item_id}/stock-adjustment")
-async def adjust_stock(item_id: str, req: StockAdjustmentRequest, session: AsyncSession):
+async def adjust_stock(
+    item_id: str, req: StockAdjustmentRequest, session: AsyncSession
+):
     old_stock = item.current_stock
     new_stock = await InventoryService.adjust_stock(item_id, req.quantity)
-    
+
     # Trigger integrations
     await InventoryIntegrationService.on_stock_adjusted(
         tenant_id=req.tenant_id,
@@ -475,7 +479,7 @@ async def adjust_stock(item_id: str, req: StockAdjustmentRequest, session: Async
         adjustment_reason=req.reason,
         cost_per_unit=item.cost_per_unit,
     )
-    
+
     return {"old": old_stock, "new": new_stock}
 ```
 
@@ -512,10 +516,11 @@ The Medications Service uses `MedicationsIntegrationService` to publish events.
 ```python
 from medications.integrations import MedicationsIntegrationService
 
+
 @router.post("/lots")
 async def create_medication_lot(req: CreateLotRequest, session: AsyncSession):
     lot = await MedicationsService.create_lot(...)
-    
+
     # Trigger integrations
     await MedicationsIntegrationService.on_medication_lot_created(
         tenant_id=req.tenant_id,
@@ -527,13 +532,16 @@ async def create_medication_lot(req: CreateLotRequest, session: AsyncSession):
         storage_location=req.storage_location,
         cost_per_unit=req.cost_per_unit,
     )
-    
+
     return lot
 
+
 @router.post("/lots/{lot_id}/administer")
-async def administer_medication(lot_id: str, req: AdministerRequest, session: AsyncSession):
+async def administer_medication(
+    lot_id: str, req: AdministerRequest, session: AsyncSession
+):
     result = await MedicationsService.administer(lot_id, req.quantity)
-    
+
     # Trigger integrations
     await MedicationsIntegrationService.on_medication_administered(
         tenant_id=req.tenant_id,
@@ -544,7 +552,7 @@ async def administer_medication(lot_id: str, req: AdministerRequest, session: As
         cost_per_unit=req.cost_per_unit,
         administered_by=req.user_id,
     )
-    
+
     return result
 ```
 
@@ -620,10 +628,11 @@ modified or deleted, only read for inspection.
 ```python
 from core_app.integrations import NarcoticsIntegrationService
 
+
 @router.post("/vials/{vial_id}/transfer")
 async def transfer_vial(vial_id: str, req: TransferRequest, session: AsyncSession):
     vial = await NarcoticsService.transfer_vial(vial_id, req.to_unit_id)
-    
+
     # Trigger integrations
     await NarcoticsIntegrationService.on_vial_transferred(
         tenant_id=req.tenant_id,
@@ -635,7 +644,7 @@ async def transfer_vial(vial_id: str, req: TransferRequest, session: AsyncSessio
         quantity=vial.quantity,
         transferred_by=req.user_id,
     )
-    
+
     # Create immutable ledger entry
     await NarcoticsIntegrationService.on_chain_of_custody_entry(
         tenant_id=req.tenant_id,
@@ -652,7 +661,7 @@ async def transfer_vial(vial_id: str, req: TransferRequest, session: AsyncSessio
         entry_id=str(uuid4()),
         created_at=datetime.now(timezone.utc),
     )
-    
+
     return vial
 ```
 
@@ -719,53 +728,55 @@ import pytest
 from uuid import uuid4
 from datetime import datetime, timezone
 
+
 @pytest.mark.asyncio
 async def test_low_stock_alert_flow():
     """Test: stock adjustment → low-stock alert → notification."""
     tenant_id = uuid4()
-    
+
     # 1. Create inventory item
     item = await create_inventory_item(
         tenant_id=tenant_id,
         item_name="Saline 0.9%",
         par_level=20,
     )
-    
+
     # 2. Adjust stock below par
     await adjust_stock(item.id, -16)  # 20 → 4
-    
+
     # 3. Verify notification was sent
     notifications = await get_notifications(tenant_id)
     assert len(notifications) > 0
     assert "Low Stock" in notifications[0].title
-    
+
     # 4. Verify indexed in Search
     search_result = await search_inventory("Saline")
     assert search_result["current_stock"] == 4
-    
+
     # 5. Verify Audit logged
     audit_entries = await get_audit_entries(tenant_id, "inventory_item", item.id)
     assert any(e.action == "stock_adjusted" for e in audit_entries)
+
 
 @pytest.mark.asyncio
 async def test_chain_of_custody_immutability():
     """Test: COC entries are immutable."""
     tenant_id = uuid4()
-    
+
     # 1. Create vial
     vial = await create_narcotic_vial(...)
-    
+
     # 2. Transfer vial (creates COC entry)
     coc_entry_id = await transfer_vial(...)
-    
+
     # 3. Verify entry cannot be modified
     with pytest.raises(AuditError):
         await update_audit_entry(coc_entry_id, ...)
-    
+
     # 4. Verify entry cannot be deleted
     with pytest.raises(AuditError):
         await delete_audit_entry(coc_entry_id)
-    
+
     # 5. Verify entry can be read
     entry = await get_audit_entry(coc_entry_id)
     assert entry.action == "coc_transferred"
