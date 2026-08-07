@@ -48,6 +48,18 @@ suites work without a full gateway. Likewise, in production a signature that is
 PRESENT but cannot be verified (no shared secret configured) is REJECTED
 (fail-closed) rather than trusted. See the F-24 block in ``get_auth_context``.
 
+Founder privilege floor on the unsigned path (APPSEC-CONTRACTS-UNSIGNED-FOUNDER-ESCALATION)
+-------------------------------------------------------------------------------------------
+The opt-out above (``ADAPTIX_GATEWAY_HMAC_ENFORCE=false``) keeps a service's
+legitimate UNSIGNED intra-VPC callers working — but it also re-opens the
+unsigned identity path, on which ``X-Is-Founder`` and ``X-User-Roles`` are plain
+headers covered by no signature. In PRODUCTION, ``founder`` is therefore never
+granted on that path: the request still proceeds with the caller's ordinary
+roles, but the platform-owner privilege that lifts tenant scoping is refused and
+the demotion is logged at WARNING. This REJECTS NOTHING, so it is safe to run
+ahead of the per-service HMAC enforcement rollout. Outside production the
+behaviour is unchanged so dev/test can still simulate a founder with headers.
+
 The RS256 gateway-context JWT mode that appeared in prior versions of this
 module has been removed. Services that reference ``build_gateway_context_jwt``
 or ``GATEWAY_PUBLIC_KEY_ENV`` should be updated to use the new header contract.
@@ -117,6 +129,12 @@ _warned_missing_secret = False
 
 _TRUEY = ("true", "1", "yes")
 _FALSEY = ("false", "0", "no")
+
+# The single highest-privilege role on the platform. Founder lifts tenant
+# scoping on cross-tenant reads, so it is the one role that must never be
+# grantable by a header nobody signed. See the privilege floor in
+# ``get_auth_context`` (APPSEC-CONTRACTS-UNSIGNED-FOUNDER-ESCALATION).
+_FOUNDER_ROLE = "founder"
 
 
 def _gateway_hmac_enforce() -> bool:
@@ -450,6 +468,52 @@ async def get_auth_context(
         # Conversely, if "founder" is in roles, set is_founder.
         if "founder" in {r.lower() for r in roles}:
             is_founder_flag = True
+
+        # ------------------------------------------------------------------
+        # PRIVILEGE FLOOR — APPSEC-CONTRACTS-UNSIGNED-FOUNDER-ESCALATION.
+        #
+        # In PRODUCTION, founder is NEVER granted from an unsigned request.
+        # Both inputs above (``X-Is-Founder`` and ``X-User-Roles``) are plain
+        # request headers covered by no signature, so an in-VPC / ALB-direct
+        # caller that reaches a service without traversing the gateway could
+        # send ``X-Is-Founder: true`` and be treated as the platform owner —
+        # which lifts tenant scoping on founder-gated cross-tenant reads.
+        #
+        # This REJECTS NOTHING. It only refuses to ELEVATE: the request still
+        # proceeds with the caller's ordinary roles. That is what makes it
+        # safe to land ahead of the per-service HMAC enforcement rollout —
+        # unlike removing this branch or defaulting the enforcement flag to
+        # true, which would 401 every not-yet-signing caller fleet-wide.
+        #
+        # Reachability in production is already narrow: the absent-signature
+        # path is fail-closed by default here (``_gateway_hmac_enforce`` ->
+        # ``_is_production``), so this floor applies only to services that
+        # EXPLICITLY set ``ADAPTIX_GATEWAY_HMAC_ENFORCE=false`` — i.e. exactly
+        # the services knowingly running in the degraded mode where the
+        # escalation is reachable.
+        #
+        # Outside production the behaviour is deliberately unchanged, so local
+        # development and the fleet's test suites can still simulate a founder
+        # with headers alone.
+        #
+        # Precedent: Adaptix-AI-Service already applies this identical floor in
+        # its own ``require_auth`` wrapper (``ai_app/auth.py``). This moves the
+        # floor into the canonical dependency so every adopter inherits it
+        # instead of each service having to reimplement it.
+        # ------------------------------------------------------------------
+        if is_founder_flag and _is_production():
+            logger.warning(
+                "founder privilege refused on an UNSIGNED gateway context "
+                "(user=%s tenant=%s roles=%s) — founder is only honoured on an "
+                "HMAC-verified context. Sign the request, or set %s=true once "
+                "every caller of this service signs.",
+                user_uuid,
+                tenant_uuid,
+                sorted(roles),
+                _GATEWAY_HMAC_ENFORCE_ENV,
+            )
+            roles = [r for r in roles if r.lower() != _FOUNDER_ROLE]
+            is_founder_flag = False
 
     return AuthContext(
         user_id=user_uuid,
