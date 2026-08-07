@@ -51,9 +51,16 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# One-shot guard so the unpinned-audience warning below does not flood logs on
+# every request. Reset only on process restart.
+_warned_audience_unpinned = False
 
 # Environment-variable NAMES (never values) — single source of truth for the
 # consumer side, and the only definition of these names in the package.
@@ -207,6 +214,41 @@ def verify_gateway_signature(
             raise GatewaySignatureError(
                 f"unexpected audience {aud!r} (expected {expected_aud!r})"
             )
+    else:
+        # OBSERVABILITY — AX5-00036 (gateway Cognito audience bypass).
+        #
+        # The gateway signs a PER-ROUTE audience into every context it mints
+        # (``_audience_for_path`` -> ``sign_context(audience=...)`` in
+        # ``Adaptix-Gateway/backend/app/middleware/cognito_auth.py``). For a
+        # Cognito token the gateway then SKIPS its own audience enforcement,
+        # because a Cognito JWT carries ``aud=<client_id>`` and never a service
+        # audience — so gateway-side enforcement is impossible by construction
+        # and this consumer-side check is the ONLY place the signed audience can
+        # actually be verified.
+        #
+        # That makes an unset ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` a SILENT
+        # hole: the audience is signed but checked at neither end, so a context
+        # minted for one service is replayable against another. Silence is the
+        # real problem — the gap looks identical to a correctly-pinned service
+        # in logs. Warn once per process so the services still missing the
+        # variable can be enumerated from CloudWatch, which is the precondition
+        # for installing it fleet-wide and then removing the gateway bypass.
+        #
+        # Deliberately WARN and not raise: rejecting here would 401 every
+        # service that has not yet had the variable installed, which is the
+        # outage this sequencing exists to avoid.
+        global _warned_audience_unpinned
+        if not _warned_audience_unpinned and payload.get("aud"):
+            logger.warning(
+                "gateway context carries a signed audience %r but %s is not "
+                "configured, so the audience is NOT verified; a context minted "
+                "for another service would be accepted here. Set %s to this "
+                "service's audience to close cross-service replay.",
+                payload.get("aud"),
+                GATEWAY_EXPECTED_AUDIENCE_ENV,
+                GATEWAY_EXPECTED_AUDIENCE_ENV,
+            )
+            _warned_audience_unpinned = True
 
     # 5. Replay window.
     exp = payload.get("exp")
