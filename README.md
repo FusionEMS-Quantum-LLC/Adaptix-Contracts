@@ -132,7 +132,7 @@ claim = ClaimContract(
     total_charge_cents=10000,
     balance_cents=10000,
     created_at=datetime.now(),
-    updated_at=datetime.now()
+    updated_at=datetime.now(),
 )
 ```
 
@@ -163,7 +163,7 @@ event = ClaimCreatedEvent(
     claim_id="claim-123",
     tenant_id="tenant-123",
     patient_id="patient-123",
-    created_at=datetime.now()
+    created_at=datetime.now(),
 )
 
 # Serialize to dict

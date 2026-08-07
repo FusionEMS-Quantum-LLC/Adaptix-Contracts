@@ -42,20 +42,24 @@ async def require_founder(auth=Depends(require_auth)):
         raise HTTPException(status_code=403)
     return auth
 
+
 # AFTER
 from adaptix_contracts.rbac_contracts import compute_inventory_permissions
 
+
 async def require_inventory_permission(permission: str) -> Callable:
     """Check if user has a specific inventory permission."""
+
     async def dependency(auth=Depends(require_auth)):
         roles = extract_roles(auth)
         permissions = compute_inventory_permissions(roles)
         if permission not in permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {permission}"
+                detail=f"Permission denied: {permission}",
             )
         return auth
+
     return Depends(dependency)
 ```
 
@@ -74,7 +78,7 @@ async def verify_tenant_isolation(
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this tenant"
+            detail="You do not have access to this tenant",
         )
 ```
 
@@ -271,6 +275,7 @@ from adaptix_contracts.core_service_integration import (
     close_core_service_client,
 )
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -278,9 +283,9 @@ async def lifespan(app: FastAPI):
     await init_db()
     await init_core_service_client()  # ← Add this
     logger.info("Service ready")
-    
+
     yield
-    
+
     # Shutdown
     await close_core_service_client()  # ← Add this
     logger.info("Service shut down")
@@ -323,12 +328,12 @@ async def require_billing_access(
 ):
     """Verify user has billing access (cost reports)."""
     allowed_roles = {"founder", "agency_admin", "billing_operator"}
-    
+
     roles = extract_roles(auth)
     if not any(r in allowed_roles for r in roles):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Billing access requires Billing Operator, Admin, or Founder role"
+            detail="Billing access requires Billing Operator, Admin, or Founder role",
         )
     return auth
 ```
@@ -345,6 +350,7 @@ async def get_cost_reports(
 ):
     """Cost reports (Billing only)."""
     ...
+
 
 @router.get("/cost-attribution")
 async def get_cost_attribution(

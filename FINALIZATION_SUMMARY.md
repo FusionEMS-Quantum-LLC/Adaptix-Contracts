@@ -186,14 +186,17 @@ from adaptix_contracts.schemas import *
 
 # Specific imports
 from adaptix_contracts.schemas import (
-    ClaimContract, ClaimStatus,
-    AuditRecord, AuditContext,
-    WorkflowExecution, WorkflowStatus
+    ClaimContract,
+    ClaimStatus,
+    AuditRecord,
+    AuditContext,
+    WorkflowExecution,
+    WorkflowStatus,
 )
 
 # Model instantiation
 claim = ClaimContract(...)  # ✅ Works
-audit = AuditRecord(...)    # ✅ Works
+audit = AuditRecord(...)  # ✅ Works
 workflow = WorkflowExecution(...)  # ✅ Works
 ```
 

@@ -156,8 +156,7 @@ def nearest_uv_lock(pyproject_path: Path) -> Path | None:
 def check_python(policy: dict[str, Any], violations: list[str]) -> None:
     allowed = collect_allowed(policy)
     forbidden = {
-        normalized_python_name(str(item))
-        for item in policy.get("forbidden", [])
+        normalized_python_name(str(item)) for item in policy.get("forbidden", [])
     }
 
     for pyproject_path in iter_files("pyproject.toml"):
@@ -209,9 +208,7 @@ def check_terraform(violations: list[str]) -> None:
     lockfiles = list(iter_files(".terraform.lock.hcl"))
 
     if not lockfiles:
-        violations.append(
-            "Terraform files exist but no .terraform.lock.hcl was found"
-        )
+        violations.append("Terraform files exist but no .terraform.lock.hcl was found")
 
 
 def check_gradle(violations: list[str]) -> None:
