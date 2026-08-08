@@ -120,15 +120,28 @@ def test_no_warning_when_audience_is_pinned(
     assert not [r for r in caplog.records if "EXPECTED_AUDIENCE" in r.getMessage()]
 
 
-def test_no_warning_when_context_carries_no_audience(
+def test_context_with_no_audience_is_rejected(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """No signed aud means nothing to pin — warning would be noise."""
+    """A context carrying no ``aud`` is REJECTED, so it can never be warned about.
+
+    This test previously asserted that such a context verified silently, on the
+    reasoning that "no signed aud means nothing to pin". That reasoning is what
+    AX5-00037/AX5-00038 identified: "no audience" and "correct audience" then
+    produced identical outcomes and identical logs. Every legitimate producer
+    signs an audience — the gateway's ``_audience_for_path`` cannot return empty
+    and ``build_gateway_signed_headers`` raises without one — so presence is now
+    required for every service, pinned or not.
+
+    The original property (no noisy warning) still holds, and now holds because
+    the context never reaches the warning branch at all.
+    """
     ctx, sig = _sign(aud=None)
     with caplog.at_level("WARNING", logger="adaptix_contracts.gateway_signature"):
-        verify_gateway_signature(
-            context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
-        )
+        with pytest.raises(GatewaySignatureError, match="missing required claim"):
+            verify_gateway_signature(
+                context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
+            )
     assert not [r for r in caplog.records if "EXPECTED_AUDIENCE" in r.getMessage()]
 
 
