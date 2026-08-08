@@ -36,13 +36,27 @@ Audience handling
 -----------------
 ``adaptix-contracts`` is a SHARED package consumed by ~52 services, each with
 its own ``aud`` (``adaptix-core``, ``adaptix-epcr``, ``adaptix-billing`` ...).
-This verifier therefore does NOT pin a single audience by default — doing so
-would break every service whose audience is not the hardcoded value. A service
-that wants audience-pinning (defense-in-depth against cross-service replay)
-sets ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` to its own audience string; when set,
-the ``aud`` claim must match (string-equal, or membership when the claim is a
-list). When unset, the signature + issuer + replay-window checks still fully
-close the in-VPC identity-spoofing path this verifier exists to fix.
+This verifier therefore cannot pin ONE audience by default — hardcoding a value
+would reject every service whose audience differs. Audience checking is
+consequently layered, and the first two layers apply to EVERY service whether or
+not it has been configured:
+
+1. **Presence — always enforced.** Every legitimate producer signs an audience:
+   the gateway's ``_audience_for_path`` never returns empty (it falls back to
+   ``adaptix-core``) and ``gateway_signing.build_gateway_signed_headers`` raises
+   without one. A context with no ``aud`` is therefore not something any Adaptix
+   producer emits, and accepting it was the silent case — "no audience" read as
+   "any audience".
+2. **Registry membership — always enforced.** ``aud`` must name a live Adaptix
+   service (``service_audiences.KNOWN_SERVICE_AUDIENCES``, the same set the
+   gateway route table is validated against). This bounds an unpinned service to
+   contexts minted for real Adaptix destinations instead of arbitrary strings.
+3. **Exact pin — per service.** ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` set to the
+   service's own audience closes cross-service replay outright: a context minted
+   for service A is rejected by service B. Only this layer stops A→B replay, so
+   an unset variable is a real gap and is warned about once per process. The
+   configured value is itself validated against the registry — a typo previously
+   produced a silent 401 storm indistinguishable from an attack.
 """
 
 from __future__ import annotations
@@ -55,6 +69,8 @@ import logging
 import os
 import time
 from typing import Any
+
+from adaptix_contracts.service_audiences import is_known_service_audience
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +121,48 @@ def gateway_shared_secret() -> str | None:
 
 
 def _expected_audience() -> str | None:
+    """Return this service's pinned audience, validated against the registry.
+
+    A misconfigured pin is indistinguishable from an attack at the request
+    layer: every real request fails the exact-match check and the service
+    returns a 401 storm that looks exactly like forged traffic. Validating the
+    CONFIGURED value against ``KNOWN_SERVICE_AUDIENCES`` turns that into a
+    named, actionable error at first use.
+
+    Raises:
+        GatewaySignatureError: When the configured value does not name a live
+            Adaptix service.
+    """
     aud = os.environ.get(GATEWAY_EXPECTED_AUDIENCE_ENV, "").strip()
-    return aud or None
+    if not aud:
+        return None
+    if not is_known_service_audience(aud):
+        raise GatewaySignatureError(
+            f"{GATEWAY_EXPECTED_AUDIENCE_ENV}={aud!r} does not name a live "
+            "Adaptix service audience (see adaptix_contracts.service_audiences."
+            "KNOWN_SERVICE_AUDIENCES). Every request would fail the audience "
+            "check with this value."
+        )
+    return aud
+
+
+def _audience_names_a_live_service(aud: Any) -> bool:
+    """Return whether a signed ``aud`` claim names a live Adaptix service.
+
+    Accepts the string shape every Adaptix producer emits, and a list
+    defensively (RFC 7519 §4.1.3) where at least one member must be known.
+
+    Args:
+        aud: The raw ``aud`` claim from the verified payload.
+
+    Returns:
+        ``True`` when the claim names a live service.
+    """
+    if isinstance(aud, str):
+        return is_known_service_audience(aud)
+    if isinstance(aud, list):
+        return any(isinstance(a, str) and is_known_service_audience(a) for a in aud)
+    return False
 
 
 def _b64url_decode(value: str) -> bytes:
@@ -201,7 +257,30 @@ def verify_gateway_signature(
             f"unexpected issuer {payload.get('iss')!r} (expected {_EXPECTED_ISSUER!r})"
         )
 
-    # 4. Audience — opt-in per service.
+    # 4a. Audience PRESENCE and REGISTRY MEMBERSHIP — enforced for every
+    # service, pinned or not (AX5-00037 / AX5-00038).
+    #
+    # These two checks used to run only when ADAPTIX_GATEWAY_EXPECTED_AUDIENCE
+    # was set, which meant the ~47 services without it verified NO audience at
+    # all: the gateway signed one, nobody read it, and "no audience" was
+    # indistinguishable from "correct audience" in every log. Presence and
+    # membership are safe to enforce unconditionally because every legitimate
+    # producer already satisfies them — the gateway's ``_audience_for_path``
+    # cannot return empty and ``build_gateway_signed_headers`` raises without an
+    # audience — so this rejects only contexts no Adaptix producer emits.
+    signed_aud = payload.get("aud")
+    if not signed_aud:
+        raise GatewaySignatureError("context missing required claim: 'aud'")
+    if not _audience_names_a_live_service(signed_aud):
+        raise GatewaySignatureError(
+            f"audience {signed_aud!r} does not name a live Adaptix service"
+        )
+
+    # 4b. Exact audience pin — per service. THIS is the layer that stops
+    # cross-service replay (a context minted for A being presented to B), and it
+    # is the only one that can; the two above bound the blast radius but cannot
+    # tell A from B. An unset variable is therefore a real gap, warned about
+    # below rather than silently accepted.
     expected_aud = _expected_audience()
     if expected_aud is not None:
         aud = payload.get("aud")
