@@ -714,6 +714,26 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-training",
         source="Gateway ROUTE_TABLE /api/v1/training; Web-App app/workspace/training",
     ),
+    # ── Forms ────────────────────────────────────────────────────────────
+    # Adaptix-Forms-Service is a live upstream with its own gateway route and
+    # audience, but the module had NO row here — so audience_map() lacked a
+    # ``forms`` key, Core's _MODULE_TO_AUDIENCE never mapped it, and
+    # _session_audiences could not add ``adaptix-forms`` to any non-founder
+    # tenant's token. The gateway's AudienceEnforcementMiddleware then 403'd
+    # (jwt_audience_mismatch) EVERY /api/v1/forms request for every tenant.
+    # Adding the mapping makes the module reachable for entitled tenants on
+    # Core's next deploy. purchasable=False: forms is granted through the admin
+    # module toggle (Core MODULE_CATALOG), not a signup-pricing SKU — same
+    # shape as ``integration`` / ``training`` above.
+    _m(
+        "forms",
+        "Forms",
+        audience="adaptix-forms",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/forms -> forms_service_url "
+            "audience=adaptix-forms; Core MODULE_CATALOG"
+        ),
+    ),
 )
 
 
