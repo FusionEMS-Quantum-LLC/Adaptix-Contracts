@@ -481,3 +481,49 @@ def test_audience_map_is_consistent_with_the_registry() -> None:
             assert mapping[module_id] == definition.audience
         else:
             assert module_id not in mapping
+
+
+# ---------------------------------------------------------------------------
+# Module-id canonicalization drift (underscore/hyphen, singular/plural).
+#
+# Core persists + mints the canonical module id (``patient_identity`` underscore,
+# ``integration`` singular); the owning service is slugged with the drifted
+# spelling (``patient-identity`` hyphen, ``integrations`` plural — see
+# ``service_registry`` + the gateway ROUTE_TABLE), so a guard declared with the
+# service spelling denied an entitled tenant under exact match. These pin the
+# alias resolution so the drift cannot silently return.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("service_spelling", "canonical"),
+    [
+        ("patient-identity", "patient_identity"),
+        ("integrations", "integration"),
+    ],
+)
+def test_service_spelling_resolves_to_the_canonical_module(
+    service_spelling: str, canonical: str
+) -> None:
+    assert resolve_module_id(service_spelling) == canonical
+    # A guard declared with the service spelling is satisfied by a token that
+    # carries the canonical id (the real production shape), and vice-versa.
+    assert is_module_entitled(service_spelling, ["core", canonical]) is True
+    assert is_module_entitled(canonical, ["core", service_spelling]) is True
+    # Same reachable audience under either spelling.
+    assert module_audiences(service_spelling) == module_audiences(canonical)
+    assert module_audiences(service_spelling), (
+        "drifted module must reach a service audience"
+    )
+
+
+@pytest.mark.parametrize("service_spelling", ["patient-identity", "integrations"])
+def test_service_spelling_does_not_widen_entitlement(service_spelling: str) -> None:
+    """The alias unifies spellings of ONE module; it grants no other module."""
+    # A tenant that holds only an unrelated module is still denied.
+    assert is_module_entitled(service_spelling, ["core", "epcr"]) is False
+    assert is_module_entitled(service_spelling, ["core"]) is False
+    # The drifted spelling never leaks into ``audience_map()`` keys — Core keys
+    # ``_MODULE_TO_AUDIENCE`` by canonical id, so an alias key there would be a
+    # dead audience row.
+    assert service_spelling not in audience_map()
