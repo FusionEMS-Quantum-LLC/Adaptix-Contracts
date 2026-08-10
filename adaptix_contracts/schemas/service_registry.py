@@ -160,10 +160,11 @@ AIR_SERVICE = ServiceDefinition(
 )
 
 # Workforce scheduling domain. Registered here because 27 ``schedule.*`` events in
-# ``adaptix_contracts.events.registry`` already declare
-# ``source_service="adaptix-scheduling"``; without this entry those events name a
-# service that does not resolve (see
-# ``tests/test_scheduling_service_registration.py``).
+# ``adaptix_contracts.events.registry`` declare ``source_service="scheduling"``;
+# without this entry those events name a service that does not resolve (see
+# ``tests/test_scheduling_service_registration.py``). Those events previously
+# declared ``"adaptix-scheduling"``, which is now carried as a backward-compatible
+# entry in ``events.registry.LEGACY_SOURCE_SERVICE_ALIASES``.
 #
 # Runtime note (verified 2026-07-23 against
 # Adaptix-Gateway/backend/app/config/routes.py:1830-1842): the ``/api/v1/scheduling``

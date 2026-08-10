@@ -313,7 +313,7 @@
       "schedule.audit.event.created"
     ],
     "status": "declared_not_deployed",
-    "notes": "Contract-level owner of the scheduling domain per SCHEDULING_ARCHITECTURE_LOCK.md section 3.3. The 27 owned_events above are the source of truth for adaptix_contracts.scheduling.events.ALL_SCHEDULING_EVENTS, which events/registry.py:128-131 already stamps with source_service='adaptix-scheduling'. RUNTIME REALITY (verified 2026-07-23): Adaptix-Gateway/backend/app/config/routes.py:1830-1842 proxies /api/v1/scheduling and /api/v1/scheduling/healthz to Labor-Service with audience 'adaptix-labor'. No ECS service, ECR repo, database schema, or repository is assigned. This entry declares ownership; it does not assert a deployment."
+    "notes": "Contract-level owner of the scheduling domain per SCHEDULING_ARCHITECTURE_LOCK.md section 3.3. The 27 owned_events above are the source of truth for adaptix_contracts.scheduling.events.ALL_SCHEDULING_EVENTS, which events/registry.py stamps with source_service='scheduling' (the service-registry slug; the previously-published 'adaptix-scheduling' remains resolvable via events.registry.LEGACY_SOURCE_SERVICE_ALIASES). RUNTIME REALITY (verified 2026-07-23): Adaptix-Gateway/backend/app/config/routes.py:1830-1842 proxies /api/v1/scheduling and /api/v1/scheduling/healthz to Labor-Service with audience 'adaptix-labor'. No ECS service, ECR repo, database schema, or repository is assigned. This entry declares ownership; it does not assert a deployment."
   },
   "inventory": {
     "canonical_repo": "joshuawendorf21310/Adaptix-Inventory-Service",

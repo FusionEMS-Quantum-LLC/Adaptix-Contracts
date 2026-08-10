@@ -69,17 +69,13 @@ def test_directive_event_aliases_are_importable_and_registered() -> None:
     assert FIRE_INVESTIGATION_READINESS_UPDATED in FIRE_EVENTS
     assert NERIS_SCHEMA_ASSET_REFRESHED in NERIS_EVENTS
     assert NERIS_NORMALIZATION_COMPLETED in NERIS_EVENTS
-    assert (
-        ALL_EVENTS[FIRE_BENCHMARK_TIMELINE_UPDATED]["source_service"] == "adaptix-fire"
-    )
-    assert (
-        ALL_EVENTS[FIRE_INVESTIGATION_READINESS_UPDATED]["source_service"]
-        == "adaptix-fire"
-    )
-    assert ALL_EVENTS[NERIS_SCHEMA_ASSET_REFRESHED]["source_service"] == "adaptix-neris"
-    assert (
-        ALL_EVENTS[NERIS_NORMALIZATION_COMPLETED]["source_service"] == "adaptix-neris"
-    )
+    # source_service is the service-registry slug, not the JWT audience. The
+    # audiences "adaptix-fire" / "adaptix-neris" still exist in
+    # adaptix_contracts.service_audiences; they are a separate namespace.
+    assert ALL_EVENTS[FIRE_BENCHMARK_TIMELINE_UPDATED]["source_service"] == "fire"
+    assert ALL_EVENTS[FIRE_INVESTIGATION_READINESS_UPDATED]["source_service"] == "fire"
+    assert ALL_EVENTS[NERIS_SCHEMA_ASSET_REFRESHED]["source_service"] == "neris"
+    assert ALL_EVENTS[NERIS_NORMALIZATION_COMPLETED]["source_service"] == "neris"
 
 
 def test_neris_directive_models_preserve_ownership_boundaries() -> None:

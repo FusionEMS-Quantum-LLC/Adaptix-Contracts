@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 import adaptix_contracts
-from adaptix_contracts.events.registry import ALL_EVENTS
+from adaptix_contracts.events.registry import ALL_EVENTS, resolve_source_service
 from adaptix_contracts.scheduling.events import ALL_SCHEDULING_EVENTS
 from adaptix_contracts.schemas.service_registry import (
     ALL_SERVICES,
@@ -47,18 +47,15 @@ def _load_manifest() -> dict[str, dict]:
 
 
 def _resolve_source_service(source_service: str) -> ServiceDefinition | None:
-    """Resolve an event ``source_service`` string to a registered service.
+    """Resolve via the SHIPPED resolver, not a test-local heuristic.
 
-    ``events/registry.py`` stamps two conventions today: the bare slug
-    (``"billing"``, ``"epcr"``) and the ``adaptix-``-prefixed service name
-    (``"adaptix-fire"``, ``"adaptix-neris"``, ``"adaptix-scheduling"``). Both
-    forms must land on the same registry.
+    ``events/registry.py`` previously stamped two conventions (the bare slug
+    ``"billing"`` and the prefixed ``"adaptix-fire"``) and only this test knew
+    how to reconcile them, so no consumer could. The reconciliation now lives in
+    the library as ``resolve_source_service``; this test exercises the same code
+    path a consumer runs.
     """
-    if source_service in SERVICE_BY_SLUG:
-        return SERVICE_BY_SLUG[source_service]
-    if source_service.startswith("adaptix-"):
-        return SERVICE_BY_SLUG.get(source_service.removeprefix("adaptix-"))
-    return None
+    return resolve_source_service(source_service)
 
 
 # ---------------------------------------------------------------------------
@@ -107,8 +104,11 @@ def test_scheduling_events_resolve_to_scheduling_service() -> None:
     assert ALL_SCHEDULING_EVENTS, "ALL_SCHEDULING_EVENTS is empty"
     for event_type in ALL_SCHEDULING_EVENTS:
         meta = ALL_EVENTS[event_type]
-        assert meta["source_service"] == "adaptix-scheduling"
+        assert meta["source_service"] == "scheduling"
         assert _resolve_source_service(meta["source_service"]) is SCHEDULING_SERVICE
+    # The previously-published value must keep resolving for consumers holding a
+    # persisted event row or a pinned older adaptix-contracts.
+    assert _resolve_source_service("adaptix-scheduling") is SCHEDULING_SERVICE
 
 
 # ---------------------------------------------------------------------------

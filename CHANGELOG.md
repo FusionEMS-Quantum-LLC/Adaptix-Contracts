@@ -7,7 +7,73 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.2.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.3.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.3.0]
+
+### Fixed — event registry was out of sync with its live producers
+
+`events/registry.ALL_EVENTS` is the allow-list behind `is_registered()` and
+`events/operational_envelope.assert_event_type_registered()`. A workspace audit
+(`scripts/audit_event_producer_drift.py`, run 2026-08-09 across 92 sibling
+repos) found 38 production sites constructing a shared contract envelope with a
+literal `event_type`, of which **18 event types were unregistered** — so the
+allow-list returned `False` for real production traffic:
+
+- `billing.claim.created`, `billing.claim.status_changed`,
+  `billing.payment.received`, `billing.invoice.created`, `billing.invoice.paid`,
+  `billing.call_context.assembled`, `trustsign.document.signed`
+  (producer: Adaptix-Billing-Service, slug `billing`)
+- `epcr.chart.created`, `.finalized`, `.signed`, `.locked`, `.unlocked`,
+  `.nemsis_validation_completed`, `.nemsis_export_completed`
+  (producer: Adaptix-EPCR-Service, slug `epcr`)
+- `fire.incident.completed`, `fire.incident.closed`, `fire.unit.dispatched`,
+  `fire.incident.status_changed` (producer: Adaptix-Fire-Service, slug `fire`)
+
+All 18 are now registered with the `source_service` their producer actually
+stamps. Each carries its producing `file:line` at origin/main as an in-source
+citation, enforced by `tests/test_event_producer_registry_drift.py`.
+
+`fire.incident.status_changed` is registered ALONGSIDE the pre-existing
+`fire.incident.status.updated`; they are distinct strings and only the former
+has a producer. Collapsing them is a Fire-domain decision, so both remain and
+the divergence is documented in `events/registry.py`.
+
+### Changed — `source_service` is one vocabulary: the service-registry slug
+
+64 of the 67 previously registered events stamped `source_service` values
+(`adaptix-fire`, `adaptix-neris`, `adaptix-scheduling`) that are **not**
+`schemas.service_registry.SERVICE_BY_SLUG` keys, while the live producers stamp
+the slug (`Adaptix-Fire-Service/backend/fire_app/services/event_publisher.py:41`
+emits `source_service="fire"`). The only reconciliation lived in a private
+helper inside `tests/test_scheduling_service_registration.py`, so no consumer
+could perform it. All entries now use the slug, matching both the producers and
+the `source_service` semantics `events/operational_envelope.py` already
+documented. `adaptix-fire` / `adaptix-neris` remain valid JWT audiences in
+`service_audiences` and ECS service names in `platform/ownership_manifest.json`
+— those are separate namespaces and are unchanged.
+
+### Added — shipped producer resolution and drift detection
+
+- `events.registry.resolve_source_service(source_service)` and
+  `events.registry.producer_of(event_type)` return the `ServiceDefinition` for
+  an event's producer. `producer_of` raises `KeyError` on an unregistered type
+  rather than guessing.
+- `events.registry.LEGACY_SOURCE_SERVICE_ALIASES` keeps the previously published
+  `adaptix-`-prefixed strings resolvable for persisted event rows, EventBridge
+  archive replays, and consumers pinned to an older `adaptix-contracts`.
+- `scripts/audit_event_producer_drift.py` — reusable polyrepo audit that AST-parses
+  every shared-envelope construction and reports `UNREGISTERED`,
+  `SOURCE_SERVICE_MISMATCH` and `UNRESOLVED_SOURCE_SERVICE`. Exit 0 clean, 1 on
+  drift, 2 on misuse; `--json` for machine consumption.
+- `tests/test_audit_event_producer_drift.py` validates the detector against a
+  known-good control plus one fixture per defect class, and asserts its
+  documented blind spots (dynamic `event_type`, test files) so they cannot be
+  mistaken for coverage.
+
+Limitation, stated explicitly: none of this validates event PAYLOAD shape. Both
+envelopes carry `payload: dict[str, Any]`, so payload compatibility between a
+producer and a consumer remains unguarded by contract.
 
 ## [Unreleased]
 
