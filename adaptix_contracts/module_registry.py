@@ -594,11 +594,33 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     _m(
         "device", "Device", audience="adaptix-device", source="Core _MODULE_TO_AUDIENCE"
     ),
+    # alias ``patient-identity`` (hyphen): the canonical module id Core persists
+    # and mints is ``patient_identity`` (underscore, from Core
+    # _MODULE_TO_AUDIENCE), but the SERVICE that owns the surface is slugged
+    # ``patient-identity`` — ``adaptix_contracts.schemas.service_registry
+    # .PATIENT_IDENTITY_SERVICE`` (slug="patient-identity",
+    # route_prefix="/api/v1/patient-identity") — and the gateway RouteEntry for
+    # /api/v1/patient-identity carries audience ``adaptix-patient-identity``.
+    # A route/service guard declared with the hyphen spelling
+    # (require_module_entitlement("patient-identity")) therefore did NOT resolve
+    # against a token carrying ``patient_identity`` under the registry's exact
+    # normalized match, so an entitled tenant got 402/403 MODULE_NOT_ENTITLED on
+    # the identity surface even though the ``adaptix-patient-identity`` audience
+    # was minted. Registering the hyphen spelling as an alias of the SAME module
+    # makes both sides resolve to one canonical id. Non-widening: an alias is a
+    # synonym for the same product (collision-checked at import — it can never
+    # shadow a canonical id or map to two canonicals), so this grants no
+    # additional module; it only unifies two spellings of one.
     _m(
         "patient_identity",
         "Patient Identity",
+        aliases=("patient-identity",),
         audience="adaptix-patient-identity",
-        source="Core _MODULE_TO_AUDIENCE",
+        source=(
+            "Core _MODULE_TO_AUDIENCE ('patient_identity'); "
+            "service_registry PATIENT_IDENTITY_SERVICE slug + gateway "
+            "ROUTE_TABLE /api/v1/patient-identity ('patient-identity')"
+        ),
     ),
     _m("hl7", "HL7", audience="adaptix-hl7", source="Core _MODULE_TO_AUDIENCE"),
     _m(
@@ -702,11 +724,28 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-core",
         source="Gateway ROUTE_TABLE /api/v1/interoperability; Web-App app/interoperability",
     ),
+    # alias ``integrations`` (plural): the canonical module id Core persists and
+    # mints is ``integration`` (singular, matching Core MODULE_CATALOG), but the
+    # SERVICE is slugged ``integrations`` — ``adaptix_contracts.schemas
+    # .service_registry.INTEGRATIONS_SERVICE`` (slug="integrations",
+    # route_prefix="/api/v1/integrations") — and the gateway RouteEntry for
+    # /api/v1/integrations carries audience ``adaptix-integrations``. A
+    # route/service guard declared with the plural spelling
+    # (require_module_entitlement("integrations")) did NOT resolve against a
+    # token carrying ``integration`` under exact normalized match, so an entitled
+    # tenant got 402/403 MODULE_NOT_ENTITLED on the integrations surface even
+    # though the ``adaptix-integrations`` audience was minted. Same fix + same
+    # safety as ``patient-identity`` above: one canonical module, two spellings.
     _m(
         "integration",
         "Integrations",
+        aliases=("integrations",),
         audience="adaptix-integrations",
-        source="Gateway ROUTE_TABLE /api/v1/integrations; Web-App app/workspace/integrations",
+        source=(
+            "Core MODULE_CATALOG ('integration'); service_registry "
+            "INTEGRATIONS_SERVICE slug + gateway ROUTE_TABLE /api/v1/integrations "
+            "('integrations')"
+        ),
     ),
     _m(
         "training",
