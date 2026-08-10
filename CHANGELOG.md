@@ -7,7 +7,42 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.4.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.5.0]
+
+### Fixed — `epcr.chart.finalized` rejected every payload its producer sends
+
+`EpcrChartFinalizedEvent` declared `is_nemsis_compliant: bool` with no default.
+The authoritative producer,
+`Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py:260`
+(origin/main, read 2026-08-09), writes a payload of exactly
+`chart_id, tenant_id, call_number, finalized_at, billing_case_id, record_mode` —
+and the string `is_nemsis_compliant` occurs nowhere in that service.
+
+The sole consumer,
+`Adaptix-Billing-Service/backend/billing_app/event_consumers.py:69`, calls
+`EpcrChartFinalizedEvent.model_validate(payload)` inside a `try` whose `except`
+logs and returns `False`. Every real chart finalization therefore raised
+`ValidationError` and produced **no claim-intake row, no patient financial
+account and no draft claim**, while the chart still showed finalized to the
+crew. The identical `ValidationError` is recorded verbatim in the archived
+`Adaptix-Core-Service/PHASE_11_VALIDATION_RESULTS.json`.
+
+Every fixture for this event supplied the field, which is why the suites stayed
+green. `tests/test_epcr_chart_finalized_producer_payload.py` now validates the
+producer's key set verbatim; 4 of its 12 tests fail against the old contract.
+
+The field is now `Optional[bool] = None`, deliberately tri-state rather than
+defaulted to a bool: an absent value is not evidence of compliance and not
+evidence of non-compliance. A consumer that gates on compliance must treat
+`None` as unknown and read `EpcrNemsissComplianceContract` instead. No code in
+the workspace reads `is_nemsis_compliant` today (verified by fleet-wide grep),
+so widening it breaks no reader.
+
+Taking this into the running Billing service requires that repo to bump its
+pinned `adaptix-contracts` commit (currently `8465ddf`, which carries the
+required-field version) and redeploy.
 
 ## [2.4.0]
 
