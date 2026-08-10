@@ -40,6 +40,7 @@ from adaptix_contracts.events.operational_envelope import (
 from adaptix_contracts.events.registry import (
     ALL_EVENTS,
     LEGACY_SOURCE_SERVICE_ALIASES,
+    PRODUCER_SOURCE_SERVICE_ALIASES,
     is_registered,
     producer_of,
     resolve_source_service,
@@ -171,6 +172,183 @@ LIVE_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
     ),
 )
 
+#: (event_type, registry source_service slug, producing file:line at
+#: origin/main on 2026-08-09) for producers that reach a shared envelope
+#: INDIRECTLY, and are therefore invisible to a scanner that only reads a
+#: literal ``event_type=`` on the envelope construction itself:
+#:
+#: * ``ChartEventOutbox`` rows are republished with the row's OWN event_type by
+#:   ``Adaptix-EPCR-Service/backend/epcr_app/outbox_worker.py:99``
+#:   (``source_service="epcr"``).
+#: * ``epcr.vision.*`` / ``hospital.cath_lab.*`` go through the thin wrapper
+#:   ``chart_vision_capture_service.py:728`` (``source_service="epcr"``).
+#: * ``patient.identity.merged`` is an ``OutboxEvent`` row republished by
+#:   ``Adaptix-Patient-Identity-Service/.../outbox_worker.py:88``.
+#:
+#: Every one of these was unregistered until this inventory landed, so
+#: ``is_registered()`` returned False for real production traffic.
+INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
+    # --- Adaptix-EPCR-Service, via ChartEventOutbox -> outbox_worker.py:99 ---
+    (
+        "epcr.chart.amended",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/chart_amendment_service.py:92",
+    ),
+    (
+        "epcr.chart.billing_handoff",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/api_chart_cortex_lifecycle.py:102",
+    ),
+    (
+        "epcr.nemsis_submit.failed",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py:57",
+    ),
+    (
+        "epcr.nemsis_submit.succeeded",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py:58",
+    ),
+    (
+        "caregraph.node.created",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_caregraph.py:57",
+    ),
+    (
+        "caregraph.node.amended",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_caregraph.py:58",
+    ),
+    (
+        "caregraph.node.reviewed",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_caregraph.py:59",
+    ),
+    (
+        "caregraph.node.ruled_out",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_caregraph.py:60",
+    ),
+    (
+        "caregraph.edge.created",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_caregraph.py:61",
+    ),
+    (
+        "caregraph.edge.removed",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_caregraph.py:62",
+    ),
+    (
+        "cpae.finding.created",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_cpae.py:55",
+    ),
+    (
+        "cpae.finding.proposed",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_cpae.py:56",
+    ),
+    (
+        "cpae.finding.accepted",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_cpae.py:57",
+    ),
+    (
+        "cpae.finding.amended",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_cpae.py:58",
+    ),
+    (
+        "cpae.finding.rejected",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_cpae.py:59",
+    ),
+    (
+        "cpae.finding.contradiction_detected",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_cpae.py:60",
+    ),
+    (
+        "vas.overlay.created",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_vas.py:47",
+    ),
+    (
+        "vas.overlay.accepted",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_vas.py:49",
+    ),
+    (
+        "vas.overlay.rejected",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_vas.py:50",
+    ),
+    (
+        "vas.overlay.amended",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_vas.py:51",
+    ),
+    (
+        "vas.overlay.removed",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_vas.py:52",
+    ),
+    (
+        "vas.projection.proposed",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_vas.py:53",
+    ),
+    (
+        "vas.projection.reviewed",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services_vas.py:54",
+    ),
+    # --- Adaptix-EPCR-Service, via the chart_vision_capture publish wrapper ---
+    (
+        "epcr.vision.capture_created",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services/"
+        "chart_vision_capture_service.py:905",
+    ),
+    (
+        "epcr.vision.capture_accepted",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services/"
+        "chart_vision_capture_service.py:1119",
+    ),
+    (
+        "epcr.vision.vital_signs_accepted",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services/"
+        "chart_vision_capture_service.py:1132",
+    ),
+    (
+        "epcr.vision.twelve_lead_accepted",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services/"
+        "chart_vision_capture_service.py:1147",
+    ),
+    (
+        "epcr.vision.capture_rejected",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services/"
+        "chart_vision_capture_service.py:1201",
+    ),
+    (
+        "hospital.cath_lab.activate_recommended",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/services/"
+        "chart_vision_capture_service.py:1155",
+    ),
+    # --- Adaptix-Patient-Identity-Service, via OutboxEvent -> worker:88 ---
+    (
+        "patient.identity.merged",
+        "patient-identity",
+        "Adaptix-Patient-Identity-Service/backend/patient_identity_app/outbox.py:173",
+    ),
+)
+
 _EXPECTED_PRODUCER_SERVICE = {
     "billing": BILLING_SERVICE,
     "epcr": EPCR_SERVICE,
@@ -208,6 +386,110 @@ def test_live_producer_event_is_registered(
 def test_live_producer_inventory_has_no_duplicate_rows() -> None:
     event_types = [entry[0] for entry in LIVE_ENVELOPE_PRODUCERS]
     assert len(set(event_types)) == len(event_types)
+
+
+# ---------------------------------------------------------------------------
+# Indirect producers: outbox relays and thin publish wrappers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("event_type", "slug", "site"),
+    INDIRECT_ENVELOPE_PRODUCERS,
+    ids=[entry[0] for entry in INDIRECT_ENVELOPE_PRODUCERS],
+)
+def test_indirect_producer_event_is_registered(
+    event_type: str, slug: str, site: str
+) -> None:
+    assert is_registered(event_type), (
+        f"{event_type!r} reaches the shared contract envelope from {site} but is "
+        "absent from ALL_EVENTS. It never appears as a literal at the envelope "
+        "construction site, so only the relay/wrapper-aware audit sees it. "
+        "Register it — do not delete this row."
+    )
+    declared = ALL_EVENTS[event_type]["source_service"]
+    assert declared == slug, (
+        f"{event_type!r} is produced by {site} and must declare "
+        f"source_service={slug!r}, but the registry declares {declared!r}."
+    )
+    assert producer_of(event_type) is SERVICE_BY_SLUG[slug]
+
+
+def test_indirect_producer_inventory_has_no_duplicate_rows() -> None:
+    event_types = [entry[0] for entry in INDIRECT_ENVELOPE_PRODUCERS]
+    assert len(set(event_types)) == len(event_types)
+
+
+def test_indirect_and_direct_inventories_do_not_overlap() -> None:
+    direct = {entry[0] for entry in LIVE_ENVELOPE_PRODUCERS}
+    indirect = {entry[0] for entry in INDIRECT_ENVELOPE_PRODUCERS}
+    assert direct & indirect == set()
+
+
+@pytest.mark.parametrize(
+    ("event_type", "slug", "site"),
+    INDIRECT_ENVELOPE_PRODUCERS,
+    ids=[entry[0] for entry in INDIRECT_ENVELOPE_PRODUCERS],
+)
+def test_indirect_producer_event_passes_operational_backbone_gate(
+    event_type: str, slug: str, site: str
+) -> None:
+    """Proves the allow-list gate now ACCEPTS each indirectly-produced event.
+
+    Does NOT prove the event is actually delivered on EventBridge, nor that any
+    consumer subscribes to it, nor anything about its payload shape.
+    """
+    envelope = _operational_envelope(event_type, slug)
+    assert_event_type_registered(envelope)
+
+
+def test_registry_cites_a_producer_file_for_each_indirect_event() -> None:
+    """No indirect event may be registered without in-source producer evidence."""
+    registry_source = (
+        Path(__file__).resolve().parents[1]
+        / "adaptix_contracts"
+        / "events"
+        / "registry.py"
+    ).read_text(encoding="utf-8")
+    for event_type, _slug, site in INDIRECT_ENVELOPE_PRODUCERS:
+        producer_file = site.rsplit("/", 1)[-1].split(":")[0]
+        assert event_type in registry_source, (
+            f"registry.py does not contain the event type {event_type!r}"
+        )
+        assert producer_file in registry_source, (
+            f"registry.py has no citation for the producer of {event_type!r} ({site})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Live-producer source_service aliases
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("stamped", "slug"), sorted(PRODUCER_SOURCE_SERVICE_ALIASES.items())
+)
+def test_live_producer_source_service_alias_resolves(stamped: str, slug: str) -> None:
+    """The string a RUNNING producer stamps must identify its service."""
+    assert stamped not in SERVICE_BY_SLUG, (
+        f"{stamped!r} is a real registry slug; it does not need an alias"
+    )
+    service = resolve_source_service(stamped)
+    assert service is not None
+    assert service is SERVICE_BY_SLUG[slug]
+
+
+def test_producer_and_legacy_alias_maps_are_disjoint() -> None:
+    """A string is either historical drift or a live spelling, never both."""
+    overlap = set(PRODUCER_SOURCE_SERVICE_ALIASES) & set(LEGACY_SOURCE_SERVICE_ALIASES)
+    assert overlap == set()
+
+
+def test_patient_identity_producer_alias_matches_the_registered_declaration() -> None:
+    """The underscore form the worker stamps resolves to the declared slug."""
+    declared = str(ALL_EVENTS["patient.identity.merged"]["source_service"])
+    assert declared == "patient-identity"
+    assert resolve_source_service("patient_identity") is SERVICE_BY_SLUG[declared]
 
 
 # ---------------------------------------------------------------------------
