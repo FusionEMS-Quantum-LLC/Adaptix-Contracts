@@ -10,8 +10,8 @@ Covered here:
 * ``workforce.shift.cancelled`` is registered and its ``source_service`` resolves
   to the live Workforce service (slug ``workforce``);
 * it is a workforce-owned event, NOT one of the 27 ``schedule.*`` events that
-  carry ``source_service="adaptix-scheduling"`` — the reconciliation the prior
-  finding asked for;
+  carry ``source_service="scheduling"`` — the reconciliation the prior finding
+  asked for;
 * ``OperationalEventEnvelope`` (schema_version 1.0) carries all nine mandated
   fields, is tenant-scoped, idempotent, traceable and round-trips losslessly.
 """
@@ -71,7 +71,7 @@ def test_workforce_event_source_service_resolves_to_workforce_service() -> None:
 
 def test_workforce_event_is_not_a_scheduling_event() -> None:
     # Reconciliation: the event is workforce-owned, not one of the 27 schedule.*
-    # events that declare source_service="adaptix-scheduling".
+    # events that declare source_service="scheduling".
     assert WORKFORCE_SHIFT_CANCELLED not in ALL_SCHEDULING_EVENTS
     assert not WORKFORCE_SHIFT_CANCELLED.startswith("schedule.")
 
