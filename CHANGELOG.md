@@ -7,7 +7,70 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.3.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.4.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.4.0]
+
+### Fixed — 30 more live event types were invisible to the producer audit
+
+The 2.3.0 audit only resolved a **literal** `event_type=` written directly on a
+shared-envelope construction. Adaptix producers routinely do neither: they write
+an outbox row that a worker later republishes with the row's own `event_type`,
+or they call a thin publish wrapper. Both shapes put a variable at the envelope
+construction site, so the scanner walked straight past them and reported PASS.
+
+`scripts/audit_event_producer_drift.py` now also resolves module-level string
+constants, both branches of a conditional, every value a function-local can
+hold, calls through an envelope-forwarding wrapper (bare, `Class.helper(...)`
+and `self.helper(...)`), and rows written to a **declared outbox relay** — each
+relay listed with the exact `file:line` of the worker that proves it. Resolved
+production emission sites went from 38 to 74, exposing **30 unregistered event
+types** that reach cross-service consumers today:
+
+- via `ChartEventOutbox` → `Adaptix-EPCR-Service/backend/epcr_app/outbox_worker.py:99`
+  (`source_service="epcr"`): `epcr.chart.amended`, `epcr.chart.billing_handoff`,
+  `epcr.nemsis_submit.failed`, `epcr.nemsis_submit.succeeded`, the six
+  `caregraph.*`, the six `cpae.*` and the seven `vas.*` events
+- via the vision-capture publish wrapper
+  (`chart_vision_capture_service.py:728`, `source_service="epcr"`): the five
+  `epcr.vision.*` events and `hospital.cath_lab.activate_recommended`
+- via `OutboxEvent` →
+  `Adaptix-Patient-Identity-Service/.../outbox_worker.py:88`:
+  `patient.identity.merged`
+
+All 30 are registered with the `source_service` their producer actually stamps
+and an in-source producing `file:line` citation, enforced by
+`INDIRECT_ENVELOPE_PRODUCERS` in `tests/test_event_producer_registry_drift.py`.
+Registry size: 85 → 115 event types.
+
+### Fixed — a live producer's `source_service` resolved to no service
+
+`Adaptix-Patient-Identity-Service/.../outbox_worker.py:88` stamps
+`source_service="patient_identity"` (underscore), but the service-registry slug
+is `patient-identity` (hyphen), so `resolve_source_service()` returned `None`
+and `producer_of()` would have raised for every event that service publishes.
+New `PRODUCER_SOURCE_SERVICE_ALIASES` maps the live spelling to the canonical
+slug. It is deliberately separate from `LEGACY_SOURCE_SERVICE_ALIASES`: a legacy
+alias still reports as drift (a producer emitting a superseded string is worth
+surfacing), a live-producer alias does not.
+
+### Fixed — the test suite could validate an installed copy, not this checkout
+
+`tests/` has no `__init__.py` and `pyproject.toml` set no `pythonpath`, so
+running the repo's own gate (`scripts/local-ci.sh python pr`, which invokes the
+`pytest` console script) under an interpreter with an older `adaptix-contracts`
+in site-packages imported THAT package. The suite then measured code that is not
+in the working tree — green while the source is broken, red while it is correct.
+`pythonpath = ["."]` now pins resolution to the checkout, and
+`tests/test_suite_tests_this_checkout.py` fails if the setting is removed.
+
+### Known limits (unchanged)
+
+Neither the audit nor these tests validate event PAYLOAD shape. Both shared
+envelopes carry `payload: dict[str, Any]`, so producer/consumer payload
+compatibility remains unguarded by contract. A fully dynamic re-publisher such
+as `Adaptix-Audit-Service/backend/audit_app/events/publisher.py:67` also stays
+out of scope by design — its caller chooses the event type.
 
 ## [2.3.0]
 
