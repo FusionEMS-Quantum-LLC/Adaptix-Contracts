@@ -22,7 +22,28 @@ class EpcrChartCreatedEvent(BaseModel):
 
 
 class EpcrChartFinalizedEvent(BaseModel):
-    """Published when an ePCR chart is finalized."""
+    """Published when an ePCR chart is finalized.
+
+    The authoritative producer is
+    ``Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py:260``
+    (origin/main, verified 2026-08-09), which writes a ``ChartEventOutbox`` row
+    whose payload carries exactly::
+
+        chart_id, tenant_id, call_number, finalized_at, billing_case_id,
+        record_mode
+
+    The row is republished onto the shared envelope by
+    ``epcr_app/outbox_worker.py:78`` -> ``EpcrEventPublisher.publish_chart_finalized``.
+    The sole consumer is
+    ``Adaptix-Billing-Service/backend/billing_app/event_consumers.py:69``, which
+    calls ``EpcrChartFinalizedEvent.model_validate(payload)`` before creating the
+    claim-intake row, the patient financial account and the draft claim.
+
+    Fields absent from that payload MUST therefore be optional. Requiring one
+    makes every real finalization raise ``ValidationError`` inside the
+    consumer's ``except`` block, which logs and returns ``False`` — so the chart
+    finalizes, the crew sees success, and no billing record is ever created.
+    """
 
     event_type: str = "epcr.chart.finalized"
 
@@ -31,7 +52,23 @@ class EpcrChartFinalizedEvent(BaseModel):
     call_number: str
 
     finalized_at: datetime
-    is_nemsis_compliant: bool
+
+    # NEMSIS compliance as stated BY THE PRODUCER. ``None`` means the producer
+    # did not report it — which is the live case: ``is_nemsis_compliant``
+    # appears nowhere in Adaptix-EPCR-Service at origin/main, and the
+    # finalization payload above does not carry it. This field was declared
+    # required, so every production ``epcr.chart.finalized`` event failed
+    # validation in the Billing consumer. (The same ValidationError is recorded
+    # verbatim in the archived Phase 11 run,
+    # ``Adaptix-Core-Service/PHASE_11_VALIDATION_RESULTS.json``.)
+    #
+    # It is deliberately tri-state rather than defaulting to a bool: absent is
+    # NOT evidence of compliance, and it is not evidence of non-compliance
+    # either. A consumer that gates on compliance must treat ``None`` as
+    # "unknown — do not assume compliant" and obtain the status from the
+    # authoritative compliance contract (``EpcrNemsissComplianceContract``)
+    # rather than inferring it from this event.
+    is_nemsis_compliant: Optional[bool] = None
 
     missing_fields: list[str] = Field(default_factory=list)
 
