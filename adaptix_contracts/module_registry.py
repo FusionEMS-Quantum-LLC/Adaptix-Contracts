@@ -439,13 +439,25 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         source="Web-App MODULES; Core MODULE_CATALOG; Core _MODULE_TO_AUDIENCE",
     ),
     # ── Controlled substances / supply ───────────────────────────────────
+    # alias ``narcotic`` (singular): the gateway ROUTE_TABLE carries BOTH
+    # prefix="/api/v1/narcotic" (routes.py:2287) and prefix="/api/v1/narcotics"
+    # as separate entries, and ``_extract_module_id`` takes the first path
+    # segment verbatim — so the singular route produced module_id "narcotic",
+    # which matched no registered module and was not in the tenant's
+    # entitlements (Core persists the plural ``narcotics``) -> 403
+    # MODULE_NOT_ENTITLED on a controlled-substances surface for a tenant that
+    # holds the module. Denying narcotics access to an entitled agency blocks
+    # DEA chain-of-custody work, so this is not a cosmetic spelling issue.
     _m(
         "narcotics",
         "Narcotics + DEA Compliance",
-        aliases=("narcotics_dea",),
+        aliases=("narcotics_dea", "narcotic"),
         purchasable=True,
         audience="adaptix-narcotics",
-        source="Core signup_pricing ('narcotics_dea'); Core MODULE_CATALOG ('narcotics')",
+        source=(
+            "Core signup_pricing ('narcotics_dea'); Core MODULE_CATALOG ('narcotics'); "
+            "Gateway ROUTE_TABLE /api/v1/narcotic ('narcotic')"
+        ),
     ),
     _m(
         "medications",
@@ -591,8 +603,23 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-terminology",
         source="Core _MODULE_TO_AUDIENCE",
     ),
+    # alias ``devices`` (plural): the gateway derives module_id from the FIRST
+    # path segment verbatim (Adaptix-Gateway backend/app/middleware/entitlements.py
+    # ``_extract_module_id``), and ROUTE_TABLE carries BOTH spellings as separate
+    # entries — prefix="/api/v1/devices" (routes.py:2771) alongside
+    # prefix="/api/v1/device" (routes.py:2777). The canonical module id Core
+    # persists and mints is the singular ``device``, so a request to
+    # /api/v1/devices/* produced module_id "devices", which resolved to nothing
+    # and was not in the tenant's entitlements -> 403 MODULE_NOT_ENTITLED for a
+    # tenant that genuinely holds ``device``. Same defect class as the
+    # ``patient-identity`` alias below, found by sweeping every ROUTE_TABLE slug
+    # against this registry rather than fixing the one that was reported.
     _m(
-        "device", "Device", audience="adaptix-device", source="Core _MODULE_TO_AUDIENCE"
+        "device",
+        "Device",
+        aliases=("devices",),
+        audience="adaptix-device",
+        source="Core _MODULE_TO_AUDIENCE; Gateway ROUTE_TABLE /api/v1/devices ('devices')",
     ),
     # alias ``patient-identity`` (hyphen): the canonical module id Core persists
     # and mints is ``patient_identity`` (underscore, from Core
