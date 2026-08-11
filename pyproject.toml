@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "adaptix-contracts"
-version = "2.3.0"
+version = "2.5.0"
 description = "Shared cross-domain schemas and contracts for the Adaptix platform"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
@@ -47,6 +47,13 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# Test the SOURCE in this checkout, never a previously-installed copy of
+# adaptix_contracts that happens to be on the interpreter's site-packages.
+# Without this, `pytest` under an interpreter that has an older adaptix-contracts
+# installed validates that stale copy: the suite can pass while the repo source
+# is broken, and fail while it is correct. `pythonpath` entries are prepended to
+# sys.path, so the checkout always wins.
+pythonpath = ["."]
 
 [tool.setuptools]
 package-dir = {"" = "."}

@@ -7,7 +7,105 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.3.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.5.0]
+
+### Fixed — `epcr.chart.finalized` rejected every payload its producer sends
+
+`EpcrChartFinalizedEvent` declared `is_nemsis_compliant: bool` with no default.
+The authoritative producer,
+`Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py:260`
+(origin/main, read 2026-08-09), writes a payload of exactly
+`chart_id, tenant_id, call_number, finalized_at, billing_case_id, record_mode` —
+and the string `is_nemsis_compliant` occurs nowhere in that service.
+
+The sole consumer,
+`Adaptix-Billing-Service/backend/billing_app/event_consumers.py:69`, calls
+`EpcrChartFinalizedEvent.model_validate(payload)` inside a `try` whose `except`
+logs and returns `False`. Every real chart finalization therefore raised
+`ValidationError` and produced **no claim-intake row, no patient financial
+account and no draft claim**, while the chart still showed finalized to the
+crew. The identical `ValidationError` is recorded verbatim in the archived
+`Adaptix-Core-Service/PHASE_11_VALIDATION_RESULTS.json`.
+
+Every fixture for this event supplied the field, which is why the suites stayed
+green. `tests/test_epcr_chart_finalized_producer_payload.py` now validates the
+producer's key set verbatim; 4 of its 12 tests fail against the old contract.
+
+The field is now `Optional[bool] = None`, deliberately tri-state rather than
+defaulted to a bool: an absent value is not evidence of compliance and not
+evidence of non-compliance. A consumer that gates on compliance must treat
+`None` as unknown and read `EpcrNemsissComplianceContract` instead. No code in
+the workspace reads `is_nemsis_compliant` today (verified by fleet-wide grep),
+so widening it breaks no reader.
+
+Taking this into the running Billing service requires that repo to bump its
+pinned `adaptix-contracts` commit (currently `8465ddf`, which carries the
+required-field version) and redeploy.
+
+## [2.4.0]
+
+### Fixed — 30 more live event types were invisible to the producer audit
+
+The 2.3.0 audit only resolved a **literal** `event_type=` written directly on a
+shared-envelope construction. Adaptix producers routinely do neither: they write
+an outbox row that a worker later republishes with the row's own `event_type`,
+or they call a thin publish wrapper. Both shapes put a variable at the envelope
+construction site, so the scanner walked straight past them and reported PASS.
+
+`scripts/audit_event_producer_drift.py` now also resolves module-level string
+constants, both branches of a conditional, every value a function-local can
+hold, calls through an envelope-forwarding wrapper (bare, `Class.helper(...)`
+and `self.helper(...)`), and rows written to a **declared outbox relay** — each
+relay listed with the exact `file:line` of the worker that proves it. Resolved
+production emission sites went from 38 to 74, exposing **30 unregistered event
+types** that reach cross-service consumers today:
+
+- via `ChartEventOutbox` → `Adaptix-EPCR-Service/backend/epcr_app/outbox_worker.py:99`
+  (`source_service="epcr"`): `epcr.chart.amended`, `epcr.chart.billing_handoff`,
+  `epcr.nemsis_submit.failed`, `epcr.nemsis_submit.succeeded`, the six
+  `caregraph.*`, the six `cpae.*` and the seven `vas.*` events
+- via the vision-capture publish wrapper
+  (`chart_vision_capture_service.py:728`, `source_service="epcr"`): the five
+  `epcr.vision.*` events and `hospital.cath_lab.activate_recommended`
+- via `OutboxEvent` →
+  `Adaptix-Patient-Identity-Service/.../outbox_worker.py:88`:
+  `patient.identity.merged`
+
+All 30 are registered with the `source_service` their producer actually stamps
+and an in-source producing `file:line` citation, enforced by
+`INDIRECT_ENVELOPE_PRODUCERS` in `tests/test_event_producer_registry_drift.py`.
+Registry size: 85 → 115 event types.
+
+### Fixed — a live producer's `source_service` resolved to no service
+
+`Adaptix-Patient-Identity-Service/.../outbox_worker.py:88` stamps
+`source_service="patient_identity"` (underscore), but the service-registry slug
+is `patient-identity` (hyphen), so `resolve_source_service()` returned `None`
+and `producer_of()` would have raised for every event that service publishes.
+New `PRODUCER_SOURCE_SERVICE_ALIASES` maps the live spelling to the canonical
+slug. It is deliberately separate from `LEGACY_SOURCE_SERVICE_ALIASES`: a legacy
+alias still reports as drift (a producer emitting a superseded string is worth
+surfacing), a live-producer alias does not.
+
+### Fixed — the test suite could validate an installed copy, not this checkout
+
+`tests/` has no `__init__.py` and `pyproject.toml` set no `pythonpath`, so
+running the repo's own gate (`scripts/local-ci.sh python pr`, which invokes the
+`pytest` console script) under an interpreter with an older `adaptix-contracts`
+in site-packages imported THAT package. The suite then measured code that is not
+in the working tree — green while the source is broken, red while it is correct.
+`pythonpath = ["."]` now pins resolution to the checkout, and
+`tests/test_suite_tests_this_checkout.py` fails if the setting is removed.
+
+### Known limits (unchanged)
+
+Neither the audit nor these tests validate event PAYLOAD shape. Both shared
+envelopes carry `payload: dict[str, Any]`, so producer/consumer payload
+compatibility remains unguarded by contract. A fully dynamic re-publisher such
+as `Adaptix-Audit-Service/backend/audit_app/events/publisher.py:67` also stays
+out of scope by design — its caller chooses the event type.
 
 ## [2.3.0]
 
