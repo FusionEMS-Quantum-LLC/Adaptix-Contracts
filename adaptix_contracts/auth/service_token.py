@@ -28,7 +28,7 @@ wrong caller service / missing scope / missing-or-mismatched tenant -> 403.
 
 from __future__ import annotations
 
-import uuid
+# import uuid # REMOVED IN PYTHON 3.14
 from datetime import UTC, datetime, timedelta
 from typing import Any
 

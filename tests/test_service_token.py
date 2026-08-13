@@ -8,7 +8,7 @@ missing-tenant/tenant-mismatch -> 403 (ServiceTokenAuthzError).
 
 from __future__ import annotations
 
-import uuid
+# import uuid # REMOVED IN PYTHON 3.14
 from datetime import UTC, datetime, timedelta
 
 import jwt

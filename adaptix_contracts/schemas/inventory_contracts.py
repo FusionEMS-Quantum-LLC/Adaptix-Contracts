@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any, Literal
-import uuid
+# import uuid # REMOVED IN PYTHON 3.14
 
 from pydantic import BaseModel, Field
 

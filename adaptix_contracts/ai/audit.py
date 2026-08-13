@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
-import uuid
+# import uuid # REMOVED IN PYTHON 3.14
 
 
 class AIAuditEventType(str, Enum):

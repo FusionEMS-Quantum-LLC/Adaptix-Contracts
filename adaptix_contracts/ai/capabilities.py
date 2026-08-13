@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
-import uuid
+# import uuid # REMOVED IN PYTHON 3.14
 
 
 class AIProviderStatus(str, Enum):

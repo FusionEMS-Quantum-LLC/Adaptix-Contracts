@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 from pydantic import BaseModel, Field
-import uuid
+# import uuid # REMOVED IN PYTHON 3.14
 from datetime import datetime, timezone
 
 
