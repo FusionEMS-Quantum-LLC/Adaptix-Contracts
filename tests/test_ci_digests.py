@@ -19,15 +19,15 @@ class TestDigestRegistryIntegrity:
 
     def test_all_active_digests_are_hex_sha256(self) -> None:
         for digest in VERIFIED_DIGESTS:
-            assert SHA256_PATTERN.match(
-                digest
-            ), f"Active digest is not a valid SHA-256 hex string: {digest!r}"
+            assert SHA256_PATTERN.match(digest), (
+                f"Active digest is not a valid SHA-256 hex string: {digest!r}"
+            )
 
     def test_all_retired_digests_are_hex_sha256(self) -> None:
         for digest in _RETIRED_DIGESTS:
-            assert SHA256_PATTERN.match(
-                digest
-            ), f"Retired digest is not a valid SHA-256 hex string: {digest!r}"
+            assert SHA256_PATTERN.match(digest), (
+                f"Retired digest is not a valid SHA-256 hex string: {digest!r}"
+            )
 
     def test_no_overlap_between_active_and_retired(self) -> None:
         overlap = VERIFIED_DIGESTS & _RETIRED_DIGESTS
