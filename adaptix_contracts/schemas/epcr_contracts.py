@@ -21,6 +21,38 @@ class EpcrChartCreatedEvent(BaseModel):
     created_at: datetime
 
 
+class EpcrChartAmendedEvent(BaseModel):
+    """Published when a FINALIZED ePCR chart is amended.
+
+    The producer is
+    ``Adaptix-EPCR-Service/backend/epcr_app/chart_amendment_service.py``
+    (``ChartEventOutbox`` row, event type ``epcr.chart.amended``), relayed by
+    ``epcr_app/outbox_worker.py``. ``tenant_id`` is REQUIRED: the relay's
+    generic publish path refuses tenant-less events, so a payload without it
+    can never reach the bus at all — the field being mandatory here keeps the
+    producer honest at validation time instead of at relay time.
+
+    The intended consumer is Billing: a clinical amendment landing AFTER the
+    chart was handed to billing must become visible against the claim that
+    was built from the pre-amendment chart, never silently diverge from it.
+
+    ``field`` is the chart attribute that was amended (e.g. ``"narrative"``);
+    ``amendment_id`` is the append-only ``ChartAmendment`` row id so the
+    consumer can fetch the full before/after detail through the authorized
+    ePCR read path if it needs more than the notification.
+    """
+
+    event_type: str = "epcr.chart.amended"
+
+    amendment_id: str
+    chart_id: str
+    tenant_id: str
+    field: str
+
+    actor_id: Optional[str] = None
+    amended_at: Optional[datetime] = None
+
+
 class EpcrChartFinalizedEvent(BaseModel):
     """Published when an ePCR chart is finalized.
 
