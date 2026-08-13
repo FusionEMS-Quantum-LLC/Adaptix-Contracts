@@ -565,6 +565,7 @@ from .crewlink_contracts import (
 
 # ePCR
 from .epcr_contracts import (
+    EpcrChartAmendedEvent,
     EpcrChartCreatedEvent,
     EpcrChartFinalizedEvent,
     EpcrChartContract,
@@ -1422,6 +1423,7 @@ __all__ = [
     "CrewMemberContract",
     "CrewRosterSyncContract",
     # ePCR
+    "EpcrChartAmendedEvent",
     "EpcrChartCreatedEvent",
     "EpcrChartFinalizedEvent",
     "EpcrChartContract",
