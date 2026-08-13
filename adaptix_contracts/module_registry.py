@@ -800,6 +800,52 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-forms; Core MODULE_CATALOG"
         ),
     ),
+    # ── HR ───────────────────────────────────────────────────────────────
+    # Identical defect to ``forms`` above, runtime-proven in production on
+    # 2026-08-13: Adaptix-HR-Service is deployed and healthy
+    # (adaptix-production-hr), the gateway routes /api/v1/hr to it behind
+    # audience ``adaptix-hr`` — but no module row existed here, so
+    # audience_map() had no ``hr`` key, Core's _MODULE_TO_AUDIENCE never mapped
+    # it, and _session_audiences could not put ``adaptix-hr`` in ANY tenant's
+    # token. Probed with a real agency_admin session carrying all 55 entitled
+    # modules:
+    #
+    #     GET /api/v1/hr/employees    -> 403 jwt_audience_mismatch
+    #     GET /api/v1/hr/pto          -> 403 jwt_audience_mismatch
+    #     GET /api/v1/hr/credentials  -> 403 jwt_audience_mismatch
+    #
+    # i.e. the whole HR service was unreachable for every tenant, always.
+    # purchasable=False: HR is granted through the admin module toggle (Core
+    # MODULE_CATALOG), not a signup-pricing SKU — same shape as ``forms``.
+    _m(
+        "hr",
+        "HR",
+        audience="adaptix-hr",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/hr -> hr_service_url "
+            "audience=adaptix-hr; ECS adaptix-production-hr"
+        ),
+    ),
+    # ── Office ───────────────────────────────────────────────────────────
+    # Same defect and same runtime proof as ``hr`` above: Adaptix-Office-Service
+    # runs as adaptix-production-office and the gateway routes /api/v1/office to
+    # it behind audience ``adaptix-office``, with no module row here.
+    #
+    #     GET /api/v1/office          -> 403 jwt_audience_mismatch
+    #     GET /api/v1/office/health   -> 403 jwt_audience_mismatch
+    #
+    # NOTE: ``officeally`` is a DIFFERENT service (the Office Ally clearinghouse
+    # upstream, audience ``adaptix-officeally``) and is deliberately not added
+    # here — provider policy pins Office Ally to MIGRATION_ONLY.
+    _m(
+        "office",
+        "Office",
+        audience="adaptix-office",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/office -> office_service_url "
+            "audience=adaptix-office; ECS adaptix-production-office"
+        ),
+    ),
 )
 
 
