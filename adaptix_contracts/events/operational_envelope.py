@@ -29,7 +29,7 @@ field set or their semantics bump it; additive optional fields do not.
 
 from __future__ import annotations
 
-# import uuid # REMOVED IN PYTHON 3.14
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Final
 

@@ -8,7 +8,7 @@ key mismatched) -> 401; and authz failures (wrong audience) -> 403.
 
 from __future__ import annotations
 
-# import uuid # REMOVED IN PYTHON 3.14
+import uuid
 
 import jwt
 import pytest

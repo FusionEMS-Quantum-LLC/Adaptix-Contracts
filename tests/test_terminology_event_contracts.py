@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-# import uuid # REMOVED IN PYTHON 3.14
+import uuid
 from datetime import UTC, datetime
 
 import pytest
