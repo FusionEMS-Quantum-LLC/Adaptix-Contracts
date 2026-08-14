@@ -527,3 +527,18 @@ def test_service_spelling_does_not_widen_entitlement(service_spelling: str) -> N
     # ``_MODULE_TO_AUDIENCE`` by canonical id, so an alias key there would be a
     # dead audience row.
     assert service_spelling not in audience_map()
+
+
+def test_facilities_reaches_its_own_service() -> None:
+    """The facility registry gateway route is behind audience adaptix-facilities.
+
+    Regression pin for the gap proven live 2026-08-14: the gateway enforced
+    adaptix-facilities on /api/v1/facilities, but no module entitlement mapped
+    to it, so no tenant JWT could ever carry that audience and every facilities
+    request 403'd jwt_audience_mismatch. Removing the ``facilities`` registry
+    row turns this RED.
+    """
+    assert module_audiences("facilities") == {"adaptix-facilities"}
+    # The drifted spellings a caller might send resolve to the same audience.
+    assert module_audiences("facility") == {"adaptix-facilities"}
+    assert module_audiences("facility_registry") == {"adaptix-facilities"}

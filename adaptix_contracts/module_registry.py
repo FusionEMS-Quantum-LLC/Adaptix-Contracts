@@ -846,6 +846,45 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-office; ECS adaptix-production-office"
         ),
     ),
+    # ── Facilities ───────────────────────────────────────────────────────
+    # Same defect and same runtime proof as ``hr`` and ``office`` above:
+    # Adaptix-Facility-Registry-Service runs as adaptix-production-facilities
+    # and the gateway routes /api/v1/facilities to it behind audience
+    # ``adaptix-facilities`` (Gateway routes.py:3554), but there was no module
+    # row here — so a tenant could carry ``facilities`` in
+    # ``metadata_json["module_entitlements"]``, and Core's ``_session_audiences``
+    # would mint NO ``adaptix-facilities`` audience for it, leaving every
+    # facilities request 403 ``jwt_audience_mismatch``.
+    #
+    # Runtime-proven 2026-08-14T02:5xZ against api.adaptixcore.com with a real
+    # provisioned agency_admin session whose module_entitlements included
+    # "facilities":
+    #
+    #     POST /api/v1/facilities  -> 403 jwt_audience_mismatch
+    #       {"expected":"adaptix-facilities",
+    #        "actual":["adaptix-billing","adaptix-core","adaptix-epcr",
+    #                  "adaptix-patient-identity","adaptix-trustsign"]}
+    #
+    # adaptix-facilities is in service_audiences.KNOWN_SERVICE_AUDIENCES, so
+    # test_every_declared_audience_is_a_known_live_service_audience passes.
+    #
+    # Non-purchasable / no ``implies``, matching hr and office: the facility
+    # registry is a shared platform directory, not an individually sold SKU.
+    # Whether a base plan should auto-grant it (via ``implies``) so every ePCR/
+    # CAD tenant can resolve transport destinations without a separate line item
+    # is a product decision left to the founder; this row makes the entitlement
+    # GRANTABLE and the audience MINTABLE, which is what unblocks the 403.
+    _m(
+        "facilities",
+        "Facilities",
+        aliases=("facility", "facility_registry"),
+        audience="adaptix-facilities",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/facilities -> facilities_service_url "
+            "audience=adaptix-facilities (routes.py:3554); "
+            "ECS adaptix-production-facilities"
+        ),
+    ),
 )
 
 
