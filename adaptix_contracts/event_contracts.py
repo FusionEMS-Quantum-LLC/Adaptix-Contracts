@@ -206,31 +206,68 @@ class EventBusPublisherClient:
 
     @staticmethod
     async def get_pending_events_unfiltered(
-        _session: Any = None, limit: int = 100
+        _session: Any = None, limit: int = 100, consumer: str | None = None
     ) -> list[dict[str, Any]]:
-        """Retrieve pending events from Core through the service-authenticated API."""
+        """Retrieve pending events from Core through the service-authenticated API.
+
+        ``consumer`` selects Core's delivery model (see
+        ``/api/core/internal/events/pending``):
+
+        * **supplied** — FAN-OUT. Delivery is tracked per (event_id, consumer)
+          in ``core_event_bus_deliveries``, so another service polling the same
+          queue can never mark an event delivered out from under this
+          subscriber. REQUIRED for any consumer that must not miss events (e.g.
+          Billing minting claims from ``epcr.chart.finalized``).
+        * **omitted** — legacy shared queue where the FIRST poller to ack an
+          event removes it for everybody. Kept only for not-yet-migrated
+          callers; unsafe for new consumers.
+
+        The name reflects that the poll is intentionally unfiltered BY TENANT
+        (workers pull cross-tenant queues); ``consumer`` adds per-subscriber
+        delivery tracking without changing that.
+        """
+        params: dict[str, Any] = {"limit": limit}
+        if consumer:
+            params["consumer"] = consumer
         data = await EventBusPublisherClient._request(
             "GET",
             "/api/core/internal/events/pending",
-            params={"limit": limit},
+            params=params,
         )
         return list(data.get("items", []))
 
     @staticmethod
-    async def mark_delivered(_session: Any, event_id: Any) -> None:
-        """Mark an event delivered through Core's service-authenticated API."""
+    async def mark_delivered(
+        _session: Any, event_id: Any, consumer: str | None = None
+    ) -> None:
+        """Mark an event delivered through Core's service-authenticated API.
+
+        Supply the same ``consumer`` used when polling so the acknowledgement is
+        recorded for THIS subscriber only (fan-out) and other subscribers still
+        receive the event. Omitting it applies the legacy global flip.
+        """
         await EventBusPublisherClient._request(
             "POST",
             f"/api/core/internal/events/{event_id}/delivered",
+            params={"consumer": consumer} if consumer else None,
         )
 
     @staticmethod
-    async def mark_failed(_session: Any, event_id: Any, error: str) -> None:
-        """Mark an event failed through Core's service-authenticated API."""
+    async def mark_failed(
+        _session: Any, event_id: Any, error: str, consumer: str | None = None
+    ) -> None:
+        """Mark an event failed through Core's service-authenticated API.
+
+        With ``consumer`` the failure and its retry count are recorded for THIS
+        subscriber only; Core re-offers the event to that consumer until
+        ``MAX_DELIVERY_ATTEMPTS`` is reached, leaving other subscribers
+        unaffected.
+        """
         await EventBusPublisherClient._request(
             "POST",
             f"/api/core/internal/events/{event_id}/failed",
             json={"error": error},
+            params={"consumer": consumer} if consumer else None,
         )
 
 
