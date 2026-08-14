@@ -116,6 +116,61 @@ class EpcrChartFinalizedEvent(BaseModel):
     # (a real encounter is never silently dropped from billing).
     is_test: bool = False
 
+    # Claim-ready fact snapshot the producer collects at finalize time
+    # (Adaptix-EPCR-Service ``ChartBillingReadinessExport``). OPTIONAL and
+    # fully back-compatible: absent on legacy/persisted events, in which case
+    # the Billing consumer falls back to its prior placeholder behaviour and
+    # can call back for detail. When present it lets Billing mint a claim with
+    # real demographics, primary impression + codes, transport reason, level
+    # of service and attending crew instead of ``patient_name = call_number``.
+    # Every field is optional — a finalized chart is a clinical/legal act and
+    # must never be blocked by an incomplete billing fact set.
+    billing_snapshot: Optional["EpcrBillingSnapshot"] = None
+
+
+class EpcrBillingPatientDemographics(BaseModel):
+    """Demographic block carried on the finalized event for billing."""
+
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    age_years: Optional[int] = None
+    sex: Optional[str] = None
+    weight_kg: Optional[float] = None
+
+
+class EpcrBillingCrewMember(BaseModel):
+    """One attending crew member carried on the finalized event."""
+
+    crew_member_id: str
+    level_code: Optional[str] = None
+    response_role_code: Optional[str] = None
+    sequence_index: int = 0
+
+
+class EpcrBillingSnapshot(BaseModel):
+    """Claim-ready fact set mirrored from EPCR's ChartBillingReadinessExport.
+
+    The producer's ``BillingReadinessSnapshot.to_dict()`` is the source of
+    truth for the shape. Every field is optional so a partial chart still
+    produces a valid event; ``missing_fields`` and ``ready_for_billing`` let
+    the consumer decide whether to open a claim or hold for documentation.
+    """
+
+    chart_status: Optional[str] = None
+    primary_impression: Optional[str] = None
+    primary_impression_icd10: Optional[str] = None
+    primary_impression_snomed: Optional[str] = None
+    transport_reason: Optional[str] = None
+    transport_reason_source: Optional[str] = None
+    level_of_service_code: Optional[str] = None
+    level_of_service_label: Optional[str] = None
+    patient_demographics: Optional[EpcrBillingPatientDemographics] = None
+    attending_crew: list[EpcrBillingCrewMember] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)
+    ready_for_billing: bool = False
+
 
 class EpcrChartContract(BaseModel):
     """Read-only ePCR chart contract for cross-domain consumption."""
