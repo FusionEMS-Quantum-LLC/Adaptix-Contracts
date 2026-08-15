@@ -7,7 +7,7 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.5.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.8.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
 ## [2.5.0]
 
@@ -186,6 +186,26 @@ producer and a consumer remains unguarded by contract.
   test fixtures that build synthetic signed payloads must include the same
   claim (for example, CAD discovered this while updating to the new
   `EventBusPublisherClient` consumer API in PR #285).
+- `EventBusPublisherClient.get_pending_events_unfiltered`,
+  `.mark_delivered`, and `.mark_failed` now emit a `FutureWarning` when
+  called with `consumer=None`, so the remaining legacy shared-queue path fails
+  loudly during the 2.8.0 rollout instead of silently preserving the unsafe
+  behavior.
+- Blank consumer names now raise `ValueError` instead of being treated like the
+  legacy omitted-consumer path.
+
+### Added — canonical event-bus consumer registry
+
+- Added `adaptix_contracts.event_consumers` as the single import surface for the
+  current audited Core fan-out consumer names:
+  `BILLING_SERVICE_CONSUMER`, `CAD_SERVICE_CONSUMER`,
+  `EPCR_SERVICE_CONSUMER`, and `HOSPITAL_SERVICE_CONSUMER`.
+- Re-exported those constants from `adaptix_contracts.event_contracts` and the
+  package root for downstream callers already anchored on the event client
+  module.
+- Documented the hard-break follow-up now: once the Hospital migration lands,
+  `adaptix-contracts` 2.9.0 will reject omitted consumer names instead of
+  warning.
 
 ### Added — EPCR submission event typing
 

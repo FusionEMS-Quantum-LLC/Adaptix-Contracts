@@ -4,12 +4,23 @@ Contains event schemas, validators, and registry for cross-service events.
 """
 
 from __future__ import annotations
+import builtins
 import os
-from typing import Any, Optional
+import warnings
 from collections.abc import Callable
+from typing import Any, Optional
 
 import httpx
-import builtins
+
+from adaptix_contracts.event_consumers import (
+    BILLING_SERVICE_CONSUMER as BILLING_SERVICE_CONSUMER,
+    CAD_SERVICE_CONSUMER as CAD_SERVICE_CONSUMER,
+    EPCR_SERVICE_CONSUMER as EPCR_SERVICE_CONSUMER,
+    HOSPITAL_SERVICE_CONSUMER as HOSPITAL_SERVICE_CONSUMER,
+    KNOWN_EVENT_BUS_CONSUMERS as KNOWN_EVENT_BUS_CONSUMERS,
+    KnownEventBusConsumerName as KnownEventBusConsumerName,
+    is_known_event_bus_consumer as is_known_event_bus_consumer,
+)
 
 
 class EventMetadata:
@@ -177,6 +188,35 @@ class EventBusPublisherClient:
     runtime failure so delivery cannot be silently simulated.
     """
 
+    LEGACY_SHARED_QUEUE_DEPRECATION_VERSION = "2.8.0"
+    LEGACY_SHARED_QUEUE_REMOVAL_VERSION = "2.9.0"
+
+    @staticmethod
+    def _consumer_param(
+        consumer: str | None, *, operation: str
+    ) -> builtins.dict[str, str] | None:
+        if consumer is None:
+            warnings.warn(
+                f"EventBusPublisherClient.{operation} called without a consumer name. "
+                "That uses Core's legacy shared queue, is deprecated for the "
+                f"{EventBusPublisherClient.LEGACY_SHARED_QUEUE_DEPRECATION_VERSION} "
+                "migration path, and will raise ValueError in adaptix-contracts "
+                f"{EventBusPublisherClient.LEGACY_SHARED_QUEUE_REMOVAL_VERSION}. "
+                "Import a canonical consumer constant from "
+                "adaptix_contracts.event_consumers (for example "
+                "EPCR_SERVICE_CONSUMER or HOSPITAL_SERVICE_CONSUMER) and pass it "
+                "explicitly.",
+                FutureWarning,
+                stacklevel=3,
+            )
+            return None
+
+        normalized_consumer = consumer.strip()
+        if not normalized_consumer:
+            raise ValueError("consumer must be a non-empty string when supplied")
+
+        return {"consumer": normalized_consumer}
+
     @staticmethod
     def _configuration() -> tuple[str, str, float]:
         core_url = os.getenv("CORE_EVENT_BUS_URL", "").rstrip("/")
@@ -227,8 +267,12 @@ class EventBusPublisherClient:
         delivery tracking without changing that.
         """
         params: dict[str, Any] = {"limit": limit}
-        if consumer:
-            params["consumer"] = consumer
+        consumer_param = EventBusPublisherClient._consumer_param(
+            consumer,
+            operation="get_pending_events_unfiltered",
+        )
+        if consumer_param is not None:
+            params.update(consumer_param)
         data = await EventBusPublisherClient._request(
             "GET",
             "/api/core/internal/events/pending",
@@ -246,10 +290,14 @@ class EventBusPublisherClient:
         recorded for THIS subscriber only (fan-out) and other subscribers still
         receive the event. Omitting it applies the legacy global flip.
         """
+        consumer_param = EventBusPublisherClient._consumer_param(
+            consumer,
+            operation="mark_delivered",
+        )
         await EventBusPublisherClient._request(
             "POST",
             f"/api/core/internal/events/{event_id}/delivered",
-            params={"consumer": consumer} if consumer else None,
+            params=consumer_param,
         )
 
     @staticmethod
@@ -263,18 +311,29 @@ class EventBusPublisherClient:
         ``MAX_DELIVERY_ATTEMPTS`` is reached, leaving other subscribers
         unaffected.
         """
+        consumer_param = EventBusPublisherClient._consumer_param(
+            consumer,
+            operation="mark_failed",
+        )
         await EventBusPublisherClient._request(
             "POST",
             f"/api/core/internal/events/{event_id}/failed",
             json={"error": error},
-            params={"consumer": consumer} if consumer else None,
+            params=consumer_param,
         )
 
 
 __all__ = [
     "EventBusPublisherClient",
+    "BILLING_SERVICE_CONSUMER",
+    "CAD_SERVICE_CONSUMER",
+    "EPCR_SERVICE_CONSUMER",
     "EventMetadata",
     "EventSchema",
     "EventValidator",
+    "HOSPITAL_SERVICE_CONSUMER",
+    "KNOWN_EVENT_BUS_CONSUMERS",
+    "KnownEventBusConsumerName",
     "LocalEventConsumerRegistry",
+    "is_known_event_bus_consumer",
 ]
