@@ -607,10 +607,7 @@ from .epcr_contracts import (
     EpcrBillingPatientDemographics,
     EpcrBillingSnapshot,
     EpcrChartFinalizedEvent,
-<<<<<<< HEAD
-=======
     EpcrChartHospitalHandoffEvent,
->>>>>>> origin/main
     EpcrNemsisSubmitSucceededEvent,
     EpcrChartContract,
     EpcrPatientProfileContract,
@@ -1509,10 +1506,7 @@ __all__ = [
     "EpcrBillingPatientDemographics",
     "EpcrBillingSnapshot",
     "EpcrChartFinalizedEvent",
-<<<<<<< HEAD
-=======
     "EpcrChartHospitalHandoffEvent",
->>>>>>> origin/main
     "EpcrNemsisSubmitSucceededEvent",
     "EpcrChartContract",
     "EpcrPatientProfileContract",
