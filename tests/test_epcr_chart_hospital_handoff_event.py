@@ -41,7 +41,14 @@ def test_minimal_valid_payload_round_trips() -> None:
 
 @pytest.mark.parametrize(
     "required",
-    ["chart_id", "tenant_id", "handoff_id", "hospital_id", "handoff_status", "created_at"],
+    [
+        "chart_id",
+        "tenant_id",
+        "handoff_id",
+        "hospital_id",
+        "handoff_status",
+        "created_at",
+    ],
 )
 def test_required_fields_are_enforced(required: str) -> None:
     payload = _minimal_payload()
