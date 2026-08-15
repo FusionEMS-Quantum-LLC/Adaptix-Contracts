@@ -86,9 +86,9 @@ class TestBuildspecDigests:
         digest = _extract_buildspec_sha(
             CODEBUILD_DIR / "security-scan.yml", "GITLEAKS_SHA256"
         )
-        assert is_verified(
-            digest
-        ), "security-scan.yml uses an unverified gitleaks digest"
+        assert is_verified(digest), (
+            "security-scan.yml uses an unverified gitleaks digest"
+        )
 
     def test_security_scan_verifies_gitleaks_checksum(self) -> None:
         text = (CODEBUILD_DIR / "security-scan.yml").read_text(encoding="utf-8")
