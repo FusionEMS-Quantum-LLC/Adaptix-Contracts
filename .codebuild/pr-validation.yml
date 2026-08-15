@@ -93,7 +93,7 @@ phases:
       - |
         # Any requirements files (dev/test) the repo ships.
         for f in $(find . -maxdepth 3 -name "requirements*.txt" -not -path "*/node_modules/*" -not -path "*/.git/*"); do
-          uv pip install --system --quiet -r "$f" || true
+          uv pip install --system --quiet -r "$f"
         done
 
       - |

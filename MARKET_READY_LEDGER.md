@@ -14,7 +14,8 @@ Status: PASS
 ## Files Changed
 
 - `pyproject.toml`
-- `.github/workflows/contracts-validation.yml`
+- Historical GitHub Actions validation workflow (retired; no longer present in
+  the repo)
 - `validate_contracts.py`
 - `scripts/audit_workspace_contracts.py`
 - `.env.example`

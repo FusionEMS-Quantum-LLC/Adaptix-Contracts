@@ -1,3 +1,6 @@
+#
+# Analysis-only workflow. It must never become this repo's release, publish, or
+# deployment authority; CodeBuild owns those paths.
 name: "CodeQL"
 
 on:

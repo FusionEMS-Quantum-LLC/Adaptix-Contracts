@@ -1,5 +1,8 @@
 # Adaptix-Contracts Deployment Checklist
 
+> This repository is a Python package, not an ECS service. GitHub Actions are
+> analysis-only here; CodeBuild owns authoritative release/publish validation.
+
 ## Preflight
 
 - [ ] Run `python validate_contracts.py`.
@@ -13,6 +16,7 @@
 
 ## Release
 
+- [ ] Confirm the CodeBuild main/release validation gate is green.
 - [ ] Publish package or commit Git dependency target.
 - [ ] Update consumers intentionally.
 - [ ] Run consumer import tests.
