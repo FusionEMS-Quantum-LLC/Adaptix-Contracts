@@ -299,7 +299,7 @@ class StediMigrationTransitionResponse(BaseModel):
 class StediMigrationTransitionHistoryRow(BaseModel):  # pylint: disable=invalid-name
     """One append-only migration-mode audit row."""
 
-    id: str
+    id: str  # pylint: disable=invalid-name
     tenant_id: str
     from_mode: Optional[StediMigrationMode] = None
     to_mode: StediMigrationMode
