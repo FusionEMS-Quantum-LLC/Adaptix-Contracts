@@ -347,7 +347,9 @@ def test_stedi_enrollment_request_and_response_shape_match_service() -> None:
         StediEnrollmentTransactionType.ERA,
     ]
     with pytest.raises(ValidationError):
-        StediCreateEnrollmentRequest(payer_id="payer-1", transaction_types=["claims", "claims_status"])
+        StediCreateEnrollmentRequest(
+            payer_id="payer-1", transaction_types=["claims", "claims_status"]
+        )
 
     response = StediCreateEnrollmentResponse(
         enrollment_id="enroll-1",
@@ -448,7 +450,9 @@ def test_submission_and_remittance_status_vocabularies_match_web_client() -> Non
     assert listing.items[0].posting_status is RemittancePostingStatus.UNPOSTED
 
 
-def test_stedi_artifact_reconciliation_vocabularies_preserve_undetermined_states() -> None:
+def test_stedi_artifact_reconciliation_vocabularies_preserve_undetermined_states() -> (
+    None
+):
     assert {k.value for k in StediArtifactTransactionKind} == {
         "file_delivered",
         "file_failed",

@@ -4,6 +4,8 @@ Canonical historical submission, response, and enrollment-status shapes for
 Office Ally data imported into Adaptix. These models do not authorize Office
 Ally as a live billing claim submitter; live submissions are STEDI-only.
 """
+# This legacy DTO module intentionally mirrors the common schema-file layout.
+# pylint: disable=duplicate-code
 
 from __future__ import annotations
 

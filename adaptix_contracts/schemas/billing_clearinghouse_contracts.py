@@ -9,6 +9,8 @@ Change Healthcare, TriZetto, and other legacy vendors are migration/source
 systems only and must never be interpreted as live claim-submission targets by
 consumers of these contracts.
 """
+# Pydantic schema DTOs intentionally expose fields, not behavior.
+# pylint: disable=too-few-public-methods
 
 from __future__ import annotations
 
@@ -294,7 +296,7 @@ class StediMigrationTransitionResponse(BaseModel):
     occurred_at: str
 
 
-class StediMigrationTransitionHistoryRow(BaseModel):
+class StediMigrationTransitionHistoryRow(BaseModel):  # pylint: disable=invalid-name
     """One append-only migration-mode audit row."""
 
     id: str
