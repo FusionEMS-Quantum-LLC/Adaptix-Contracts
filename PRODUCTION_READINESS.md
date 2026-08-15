@@ -1,12 +1,7 @@
 # Adaptix-Contracts Production Readiness
 
-> **HISTORICAL (2026-05 / 1.0.x era)** — superseded by CHANGELOG.md and TEST_EVIDENCE.md.
-> The auth trust model changed materially in 1.3.0–1.4.0 (gateway HMAC verification,
-> production fail-closed defaults); statements below predate that and are not
-> current claims.
-
-Date: 2026-05-08
-Classification: PASS
+Date: 2026-08-14
+Classification: NO-GO FOR PLATFORM ROLLOUT / LOCAL CONTRACT GATES PASS
 
 ## Service Purpose
 
@@ -39,18 +34,25 @@ All service repos that import shared schemas.
 
 No HTTP endpoint applies because this repo is a library. Readiness is defined by:
 
-- `python validate_contracts.py`
 - `python validate_contracts.py --json`
-- `python -m pytest`
+- `python -m pytest tests -q`
 - `python -m build --sdist --wheel`
 - `python -m twine check dist/*`
 - `python scripts/audit_workspace_contracts.py --workspace-root <workspace>`
+- consumer repository import/build/runtime verification against the exact published
+  or pinned contract version
 
 ## Test Status
 
-Local validator and regression suite pass in this repo. Focused consumer
-validation also passed after removing the Core, Inventory, Narcotics, and
-Integrations shadow `adaptix_contracts` trees.
+Local contract validation passes in this checkout:
+
+- `python validate_contracts.py --json` — PASS on 2026-08-14
+  (`export_count=881`, `model_count=677`, `enum_count=191`,
+  `actual_domain_count=73`, `missing_domains=[]`).
+
+This evidence is limited to the Contracts repository. It does not prove that
+downstream producer and consumer repositories have rebuilt, imported, deployed,
+or run against this contract version.
 
 ## Deployment Status
 
@@ -62,7 +64,19 @@ authority.
 
 ## Production Blockers
 
-- None for the audited workspace slice.
+- Consumer runtime verification is missing for the current contract version.
+  Exact coordination owners: all service repositories that import
+  `adaptix-contracts`, with priority on known event producers/consumers
+  `Adaptix-Billing-Service`, `Adaptix-EPCR-Service`, `Adaptix-Fire-Service`,
+  `Adaptix-Patient-Identity-Service`, `Adaptix-Audit-Service`, and
+  `Adaptix-Core-Service`.
+- Cross-repo event payload compatibility is not fully contract-enforced for
+  shared event envelopes whose `payload` remains `dict[str, Any]`. Registry and
+  `source_service` drift are guarded here, but payload-shape compatibility must
+  be covered by exact producer/consumer schema contracts before platform rollout
+  can be declared production-complete.
+- A workspace-wide shadow-package audit must be rerun immediately before release:
+  `python scripts/audit_workspace_contracts.py --workspace-root <workspace>`.
 
 ## Remediation Completed
 
@@ -71,8 +85,11 @@ authority.
 - Added workspace shadow-package audit script.
 - Added CodeBuild artifact build and `twine check` verification.
 - Added `.env.example` for workspace audit configuration.
+- Added event producer registry/source-service drift guards and documented the
+  remaining payload-shape limitation instead of treating it as covered.
 
 ## Final Verdict
 
-PASS — the canonical package is validated, buildable, and proven authoritative
-across the audited workspace.
+NO-GO FOR PLATFORM ROLLOUT — local contract gates pass, but production-complete
+user-ready status requires downstream producer/consumer rebuild, import, runtime,
+and payload-compatibility evidence against this exact contract version.
