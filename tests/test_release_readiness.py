@@ -30,6 +30,15 @@ def test_validate_contracts_json_report() -> None:
     }
 
 
+def test_production_readiness_does_not_overclaim_platform_rollout() -> None:
+    readiness = (REPO_ROOT / "PRODUCTION_READINESS.md").read_text(encoding="utf-8")
+
+    assert "Classification: NO-GO FOR PLATFORM ROLLOUT" in readiness
+    assert "Consumer runtime verification is missing" in readiness
+    assert "payload-shape compatibility" in readiness
+    assert "PASS — the canonical package" not in readiness
+
+
 def test_workspace_audit_detects_shadow_contract_package(tmp_path: Path) -> None:
     contracts_repo = tmp_path / "Adaptix-Contracts"
     scripts_dir = contracts_repo / "scripts"

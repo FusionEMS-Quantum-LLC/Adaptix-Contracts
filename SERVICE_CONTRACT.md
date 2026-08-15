@@ -13,6 +13,10 @@ Publish shared request/response/event schemas used across Adaptix services.
   and backwards compatibility where promised.
 - Workspace release checks must fail if a shadow `adaptix_contracts` package is
   detected outside this repo.
+- Event contracts must not stop at `event_type` registration when payloads cross
+  service boundaries; any generic `payload: dict[str, Any]` path must have an
+  exact producer/consumer schema contract or be recorded as a rollout blocker for
+  the producer and consumer repos.
 
 ## Data Ownership
 

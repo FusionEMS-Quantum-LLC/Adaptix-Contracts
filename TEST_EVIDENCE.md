@@ -1,8 +1,35 @@
 # Adaptix-Contracts Test Evidence
 
-Date: 2026-07-03 (supersedes the 2026-05-08 snapshot below)
+Date: 2026-08-14 (supersedes the 2026-07-03 snapshot below)
 
-## Evidence — 2026-07-03 @ v1.4.0 (main 224673b)
+## Evidence — 2026-08-14 @ v2.6.0 (current branch)
+
+- `python validate_contracts.py --json` — PASS (exit 0)
+  - `export_count: 881`
+  - `model_count: 677`
+  - `enum_count: 191`
+  - `actual_domain_count: 73`
+  - `missing_domains: []`
+
+## Evidence Missing
+
+- Consumer repository runtime verification against this exact contract version.
+- Workspace-wide shadow-package audit immediately before release:
+  `python scripts/audit_workspace_contracts.py --workspace-root <workspace>`.
+- Event payload-shape compatibility for shared envelopes that still expose
+  `payload: dict[str, Any]`; registry/source-service drift is guarded, but
+  payload shape is not fully enforced by the generic envelope.
+
+## Verdict
+
+Local contract validation PASS. Platform rollout remains NO-GO until the missing
+consumer and payload-compatibility evidence above is supplied.
+
+---
+
+## Historical evidence — 2026-07-03 @ v1.4.0
+
+Snapshot: main 224673b.
 
 - `ruff check .` — PASS (exit 0)
 - `ruff format --check .` — PASS (174 files already formatted)
@@ -35,13 +62,13 @@ Date: 2026-07-03 (supersedes the 2026-05-08 snapshot below)
 - `python scripts/audit_workspace_contracts.py --workspace-root <workspace> --json`
   — PASS (`shadow_package_count = 0`)
 
-## Evidence Missing
+### Evidence Missing
 
 - Runtime verification of any consumer service running against v1.4.0
   (no consumer has rebuilt on 1.4.0 yet — rollout tracked in the 1.4.0 release
   notes and Infra env wiring).
 
-## Verdict
+### Verdict
 
 Local gates PASS at v1.4.0. Coverage 67% with three zero-coverage modules listed
 above.
