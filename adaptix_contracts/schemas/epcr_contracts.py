@@ -172,6 +172,43 @@ class EpcrBillingSnapshot(BaseModel):
     ready_for_billing: bool = False
 
 
+class EpcrChartHospitalHandoffEvent(BaseModel):
+    """Published when ePCR emits a typed hospital handoff event.
+
+    This contract captures the chart-to-hospital linkage and transfer-of-care
+    facts shared across EPCR and hospital-facing consumers. ``tenant_id`` is
+    REQUIRED so the generic EPCR outbox relay can publish it on the shared bus
+    without failing closed on a tenant-less row.
+    """
+
+    event_type: str = "epcr.chart.hospital_handoff"
+
+    chart_id: str
+    tenant_id: str
+    handoff_id: str
+    call_number: str
+    hospital_id: str
+    handoff_status: str
+    created_at: datetime
+
+    hospital_name: Optional[str] = None
+    incident_id: Optional[str] = None
+    unit_id: Optional[str] = None
+    bed_assignment: Optional[str] = None
+    receiving_facility: Optional[str] = None
+    receiving_clinician_name: Optional[str] = None
+    receiving_role_title: Optional[str] = None
+    transfer_of_care_time: Optional[datetime] = None
+    hl7_message_id: Optional[str] = None
+    is_test: bool = False
+    chief_complaint: Optional[str] = None
+    primary_impression: Optional[str] = None
+    handoff_summary: Optional[str] = None
+    patient_demographics: Optional[EpcrBillingPatientDemographics] = None
+    transmitted_at: Optional[datetime] = None
+    acknowledged_at: Optional[datetime] = None
+
+
 class EpcrChartContract(BaseModel):
     """Read-only ePCR chart contract for cross-domain consumption."""
 

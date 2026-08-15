@@ -109,8 +109,14 @@ EPCR_CHART_NEMSIS_EXPORT_COMPLETED: Final[str] = "epcr.chart.nemsis_export_compl
 #   epcr_app/api_chart_cortex_lifecycle.py:102    epcr.chart.billing_handoff
 #   epcr_app/chart_finalization_service.py:57     epcr.nemsis_submit.failed
 #   epcr_app/chart_finalization_service.py:58     epcr.nemsis_submit.succeeded
+#
+# ``epcr.chart.hospital_handoff`` is registered here as the shared typed
+# contract for the upcoming EPCR->hospital handoff emission. The producer is
+# not yet present in this workspace, so it is intentionally NOT listed in the
+# live indirect-producer drift inventory until EPCR lands the emitting file:line.
 EPCR_CHART_AMENDED: Final[str] = "epcr.chart.amended"
 EPCR_CHART_BILLING_HANDOFF: Final[str] = "epcr.chart.billing_handoff"
+EPCR_CHART_HOSPITAL_HANDOFF: Final[str] = "epcr.chart.hospital_handoff"
 EPCR_NEMSIS_SUBMIT_FAILED: Final[str] = "epcr.nemsis_submit.failed"
 EPCR_NEMSIS_SUBMIT_SUCCEEDED: Final[str] = "epcr.nemsis_submit.succeeded"
 
@@ -277,6 +283,7 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     EPCR_CHART_NEMSIS_EXPORT_COMPLETED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_AMENDED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_BILLING_HANDOFF: {"version": "1.0", "source_service": "epcr"},
+    EPCR_CHART_HOSPITAL_HANDOFF: {"version": "1.0", "source_service": "epcr"},
     EPCR_NEMSIS_SUBMIT_FAILED: {"version": "1.0", "source_service": "epcr"},
     EPCR_NEMSIS_SUBMIT_SUCCEEDED: {"version": "1.0", "source_service": "epcr"},
     EPCR_VISION_CAPTURE_CREATED: {"version": "1.0", "source_service": "epcr"},
@@ -493,6 +500,7 @@ __all__ = [
     "EPCR_CHART_BILLING_HANDOFF",
     "EPCR_CHART_CREATED",
     "EPCR_CHART_FINALIZED",
+    "EPCR_CHART_HOSPITAL_HANDOFF",
     "EPCR_CHART_LOCKED",
     "EPCR_CHART_NEMSIS_EXPORT_COMPLETED",
     "EPCR_CHART_NEMSIS_VALIDATION_COMPLETED",
