@@ -1,7 +1,8 @@
-"""Office Ally clearinghouse contracts shared across Adaptix services.
+"""Office Ally migration/read-only clearinghouse contracts.
 
-Canonical submission, response, and enrollment-status shapes for the
-AdaptixCore Office Ally integration shared service.
+Canonical historical submission, response, and enrollment-status shapes for
+Office Ally data imported into Adaptix. These models do not authorize Office
+Ally as a live billing claim submitter; live submissions are STEDI-only.
 """
 
 from __future__ import annotations
@@ -55,7 +56,7 @@ class OfficeAllyEnrollment(BaseModel):
 
 
 class OfficeAllySubmission(BaseModel):
-    """An X12 submission sent to Office Ally."""
+    """A historical/imported X12 submission associated with Office Ally."""
 
     model_config = ConfigDict(from_attributes=True)
 

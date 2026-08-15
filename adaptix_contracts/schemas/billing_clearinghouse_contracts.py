@@ -1,11 +1,13 @@
 """Billing clearinghouse integration contracts.
 
-Defines all typed request/response/event contracts for external clearinghouse
-interactions: claim submission, acknowledgements, remittance ingestion,
-and error handling.
+Defines all typed request/response/event contracts for live Stedi claim
+submission, acknowledgements, remittance ingestion, migration/source vendor
+settings, migration-mode controls, and error handling.
 
-This layer isolates external vendor behavior (Office Ally, Availity, etc.)
-from the core billing domain.
+STEDI is the only live billing clearinghouse. Office Ally, Waystar, Availity,
+Change Healthcare, TriZetto, and other legacy vendors are migration/source
+systems only and must never be interpreted as live claim-submission targets by
+consumers of these contracts.
 """
 
 from __future__ import annotations
@@ -14,10 +16,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Import shared enums from core billing contracts
-from .billing_contracts import ClearinghouseProvider
+from .billing_contracts import ClearinghouseProvider, MigrationSourceVendor
 
 
 # ---------------------------------------------------------------------------
@@ -44,13 +46,411 @@ class AckType(str, Enum):
     UNKNOWN = "unknown"
 
 
+class StediReadinessState(str, Enum):
+    """The 15 wire readiness states shared by Billing Service and Web App."""
+
+    NOT_CONFIGURED = "not_configured"
+    CREDENTIALS_MISSING = "credentials_missing"
+    CREDENTIALS_INVALID = "credentials_invalid"
+    CREDENTIALS_CONFIGURED = "credentials_configured"
+    CONNECTION_VERIFICATION_PENDING = "connection_verification_pending"
+    CONNECTION_VERIFIED = "connection_verified"
+    PROVIDER_INCOMPLETE = "provider_incomplete"
+    ENROLLMENT_REQUIRED = "enrollment_required"
+    TEST_READY = "test_ready"
+    TESTING = "testing"
+    TEST_FAILED = "test_failed"
+    PRODUCTION_PENDING = "production_pending"
+    PRODUCTION_READY = "production_ready"
+    DEGRADED = "degraded"
+    SUSPENDED = "suspended"
+
+
+class StediWebhookVerification(str, Enum):
+    """Inbound Stedi webhook verification tri-state."""
+
+    VERIFIED = "verified"
+    NOT_VERIFIED = "not_verified"
+    UNKNOWN = "unknown"
+
+
+class StediReadinessBlockerOwner(str, Enum):
+    """Who must clear a Stedi readiness blocker."""
+
+    AGENCY = "agency"
+    ADAPTIX = "adaptix"
+    PAYER = "payer"
+
+
+class StediMigrationMode(str, Enum):
+    """Server-enforced Stedi migration modes.
+
+    ``office_ally_active`` is retained as a legacy/source-mode wire value for
+    migration compatibility. It must not be interpreted by contract consumers as
+    permission to route new live claims through Office Ally.
+    """
+
+    OFFICE_ALLY_ACTIVE = "office_ally_active"
+    STEDI_SHADOW = "stedi_shadow"
+    STEDI_TEST = "stedi_test"
+    STEDI_PRIMARY = "stedi_primary"
+    OFFICE_ALLY_READ_ONLY = "office_ally_read_only"
+    MIGRATION_BLOCKED = "migration_blocked"
+
+
+class StediMigrationTransitionKind(str, Enum):
+    """Classification of a migration-mode transition."""
+
+    ADVANCE = "advance"
+    ROLLBACK = "rollback"
+    BLOCK = "block"
+    RECOVER = "recover"
+
+
+class StediEnrollmentTransactionType(str, Enum):
+    """Logical transaction types accepted by the Stedi enrollment API."""
+
+    CLAIMS = "claims"
+    ERA = "era"
+    ELIGIBILITY = "eligibility"
+
+
+class StediPayerEnrollmentStatus(str, Enum):
+    """Adaptix-normalized Stedi payer-enrollment lifecycle."""
+
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    PENDING = "pending"
+    LIVE = "live"
+    REJECTED = "rejected"
+    CANCELED = "canceled"
+    UNKNOWN = "unknown"
+
+
+class SubmissionAttemptStatus(str, Enum):
+    """Persisted claim-submission attempt lifecycle statuses."""
+
+    PENDING = "pending"
+    PREFLIGHT_FAILED = "preflight_failed"
+    QUEUED = "queued"
+    TRANSMITTED = "transmitted"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    RESUBMIT_REQUIRED = "resubmit_required"
+
+
+class RemittancePostingStatus(str, Enum):
+    """Derived posting status for parsed 835 remittances."""
+
+    POSTED = "posted"
+    UNPOSTED = "unposted"
+
+
+class SubmissionFrequency(str, Enum):
+    """Migration-source polling/submission cadence."""
+
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
+class StediArtifactTransactionKind(str, Enum):
+    """Kinds of Stedi artifacts the reconciler classifies."""
+
+    FILE_DELIVERED = "file_delivered"
+    FILE_FAILED = "file_failed"
+    ACK_999 = "ack_999"
+    ACK_277CA = "ack_277ca"
+    REMITTANCE_835 = "remittance_835"
+
+
+class StediClaimTransition(str, Enum):
+    """Claim transition emitted by normalized Stedi artifact reconciliation."""
+
+    DELIVERED_TO_PAYER = "delivered_to_payer"
+    DELIVERY_FAILED = "delivery_failed"
+    ACK_ACCEPTED = "ack_accepted"
+    ACK_REJECTED = "ack_rejected"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    DENIED = "denied"
+    PARTIALLY_PAID = "partially_paid"
+    PAID = "paid"
+    UNDETERMINED = "undetermined"
+
+
+class StediWebhookProcessingStatus(str, Enum):
+    """Durable Stedi webhook receipt processing statuses."""
+
+    RECEIVED = "received"
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    PROCESSED = "processed"
+    FAILED = "failed"
+    PENDING_RECONCILIATION = "pending_reconciliation"
+    RECEIVED_UNKNOWN_TYPE = "received_unknown_type"
+
+
+# ---------------------------------------------------------------------------
+# Stedi readiness + migration-mode contracts
+# ---------------------------------------------------------------------------
+
+
+class StediProviderRow(BaseModel):
+    """One tenant billing-provider identity row for Stedi readiness."""
+
+    provider_id: str
+    provider_name: Optional[str] = None
+    npi_masked: Optional[str] = None
+    state: StediReadinessState
+
+
+class StediPayerRow(BaseModel):
+    """One Stedi payer enrollment row and whether enrollment is required."""
+
+    payer_id: str
+    payer_name: Optional[str] = None
+    state: StediReadinessState
+    enrollment_required: bool
+
+
+class StediWebhookStatus(BaseModel):
+    """Tri-state inbound-webhook verification for Stedi events."""
+
+    verification: StediWebhookVerification
+    last_event_at: Optional[str] = None
+
+
+class StediStatusBlocker(BaseModel):
+    """One readiness blocker surfaced to UI and migration-mode gates."""
+
+    code: str
+    label: str
+    section: str
+    owner: StediReadinessBlockerOwner
+
+
+class StediStatusResponse(BaseModel):
+    """GET /api/v1/billing/stedi/status response."""
+
+    tenant_id: str
+    state: StediReadinessState
+    checked_at: Optional[str] = None
+    providers: list[StediProviderRow]
+    payers: list[StediPayerRow]
+    webhook: StediWebhookStatus
+    blockers: list[StediStatusBlocker]
+
+
+class StediAllowedTransition(BaseModel):
+    """One legal migration-mode transition returned by the backend."""
+
+    to_mode: StediMigrationMode
+    kind: StediMigrationTransitionKind
+    requires_founder: bool
+    caller_authorized: bool
+    description: str
+
+
+class StediMigrationModeResponse(BaseModel):
+    """GET /api/v1/billing/stedi/migration-mode response."""
+
+    tenant_id: str
+    mode: StediMigrationMode
+    description: str
+    updated_by: Optional[str] = None
+    last_reason: Optional[str] = None
+    updated_at: Optional[str] = None
+    is_default: bool
+    allowed_transitions: list[StediAllowedTransition]
+
+
+class StediMigrationTransitionRequest(BaseModel):
+    """POST /api/v1/billing/stedi/migration-mode/transition request."""
+
+    to_mode: StediMigrationMode
+    reason: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("reason must not be blank")
+        return cleaned
+
+
+class StediMigrationTransitionResponse(BaseModel):
+    """Response for a successful audited migration-mode transition."""
+
+    transition_id: str
+    tenant_id: str
+    from_mode: StediMigrationMode
+    to_mode: StediMigrationMode
+    kind: StediMigrationTransitionKind
+    reason: str
+    actor_id: Optional[str] = None
+    actor_role: Optional[str] = None
+    founder_authorized: bool
+    occurred_at: str
+
+
+class StediMigrationTransitionHistoryRow(BaseModel):
+    """One append-only migration-mode audit row."""
+
+    id: str
+    tenant_id: str
+    from_mode: Optional[StediMigrationMode] = None
+    to_mode: StediMigrationMode
+    kind: StediMigrationTransitionKind
+    reason: str
+    actor_id: Optional[str] = None
+    actor_role: Optional[str] = None
+    founder_authorized: bool
+    created_at: str
+
+
+class StediCreateEnrollmentRequest(BaseModel):
+    """POST /api/v1/billing/stedi/enrollments request body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    payer_id: str = Field(..., min_length=1, max_length=80)
+    payer_name: Optional[str] = Field(None, max_length=200)
+    transaction_types: list[StediEnrollmentTransactionType] = Field(..., min_length=1)
+
+    @field_validator("payer_id")
+    @classmethod
+    def _payer_id_not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("payer_id must not be blank")
+        return cleaned
+
+
+class StediCreateEnrollmentResponse(BaseModel):
+    """Response for a successful Stedi payer-enrollment initiation."""
+
+    enrollment_id: str
+    stedi_enrollment_id: str
+    status: StediPayerEnrollmentStatus
+    payer_id: str
+    transaction_types: list[StediEnrollmentTransactionType]
+
+
+class MigrationSourceClearinghouseSettingsResponse(BaseModel):
+    """Read-only/import clearinghouse settings for a tenant.
+
+    ``clearinghouse_vendor`` is the migration source/incumbent vendor. It is
+    not a live submission route; live claim submission remains STEDI-only.
+    """
+
+    tenant_id: str
+    clearinghouse_vendor: MigrationSourceVendor
+    oa_sftp_username: Optional[str] = None
+    oa_tpid: Optional[str] = None
+    oa_sftp_verified: bool
+    edi_837p_enabled: bool
+    edi_835_enabled: bool
+    edi_999_enabled: bool
+    edi_277_enabled: bool
+    submission_frequency: SubmissionFrequency
+    updated_at: Optional[str] = None
+
+
+class MigrationSourceClearinghouseSettingsUpdate(BaseModel):
+    """PUT body for migration-source clearinghouse settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    clearinghouse_vendor: MigrationSourceVendor = Field(
+        default=MigrationSourceVendor.OFFICE_ALLY
+    )
+    oa_sftp_username: Optional[str] = Field(None, max_length=200)
+    oa_tpid: Optional[str] = Field(None, max_length=50)
+    oa_sftp_verified: bool = False
+    edi_837p_enabled: bool = True
+    edi_835_enabled: bool = True
+    edi_999_enabled: bool = True
+    edi_277_enabled: bool = True
+    submission_frequency: SubmissionFrequency = SubmissionFrequency.DAILY
+
+
+class SubmissionSummaryResponse(BaseModel):
+    """Tenant submission-attempt roll-up grouped by persisted status."""
+
+    availability: str
+    by_status: dict[SubmissionAttemptStatus, int] = Field(default_factory=dict)
+    total_queued: int = Field(..., ge=0)
+    total_transmitted: int = Field(..., ge=0)
+    total_accepted: int = Field(..., ge=0)
+    total_rejected: int = Field(..., ge=0)
+    as_of: str
+
+
+class RemittanceSummary(BaseModel):
+    """Parsed 835 remittance summary with posting status."""
+
+    id: str
+    era_check_number: Optional[str] = None
+    payer_name: Optional[str] = None
+    payer_id: Optional[str] = None
+    total_paid_cents: int = Field(..., ge=0)
+    claim_count: int = Field(..., ge=0)
+    source_filename: Optional[str] = None
+    received_at: Optional[str] = None
+    posting_status: RemittancePostingStatus
+
+
+class RemittanceListResponse(BaseModel):
+    """GET /api/v1/billing/eob/remittances response."""
+
+    items: list[RemittanceSummary]
+    count: int = Field(..., ge=0)
+    unposted_count: int = Field(..., ge=0)
+    limit: int = Field(..., ge=1)
+    offset: int = Field(..., ge=0)
+
+
+class StediServiceLineOutcome(BaseModel):
+    """One 835 service-line adjudication result used for reconciliation."""
+
+    billed_cents: int = Field(..., ge=0)
+    paid_cents: int = Field(..., ge=0)
+    denied: bool = False
+    patient_responsibility_cents: int = Field(0, ge=0)
+
+
+class StediNormalizedArtifact(BaseModel):
+    """Provider-agnostic Stedi artifact view used by the state machine."""
+
+    kind: StediArtifactTransactionKind
+    ack_accepted: Optional[bool] = None
+    syntactic_accepted: Optional[bool] = None
+    service_lines: list[StediServiceLineOutcome] = Field(default_factory=list)
+
+
+class StediNormalizationResult(BaseModel):
+    """Normalized artifact plus tenant/claim reference for reconciliation."""
+
+    artifact: StediNormalizedArtifact
+    tenant_id: Optional[str] = None
+    claim_ref: Optional[str] = None
+
+
+class StediWebhookReconcileOutcome(BaseModel):
+    """Worker outcome for one durable Stedi webhook receipt."""
+
+    status: StediWebhookProcessingStatus
+    detail: str = ""
+
+
 # ---------------------------------------------------------------------------
 # Submission Contracts
 # ---------------------------------------------------------------------------
 
 
 class ClaimSubmissionRequest(BaseModel):
-    """Request to submit a claim to a clearinghouse."""
+    """Request to submit a claim to the live billing clearinghouse (STEDI only)."""
 
     claim_id: str
     tenant_id: str
@@ -62,7 +462,7 @@ class ClaimSubmissionRequest(BaseModel):
 
 
 class ClaimSubmissionResponse(BaseModel):
-    """Response after attempting submission to clearinghouse."""
+    """Response after attempting submission to the live clearinghouse."""
 
     submission_id: str
     claim_id: str
@@ -375,14 +775,14 @@ class ClaimRetryEligibilityResponse(BaseModel):
 class ClaimOperatorFallbackRequest(BaseModel):
     """Request body for POST .../claims/{claim_id}/operator-fallback.
 
-    Mirrors ``OperatorFallbackRequest`` including field constraints
-    (clearinghouse_router_routes.py:151-157). ``target_clearinghouse_slug`` must
-    match ``^[a-z][a-z0-9_]+$`` and be a slug on the tenant's roster;
-    ``acknowledge_duplicate_risk`` must be true to proceed when the original
-    transmission state is ``unknown``.
+    STEDI is the only valid target for new/live outbound billing submissions.
+    Migration/source vendors may appear as historical originals, but this
+    contract must not let clients target Office Ally/Waystar/Availity as live
+    submitters. ``acknowledge_duplicate_risk`` must be true to proceed when the
+    original transmission state is ``unknown``.
     """
 
-    target_clearinghouse_slug: str = Field(..., pattern="^[a-z][a-z0-9_]+$")
+    target_clearinghouse_slug: ClearinghouseProvider
     reason: str = Field(..., min_length=4, max_length=2000)
     evidence: str = Field(..., min_length=4, max_length=4000)
     acknowledge_duplicate_risk: bool = False
@@ -399,7 +799,7 @@ class ClaimOperatorFallbackResponse(BaseModel):
     fallback_event_id: str
     original_clearinghouse_slug: str
     original_transmission_state: str
-    target_clearinghouse_slug: str
+    target_clearinghouse_slug: ClearinghouseProvider
     new_submission_reference: Optional[str] = None
     cost_cents: int
 
@@ -447,5 +847,5 @@ class ClaimOperatorFallbackTargetFailedError(BaseModel):
     """
 
     error: str = "target_clearinghouse_submit_failed"
-    target_slug: str
+    target_slug: ClearinghouseProvider
     transmission_state: str

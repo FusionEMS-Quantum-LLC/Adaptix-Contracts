@@ -64,14 +64,33 @@ class ClearinghouseStatus(str, Enum):
     ERROR = "error"
 
 
+class LiveBillingClearinghouse(str, Enum):
+    """Clearinghouse allowed to transmit live Adaptix billing claims.
+
+    STEDI is the sole live billing clearinghouse. Legacy clearinghouses are
+    represented by ``MigrationSourceVendor`` and must only be used for
+    migration/import/read-only tails.
+    """
+
+    STEDI = "stedi"
+
+
 class ClearinghouseProvider(str, Enum):
-    """Supported clearinghouse providers."""
+    """Backward-compatible name for the live billing clearinghouse enum."""
+
+    STEDI = "stedi"
+
+
+class MigrationSourceVendor(str, Enum):
+    """Legacy/import vendor vocabulary; never a live claim-submission target."""
 
     OFFICE_ALLY = "office_ally"
-    CHANGE_HEALTHCARE = "change_healthcare"
-    AVAILITY = "availity"
     WAYSTAR = "waystar"
+    AVAILITY = "availity"
+    CHANGE_HEALTHCARE = "change_healthcare"
+    TRIZETTO = "trizetto"
     OTHER = "other"
+    NONE_YET = "none_yet"
 
 
 class PayerType(str, Enum):
