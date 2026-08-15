@@ -20,6 +20,10 @@
 - [ ] Publish package or commit Git dependency target.
 - [ ] Update consumers intentionally.
 - [ ] Run consumer import tests.
+- [ ] Run producer/consumer contract checks in every repo that imports this
+  package, prioritized for Billing, ePCR, Fire, Patient Identity, Audit, and Core.
+- [ ] Record any required consumer code change as a linked PR or blocker in that
+  exact repo; do not claim the Contracts repo alone proves runtime compatibility.
 
 ## Runtime Verification
 
@@ -27,9 +31,11 @@
 - [ ] ePCR imports succeed.
 - [ ] Billing imports succeed.
 - [ ] All service contract imports succeed in deployed images.
+- [ ] Event producers and consumers that exchange shared envelopes verify payload
+  shape compatibility, not only `event_type` registration.
 
 ## Verdict
 
-PASS when all checks above pass and
+PASS only when all checks above pass and
 `python scripts/audit_workspace_contracts.py --workspace-root <workspace>`
 reports `shadow_package_count = 0`.
