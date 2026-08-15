@@ -21,7 +21,9 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from .billing_contracts import MigrationSourceVendor
 
 # ---------------------------------------------------------------------------
 # Enumerations
@@ -274,7 +276,7 @@ class ConditionalEmsFireFields(BaseModel):
     current_epcr_system: str | None = None
     current_dispatch_system: str | None = None
     billing_model: str | None = None
-    billing_vendor: str | None = None
+    billing_vendor: MigrationSourceVendor | None = None
     go_live_timeline: str | None = None
     needs_baa: bool | None = None
     requested_modules: list[AdaptixModule] = Field(default_factory=list)
@@ -282,7 +284,7 @@ class ConditionalEmsFireFields(BaseModel):
 
 class ConditionalBillingCompanyFields(BaseModel):
     monthly_claim_volume: int | None = Field(default=None, ge=0)
-    current_clearinghouse: str | None = None
+    current_clearinghouse: MigrationSourceVendor | None = None
     current_billing_system: str | None = None
     number_of_clients: int | None = Field(default=None, ge=0)
     migration_needed: bool | None = None
@@ -347,15 +349,6 @@ class IntakeInitializeResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ClearinghouseProvider(str, enum.Enum):
-    OFFICE_ALLY = "office_ally"
-    WAYSTAR = "waystar"
-    CHANGE_HEALTHCARE = "change_healthcare"
-    AVAILITY = "availity"
-    OTHER = "other"
-    NONE_YET = "none_yet"
-
-
 class BillingModelChoice(str, enum.Enum):
     IN_HOUSE = "in_house"
     OUTSOURCED = "outsourced"
@@ -379,6 +372,8 @@ class BillingDefaultsRequest(BaseModel):
     endpoint is idempotent: re-posting overwrites the stored record.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     npi: str | None = Field(
         default=None,
         pattern=r"^\d{10}$",
@@ -394,8 +389,13 @@ class BillingDefaultsRequest(BaseModel):
         max_length=20,
         description="Provider taxonomy code (e.g. 341600000X for ground ambulance).",
     )
-    clearinghouse: ClearinghouseProvider = Field(
-        default=ClearinghouseProvider.NONE_YET,
+    migration_source_vendor: MigrationSourceVendor = Field(
+        default=MigrationSourceVendor.NONE_YET,
+        validation_alias="clearinghouse",
+        description=(
+            "Incumbent/migration source vendor only. Live billing submission is "
+            "STEDI-only and is not selected by this field."
+        ),
     )
     payer_mix: list[PayerType] = Field(
         default_factory=list,
@@ -420,13 +420,21 @@ class BillingDefaultsRequest(BaseModel):
 class BillingDefaultsResponse(BaseModel):
     """Response body for billing-defaults POST and GET."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     intake_id: UUID
     organization_id: UUID
     billing_readiness_state: BillingReadinessState
     npi: str | None = None
     tax_id: str | None = None
     taxonomy_code: str | None = None
-    clearinghouse: ClearinghouseProvider
+    migration_source_vendor: MigrationSourceVendor = Field(
+        validation_alias="clearinghouse",
+        description=(
+            "Incumbent/migration source vendor only. Live billing submission is "
+            "STEDI-only and is not selected by this field."
+        ),
+    )
     payer_mix: list[PayerType]
     billing_model: BillingModelChoice
     existing_software: str | None = None
@@ -473,7 +481,7 @@ __all__ = [
     "ConditionalBillingCompanyFields",
     "ConditionalInvestorFields",
     "ConditionalDeveloperFields",
-    "ClearinghouseProvider",
+    "MigrationSourceVendor",
     "BillingModelChoice",
     "PayerType",
     "BillingDefaultsRequest",

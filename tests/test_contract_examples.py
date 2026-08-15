@@ -183,10 +183,10 @@ def test_claim_contract_rejects_negative_balances() -> None:
         )
 
 
-def test_claim_created_event_accepts_supported_clearinghouse_enum_values() -> None:
-    """Keep enum serialization stable for downstream event consumers."""
+def test_claim_created_event_accepts_stedi_only_live_clearinghouse_value() -> None:
+    """Keep live clearinghouse enum serialization STEDI-only."""
 
-    assert ClearinghouseProvider.OFFICE_ALLY.value == "office_ally"
+    assert ClearinghouseProvider.STEDI.value == "stedi"
 
 
 def test_trustsign_execution_response_round_trip_with_evidence_fields() -> None:
