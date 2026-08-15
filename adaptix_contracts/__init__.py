@@ -15,10 +15,10 @@ Import patterns:
     )
 """
 
+import tomllib
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from adaptix_contracts import schemas as _schemas
-import tomllib
 
 # Static re-export surface for type checkers (runtime uses globals().update below).
 from typing import TYPE_CHECKING

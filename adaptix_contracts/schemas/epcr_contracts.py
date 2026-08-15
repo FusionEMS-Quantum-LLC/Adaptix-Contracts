@@ -128,7 +128,7 @@ class EpcrChartFinalizedEvent(BaseModel):
     billing_snapshot: Optional["EpcrBillingSnapshot"] = None
 
 
-class EpcrNemsisSubmitSucceededEvent(BaseModel):
+class EpcrNemsisSubmitSucceededEvent(BaseModel):  # pylint: disable=too-few-public-methods
     """Published when EPCR successfully submits a chart to NEMSIS.
 
     The authoritative producer is
