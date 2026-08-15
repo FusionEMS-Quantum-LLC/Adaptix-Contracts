@@ -180,6 +180,20 @@ producer and a consumer remains unguarded by contract.
 - Clarified current automation authority: GitHub Actions in this repo remain
   analysis-only (`CodeQL`, `Codacy`) while CodeBuild owns authoritative
   main/release validation and any publication/deploy path.
+- Release note for downstream consumers of
+  `adaptix_contracts.gateway_signature.verify_gateway_signature`: signed
+  payloads now require an `aud` claim naming the target Adaptix service, and
+  test fixtures that build synthetic signed payloads must include the same
+  claim (for example, CAD discovered this while updating to the new
+  `EventBusPublisherClient` consumer API in PR #285).
+
+### Added — EPCR submission event typing
+
+- Added `EpcrNemsisSubmitSucceededEvent` for the producer-owned
+  `epcr.nemsis_submit.succeeded` outbox payload emitted by
+  `Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py`.
+- Exported the new typed schema from `adaptix_contracts.schemas` and added
+  regression coverage that pins the exact required producer fields.
 
 ### Added — canonical signup application-creation contract
 

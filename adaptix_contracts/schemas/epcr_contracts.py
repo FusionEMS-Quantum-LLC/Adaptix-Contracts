@@ -128,6 +128,31 @@ class EpcrChartFinalizedEvent(BaseModel):
     billing_snapshot: Optional["EpcrBillingSnapshot"] = None
 
 
+class EpcrNemsisSubmitSucceededEvent(BaseModel):  # pylint: disable=too-few-public-methods
+    """Published when EPCR successfully submits a chart to NEMSIS.
+
+    The authoritative producer is
+    ``Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py``,
+    whose success path writes an outbox payload carrying exactly::
+
+        chart_id, tenant_id, state_code, submission_id,
+        transmission_status, attempted_at
+
+    Consumers that want typed dispatch for NEMSIS submission success must
+    validate against that producer-owned shape instead of string-matching the
+    event type alone.
+    """
+
+    event_type: str = "epcr.nemsis_submit.succeeded"
+
+    chart_id: str
+    tenant_id: str
+    state_code: str
+    submission_id: str
+    transmission_status: str
+    attempted_at: datetime
+
+
 class EpcrBillingPatientDemographics(BaseModel):
     """Demographic block carried on the finalized event for billing."""
 
