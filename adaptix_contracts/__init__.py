@@ -15,7 +15,10 @@ Import patterns:
     )
 """
 
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from adaptix_contracts import schemas as _schemas
+import tomllib
 
 # Static re-export surface for type checkers (runtime uses globals().update below).
 from typing import TYPE_CHECKING
@@ -41,7 +44,19 @@ from adaptix_contracts.event_contracts import (
     LocalEventConsumerRegistry as LocalEventConsumerRegistry,
 )
 
-__version__ = "2.7.0"
+
+def _resolve_version() -> str:
+    """Resolve the package version from installed metadata or ``pyproject.toml``."""
+
+    try:
+        return version("adaptix-contracts")
+    except PackageNotFoundError:
+        pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        project_config = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+        return str(project_config["project"]["version"])
+
+
+__version__ = _resolve_version()
 
 # Re-export all schema symbols at package level for convenience.
 __all__ = list(_schemas.__all__)

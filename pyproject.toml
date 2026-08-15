@@ -71,4 +71,4 @@ ignore_missing_imports = true
 # camelCase aliases (validated at runtime by populate_by_name) which the pydantic
 # mypy plugin cannot model on the synthesized __init__; excluding tests scopes
 # strict typing to shipped code without hiding any source/production error.
-exclude = "(^|/)tests/"
+exclude = "(^|/)(tests|build|dist)/"
