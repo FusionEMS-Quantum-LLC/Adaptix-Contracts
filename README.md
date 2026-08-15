@@ -275,6 +275,10 @@ python -m build --sdist --wheel
 python -m twine check dist/*
 ```
 
+GitHub Actions in this repo (`CodeQL`, `Codacy Coverage`) are analysis-only.
+Authoritative release and publishability validation is owned by CodeBuild
+buildspecs, not GitHub Actions.
+
 Audit a polyrepo workspace for shadow `adaptix_contracts` packages that can
 silently override the canonical repo during production builds:
 

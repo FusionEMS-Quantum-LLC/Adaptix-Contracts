@@ -1,3 +1,6 @@
+#
+# Analysis-only workflow. It reports coverage to Codacy but is not a release,
+# publish, or deployment authority; CodeBuild owns those paths.
 name: Codacy Coverage
 on:
   push:
@@ -21,14 +24,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio pytest-cov pytest-xdist aiosqlite httpx
-          pip install -e . || true
-          pip install -e ".[test]" || true
-          pip install -e ".[dev]" || true
-          for f in $(find . -maxdepth 3 -name "requirements*.txt" -not -path "*/node_modules/*" -not -path "*/.git/*"); do pip install -r "$f" || true; done
+          pip install -e ".[dev]" aiosqlite httpx
+          for f in $(find . -maxdepth 3 -name "requirements*.txt" -not -path "*/node_modules/*" -not -path "*/.git/*"); do pip install -r "$f"; done
       - name: Run tests with coverage
         working-directory: .
-        continue-on-error: true
         run: python -m pytest --cov=adaptix_contracts --cov-report=xml:coverage.xml -q
       - name: Normalize coverage paths
         working-directory: .

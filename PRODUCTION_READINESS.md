@@ -54,9 +54,11 @@ Integrations shadow `adaptix_contracts` trees.
 
 ## Deployment Status
 
-The package is locally buildable, CI verifies publishable artifacts, and the
-workspace audit now proves canonical-package adoption across the audited
-consumer repos.
+The package is locally buildable, CodeBuild is the authoritative automation path
+for publishable-artifact verification, and the workspace audit proves
+canonical-package adoption across the audited consumer repos. GitHub Actions in
+this repo are analysis-only and do not hold deployment or publication
+authority.
 
 ## Production Blockers
 
@@ -67,7 +69,7 @@ consumer repos.
 - Existing shared contract package identified as authority path.
 - Added machine-readable validation output via `validate_contracts.py --json`.
 - Added workspace shadow-package audit script.
-- Added CI artifact build and `twine check` verification.
+- Added CodeBuild artifact build and `twine check` verification.
 - Added `.env.example` for workspace audit configuration.
 
 ## Final Verdict

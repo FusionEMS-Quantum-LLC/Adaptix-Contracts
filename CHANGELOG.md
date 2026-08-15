@@ -175,6 +175,12 @@ producer and a consumer remains unguarded by contract.
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified current automation authority: GitHub Actions in this repo remain
+  analysis-only (`CodeQL`, `Codacy`) while CodeBuild owns authoritative
+  main/release validation and any publication/deploy path.
+
 ### Added — canonical signup application-creation contract
 
 - Added SignupApplicationCreateRequest and SignupApplicationCreateResponse for

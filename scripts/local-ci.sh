@@ -20,15 +20,18 @@
 #              repo-wide mypy, NO integration/db/network/e2e tests, NO builds.
 #   pr     — full PR validation (authoritative). lint, format, typecheck,
 #              unit tests, secrets, dependency/security audit. (default)
-#   full   — main/release validation. Same as pr today; reserved for adding
-#              contract/build verification without touching pre-push speed.
+#   full   — main/release validation in CodeBuild. lint, format, typecheck,
+#              unit tests, then release-readiness checks such as validator JSON,
+#              build verification, and twine checks from the authoritative
+#              main-validation buildspec.
 #   deploy — deployment/runtime validation. Reserved (image build, migration
-#              check, deploy validation, health/smoke) — runs in AWS Pipeline.
+#              check, deploy validation, health/smoke) — runs only from
+#              CodeBuild-backed release/deploy automation, never GitHub Actions.
 #
 # Pre-push calls `quick`. CodeBuild PR calls `pr`. CodeBuild main calls `full`.
-# AWS Pipeline calls `deploy`. Coverage is NOT removed — expensive validation
-# moves from pre-push to CodeBuild/Pipeline, which remain the authoritative,
-# fail-closed gates.
+# CodeBuild-backed deploy automation calls `deploy`. Coverage is NOT removed —
+# expensive validation moves from pre-push to CodeBuild, which remains the
+# authoritative, fail-closed gate family.
 #
 # Optional environment:
 #   ADAPTIX_CI_SKIP=<comma-list>   skip named checks (lint,format,typecheck,test,secrets,deps)

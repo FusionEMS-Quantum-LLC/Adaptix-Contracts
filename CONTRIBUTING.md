@@ -91,7 +91,9 @@ All contributions must follow these principles:
 4. Ensure validation passes (`python validate_contracts.py`).
 5. Update `CHANGELOG.md` with a description of your changes under an
    `[Unreleased]` section.
-6. Submit a pull request with a clear description of what you added or changed.
+6. Treat GitHub Actions as analysis-only. Authoritative release/publish
+   automation for this repo runs through CodeBuild.
+7. Submit a pull request with a clear description of what you added or changed.
 
 ## Versioning
 
