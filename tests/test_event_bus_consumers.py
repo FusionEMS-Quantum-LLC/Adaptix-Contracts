@@ -58,7 +58,9 @@ async def test_omitted_consumer_emits_future_warning(
     async def _fake_request(*_args: Any, **_kwargs: Any) -> dict[str, list[Any]] | None:
         return {"items": []}
 
-    monkeypatch.setattr(EventBusPublisherClient, "_request", staticmethod(_fake_request))
+    monkeypatch.setattr(
+        EventBusPublisherClient, "_request", staticmethod(_fake_request)
+    )
 
     with pytest.warns(
         FutureWarning,
