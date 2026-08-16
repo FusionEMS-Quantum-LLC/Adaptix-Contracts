@@ -43,6 +43,21 @@ EPCR_CHART_UPDATED: Final[str] = "epcr.chart.updated"
 WORKFORCE_SHIFT_CANCELLED: Final[str] = "workforce.shift.cancelled"
 
 # ---------------------------------------------------------------------------
+# Fleet operational events (producer: Adaptix-Fleet-Service, slug ``fleet``)
+# ---------------------------------------------------------------------------
+# Emitted by ``fleet_app/outbox.py`` (transactional outbox, same lifecycle as
+# the Workforce outbox above) when a vehicle's status changes. Fleet ALSO
+# publishes these two event names to a separate SQS queue
+# (``signal-events-queue``, ``fleet_app/intelligence_event_publisher.py``) for
+# OpsTwin/PulseIQ — that is a distinct transport, not this registry's
+# EventBridge backbone. Registering here is what lets CAD-Service's event
+# worker (which polls the Core event bus, not signal-events-queue) subscribe.
+# Producer citation: Adaptix-Fleet-Service/backend/fleet_app/outbox.py,
+# ``enqueue_unit_status_changed`` / ``enqueue_vehicle_out_of_service``.
+FLEET_UNIT_STATUS_CHANGED: Final[str] = "fleet.unit.status_changed"
+FLEET_VEHICLE_OUT_OF_SERVICE: Final[str] = "fleet.vehicle.out_of_service"
+
+# ---------------------------------------------------------------------------
 # Billing domain events (producer: Adaptix-Billing-Service, slug ``billing``)
 # ---------------------------------------------------------------------------
 # Every constant below is emitted TODAY through the shared contract envelope
@@ -316,6 +331,8 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     VAS_PROJECTION_REVIEWED: {"version": "1.0", "source_service": "epcr"},
     PATIENT_IDENTITY_MERGED: {"version": "1.0", "source_service": "patient-identity"},
     WORKFORCE_SHIFT_CANCELLED: {"version": "1.0", "source_service": "workforce"},
+    FLEET_UNIT_STATUS_CHANGED: {"version": "1.0", "source_service": "fleet"},
+    FLEET_VEHICLE_OUT_OF_SERVICE: {"version": "1.0", "source_service": "fleet"},
     FIRE_INCIDENT_CREATED: {"version": "1.0", "source_service": "fire"},
     FIRE_INCIDENT_COMPLETED: {"version": "1.0", "source_service": "fire"},
     FIRE_INCIDENT_CLOSED: {"version": "1.0", "source_service": "fire"},
@@ -521,6 +538,8 @@ __all__ = [
     "FIRE_INCIDENT_STATUS_UPDATED",
     "FIRE_INVESTIGATION_READINESS_UPDATED",
     "FIRE_UNIT_DISPATCHED",
+    "FLEET_UNIT_STATUS_CHANGED",
+    "FLEET_VEHICLE_OUT_OF_SERVICE",
     "HOSPITAL_CATH_LAB_ACTIVATE_RECOMMENDED",
     "LEGACY_SOURCE_SERVICE_ALIASES",
     "NERIS_AUDIT_EVENT_CREATED",
