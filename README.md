@@ -237,6 +237,46 @@ Deprecated (import paths preserved until 2.0.0, emit `DeprecationWarning`):
   its `require_module_entitlement` conflicts with the real gate, and
   `rbac_decorator` enforces nothing.
 
+## Canonical signature provider
+
+**TrustSign is the only active AdaptixCore electronic-signature authority.**
+This is platform law, not a Contracts-local convention — it is enforced
+independently in multiple repos:
+
+- Adaptix-Governance `registries/providers.yml` (`trustsign` entry): *"No
+  external signature provider may be used/queued/implied without founder
+  reintroduction."*
+- Adaptix-Gateway `README.md` ("Does NOT own"): *"TrustSign is the only
+  AdaptixCore e-signature system. Do not treat Dropbox Sign or DocuSeal as
+  the live signer"* and lists DocuSeal vendor logic as *"leftover /
+  non-canonical; not the live signer."*
+- Adaptix-Billing-Service `TRUSTSIGN_BUILD_DIRECTIVE.md`, enforced by an
+  AST-based regression test (`test_signature_provider_authority.py`) that
+  fails the build if executable Billing Python imports, calls, or otherwise
+  couples to DocuSeal.
+
+| Layer | Canonical surface | Notes |
+| --- | --- | --- |
+| Signature package create/response | `adaptix_contracts.schemas.trustsign_contracts` (`SignaturePackageCreateRequest`, `SignaturePackageResponse`) | Contracts for the standalone `Adaptix-TrustSign-Service`, the sole runtime owner of signature creation, execution, verification, evidence, and audit. |
+
+Deprecated (import path preserved, fully functional; emits
+`DeprecationWarning` on instantiation — see DEPRECATION_POLICY.md):
+
+- `adaptix_contracts.schemas.docuseal_contracts`
+  (`DocuSealPackageCreateRequest`, `DocuSealPackageResponse`) — non-canonical,
+  zero consumers confirmed 2026-08-16 (repo-wide grep, org-wide GitHub code
+  search, and an 8-repo direct clone-and-grep spot check, including
+  `Adaptix-DocuSeal-Service` itself, which defines and uses its own local
+  schema instead of these contracts). Slated for removal in 3.0.0.
+
+Adaptix-Gateway's README also names `Adaptix-DocuSeal-Service` itself and
+Dropbox Sign as non-canonical. This package's own
+`contract_onboarding_contracts.DropboxSignExecutionRequest` /
+`DropboxSignExecutionResponse` / `DropboxSignCallbackEvent` show the same
+zero-consumer pattern as the DocuSeal contracts did before this deprecation,
+but are out of scope for this change and are tracked as a separate
+follow-up.
+
 ## Contract Principles
 
 This package adheres to strict contract-only boundaries:

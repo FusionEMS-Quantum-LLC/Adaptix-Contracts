@@ -321,7 +321,8 @@ from .trustsign_contracts import (
     SignaturePackageResponse,
 )
 
-# DocuSeal (separated service)
+# DocuSeal (separated service) — DEPRECATED 2.10.0, non-canonical, zero
+# consumers; TrustSign is the only active signer. See docuseal_contracts.py.
 from .docuseal_contracts import (
     DocuSealPackageCreateRequest,
     DocuSealPackageResponse,
@@ -2077,7 +2078,8 @@ __all__ = [
     # TrustSign (separated service)
     "SignaturePackageCreateRequest",
     "SignaturePackageResponse",
-    # DocuSeal (separated service)
+    # DocuSeal (separated service) — DEPRECATED 2.10.0, non-canonical, zero
+    # consumers; TrustSign is the only active signer.
     "DocuSealPackageCreateRequest",
     "DocuSealPackageResponse",
     # SageMaker (separated service)
