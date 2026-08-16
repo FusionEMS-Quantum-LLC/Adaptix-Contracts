@@ -9,6 +9,34 @@ after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
 package version is `2.8.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
+## [2.8.0]
+
+### Added — `EpcrBillingSnapshot` transport, insurance, and certification blocks
+
+`EpcrBillingSnapshot` gains three OPTIONAL sub-models (additive, minor-safe;
+legacy payloads without them still validate):
+
+- `EpcrBillingTransportBlock` (`snapshot.transport`) — origin/destination/
+  mileage/service-type facts the EPCR producer has ALWAYS emitted under the
+  snapshot's `"transport"` key (`ChartBillingReadinessExport`,
+  `chart_finalization_service.py` `_collect_billing_snapshot`). The field was
+  missing from the typed model, so `model_validate` silently discarded it and
+  Billing never received origin, destination, or transport distance — the
+  facts required to price and modifier-code a ground transport claim. Raw
+  NEMSIS strings; `transport_distance_miles` is deliberately NOT coerced.
+- `EpcrBillingInsuranceBlock` (`snapshot.insurance`) — NEMSIS ePayment.09–.22
+  / .57–.60 payer + subscriber facts persisted in `epcr_chart_payment`.
+  Absence means undocumented, never "uninsured", and never verified coverage.
+- `EpcrBillingCertificationBlock` (`snapshot.certification`) — ePayment PCS /
+  medical-necessity / prior-authorization facts (ePayment.02–.07, .44–.54)
+  that gate non-emergency submission under 42 CFR 410.40(e).
+
+Producers: Adaptix-EPCR-Service (emits `transport` today; `insurance` and
+`certification` from its 2.8.0-aligned export). Consumer:
+Adaptix-Billing-Service `EpcrEventConsumer`. Tests:
+`tests/test_epcr_finalized_billing_snapshot.py` pins legacy-shape
+compatibility and the exact producer shapes.
+
 ## [2.5.0]
 
 ### Fixed — `epcr.chart.finalized` rejected every payload its producer sends

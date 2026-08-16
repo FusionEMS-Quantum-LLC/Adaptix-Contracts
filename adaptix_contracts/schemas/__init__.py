@@ -603,9 +603,12 @@ from .crewlink_contracts import (
 from .epcr_contracts import (
     EpcrChartAmendedEvent,
     EpcrChartCreatedEvent,
+    EpcrBillingCertificationBlock,
     EpcrBillingCrewMember,
+    EpcrBillingInsuranceBlock,
     EpcrBillingPatientDemographics,
     EpcrBillingSnapshot,
+    EpcrBillingTransportBlock,
     EpcrChartFinalizedEvent,
     EpcrChartHospitalHandoffEvent,
     EpcrNemsisSubmitSucceededEvent,
@@ -1502,7 +1505,10 @@ __all__ = [
     # ePCR
     "EpcrChartAmendedEvent",
     "EpcrChartCreatedEvent",
+    "EpcrBillingCertificationBlock",
     "EpcrBillingCrewMember",
+    "EpcrBillingInsuranceBlock",
+    "EpcrBillingTransportBlock",
     "EpcrBillingPatientDemographics",
     "EpcrBillingSnapshot",
     "EpcrChartFinalizedEvent",
