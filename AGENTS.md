@@ -27,6 +27,7 @@ This repo must comply with:
 - GLOBAL_OBSERVABILITY_POLICY.md
 - GLOBAL_SECURITY_POLICY.md
 - GLOBAL_EVIDENCE_POLICY.md
+- GLOBAL_CLEARINGHOUSE_BOUNDARY.md
 
 ## Change lifecycle rule
 

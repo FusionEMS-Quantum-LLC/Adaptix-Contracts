@@ -100,7 +100,7 @@ polyrepo.
 
 ### 6. Documentation ✅
 
-**Created production-ready README.md:**
+**Created README.md (documentation only — not a production-ready or Tier 5 claim):**
 
 - Complete domain coverage documentation
 - Installation instructions
