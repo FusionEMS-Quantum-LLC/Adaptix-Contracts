@@ -174,6 +174,90 @@ class EpcrBillingCrewMember(BaseModel):
     sequence_index: int = 0
 
 
+class EpcrBillingTransportBlock(BaseModel):
+    """Transport facts carried on the finalized event for billing.
+
+    Mirrors EPCR's ``TransportBillingBlock`` (``chart_billing_readiness_export.py``),
+    which the producer has ALWAYS serialized under the snapshot's ``"transport"``
+    key — this model closes the gap where typed validation silently dropped it.
+    Without these facts a ground transport claim cannot be priced or
+    modifier-coded (origin/destination point-of-service modifiers, loaded miles).
+
+    Values are the raw NEMSIS element strings exactly as documented by the crew
+    (``origin_* <- eScene.21/.15/.11/.12``, ``destination_* <- eDisposition.02/.03``,
+    ``transport_distance_miles <- eDisposition.17``, ``service_type_code <-
+    eResponse.05``, ``unit_role_code <- eResponse.07``). The producer performs no
+    parsing or unit coercion — ``transport_distance_miles`` is a string, not a
+    number, and consumers must treat an unparseable value as absent, never guess.
+    """
+
+    origin_name: Optional[str] = None
+    origin_address: Optional[str] = None
+    origin_latitude: Optional[str] = None
+    origin_longitude: Optional[str] = None
+    destination_name: Optional[str] = None
+    destination_address: Optional[str] = None
+    transport_distance_miles: Optional[str] = None
+    service_type_code: Optional[str] = None
+    unit_role_code: Optional[str] = None
+
+
+class EpcrBillingInsuranceBlock(BaseModel):
+    """Payer/subscriber facts carried on the finalized event for billing.
+
+    Mirrors the NEMSIS ePayment insurance block persisted in EPCR's
+    ``epcr_chart_payment`` (``ePayment.09–.22`` and ``.57–.60``). All values are
+    the raw stored strings/codes; dates are ISO-8601 date strings. Absence of
+    the whole block or any field means the crew did not document it — it is
+    NOT evidence the patient is uninsured, and consumers must not treat it as
+    verified coverage (verification belongs to the eligibility workflow).
+    """
+
+    insurance_company_id: Optional[str] = None  # ePayment.09
+    insurance_company_name: Optional[str] = None  # ePayment.10
+    insurance_billing_priority_code: Optional[str] = None  # ePayment.11
+    insurance_company_address: Optional[str] = None  # ePayment.12
+    insurance_company_city: Optional[str] = None  # ePayment.13
+    insurance_company_state: Optional[str] = None  # ePayment.14
+    insurance_company_zip: Optional[str] = None  # ePayment.15
+    insurance_group_id: Optional[str] = None  # ePayment.17
+    insurance_policy_id_number: Optional[str] = None  # ePayment.18
+    insured_last_name: Optional[str] = None  # ePayment.19
+    insured_first_name: Optional[str] = None  # ePayment.20
+    insured_middle_name: Optional[str] = None  # ePayment.21
+    relationship_to_insured_code: Optional[str] = None  # ePayment.22
+    payer_type_code: Optional[str] = None  # ePayment.57
+    insurance_group_name: Optional[str] = None  # ePayment.58
+    insurance_company_phone: Optional[str] = None  # ePayment.59
+    insured_date_of_birth: Optional[str] = None  # ePayment.60, ISO date string
+
+
+class EpcrBillingCertificationBlock(BaseModel):
+    """PCS / medical-necessity / authorization facts for billing.
+
+    Mirrors the ambulance-specific NEMSIS ePayment elements persisted in
+    EPCR's ``epcr_chart_payment``. These gate non-emergency claim submission
+    (Physician Certification Statement, 42 CFR 410.40(e)) and carry the
+    condition/indicator codes and prior-authorization identifiers a clean
+    837P needs. Raw stored codes only — no inference, no invented values.
+    """
+
+    physician_certification_statement_code: Optional[str] = None  # ePayment.02
+    pcs_signed_date: Optional[str] = None  # ePayment.03, ISO date string
+    reason_for_pcs_codes: Optional[list[str]] = None  # ePayment.04 (1:M)
+    pcs_provider_type_code: Optional[str] = None  # ePayment.05
+    pcs_last_name: Optional[str] = None  # ePayment.06
+    pcs_first_name: Optional[str] = None  # ePayment.07
+    ambulance_transport_reason_code: Optional[str] = None  # ePayment.44
+    ambulance_conditions_indicator_codes: Optional[list[str]] = None  # ePayment.47
+    mileage_to_closest_hospital: Optional[float] = None  # ePayment.48
+    cms_service_level_code: Optional[str] = None  # ePayment.50
+    ems_condition_codes: Optional[list[str]] = None  # ePayment.51
+    cms_transportation_indicator_codes: Optional[list[str]] = None  # ePayment.52
+    transport_authorization_code: Optional[str] = None  # ePayment.53
+    prior_authorization_code_payer: Optional[str] = None  # ePayment.54
+
+
 class EpcrBillingSnapshot(BaseModel):
     """Claim-ready fact set mirrored from EPCR's ChartBillingReadinessExport.
 
@@ -193,6 +277,14 @@ class EpcrBillingSnapshot(BaseModel):
     level_of_service_label: Optional[str] = None
     patient_demographics: Optional[EpcrBillingPatientDemographics] = None
     attending_crew: list[EpcrBillingCrewMember] = Field(default_factory=list)
+    # Transport facts the producer has always emitted under "transport"; typed
+    # here (2.8.0) so validation stops discarding them. See the block docstring.
+    transport: Optional[EpcrBillingTransportBlock] = None
+    # ePayment insurance + PCS/authorization blocks, emitted by EPCR from
+    # 2.8.0-aligned producers. Absent on older events — consumers fall back to
+    # their prior behaviour.
+    insurance: Optional[EpcrBillingInsuranceBlock] = None
+    certification: Optional[EpcrBillingCertificationBlock] = None
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 
