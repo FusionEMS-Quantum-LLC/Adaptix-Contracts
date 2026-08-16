@@ -38,22 +38,35 @@ from adaptix_contracts.schemas.legal_execution_contracts import (
     TenantContractStatusMap as TenantContractStatusMap,
 )
 from adaptix_contracts.event_contracts import (
+    BILLING_SERVICE_CONSUMER as BILLING_SERVICE_CONSUMER,
+    CAD_SERVICE_CONSUMER as CAD_SERVICE_CONSUMER,
+    EPCR_SERVICE_CONSUMER as EPCR_SERVICE_CONSUMER,
     EventMetadata as EventMetadata,
     EventSchema as EventSchema,
     EventValidator as EventValidator,
+    HOSPITAL_SERVICE_CONSUMER as HOSPITAL_SERVICE_CONSUMER,
+    KNOWN_EVENT_BUS_CONSUMERS as KNOWN_EVENT_BUS_CONSUMERS,
+    KnownEventBusConsumerName as KnownEventBusConsumerName,
     LocalEventConsumerRegistry as LocalEventConsumerRegistry,
+    is_known_event_bus_consumer as is_known_event_bus_consumer,
 )
 
 
 def _resolve_version() -> str:
     """Resolve the package version from installed metadata or ``pyproject.toml``."""
 
+    pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    if pyproject_path.exists():
+        project_config = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+        return str(project_config["project"]["version"])
+
     try:
         return version("adaptix-contracts")
     except PackageNotFoundError:
-        pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
-        project_config = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
-        return str(project_config["project"]["version"])
+        raise RuntimeError(
+            "adaptix-contracts version metadata is unavailable and pyproject.toml "
+            "could not be found beside the source tree"
+        ) from None
 
 
 __version__ = _resolve_version()

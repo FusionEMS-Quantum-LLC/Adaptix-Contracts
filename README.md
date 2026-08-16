@@ -1,6 +1,6 @@
 # Adaptix Contracts
 
-**Version:** 2.2.0
+**Version:** 2.8.0
 
 Canonical shared cross-domain schema definitions for the Adaptix polyrepo platform.
 
@@ -13,6 +13,22 @@ communication across all Adaptix services. It is the single source of truth for:
 - **Request/Response contracts** - API request and response schemas
 - **Read-only contracts** - Cross-domain data transfer objects
 - **Shared enums** - Canonical status and type enumerations
+
+## Core event-bus consumer names
+
+`adaptix_contracts.event_consumers` is the canonical registry for Core durable
+event-bus consumer identifiers. The currently audited names are:
+
+- `BILLING_SERVICE_CONSUMER = "billing-service"`
+- `CAD_SERVICE_CONSUMER = "cad-service"`
+- `EPCR_SERVICE_CONSUMER = "epcr-service"`
+- `HOSPITAL_SERVICE_CONSUMER = "hospital-service"`
+
+Pass one of those constants to
+`EventBusPublisherClient.get_pending_events_unfiltered`,
+`.mark_delivered`, and `.mark_failed`. In `2.8.0`, omitted `consumer=None`
+still works for migration lanes but emits `FutureWarning`; the planned `2.9.0`
+hard break will reject omitted consumer names.
 
 ## Package Structure
 
