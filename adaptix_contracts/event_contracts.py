@@ -189,7 +189,10 @@ class EventBusPublisherClient:
     """
 
     LEGACY_SHARED_QUEUE_DEPRECATION_VERSION = "2.8.0"
-    LEGACY_SHARED_QUEUE_REMOVAL_VERSION = "2.9.0"
+    # Removing the omitted-consumer path NARROWS accepted values, which
+    # DEPRECATION_POLICY.md reserves for a major release. 2.9.0 shipped without
+    # the hard break; the removal target is the next major.
+    LEGACY_SHARED_QUEUE_REMOVAL_VERSION = "3.0.0"
 
     @staticmethod
     def _consumer_param(

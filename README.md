@@ -1,6 +1,6 @@
 # Adaptix Contracts
 
-**Version:** 2.8.0
+**Version:** 2.9.0
 
 Canonical shared cross-domain schema definitions for the Adaptix polyrepo platform.
 
@@ -26,9 +26,11 @@ event-bus consumer identifiers. The currently audited names are:
 
 Pass one of those constants to
 `EventBusPublisherClient.get_pending_events_unfiltered`,
-`.mark_delivered`, and `.mark_failed`. In `2.8.0`, omitted `consumer=None`
-still works for migration lanes but emits `FutureWarning`; the planned `2.9.0`
-hard break will reject omitted consumer names.
+`.mark_delivered`, and `.mark_failed`. Omitted `consumer=None` still works for
+migration lanes but emits `FutureWarning`. The hard break did **not** ship in
+`2.9.0`: rejecting a previously accepted call narrows accepted values, which
+[`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) reserves for a major release,
+so the removal target is `3.0.0`.
 
 ## Package Structure
 
@@ -52,6 +54,7 @@ adaptix_contracts/
     ├── fire_contracts.py
     ├── legal_execution_contracts.py
     ├── metrics_contracts.py
+    ├── migration_contracts.py
     ├── nemsis_exports.py
     ├── ocr_contracts.py
     ├── patient_portal_contracts.py
@@ -78,7 +81,7 @@ inventory is the validator output from `python validate_contracts.py --json`.
 - **feature_flag** - Feature flag resolution
 - **workflow** - Long-running workflows and orchestration
 
-### Billing Domain (8 modules)
+### Billing Domain (7 modules)
 
 - **billing** - Core claim lifecycle, payments, denials
 - **billing_auth** - Billing portal authentication
@@ -86,6 +89,9 @@ inventory is the validator output from `python validate_contracts.py --json`.
 - **billing_eligibility** - Insurance verification
 - **billing_portal** - Portal UI contracts
 - **billing_transport** - Billing-transport readiness
+- **migration** - Billing-vendor migration lifecycle, guarded state machine,
+  source lineage, field-mapping proposals, reconciliation controls, exception
+  groups, cutover sign-off, and the migration error taxonomy
 
 ### Clinical & Operations
 
@@ -273,8 +279,8 @@ This validates:
 - All expected domains are covered, with any additional domains reported
 - Sample models can be instantiated
 
-The current validator report on this branch emits 813 public exports, 633
-models, and 169 enums.
+The current validator report on this branch emits 922 public exports, 705
+models, and 197 enums.
 
 Run the automated regression suite for export integrity, schema serialization,
 and representative validation failures:

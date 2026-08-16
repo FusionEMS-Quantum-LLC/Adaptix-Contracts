@@ -6,9 +6,11 @@ only when current fleet code or runtime evidence proves the consumer exists; do
 not invent speculative placeholders.
 
 The 2.8.0 migration path keeps the legacy "omit consumer => shared queue" shape
-temporarily for not-yet-migrated callers. The 2.9.0 follow-up removes that
-legacy path, so callers should import one of these constants and pass it
-explicitly now.
+temporarily for not-yet-migrated callers, and 2.9.0 still keeps it: removing it
+narrows accepted values, which ``DEPRECATION_POLICY.md`` reserves for a major
+release, so the hard break moved to 3.0.0. Omitting the consumer still emits
+``FutureWarning`` today, so callers should import one of these constants and
+pass it explicitly now.
 """
 
 from __future__ import annotations

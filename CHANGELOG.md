@@ -7,7 +7,121 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.8.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.9.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.9.0]
+
+### Added — canonical billing-vendor migration contracts
+
+New module `adaptix_contracts/schemas/migration_contracts.py` (+36 public
+exports: 23 models, 6 enums, 3 constants, 3 field-type aliases, 1 pure
+function). Purely additive; no existing symbol changed, renamed, or removed.
+
+The migration subsystem in `Adaptix-Billing-Service` is real and running, but at
+`origin/main` (read 2026-08-16) it defines **zero `Enum` classes** and carries
+five mutually disjoint bare-string status vocabularies —
+`BillingMigrationJob.status`
+(`backend/billing_app/services/migration/migration_service.py:31`, dict keys
+only), `MigrationIntake.status` and `ImportBatch.status`
+(`backend/billing_app/models/migration_imports.py:30, :48`),
+`CommercialInquiry` "migration" status (declared nowhere, hardcoded in
+`backend/billing_app/api/migration.py:150`), and `CortexWhispererRun.status`
+(`backend/billing_app/models/migration_whisperer.py:29`) — plus three
+orthogonal axes (`mapping_state`, `commit_status`, `cortex_status`). None of
+those legacy vocabularies is removed or renamed here; they remain their own
+tables' persisted values. This module adds the canonical cross-service
+vocabulary they map onto.
+
+Added surface:
+
+- `MigrationState` (26 states), `MigrationEraState` (16), plus
+  `MIGRATION_STATE_TRANSITIONS` (a `frozenset` of legal successors per state),
+  `MIGRATION_TERMINAL_STATES`, and the pure guard
+  `is_legal_migration_transition(current, target) -> bool`. Guarded transitions
+  are a contract requirement: at
+  `backend/billing_app/api/migration_intelligence_routes.py:715` the live commit
+  endpoint assigns `job.status = "completed"` on a job created at `"pending"`
+  (`:192`) — an illegal jump under that service's own `_VALID_TRANSITIONS`,
+  whose guard `update_migration_status`
+  (`services/migration/migration_service.py:65`) has **zero callers**. A UI
+  button must never be able to advance state. The guard fails CLOSED on any
+  unrecognized value and rejects self-transitions. The 26-state edge set is
+  canonically defined in this module; no prior machine-readable definition
+  existed in the workspace.
+- `MappingDecisionLevel`, `MigrationExceptionCategory`,
+  `MigrationReconciliationStatus` (prefixed because `ReconciliationStatus` is
+  already the finance domain's), and `MigrationErrorCode` (23 codes incl.
+  `stedi_*`, `sagemaker_unavailable`, `model_guardrail`, `temporal_delayed`,
+  `database_transient`/`_permanent`, `object_store`, `queue_dlq`,
+  `internal_invariant`) with the `MigrationError` model carrying `code`,
+  `retryable` (defaults `False` so an unclassified failure is never retried),
+  `user_safe_message`, `operator_diagnostic`, and `correlation_id`. This is the
+  replacement for free-text `row.commit_error = f"{type(exc).__name__}: {exc}"`
+  (`api/migration_intelligence_routes.py:621, 664, 709`), which cannot be
+  counted, alerted on, or retried by class. It is deliberately NOT merged into
+  `error_contracts.ErrorCode`, which is the HTTP-envelope vocabulary.
+- Records: `MigrationSourceFile`, `SourceSchemaFingerprint`, `VendorProfileRef`,
+  `FieldMappingProposal`, `ReconciliationControl`, `ReconciliationRunResult`,
+  `MigrationExceptionGroup`, `CutoverWatermark`, `MigrationSignoff`. Each is
+  tenant-scoped (`tenant_id` required), stamped with `schema_version`, and
+  carries `correlation_id` plus a `record_version` for the optimistic-concurrency
+  conflict `MigrationErrorCode.OPTIMISTIC_CONFLICT` reports.
+- Events: `MigrationCreated`, `SourceRegistered`, `SourceFileLanded`,
+  `SourceProfiled`, `MappingProposed`, `MappingApproved`, `DryRunCompleted`,
+  `MigrationExceptionRaised`, `ReconciliationCompleted`, `CutoverApproved`,
+  `OpenARActivated`, `MigrationCompleted`, `MigrationRolledBack`. `tenant_id` is
+  REQUIRED on every one (the Core relay refuses tenant-less events); every other
+  field is optional so a producer that has not yet collected a fact emits a
+  valid event instead of raising inside a consumer's `except` — the exact defect
+  recorded for `epcr.chart.finalized` in 2.5.0 above.
+
+Money is **signed integer cents declared `strict`**, so a float is rejected
+rather than coerced — `100.0` is refused as firmly as `100.5`, because a lax
+`int` field accepts a zero-fraction float and that is how a rounding defect
+enters a financial migration unnoticed. This matches the persisted reality:
+every money column on the migration path is `BigInteger` cents
+(`models/migration_staging.py:80-82, 132-133, 189`;
+`models/migration_imports.py:134`) with no `Numeric` and no `Float`.
+`difference_cents` is deliberately unconstrained in sign — production below
+source is the direction that loses an agency money and must be representable.
+`VendorProfileRef.vendor` reuses the existing `MigrationSourceVendor` enum
+rather than duplicating it; Stedi remains the only live clearinghouse.
+
+No field, default, docstring, or example carries PHI. Operator-facing sample
+fields are named `*_masked_*` and are contractually required to be redacted by
+the producer before publication.
+
+**Not yet on the event bus.** At `origin/main` the migration subsystem publishes
+nothing to the Adaptix bus: its `event_type` strings are written to
+`billing_migration_audit_events` rows via the local `_audit_migration_event`
+helper (`api/migration_intelligence_routes.py:128`), and no migration module
+imports `EventSchema`/`EventMetadata`. These event types are therefore **not**
+registered in `adaptix_contracts.events.registry.ALL_EVENTS`, and publishing one
+through the operational envelope will fail `assert_event_type_registered` until
+registration lands with a real producer file citation. Registration is
+deliberately deferred: the registry requires evidence of a live publisher.
+`MigrationCreated.event_type` reuses the live audit value `"migration.created"`
+(`api/migration_intelligence_routes.py:201`) because it marks the same act.
+
+Producers: `Adaptix-Billing-Service` migration subsystem and
+`Adaptix-Imports-Service` (source ingest/profiling). Consumers: the Billing
+migration cockpit in `Adaptix-Web-App`, `Adaptix-Audit-Service` for the evidence
+trail, and `Adaptix-Finance-Service` for AR continuity. Tests:
+`tests/test_migration_contracts.py` (202 cases) pins enum round-trips, transition
+legality in both directions, graph integrity (every state keyed, every target
+real, terminals empty, no self-edges, every state reachable from `DRAFT`,
+rollback unreachable before cutover), float rejection on all 14 money fields, and
+`tenant_id` on all 13 events.
+
+### Changed — the legacy shared-queue hard break moved to `3.0.0`
+
+`EventBusPublisherClient.LEGACY_SHARED_QUEUE_REMOVAL_VERSION` said `"2.9.0"`,
+and `README.md` plus `event_consumers.py` promised the omitted-consumer hard
+break would land in that release. It did **not** land in 2.9.0, and it should
+not have been targeted there: rejecting a previously accepted call narrows
+accepted values, which `DEPRECATION_POLICY.md` reserves for a **major** release.
+The constant and both prose sites now name `3.0.0`. No behavior changed —
+omitting `consumer` still works and still emits `FutureWarning`.
 
 ## [2.8.0]
 
