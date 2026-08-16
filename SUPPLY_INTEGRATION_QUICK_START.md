@@ -446,4 +446,6 @@ await NarcoticsIntegrationService.on_chain_of_custody_entry(
 
 5. **Validate end-to-end**
 
-All integrations are production-ready. Zero mocks anywhere.
+Integrations in this guide are code-present only. They are PARTIAL / NOT TIER 5
+until each path has live runtime proof. Do not treat this document as a
+production-ready or GO certification.

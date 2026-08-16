@@ -866,8 +866,9 @@ async def test_chain_of_custody_immutability():
 
 ## Real Integrations
 
-All integrations are **production-ready with real notifications, real search,
-real analytics, and real audit trails**:
+All integrations described here are **code-present**. They are PARTIAL / NOT
+TIER 5 until live runtime proof exists for notifications, search, analytics,
+and audit trails:
 
 - **Notifications**: SMS/email/push via Notifications Service
 - **Search**: Full-text search via Elasticsearch/OpenSearch
