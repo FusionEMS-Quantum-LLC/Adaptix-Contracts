@@ -7,7 +7,56 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.9.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.10.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.10.0]
+
+### Deprecated (import path preserved, fully functional; emits `DeprecationWarning` on instantiation)
+
+- **docuseal_contracts:** `DocuSealPackageCreateRequest`, `DocuSealPackageResponse`
+  are non-canonical and deprecated. **TrustSign is the only active AdaptixCore
+  electronic-signature authority** — this is platform law, independently
+  enforced in Adaptix-Governance (`registries/providers.yml` `trustsign`
+  entry), Adaptix-Gateway (`README.md` "Does NOT own": *"TrustSign is the
+  only AdaptixCore e-signature system. Do not treat Dropbox Sign or DocuSeal
+  as the live signer"*), and Adaptix-Billing-Service
+  (`TRUSTSIGN_BUILD_DIRECTIVE.md`, AST-enforced by
+  `test_signature_provider_authority.py`). Codified in this repo for the
+  first time as the README "Canonical signature provider" section (this
+  law previously lived only in Adaptix-Gateway's README).
+  - These two models were added in 1.5.0 (#94) alongside the other
+    service-separation contracts (`cortex_contracts`, `trustsign_contracts`,
+    `sagemaker_contracts`, `gateway_contracts`) and were never adopted.
+  - **Non-breaking. Zero consumer action required.** Re-verified 2026-08-16
+    (not merely re-trusting the prior 3-day-old discovery): repo-wide grep
+    of this package, an org-wide GitHub code search across every
+    FusionEMS-Quantum-LLC repo, and a direct clone-and-grep spot check of 8
+    repos (`Adaptix-DocuSeal-Service`, `Adaptix-TrustSign-Service`,
+    `Adaptix-Gateway`, `Adaptix-Billing-Service`, `Adaptix-CAD-Service`,
+    `Adaptix-Core-Service`, `Adaptix-Partner-Service`,
+    `Adaptix-EPCR-Service`) all found **zero** imports of
+    `docuseal_contracts`, `DocuSealPackageCreateRequest`, or
+    `DocuSealPackageResponse`. Notably, the standalone
+    `Adaptix-DocuSeal-Service` does not consume these contracts either — it
+    defines and uses its own local `backend/app/schemas/docuseal_package.py`.
+  - Per `DEPRECATION_POLICY.md`: the import path is preserved, both models
+    remain fully functional and exported through `schemas.__all__` and the
+    package root (no API-surface removal — this is an announcement, not a
+    breaking change), and a `DeprecationWarning` now fires on
+    **instantiation** of either model (not on import — `docuseal_contracts`
+    is eagerly imported by `adaptix_contracts.schemas`, so a module-level
+    warning would have fired for all 26 pinned consumer repos on every
+    `import adaptix_contracts` regardless of whether they use DocuSeal;
+    instantiation-time warning via `model_post_init` only fires for the
+    (currently zero) real callers). Replacement:
+    `trustsign_contracts.SignaturePackageCreateRequest` /
+    `SignaturePackageResponse`. Removal is deferred to the next major
+    version (3.0.0), per policy, coordinated through the consumer bump
+    matrix at removal time.
+  - Regression coverage added: `tests/test_deprecated_docuseal_contracts.py`
+    pins the warning, proves the legacy shape still validates during the
+    overlap period, and proves the canonical TrustSign surface (and the
+    normal package import path) stay warning-free.
 
 ## [2.9.0]
 
