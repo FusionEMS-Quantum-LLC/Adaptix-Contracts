@@ -38,6 +38,8 @@ MCP_TOOL_CONTRACT_VERSION = "1.0.0"
 
 
 class ReadOrWrite(str, Enum):
+    """Whether an MCP tool reads or has a side effect (writes)."""
+
     READ = "read"
     WRITE = "write"
 
@@ -72,11 +74,13 @@ class MCPToolContractError(ValueError):
 
 
 @dataclass(frozen=True)
-class MCPToolContract:
+class MCPToolContract:  # pylint: disable=too-many-instance-attributes
     """The complete, declared contract for one MCP-exposed Adaptix tool.
 
-    All fields are required. If any field is unknown, the tool is not eligible
-    for MCP exposure — construct-time and :meth:`validate` both enforce this.
+    All 13 fields are required by the directive's tool-contract spec — the high
+    attribute count is intentional, not accidental. If any field is unknown, the
+    tool is not eligible for MCP exposure; construct-time and :meth:`validate`
+    both enforce this.
     """
 
     tool_name: str
@@ -93,67 +97,67 @@ class MCPToolContract:
     approval_required: bool
     idempotency_required: bool
 
+    _REQUIRED_STRING_FIELDS = (
+        "tool_name",
+        "contract_version",
+        "domain",
+        "description",
+        "required_adaptix_permission",
+        "required_service_scope",
+        "target_service",
+    )
+
     def validate(self) -> None:
         """Enforce every hard invariant. Raises :class:`MCPToolContractError`.
 
         The broker calls this before ever admitting a tool to the registry.
+        Each rule group lives in a small helper so this stays flat and cheap to
+        reason about.
         """
 
-        # 1. Required non-empty string fields.
-        for name in (
-            "tool_name",
-            "contract_version",
-            "domain",
-            "description",
-            "required_adaptix_permission",
-            "required_service_scope",
-            "target_service",
-        ):
+        self._check_required_fields()
+        self._check_name_and_classification()
+        self._check_risk_and_write_consistency()
+        self._check_phi_consistency()
+
+    def _check_required_fields(self) -> None:
+        for name in self._REQUIRED_STRING_FIELDS:
             value = getattr(self, name)
             if not value or not str(value).strip():
                 raise MCPToolContractError(
                     f"tool contract field {name!r} is required and non-empty"
                 )
 
-        # 2. Forbidden generic-primitive names — no exceptions.
+    def _check_name_and_classification(self) -> None:
+        # Forbidden generic-primitive names — no exceptions.
         if self.tool_name in FORBIDDEN_TOOL_NAMES:
             raise MCPToolContractError(
                 f"tool name {self.tool_name!r} is permanently forbidden from MCP exposure"
             )
-
-        # 3. SECRET never crosses MCP.
+        # SECRET never crosses MCP.
         if not data_classification_allows_mcp(self.data_classification):
             raise MCPToolContractError(
                 f"data_classification {self.data_classification!r} is not exposable through MCP"
             )
 
-        # 4. FORBIDDEN risk class is never exposable.
+    def _check_risk_and_write_consistency(self) -> None:
+        # FORBIDDEN risk class is never exposable.
         if self.risk_class == ToolRiskClass.FORBIDDEN:
             raise MCPToolContractError("FORBIDDEN risk_class tools cannot be exposed")
 
-        # 5. read_or_write must agree with risk_class.
         is_write = tool_is_write(self.risk_class)
-        if is_write and self.read_or_write != ReadOrWrite.WRITE:
+        if is_write != (self.read_or_write == ReadOrWrite.WRITE):
             raise MCPToolContractError(
-                "side-effecting risk_class must be declared read_or_write=WRITE"
-            )
-        if not is_write and self.read_or_write == ReadOrWrite.WRITE:
-            raise MCPToolContractError(
-                "read_or_write=WRITE requires a side-effecting risk_class"
+                "read_or_write must agree with risk_class (write iff side-effecting)"
             )
 
-        # 6. Any write requires approval AND idempotency (Step 22 / Step 24).
-        if is_write:
-            if not self.approval_required:
-                raise MCPToolContractError(
-                    "write tools must set approval_required=True"
-                )
-            if not self.idempotency_required:
-                raise MCPToolContractError(
-                    "write tools must set idempotency_required=True"
-                )
+        # Any write requires approval AND idempotency (Step 22 / Step 24).
+        if is_write and not (self.approval_required and self.idempotency_required):
+            raise MCPToolContractError(
+                "write tools must set approval_required and idempotency_required"
+            )
 
-        # 7. possible_phi must be consistent with data_classification.
+    def _check_phi_consistency(self) -> None:
         if self.possible_phi and not data_classification_is_phi(
             self.data_classification
         ):
