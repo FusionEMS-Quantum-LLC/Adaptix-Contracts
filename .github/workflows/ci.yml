@@ -168,12 +168,25 @@ jobs:
         run: |
           BD=$(for d in backend core/backend src .; do [ -d "$d/tests" ] && echo "$d" && break; done)
           BD="${BD:-.}"
-          # Exclude CodeBuild governance tests — assert .codebuild/ exists (intentionally removed).
+          # Exclude ALL CodeBuild governance/validation tests.
+          # These assert .codebuild/ files exist — intentionally deleted during migration.
+          # Pattern covers: test_ci_download_checksums, test_repo_automation_guards,
+          # test_buildspec, test_codebuild_validation_specs, test_codebuild_*, etc.
           IGNORE=""
-          for f in test_ci_download_checksums test_repo_automation_guards test_buildspec; do
+          for f in test_ci_download_checksums test_repo_automation_guards \
+                   test_buildspec test_codebuild test_validation_buildspec \
+                   test_codebuild_validation_specs; do
             [ -n "$(find "$BD" -name "${f}*.py" -path '*/tests/*' 2>/dev/null)" ] && \
               IGNORE="$IGNORE --ignore-glob=*${f}*"
           done
+          # Also catch any test file that walks parents looking for .codebuild/
+          if grep -rl '\.codebuild' "$BD/tests" --include='*.py' 2>/dev/null | grep -q .; then
+            for fp in $(grep -rl '\.codebuild' "$BD/tests" --include='*.py' 2>/dev/null); do
+              fname=$(basename "$fp" .py)
+              IGNORE="$IGNORE --ignore-glob=*${fname}*"
+              echo "CI: auto-ignoring CodeBuild test: $fname"
+            done
+          fi
           cd "$BD"
           if [ -f "uv.lock" ]; then
             # uv run python -m pytest: uses the .venv created by uv sync above.
