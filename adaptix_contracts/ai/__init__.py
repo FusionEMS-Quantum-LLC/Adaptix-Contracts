@@ -22,6 +22,31 @@ from .smart_text import (
     SmartTextCapability,
 )
 from .audit import AIAuditPolicy, AIAuditEvent, AIAuditEventType
+from .connection import (
+    AI_CONNECTION_CONTRACT_VERSION,
+    AIProviderKey,
+    AIExecutionMode,
+    ExternalClientType,
+    PolicyDecision,
+    ToolRiskClass,
+    DataClassification,
+    EffectivePolicyDecision,
+    PolicyReasonCode,
+    tool_risk_rank,
+    tool_is_write,
+    data_classification_allows_mcp,
+    data_classification_is_phi,
+    allow,
+    deny,
+    approval_required,
+)
+from .mcp_tools import (
+    MCP_TOOL_CONTRACT_VERSION,
+    ReadOrWrite,
+    MCPToolContract,
+    MCPToolContractError,
+    FORBIDDEN_TOOL_NAMES,
+)
 
 __all__ = [
     "AIProviderStatus",
@@ -44,4 +69,26 @@ __all__ = [
     "AIAuditPolicy",
     "AIAuditEvent",
     "AIAuditEventType",
+    # AI & Agent Connection control plane (v1)
+    "AI_CONNECTION_CONTRACT_VERSION",
+    "AIProviderKey",
+    "AIExecutionMode",
+    "ExternalClientType",
+    "PolicyDecision",
+    "ToolRiskClass",
+    "DataClassification",
+    "EffectivePolicyDecision",
+    "PolicyReasonCode",
+    "tool_risk_rank",
+    "tool_is_write",
+    "data_classification_allows_mcp",
+    "data_classification_is_phi",
+    "allow",
+    "deny",
+    "approval_required",
+    "MCP_TOOL_CONTRACT_VERSION",
+    "ReadOrWrite",
+    "MCPToolContract",
+    "MCPToolContractError",
+    "FORBIDDEN_TOOL_NAMES",
 ]

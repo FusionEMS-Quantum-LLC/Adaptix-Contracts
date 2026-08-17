@@ -94,6 +94,24 @@ class ServiceTokenClaims(BaseModel):
     scene_request_id: str | None = Field(
         default=None, description="Bound source scene-request id"
     )
+    # --- Additive AI & Agent Connection claims (v1, optional; never required) ---
+    # Added for the MCP Tool Broker -> downstream S2S path. These are identity
+    # and authorization metadata ONLY. No patient name/DOB/MRN/SSN, no claim
+    # details, no medical data, no prompt content, and no tool payload may ever
+    # be placed in a service token. Older tokens without these claims remain
+    # valid — this does not change the core RS256 trust model or bump the
+    # required schema version.
+    workspace_key: str | None = Field(
+        default=None,
+        description="Canonical validated workspace key the call is scoped to",
+    )
+    delegation_grant_id: str | None = Field(
+        default=None,
+        description="External connection grant id the call acts under (audit)",
+    )
+    tool_call_id: str | None = Field(
+        default=None, description="Correlation id of the originating MCP tool call"
+    )
     ver: int = Field(default=SERVICE_TOKEN_VERSION, description="Claims schema version")
 
 
@@ -109,6 +127,9 @@ def issue_service_token(
     actor_sub: str | None = None,
     correlation_id: str | None = None,
     scene_request_id: str | None = None,
+    workspace_key: str | None = None,
+    delegation_grant_id: str | None = None,
+    tool_call_id: str | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
     now: datetime | None = None,
 ) -> str:
@@ -148,6 +169,12 @@ def issue_service_token(
         payload["correlation_id"] = correlation_id
     if scene_request_id:
         payload["scene_request_id"] = scene_request_id
+    if workspace_key:
+        payload["workspace_key"] = workspace_key
+    if delegation_grant_id:
+        payload["delegation_grant_id"] = delegation_grant_id
+    if tool_call_id:
+        payload["tool_call_id"] = tool_call_id
 
     headers = {"kid": kid} if kid else None
     return jwt.encode(payload, private_key_pem, algorithm=_ALGORITHM, headers=headers)
