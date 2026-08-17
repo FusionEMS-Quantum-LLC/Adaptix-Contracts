@@ -139,7 +139,9 @@ class DataClassification(str, Enum):
     PHI = "PHI"
     FINANCIAL = "FINANCIAL"
     SECURITY_SENSITIVE = "SECURITY_SENSITIVE"
-    SECRET = "SECRET"
+    # Data-sensitivity *label*, not a credential. Secret scanners pattern-match
+    # the identifier/value pair; suppress the false positive explicitly.
+    SECRET = "SECRET"  # nosec B105 B106  # noqa: S105,S106
 
 
 def data_classification_allows_mcp(classification: DataClassification | str) -> bool:
@@ -210,6 +212,13 @@ class EffectivePolicyDecision:
 # Stable reason codes shared across the policy plane. Consumers should prefer
 # these constants over string literals so audit/metrics stay consistent.
 class PolicyReasonCode(str, Enum):
+    """Stable machine reason codes shared across the AI policy plane.
+
+    Consumers should prefer these constants over string literals so audit and
+    metrics dimensions stay consistent. Codes are operator-safe: they never
+    embed host names, secrets, or internal policy detail.
+    """
+
     ALLOWED = "ALLOWED"
     APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
     # Provider / Claude Direct
