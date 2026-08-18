@@ -35,7 +35,9 @@ class CrrCampaign(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     campaign_id: str = Field(..., description="Stable per-tenant campaign identifier")
-    tenant_id: str = Field(..., description="Tenant scope — required for every CRR record")
+    tenant_id: str = Field(
+        ..., description="Tenant scope — required for every CRR record"
+    )
     correlation_id: str = Field(
         ...,
         description=(
@@ -53,7 +55,9 @@ class CrrCampaign(BaseModel):
     start_date: date
     end_date: date | None = None
 
-    status: str = Field(default="planned", description="planned|active|paused|completed|cancelled")
+    status: str = Field(
+        default="planned", description="planned|active|paused|completed|cancelled"
+    )
     owner_user_id: str | None = None
 
     created_at: datetime
