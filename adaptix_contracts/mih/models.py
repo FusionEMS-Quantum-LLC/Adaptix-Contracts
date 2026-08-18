@@ -106,12 +106,8 @@ class MihProgram(_MihBase):
 
     created_by: str | None = None
     updated_by: str | None = None
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -156,9 +152,7 @@ class MihEnrollment(_MihBase):
     )
     consent_obtained_at: datetime | None = None
 
-    referred_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    referred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     enrolled_at: datetime | None = None
     discharged_at: datetime | None = None
     discharge_reason: str | None = Field(default=None, max_length=2000)
@@ -174,12 +168,8 @@ class MihEnrollment(_MihBase):
 
     created_by: str | None = None
     updated_by: str | None = None
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -245,12 +235,8 @@ class MihServicePlan(_MihBase):
 
     created_by: str | None = None
     updated_by: str | None = None
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +275,9 @@ class MihVisitVitalSigns(BaseModel):
     heart_rate: int | None = Field(default=None, ge=0, le=300)
     respiratory_rate: int | None = Field(default=None, ge=0, le=80)
     spo2: int | None = Field(default=None, ge=0, le=100)
-    temperature_c: Decimal | None = Field(default=None, ge=Decimal("20"), le=Decimal("45"))
+    temperature_c: Decimal | None = Field(
+        default=None, ge=Decimal("20"), le=Decimal("45")
+    )
     blood_glucose_mg_dl: int | None = Field(default=None, ge=0, le=1000)
     pain_scale_0_10: int | None = Field(default=None, ge=0, le=10)
 
@@ -333,12 +321,8 @@ class MihVisit(_MihBase):
 
     created_by: str | None = None
     updated_by: str | None = None
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -383,9 +367,7 @@ class MihOutcome(_MihBase):
     total_billable_visit_count: int = Field(default=0, ge=0)
 
     recorded_by: str | None = None
-    recorded_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    recorded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     payload: dict[str, Any] = Field(
         default_factory=dict,
         description="Program-specific outcome fields not modelled above.",
