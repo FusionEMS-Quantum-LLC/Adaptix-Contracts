@@ -13,10 +13,6 @@ Import patterns:
         EpcrChartCreatedEvent,
         TransportRequestCreate,
     )
-
-    # Import a domain subpackage (fire, epcr, neris, crr, citizen, ...)
-    from adaptix_contracts.crr import CrrCampaign, InterventionType
-    from adaptix_contracts.citizen import CitizenAccount, MihBooking
 """
 
 import tomllib
@@ -55,14 +51,13 @@ from adaptix_contracts.event_contracts import (
     is_known_event_bus_consumer as is_known_event_bus_consumer,
 )
 
-# Domain subpackages — imported so ``adaptix_contracts.crr`` (and its siblings)
-# are always resolvable from a plain ``import adaptix_contracts``. Deliberately
-# NOT added to ``__all__``: the surface invariant checked by
-# ``tests/test_contract_surface.py::test_package_root_reexports_schema_symbols``
-# requires ``adaptix_contracts.__all__ == schemas.__all__`` exactly, and
-# subpackages are accessed by dotted name rather than re-exported symbols.
-from adaptix_contracts import crr as crr  # noqa: F401
-from adaptix_contracts import citizen as citizen  # noqa: F401
+# Expose the Adaptix Edge apparatus compute node subpackage (Play P23) as an
+# attribute of the top-level package so ``adaptix_contracts.edge`` resolves
+# without a separate ``import adaptix_contracts.edge`` in downstream code.
+# NOT added to ``__all__`` — that surface deliberately mirrors
+# ``schemas.__all__`` (see
+# ``tests/test_contract_surface.py::test_package_root_reexports_schema_symbols``).
+from adaptix_contracts import edge as edge  # noqa: F401
 
 
 def _resolve_version() -> str:
