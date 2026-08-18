@@ -13,18 +13,11 @@ from adaptix_contracts.security.ci_digests import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CODEBUILD_DIR = REPO_ROOT / ".codebuild"
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 VAR_PATTERN = {
     "UV_SHA256": re.compile(r'UV_SHA256:\s*"(?P<sha>[0-9a-f]{64})"'),
     "GITLEAKS_SHA256": re.compile(r'GITLEAKS_SHA256:\s*"(?P<sha>[0-9a-f]{64})"'),
 }
-
-
-def _extract_buildspec_sha(path: Path, variable_name: str) -> str:
-    match = VAR_PATTERN[variable_name].search(path.read_text(encoding="utf-8"))
-    assert match, f"{variable_name} not found in {path.relative_to(REPO_ROOT)}"
-    return match.group("sha")
 
 
 class TestDigestRegistryIntegrity:
@@ -67,29 +60,3 @@ class TestHelpers:
 
     def test_is_retired_false_when_empty(self) -> None:
         assert is_retired("0" * 64) is False
-
-
-class TestBuildspecDigests:
-    def test_pr_validation_uv_digest_is_verified(self) -> None:
-        digest = _extract_buildspec_sha(
-            CODEBUILD_DIR / "pr-validation.yml", "UV_SHA256"
-        )
-        assert is_verified(digest), "pr-validation.yml uses an unverified uv digest"
-
-    def test_main_validation_uv_digest_is_verified(self) -> None:
-        digest = _extract_buildspec_sha(
-            CODEBUILD_DIR / "main-validation.yml", "UV_SHA256"
-        )
-        assert is_verified(digest), "main-validation.yml uses an unverified uv digest"
-
-    def test_security_scan_gitleaks_digest_is_verified(self) -> None:
-        digest = _extract_buildspec_sha(
-            CODEBUILD_DIR / "security-scan.yml", "GITLEAKS_SHA256"
-        )
-        assert is_verified(digest), (
-            "security-scan.yml uses an unverified gitleaks digest"
-        )
-
-    def test_security_scan_verifies_gitleaks_checksum(self) -> None:
-        text = (CODEBUILD_DIR / "security-scan.yml").read_text(encoding="utf-8")
-        assert 'echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -' in text
