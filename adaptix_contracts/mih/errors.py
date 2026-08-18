@@ -223,9 +223,7 @@ def payer_not_authorized_for_program(
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.PAYER_NOT_AUTHORIZED_FOR_PROGRAM,
-        message=(
-            f"MIH program {program_id} is not authorized to bill payer {payer}"
-        ),
+        message=(f"MIH program {program_id} is not authorized to bill payer {payer}"),
         trace=trace,
     )
 
