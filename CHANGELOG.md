@@ -7,9 +7,22 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.15.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.16.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
-## [2.15.0]
+## [2.16.0]
+
+### Fixed
+
+- **Version monotonicity:** `pyproject.toml` had been rolled back from
+  `2.15.0` to `2.12.0` by the concurrent `feat(edge)` commit
+  (`cdd94b7`), which regressed the release version below already-shipped
+  values (`2.13.0` MIH-CP bump, `2.14.0` Citizen bump, `2.15.0` from the
+  original necessity subpackage commit `de6bdcc`). Bumped forward to
+  `2.16.0` so the release version is once again monotonically ahead of
+  every previously-published tag, and re-aligned this changelog header
+  and the "current package version" note.
+
+### Added — carried forward from the original 2.15.0 (necessity) entry
 
 ### Added
 
