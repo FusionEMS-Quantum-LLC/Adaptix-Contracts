@@ -142,9 +142,7 @@ class MihDischargedPayload(_MihEventPayload):
     final_status: EnrollmentStatus
     outcome_id: UUID | None = None
     outcome_type: MihOutcomeType | None = None
-    discharged_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    discharged_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     discharge_reason: str | None = None
     total_visit_count: int = Field(default=0, ge=0)
     total_billable_visit_count: int = Field(default=0, ge=0)
@@ -216,9 +214,7 @@ def build_mih_visit_scheduled_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(
-            idempotency_key or f"mih.visit.scheduled:{payload.visit_id}"
-        ),
+        idempotency_key=(idempotency_key or f"mih.visit.scheduled:{payload.visit_id}"),
         source_service=source_service,
     )
 
@@ -238,9 +234,7 @@ def build_mih_visit_completed_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(
-            idempotency_key or f"mih.visit.completed:{payload.visit_id}"
-        ),
+        idempotency_key=(idempotency_key or f"mih.visit.completed:{payload.visit_id}"),
         source_service=source_service,
     )
 
@@ -260,9 +254,7 @@ def build_mih_discharged_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(
-            idempotency_key or f"mih.discharged:{payload.enrollment_id}"
-        ),
+        idempotency_key=(idempotency_key or f"mih.discharged:{payload.enrollment_id}"),
         source_service=source_service,
     )
 
