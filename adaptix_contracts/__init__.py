@@ -13,6 +13,9 @@ Import patterns:
         EpcrChartCreatedEvent,
         TransportRequestCreate,
     )
+
+    # Import a domain subpackage (fire, epcr, neris, crr, ...)
+    from adaptix_contracts.crr import CrrCampaign, InterventionType
 """
 
 import tomllib
@@ -50,6 +53,14 @@ from adaptix_contracts.event_contracts import (
     LocalEventConsumerRegistry as LocalEventConsumerRegistry,
     is_known_event_bus_consumer as is_known_event_bus_consumer,
 )
+
+# Domain subpackages — imported so ``adaptix_contracts.crr`` (and its siblings)
+# are always resolvable from a plain ``import adaptix_contracts``. Deliberately
+# NOT added to ``__all__``: the surface invariant checked by
+# ``tests/test_contract_surface.py::test_package_root_reexports_schema_symbols``
+# requires ``adaptix_contracts.__all__ == schemas.__all__`` exactly, and
+# subpackages are accessed by dotted name rather than re-exported symbols.
+from adaptix_contracts import crr as crr  # noqa: F401
 
 
 def _resolve_version() -> str:
