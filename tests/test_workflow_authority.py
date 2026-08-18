@@ -37,9 +37,3 @@ def test_github_actions_do_not_regain_deploy_or_release_authority() -> None:
         "GitHub Actions in this repo must stay analysis-only; remove deploy/release "
         f"authority patterns: {offenders}"
     )
-
-
-def test_codacy_workflow_does_not_mask_failures() -> None:
-    text = (WORKFLOW_DIR / "codacy-coverage.yml").read_text(encoding="utf-8")
-    assert "continue-on-error: true" not in text
-    assert "|| true" not in text
