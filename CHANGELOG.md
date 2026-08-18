@@ -7,7 +7,37 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.10.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.15.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.15.0]
+
+### Added
+
+- **necessity subpackage (`adaptix_contracts.necessity`)** — canonical
+  contracts for the **Play P02 pre-submit medical-necessity linter** that
+  runs at the ePCR chart-lock boundary before a claim is dropped to the
+  clearinghouse.
+  - Models: `NecessityAssessment`, `NecessityFinding`, `DenialPrediction`,
+    `LcdRule`, `PayerDenialPattern` — with model-level invariants
+    (`verdict` must match findings; `denial_count`/`sample_size` must equal
+    `historical_denial_rate`; observation-window `end` must be on or after
+    `start`; monetary amounts are USD **cents** as `int`, never floats).
+  - Enums: `NecessityVerdict` (`clear` / `warn` / `block`) and `MacRegion`
+    (`Novitas` / `Palmetto` / `NGS` / `FirstCoast` / `WPS` / `Noridian`,
+    CMS-cased so contractor directory imports drop in without a
+    normalisation shim).
+  - Events: `necessity.assessed`, `chart.lock.blocked`, `denial.predicted`
+    registered in `adaptix_contracts.events.registry.ALL_EVENTS` with
+    `source_service="epcr"` (the linter runs inside Adaptix-EPCR-Service;
+    Billing subscribes to `denial.predicted` as a consumer even though the
+    payload is billing-shaped). Payload models `NecessityAssessedEvent`,
+    `ChartLockBlockedEvent`, `DenialPredictedEvent` pin `event_type` with a
+    `Literal[...]` so a wrong-typed emission fails validation at the
+    producer, not at the consumer.
+  - Tests: `tests/test_necessity_contracts.py` covers enum values, the
+    verdict/findings invariant, the denial-arithmetic invariants, the
+    registry wiring for all three event types, and the subpackage export
+    surface.
 
 ## [2.10.0]
 

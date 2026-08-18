@@ -269,6 +269,18 @@ NERIS_SCHEMA_ASSET_REFRESHED: Final[str] = "neris.schema.asset.refreshed"
 NERIS_NORMALIZATION_COMPLETED: Final[str] = "neris.normalization.completed"
 
 # ---------------------------------------------------------------------------
+# Necessity domain events — Play P02 pre-submit medical-necessity linter
+# ---------------------------------------------------------------------------
+# Emitted by Adaptix-EPCR-Service at the pre-submit / chart-lock boundary when
+# the medical-necessity linter runs. All three are ``source_service="epcr"``
+# because the linter executes inside the ePCR service — Billing subscribes to
+# ``denial.predicted`` as a consumer even though the payload is billing-shaped.
+# See adaptix_contracts/necessity/events.py for the payload models.
+NECESSITY_ASSESSED: Final[str] = "necessity.assessed"
+CHART_LOCK_BLOCKED: Final[str] = "chart.lock.blocked"
+DENIAL_PREDICTED: Final[str] = "denial.predicted"
+
+# ---------------------------------------------------------------------------
 # Scheduling Events
 # ---------------------------------------------------------------------------
 SCHEDULING_EVENTS = ALL_SCHEDULING_EVENTS
@@ -395,6 +407,12 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
         "version": "1.0",
         "source_service": "neris",
     },
+    # Play P02 pre-submit medical-necessity linter — producer is the ePCR
+    # pre-submit / chart-lock code path in Adaptix-EPCR-Service. Payload models
+    # live in adaptix_contracts/necessity/events.py.
+    NECESSITY_ASSESSED: {"version": "1.0", "source_service": "epcr"},
+    CHART_LOCK_BLOCKED: {"version": "1.0", "source_service": "epcr"},
+    DENIAL_PREDICTED: {"version": "1.0", "source_service": "epcr"},
 }
 
 for event_name in SCHEDULING_EVENTS:
@@ -507,12 +525,14 @@ __all__ = [
     "CAREGRAPH_NODE_CREATED",
     "CAREGRAPH_NODE_REVIEWED",
     "CAREGRAPH_NODE_RULED_OUT",
+    "CHART_LOCK_BLOCKED",
     "CPAE_FINDING_ACCEPTED",
     "CPAE_FINDING_AMENDED",
     "CPAE_FINDING_CONTRADICTION_DETECTED",
     "CPAE_FINDING_CREATED",
     "CPAE_FINDING_PROPOSED",
     "CPAE_FINDING_REJECTED",
+    "DENIAL_PREDICTED",
     "EPCR_CHART_AMENDED",
     "EPCR_CHART_BILLING_HANDOFF",
     "EPCR_CHART_CREATED",
@@ -542,6 +562,7 @@ __all__ = [
     "FLEET_VEHICLE_OUT_OF_SERVICE",
     "HOSPITAL_CATH_LAB_ACTIVATE_RECOMMENDED",
     "LEGACY_SOURCE_SERVICE_ALIASES",
+    "NECESSITY_ASSESSED",
     "NERIS_AUDIT_EVENT_CREATED",
     "NERIS_NORMALIZATION_COMPLETED",
     "NERIS_SCHEMA_ASSET_REFRESHED",
