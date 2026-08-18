@@ -239,9 +239,7 @@ class NecessityFinding(BaseModel):
             "the maximum of finding severities (BLOCK > WARN > CLEAR)."
         ),
     )
-    message: str = Field(
-        ..., description="Human-readable message for the reviewer UI"
-    )
+    message: str = Field(..., description="Human-readable message for the reviewer UI")
     cpt_code: Optional[str] = Field(
         None, description="CPT/HCPCS the finding is anchored to"
     )
@@ -359,9 +357,7 @@ class NecessityAssessment(BaseModel):
                 "blocking findings"
             )
         if self.verdict is NecessityVerdict.CLEAR and (blocking or has_warn):
-            raise ValueError(
-                "verdict=CLEAR requires no blocking or WARN findings"
-            )
+            raise ValueError("verdict=CLEAR requires no blocking or WARN findings")
         return self
 
 
