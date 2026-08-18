@@ -207,8 +207,11 @@ def test_payer_pattern_rate_must_match_denial_over_sample() -> None:
 
 
 def test_payer_pattern_rejects_denial_count_over_sample_size() -> None:
+    # Use a rate value that passes the Field le=1.0 bound so the model_validator
+    # (not the field-level validator) is the code path under test. Passing 1.1
+    # here would trip the field bound first and never reach _check_denial_count.
     with pytest.raises(ValueError, match="cannot exceed sample_size"):
-        _pattern(sample_size=10, denial_count=11, historical_denial_rate=1.1)
+        _pattern(sample_size=10, denial_count=11, historical_denial_rate=1.0)
 
 
 def test_payer_pattern_rejects_window_end_before_start() -> None:

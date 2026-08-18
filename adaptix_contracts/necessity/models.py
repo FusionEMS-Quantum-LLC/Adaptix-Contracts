@@ -27,7 +27,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from adaptix_contracts.necessity.enums import MacRegion, NecessityVerdict
 
@@ -85,8 +85,7 @@ class LcdRule(BaseModel):
         None, description="CMS Coverage Database URL for this LCD revision"
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PayerDenialPattern(BaseModel):
@@ -135,8 +134,7 @@ class PayerDenialPattern(BaseModel):
         ..., description="When this row was (re)computed by the analytics pipeline"
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="after")
     def _check_denial_count_within_sample(self) -> "PayerDenialPattern":
@@ -207,8 +205,7 @@ class DenialPrediction(BaseModel):
     top_denial_reason_codes: list[str] = Field(default_factory=list)
     predicted_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NecessityFinding(BaseModel):
@@ -276,8 +273,7 @@ class NecessityFinding(BaseModel):
     )
     surfaced_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NecessityAssessment(BaseModel):
@@ -336,8 +332,7 @@ class NecessityAssessment(BaseModel):
         ..., description="UTC time the linter completed this run"
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="after")
     def _check_verdict_matches_findings(self) -> "NecessityAssessment":
