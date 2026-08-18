@@ -59,9 +59,7 @@ class SafetyPolicy(BaseModel):
         ),
     )
     safety_manager_id: str = Field(
-        description=(
-            "User id of the appointed safety manager (Part 5.25(b))."
-        ),
+        description=("User id of the appointed safety manager (Part 5.25(b))."),
     )
     effective_date: date
     review_due_date: date | None = None
