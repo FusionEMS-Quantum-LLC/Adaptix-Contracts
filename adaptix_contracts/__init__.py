@@ -14,8 +14,9 @@ Import patterns:
         TransportRequestCreate,
     )
 
-    # Import a domain subpackage (fire, epcr, neris, crr, ...)
+    # Import a domain subpackage (fire, epcr, neris, crr, citizen, ...)
     from adaptix_contracts.crr import CrrCampaign, InterventionType
+    from adaptix_contracts.citizen import CitizenAccount, MihBooking
 """
 
 import tomllib
@@ -61,6 +62,7 @@ from adaptix_contracts.event_contracts import (
 # requires ``adaptix_contracts.__all__ == schemas.__all__`` exactly, and
 # subpackages are accessed by dotted name rather than re-exported symbols.
 from adaptix_contracts import crr as crr  # noqa: F401
+from adaptix_contracts import citizen as citizen  # noqa: F401
 
 
 def _resolve_version() -> str:
