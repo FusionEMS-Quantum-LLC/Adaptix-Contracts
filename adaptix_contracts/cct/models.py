@@ -33,7 +33,9 @@ class CctEquipmentLoadout(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     loadout_id: str
-    tenant_id: str = Field(..., description="Tenant scope — required for every CCT record")
+    tenant_id: str = Field(
+        ..., description="Tenant scope — required for every CCT record"
+    )
     correlation_id: str = Field(
         ...,
         description=(
@@ -126,7 +128,9 @@ class ExtendedVital(BaseModel):
     heart_rate: int | None = None
     systolic_bp: int | None = None
     diastolic_bp: int | None = None
-    map_mmhg: float | None = Field(default=None, description="Mean arterial pressure (mmHg)")
+    map_mmhg: float | None = Field(
+        default=None, description="Mean arterial pressure (mmHg)"
+    )
     spo2_pct: float | None = Field(default=None, ge=0, le=100)
     etco2_mmhg: float | None = None
     respiratory_rate: int | None = None
@@ -175,7 +179,8 @@ class CamtsChecklistItem(BaseModel):
     )
     description: str
     is_satisfied: bool | None = Field(
-        default=None, description="None = not yet evaluated; True/False = evaluated outcome."
+        default=None,
+        description="None = not yet evaluated; True/False = evaluated outcome.",
     )
     evidence_notes: str | None = None
 
@@ -224,7 +229,9 @@ class CctMission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mission_id: str = Field(..., description="Stable per-tenant CCT mission identifier")
-    tenant_id: str = Field(..., description="Tenant scope — required for every CCT record")
+    tenant_id: str = Field(
+        ..., description="Tenant scope — required for every CCT record"
+    )
     correlation_id: str = Field(
         ...,
         description=(
