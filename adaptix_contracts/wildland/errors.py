@@ -120,7 +120,8 @@ class WildlandError(Exception):
             effective_trace = AdaptixTraceContext(tenant_id=self.tenant_id)
 
         return WildlandErrorEnvelope(
-            error_code=self.code,
+            error_code=AdaptixErrorCode.VALIDATION_FAILED,
+            wildland_error_code=self.code,
             message=self.message,
             detail=self.detail,
             trace=effective_trace,
@@ -195,15 +196,18 @@ class WildlandIcs209Error(WildlandError):
 class WildlandErrorEnvelope(AdaptixErrorEnvelope):
     """Adaptix HTTP error envelope widened for Wildland-specific codes.
 
-    Overrides only ``error_code`` (widened to accept
-    :class:`WildlandErrorCode`) and adds ``wildland_context`` for
-    structured Wildland-scoped fields (``assignment_id``, ``order_id``
-    …). The envelope shape, timestamp field, trace context, and
-    ``to_http_response`` behaviour are inherited unchanged from
+    ``error_code`` stays a plain :class:`AdaptixErrorCode` (unchanged
+    from the base envelope, so wire consumers built against the
+    platform-wide contract keep working); ``wildland_error_code`` adds
+    the finer-grained :class:`WildlandErrorCode` alongside it, and
+    ``wildland_context`` adds structured Wildland-scoped fields
+    (``assignment_id``, ``order_id`` …). The envelope shape, timestamp
+    field, trace context, and ``to_http_response`` behaviour are
+    inherited unchanged from
     :class:`~adaptix_contracts.errors.envelope.AdaptixErrorEnvelope`.
     """
 
-    error_code: WildlandErrorCode | AdaptixErrorCode
+    wildland_error_code: WildlandErrorCode | None = None
     wildland_context: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
@@ -215,7 +219,8 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         trace: AdaptixTraceContext | None = None,
     ) -> "WildlandErrorEnvelope":
         return cls(
-            error_code=WildlandErrorCode.WILDLAND_ASSIGNMENT_NOT_FOUND,
+            error_code=AdaptixErrorCode.NOT_FOUND,
+            wildland_error_code=WildlandErrorCode.WILDLAND_ASSIGNMENT_NOT_FOUND,
             message=f"Wildland assignment not found: {assignment_id}",
             trace=trace,
             wildland_context={
@@ -237,7 +242,8 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         trace: AdaptixTraceContext | None = None,
     ) -> "WildlandErrorEnvelope":
         return cls(
-            error_code=WildlandErrorCode.WILDLAND_IROC_SYNC_FAILED,
+            error_code=AdaptixErrorCode.PROVIDER_ERROR,
+            wildland_error_code=WildlandErrorCode.WILDLAND_IROC_SYNC_FAILED,
             message=f"IROC sync failed for order {order_id}",
             detail=reason,
             trace=trace,
@@ -253,7 +259,8 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         trace: AdaptixTraceContext | None = None,
     ) -> "WildlandErrorEnvelope":
         return cls(
-            error_code=WildlandErrorCode.WILDLAND_IRWIN_SYNC_FAILED,
+            error_code=AdaptixErrorCode.PROVIDER_ERROR,
+            wildland_error_code=WildlandErrorCode.WILDLAND_IRWIN_SYNC_FAILED,
             message=f"IRWIN sync failed for incident {irwin_incident_id}",
             detail=reason,
             trace=trace,
@@ -269,7 +276,8 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         trace: AdaptixTraceContext | None = None,
     ) -> "WildlandErrorEnvelope":
         return cls(
-            error_code=WildlandErrorCode.WILDLAND_WFDSS_SYNC_FAILED,
+            error_code=AdaptixErrorCode.PROVIDER_ERROR,
+            wildland_error_code=WildlandErrorCode.WILDLAND_WFDSS_SYNC_FAILED,
             message=f"WFDSS sync failed for decision {decision_id}",
             detail=reason,
             trace=trace,
@@ -285,7 +293,8 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         trace: AdaptixTraceContext | None = None,
     ) -> "WildlandErrorEnvelope":
         return cls(
-            error_code=WildlandErrorCode.WILDLAND_ICS209_SECTION_INCOMPLETE,
+            error_code=AdaptixErrorCode.VALIDATION_FAILED,
+            wildland_error_code=WildlandErrorCode.WILDLAND_ICS209_SECTION_INCOMPLETE,
             message=f"ICS-209 report {report_id} missing required section {section}",
             trace=trace,
             wildland_context={"report_id": report_id, "section": section},
@@ -301,7 +310,8 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         trace: AdaptixTraceContext | None = None,
     ) -> "WildlandErrorEnvelope":
         return cls(
-            error_code=WildlandErrorCode.WILDLAND_ASSIGNMENT_TENANT_MISMATCH,
+            error_code=AdaptixErrorCode.FORBIDDEN,
+            wildland_error_code=WildlandErrorCode.WILDLAND_ASSIGNMENT_TENANT_MISMATCH,
             message="Wildland assignment belongs to a different tenant",
             trace=trace,
             wildland_context={
