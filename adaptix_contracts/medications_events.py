@@ -38,6 +38,10 @@ class MedicationEventType(str, Enum):
     RECALL_DETECTED = "medications.recall.detected"
     RECALL_ALERT = "medications.alert.recall"
     EXPIRATION_ALERT = "medications.alert.expiration"
+    # Emitted by Adaptix-Medications-Service's drug-shortage matcher when one of a
+    # tenant's catalog medications is newly matched to a live FDA Drug Shortages
+    # list entry (openFDA ``drug/shortages``); see ``MedicationShortageAlert``.
+    SHORTAGE_ALERT = "medications.alert.shortage"
 
     STOCK_ADJUSTED = "medications.stock.adjusted"
     PROTOCOL_UPDATED = "medications.protocol.updated"
@@ -190,6 +194,44 @@ class MedicationExpirationAlert(BaseModel):
     trace_id: Optional[str] = Field(None)
 
 
+class MedicationShortageAlert(BaseModel):
+    """Alert event when a tenant medication is matched to a live FDA drug-shortage entry.
+
+    Inventory / reference data only — carries no patient linkage. ``match_basis``
+    is ``rxcui`` (the catalog row's RxNorm code appears in the FDA entry's
+    ``openfda.rxcui`` list) or ``generic_name`` (whole-word generic-name match).
+    ``on_hand_units`` is the tenant's real stock-balance total at evaluation time
+    and is ``None`` when no stock row exists — never an estimate.
+    """
+
+    event_type: MedicationEventType = Field(default=MedicationEventType.SHORTAGE_ALERT)
+    tenant_id: UUID = Field(..., description="Tenant context")
+    unit_id: Optional[str] = Field(None, description="Unit/station ID")
+
+    match_id: str = Field(..., description="tenant_drug_shortage_matches row id")
+    medication_id: str = Field(..., description="Medication UUID (tenant catalog row)")
+    medication_name: str = Field(..., description="Medication generic name")
+
+    shortage_entry_id: str = Field(..., description="drug_shortage_entries row id")
+    shortage_generic_name: str = Field(..., description="FDA listing generic name")
+    company_name: Optional[str] = Field(None, description="Reporting company")
+    package_ndc: Optional[str] = Field(None, description="Package NDC as listed")
+    presentation: Optional[str] = Field(None, description="Presentation as listed")
+    status: str = Field(..., description="FDA status as published, e.g. Current")
+    availability: Optional[str] = Field(None, description="Availability as published")
+    shortage_reason: Optional[str] = Field(None, description="Shortage reason as published")
+
+    match_basis: str = Field(..., description="rxcui | generic_name")
+    matched_value: str = Field(..., description="The RxCUI or normalised name that matched")
+    on_hand_units: Optional[int] = Field(None, description="Tenant on-hand units at evaluation; None when unknown")
+    source_update_date: Optional[str] = Field(None, description="FDA update_date (ISO date)")
+    detected_at: datetime = Field(..., description="When the match was first made")
+
+    timestamp: datetime = Field(...)
+    correlation_id: Optional[str] = Field(None)
+    trace_id: Optional[str] = Field(None)
+
+
 class MedicationAnalyticsEvent(BaseModel):
     """Generic analytics event for medications."""
 
@@ -218,5 +260,6 @@ __all__ = [
     "MedicationWasteEvent",
     "MedicationRecallAlert",
     "MedicationExpirationAlert",
+    "MedicationShortageAlert",
     "MedicationAnalyticsEvent",
 ]
