@@ -12,16 +12,17 @@ graph:
 
 Registration
 ------------
-These constants are **not** yet entries in
-``adaptix_contracts.events.registry.ALL_EVENTS``. That registry is an allow-list
-whose own drift guard
-(``tests/test_event_producer_registry_drift.py::test_registry_module_cites_a_producer_for_each_indirect_event``)
-requires every registered event to cite the exact producing file and line in a
-service repository. No service emits these yet — the Evidence Graph store lives
-in Adaptix-Audit-Service and has not been built. Registering them ahead of a
-producer would put an unproducible event type on the operational backbone and
-break that guard. Each constant is registered in the same change that lands its
-producer.
+All three are registered in ``adaptix_contracts.events.registry.ALL_EVENTS`` with
+``source_service="audit"``. The producer is the Evidence Graph store in
+Adaptix-Audit-Service (``audit_app/services/evidence_service.py``, lines 180 /
+309 / 411 at commit 90a23f08), and the registry entry carries that citation, as
+the registry's own drift guard requires.
+
+They are INDIRECT productions: the event-type string is a field default on the
+publication model rather than a literal at the envelope construction site, so a
+scanner that only reads ``EventSchema(event_type=...)`` call sites will not see
+them. They are inventoried in
+``tests/test_event_producer_registry_drift.py::INDIRECT_ENVELOPE_PRODUCERS``.
 
 Payload models carry no transport fields: ``tenant_id``, ``correlation_id``,
 ``occurred_at`` and friends belong to the envelope

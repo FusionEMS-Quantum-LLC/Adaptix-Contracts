@@ -208,6 +208,16 @@ _SLUGS_WITHOUT_MANIFEST_ENTRY = frozenset(
         "operations",
         "nemsis",
         "neris",
+        # Live in production but never added to the 2026-05-02 manifest:
+        # ECS service "adaptix-production-audit" on cluster
+        # "adaptix-production" was ACTIVE 1/1, task definition revision 11,
+        # rollout COMPLETED when AUDIT_SERVICE was registered (verified
+        # 2026-08-19 via ecs describe-services). No manifest entry is written
+        # here because that file uses the pre-rename "joshuawendorf21310/"
+        # canonical_repo prefix and an "adaptix-<slug>-service" ecs_service
+        # convention that the live name does not follow; guessing either would
+        # encode drift into the manifest rather than record it.
+        "audit",
     }
 )
 

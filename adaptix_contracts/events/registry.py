@@ -281,6 +281,29 @@ CHART_LOCK_BLOCKED: Final[str] = "chart.lock.blocked"
 DENIAL_PREDICTED: Final[str] = "denial.predicted"
 
 # ---------------------------------------------------------------------------
+# Evidence Graph events (producer: Adaptix-Audit-Service, slug ``audit``)
+# ---------------------------------------------------------------------------
+# Platform primitive A. Emitted by the Evidence Graph store when a fact is
+# recorded, two facts are related, or a decision records what it was made from.
+# Producer citations are origin/main of Adaptix-Audit-Service, verified
+# 2026-08-19 (commit 90a23f08):
+#   audit_app/services/evidence_service.py:180  evidence.node.created
+#   audit_app/services/evidence_service.py:309  evidence.edge.created
+#   audit_app/services/evidence_service.py:411  evidence.decision_receipt.created
+# These are INDIRECT productions: the event-type string is a field default on the
+# publication model in audit_app/schemas/evidence.py, not a literal at the
+# envelope construction site in audit_app/events/publisher.py, so only a
+# wrapper-aware audit sees them. See tests/test_event_producer_registry_drift.py
+# ``INDIRECT_ENVELOPE_PRODUCERS``.
+#
+# ``evidence.edge.created`` carrying relation="contradicts" is the operationally
+# interesting one: it is the moment two systems are recorded as disagreeing, and
+# a consumer can open an exception then rather than at the next audit.
+EVIDENCE_NODE_CREATED: Final[str] = "evidence.node.created"
+EVIDENCE_EDGE_CREATED: Final[str] = "evidence.edge.created"
+EVIDENCE_DECISION_RECEIPT_CREATED: Final[str] = "evidence.decision_receipt.created"
+
+# ---------------------------------------------------------------------------
 # Scheduling Events
 # ---------------------------------------------------------------------------
 SCHEDULING_EVENTS = ALL_SCHEDULING_EVENTS
@@ -413,6 +436,12 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     NECESSITY_ASSESSED: {"version": "1.0", "source_service": "epcr"},
     CHART_LOCK_BLOCKED: {"version": "1.0", "source_service": "epcr"},
     DENIAL_PREDICTED: {"version": "1.0", "source_service": "epcr"},
+    EVIDENCE_NODE_CREATED: {"version": "1.0", "source_service": "audit"},
+    EVIDENCE_EDGE_CREATED: {"version": "1.0", "source_service": "audit"},
+    EVIDENCE_DECISION_RECEIPT_CREATED: {
+        "version": "1.0",
+        "source_service": "audit",
+    },
 }
 
 for event_name in SCHEDULING_EVENTS:

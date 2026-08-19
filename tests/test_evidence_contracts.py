@@ -21,7 +21,11 @@ from adaptix_contracts.evidence.events import (
     EvidenceEdgeCreatedEvent,
     EvidenceNodeCreatedEvent,
 )
-from adaptix_contracts.events.registry import is_registered
+from adaptix_contracts.events.operational_envelope import (
+    OperationalEventEnvelope,
+    assert_event_type_registered,
+)
+from adaptix_contracts.events.registry import is_registered, producer_of
 import pytest
 from pydantic import ValidationError
 
@@ -205,12 +209,14 @@ class TestRetentionClass:
 
 
 class TestEvidenceEvents:
-    def test_event_types_are_not_yet_registered(self) -> None:
-        """Registration lands with the producer, not ahead of it.
+    def test_event_types_are_registered_to_their_producer(self) -> None:
+        """Registration landed with the producer, not ahead of it.
 
-        Adaptix-Audit-Service does not emit these yet. Registering them now
-        would put an unproducible type on the operational backbone and break
-        the registry's own producer-citation guard.
+        The Evidence Graph store in Adaptix-Audit-Service emits all three
+        (``audit_app/services/evidence_service.py`` 180 / 309 / 411 at commit
+        90a23f08), so each is now in ALL_EVENTS naming the service that actually
+        publishes it. ``producer_of`` resolving is what proves the declared
+        ``source_service`` is a real registry slug rather than a plausible string.
         """
 
         for event_type in (
@@ -218,7 +224,22 @@ class TestEvidenceEvents:
             EVIDENCE_EDGE_CREATED,
             EVIDENCE_DECISION_RECEIPT_CREATED,
         ):
-            assert not is_registered(event_type)
+            assert is_registered(event_type)
+            assert producer_of(event_type).slug == "audit"
+
+    def test_the_operational_backbone_gate_accepts_them(self) -> None:
+        """The allow-list now admits an evidence event onto the backbone."""
+
+        envelope = OperationalEventEnvelope(
+            event_type=EVIDENCE_NODE_CREATED,
+            tenant_id="tenant-a",
+            source_service="audit",
+            source_record_id="ev-1",
+            source_version=1,
+            observed_at=NOW,
+            effective_at=NOW,
+        )
+        assert_event_type_registered(envelope)
 
     def test_event_names_are_past_tense_facts(self) -> None:
         assert EVIDENCE_NODE_CREATED == "evidence.node.created"

@@ -427,6 +427,23 @@ NERIS_SERVICE = ServiceDefinition(
     description="NERIS fire reporting, incident documentation, NERIS export",
 )
 
+# Audit was live in production long before it was registered here: ECS service
+# ``adaptix-production-audit`` on cluster ``adaptix-production`` (us-east-1,
+# 793439286972) was ACTIVE at 1/1 running, task definition revision 11, rollout
+# COMPLETED when this entry was added. Its absence from the registry meant no
+# audit-produced event could name a resolvable ``source_service``, which is what
+# kept the Evidence Graph events out of ``events/registry.ALL_EVENTS``.
+AUDIT_SERVICE = ServiceDefinition(
+    name="Adaptix-Audit-Service",
+    slug="audit",
+    route_prefix="/api/v1/audit",
+    port=8047,
+    description=(
+        "Cross-service audit ingestion, immutable hash-chained event trails, "
+        "PHI-access records, compliance review, and the Evidence Graph"
+    ),
+)
+
 
 # ============================================================================
 # ALL SERVICES REGISTRY
@@ -483,6 +500,7 @@ ALL_SERVICES: list[ServiceDefinition] = [
     OPERATIONS_SERVICE,
     NEMSIS_SERVICE,
     NERIS_SERVICE,
+    AUDIT_SERVICE,
 ]
 
 # Lookup by slug

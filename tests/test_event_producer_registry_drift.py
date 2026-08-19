@@ -188,6 +188,25 @@ LIVE_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
 #: Every one of these was unregistered until this inventory landed, so
 #: ``is_registered()`` returned False for real production traffic.
 INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
+    # --- Adaptix-Audit-Service Evidence Graph, via the publication models in
+    # audit_app/schemas/evidence.py (event_type is a field default, so the
+    # string never appears at the AdaptixEventEnvelope construction site in
+    # audit_app/events/publisher.py) ---
+    (
+        "evidence.node.created",
+        "audit",
+        "Adaptix-Audit-Service/backend/audit_app/services/evidence_service.py:180",
+    ),
+    (
+        "evidence.edge.created",
+        "audit",
+        "Adaptix-Audit-Service/backend/audit_app/services/evidence_service.py:309",
+    ),
+    (
+        "evidence.decision_receipt.created",
+        "audit",
+        "Adaptix-Audit-Service/backend/audit_app/services/evidence_service.py:411",
+    ),
     # --- Adaptix-EPCR-Service, via ChartEventOutbox -> outbox_worker.py:99 ---
     (
         "epcr.chart.amended",
