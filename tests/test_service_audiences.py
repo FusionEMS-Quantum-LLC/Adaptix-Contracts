@@ -51,6 +51,27 @@ def test_vision_audience_is_present() -> None:
     assert "adaptix-vision" in KNOWN_SERVICE_AUDIENCES
 
 
+def test_audit_audience_is_present() -> None:
+    """Adaptix-Audit-Service is deployed and already expects this exact string.
+
+    Verified 2026-08-19 against the live account (793439286972, us-east-1): ECS
+    service ``adaptix-production-audit`` on cluster ``adaptix-production`` was
+    ACTIVE at 1/1 running, task definition revision 11, rollout COMPLETED, and
+    that task definition sets ``GATEWAY_AUDIENCE=adaptix-audit``.
+
+    Step 3 of this module's own "Adding a new service" procedure (install the
+    verifier downstream) was therefore already done in production while step 1
+    was missing here. That is the inverse of the 2026-08-04 ``adaptix-vision``
+    drift, with the same consequence: the gateway refuses to route any prefix
+    whose audience is absent from this registry
+    (``Adaptix-Gateway/backend/app/config/routes.py`` raises at
+    ``entry.audience not in KNOWN_AUDIENCES``), so no ``RouteEntry`` could be
+    written for the service at all, and its Evidence Graph surface
+    (``/api/v1/audit/evidence/...``) was unreachable at the edge as a result.
+    """
+    assert "adaptix-audit" in KNOWN_SERVICE_AUDIENCES
+
+
 @pytest.mark.parametrize(
     "value",
     ["adaptix-core", "  adaptix-core  ", "ADAPTIX-CORE"],
