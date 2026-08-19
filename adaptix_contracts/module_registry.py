@@ -281,7 +281,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     _m(
         "crr",
         "Community Risk Reduction",
-        aliases=("crr", "vision2020"),
+        aliases=("vision2020",),
         purchasable=True,
         audience="adaptix-fire",
         implies=("fire",),
