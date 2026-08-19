@@ -1,0 +1,91 @@
+"""Adaptix Family-Bridge contracts (Play P24).
+
+Re-exports the models, enums, event names/payloads/envelope factories, and
+service error contracts for the Family-Bridge SMS-to-next-of-kin thread.
+"""
+
+from adaptix_contracts.family_bridge.enums import (
+    ConsentSource,
+    ConsentStatus,
+    NoKRelationship,
+    PreferredChannel,
+    SmsDeliveryStatus,
+    ThreadCloseReason,
+    ThreadStage,
+)
+from adaptix_contracts.family_bridge.errors import (
+    FamilyBridgeErrorCode,
+    FamilyBridgeErrorEnvelope,
+    FamilyBridgeServiceError,
+    consent_required,
+    portal_token_expired,
+    portal_token_invalid,
+    sms_delivery_failed,
+    thread_invalid_stage_transition,
+    thread_not_found,
+    to_adaptix_error_code,
+)
+from adaptix_contracts.family_bridge.events import (
+    BRIDGE_SMS_SENT,
+    BRIDGE_STATUS_UPDATED,
+    BRIDGE_THREAD_CLOSED,
+    BRIDGE_THREAD_OPENED,
+    FAMILY_BRIDGE_EVENTS,
+    FAMILY_BRIDGE_SOURCE_SERVICE,
+    BridgeSmsSentPayload,
+    BridgeStatusUpdatedPayload,
+    BridgeThreadClosedPayload,
+    BridgeThreadOpenedPayload,
+    build_bridge_sms_sent_event,
+    build_bridge_status_updated_event,
+    build_bridge_thread_closed_event,
+    build_bridge_thread_opened_event,
+)
+from adaptix_contracts.family_bridge.models import (
+    FamilyBridgeThread,
+    FamilyPortalToken,
+    FamilyPortalView,
+    NoKConsent,
+    NoKContact,
+    ThreadStatusEvent,
+)
+
+__all__ = [
+    "BRIDGE_SMS_SENT",
+    "BRIDGE_STATUS_UPDATED",
+    "BRIDGE_THREAD_CLOSED",
+    "BRIDGE_THREAD_OPENED",
+    "BridgeSmsSentPayload",
+    "BridgeStatusUpdatedPayload",
+    "BridgeThreadClosedPayload",
+    "BridgeThreadOpenedPayload",
+    "ConsentSource",
+    "ConsentStatus",
+    "FAMILY_BRIDGE_EVENTS",
+    "FAMILY_BRIDGE_SOURCE_SERVICE",
+    "FamilyBridgeErrorCode",
+    "FamilyBridgeErrorEnvelope",
+    "FamilyBridgeServiceError",
+    "FamilyBridgeThread",
+    "FamilyPortalToken",
+    "FamilyPortalView",
+    "NoKConsent",
+    "NoKContact",
+    "NoKRelationship",
+    "PreferredChannel",
+    "SmsDeliveryStatus",
+    "ThreadCloseReason",
+    "ThreadStage",
+    "ThreadStatusEvent",
+    "build_bridge_sms_sent_event",
+    "build_bridge_status_updated_event",
+    "build_bridge_thread_closed_event",
+    "build_bridge_thread_opened_event",
+    "consent_required",
+    "portal_token_expired",
+    "portal_token_invalid",
+    "sms_delivery_failed",
+    "thread_invalid_stage_transition",
+    "thread_not_found",
+    "to_adaptix_error_code",
+]
