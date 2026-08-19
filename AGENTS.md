@@ -69,12 +69,18 @@ Local rules may never weaken global rules.
 
 ## Bedrock Remote Repair And Deployment Rule
 
-All Bedrock audit, repair, validation, and deployment work must run through
-GitHub-hosted workflows and pull requests. Do not leave Bedrock-generated fixes,
-audit results, deployment changes, or conflict resolutions local-only. Every
-Bedrock-generated change must be pushed to a remote branch, checked for merge
-conflicts against main, validated by required CI/security checks, merged to main
-only after green checks, and deployed only through the approved AWS deployment
-workflow with recorded evidence. If a repository does not have the Bedrock
-workflow or required AWS/GitHub variables, report it as BLOCKED instead of
-claiming repair, deployment, or production readiness.
+Agent audit, repair, validation, and deployment work must not stay local. Every
+change is verified locally against this repository's own declared gates, then
+committed directly to `main` - solo operator, trunk-based: no branch, no
+worktree, no pull request, no force-push, no history rewrite. GitHub is source
+control, not the execution engine; continuous CI-on-push was retired on
+2026-08-19, so never wait on, require, or claim a GitHub CI status that no longer
+runs. Deployment executes only through this repository's approved AWS release
+path (AWS CodeBuild is the only approved deployment executor). Release artifacts
+are immutable and traceable to the exact commit they were built from. Record the
+evidence that path actually produces: a commit on `main` is not a deployment, and
+a completed deployment is not runtime proof. Never leave a fix, audit result,
+deployment change, or conflict resolution local-only, and never weaken, skip, or
+bypass a gate to make work land. If this repository lacks its release path or the
+required AWS configuration, report it as BLOCKED rather than claiming repair,
+deployment, or production readiness.
