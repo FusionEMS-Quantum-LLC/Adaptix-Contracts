@@ -549,11 +549,15 @@ from .app_access_contracts import (
 
 # Continuity
 from .continuity_contracts import (
+    DIVERGENT_CONTINUITY_MODES,
     ClientDeviceIdentity,
     ContinuityAuditAction,
     ContinuityAuditEvent,
     ContinuityLockSnapshot,
+    ContinuityMode,
     LockState,
+    OfflineAuthorityGrant,
+    OfflineOperationEnvelope,
     OperationEnvelope,
 )
 
@@ -803,11 +807,14 @@ from .fire_contracts import (
 
 # Metrics
 from .metrics_contracts import (
+    FORBIDDEN_TELEMETRY_DIMENSION_KEYS,
     MetricSeverity,
     ServiceHealthStatus,
     QueueMetric,
     LatencyMetric,
     ErrorRateMetric,
+    ProductTelemetryEvent,
+    TelemetryOutcome,
     ThroughputMetric,
     ServiceHealthSummary,
     ServiceHealthReportedEvent,
@@ -2310,4 +2317,13 @@ __all__ = [
     "OutcomeDefinition",
     "OutcomeDirection",
     "OutcomeObservation",
+    # Offline authority (primitive J) - continuity_contracts
+    "DIVERGENT_CONTINUITY_MODES",
+    "ContinuityMode",
+    "OfflineAuthorityGrant",
+    "OfflineOperationEnvelope",
+    # PHI-safe product telemetry (primitive L) - metrics_contracts
+    "FORBIDDEN_TELEMETRY_DIMENSION_KEYS",
+    "ProductTelemetryEvent",
+    "TelemetryOutcome",
 ]

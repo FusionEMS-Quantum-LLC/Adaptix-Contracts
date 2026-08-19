@@ -35,6 +35,7 @@ from typing import Any, Final
 
 from pydantic import BaseModel, Field, field_validator
 
+from adaptix_contracts.ai.connection import DataClassification
 from adaptix_contracts.events.registry import is_registered
 
 #: Current operational-envelope contract version. Bump on any breaking change to
@@ -133,6 +134,24 @@ class OperationalEventEnvelope(BaseModel):
     )
     idempotency_key: str = Field(
         default_factory=_new_uuid, description="Stable key for dedupe on retry/replay"
+    )
+    causation_id: str | None = Field(
+        default=None,
+        description=(
+            "Event id or request id that caused this event. Optional and additive: "
+            "it lets a consumer walk a causal chain backwards without joining on "
+            "correlation_id alone, which groups everything in a trace rather than "
+            "naming the direct antecedent."
+        ),
+    )
+    sensitivity: DataClassification | None = Field(
+        default=None,
+        description=(
+            "Canonical classification of the payload, so a consumer, archive or "
+            "replay can apply the right handling without parsing the payload. "
+            "Reuses the platform vocabulary rather than a second one. Optional "
+            "for backwards compatibility; producers of protected payloads set it."
+        ),
     )
     payload: dict[str, Any] = Field(
         default_factory=dict, description="Event-specific data"
