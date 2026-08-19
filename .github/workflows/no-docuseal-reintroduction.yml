@@ -1,0 +1,77 @@
+name: No DocuSeal Reintroduction
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  docuseal-guard:
+    name: Guard against DocuSeal reintroduction
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for live DocuSeal reintroduction
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPO_NAME="$(basename "${GITHUB_REPOSITORY:-}")"
+          SELF_PATH=".github/workflows/no-docuseal-reintroduction.yml"
+
+          # (1) The DocuSeal service repo itself is fully exempt.
+          if [ "$REPO_NAME" = "Adaptix-DocuSeal-Service" ]; then
+            echo "Exempt repository ($REPO_NAME) — skipping scan."
+            exit 0
+          fi
+
+          # This guard's own workflow file necessarily names DocuSeal; never self-flag.
+          # Markdown/doc files are how every repo records the retirement policy
+          # ("do not reintroduce DocuSeal") — prose describing the ban is not a
+          # reintroduction, so docs are out of scope for this code-level guard.
+          # (2) historical docs/audits/ledgers under Adaptix-Governance are covered by
+          #     that same *.md exclusion.
+          # A line is only a violation if it names DocuSeal in a *live* code context
+          # (import, call, identifier, config/URL literal) rather than in prose that
+          # is explicitly prohibiting, denying, or deprecating DocuSeal usage.
+          NEGATION_RE='(must not|not be used|is absent|not in |no longer|retired|DEPRECATED|deprecated|denied|forbidden|not permit|does not|not the live|not a live|zero consumers|not import|absence of)'
+
+          MATCHES=""
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              "$SELF_PATH") continue ;;
+              *.md) continue ;;
+              */test_no_legacy_esign_alb_route.py|test_no_legacy_esign_alb_route.py) continue ;;
+            esac
+
+            if [ "$REPO_NAME" = "Adaptix-Governance" ]; then
+              case "$file" in
+                docs/*|audits/*|ledgers/*|*/docs/*|*/audits/*|*/ledgers/*) continue ;;
+              esac
+            fi
+
+            if ! git grep -Iq '' -- "$file" 2>/dev/null; then
+              continue  # binary
+            fi
+
+            HITS="$(grep -inE 'docuseal' "$file" 2>/dev/null || true)"
+            [ -z "$HITS" ] && continue
+
+            LIVE_HITS="$(echo "$HITS" | grep -viE "$NEGATION_RE" || true)"
+            if [ -n "$LIVE_HITS" ]; then
+              MATCHES="${MATCHES}${file}:\n${LIVE_HITS}\n"
+            fi
+          done < <(git ls-files -z)
+
+          if [ -n "$MATCHES" ]; then
+            echo "::error::DocuSeal is retired per founder decision 2026-08-18. Use TrustSign. See Adaptix-DocuSeal-Service#48."
+            printf '%b\n' "$MATCHES"
+            exit 1
+          fi
+
+          echo "No disallowed DocuSeal references found."
