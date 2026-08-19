@@ -1217,6 +1217,66 @@ from .platform_event_contracts import (
 
 
 # Explicit public surface
+# ---------------------------------------------------------------------------
+# Shared platform primitives (Wave 0)
+# ---------------------------------------------------------------------------
+# Cross-cutting contracts every domain depends on, deliberately owned here
+# rather than duplicated per module. Helper predicates (is_decided, is_terminal,
+# requires_reconciliation, is_open, has_state_conflict, ...) stay importable from
+# their own modules rather than joining this root surface, whose names are
+# re-exported at ``adaptix_contracts`` package level.
+
+# Human confirmation (primitive B)
+from .human_confirmation_contracts import (
+    DECIDED_DISPOSITIONS,
+    HumanConfirmationReceipt,
+    HumanDisposition,
+)
+
+# Rule packs (primitive C)
+from .rule_pack_contracts import (
+    MUTABLE_RULE_PACK_STATES,
+    RulePack,
+    RulePackRule,
+    RulePackState,
+)
+
+# Provider adapters (primitive D)
+from .provider_adapter_contracts import (
+    RECONCILIATION_PROVIDER_STATES,
+    TERMINAL_PROVIDER_STATES,
+    ProviderOperationRecord,
+    ProviderOperationState,
+    ProviderRetryability,
+    ProviderTransportResult,
+)
+
+# Exception inbox (primitive F)
+from .exception_contracts import (
+    TERMINAL_EXCEPTION_STATUSES,
+    ExceptionRecord,
+    ExceptionSeverity,
+    ExceptionStatus,
+)
+
+# Protected-state conflicts (primitive G)
+from .state_conflict_contracts import (
+    ProtectedStateKind,
+    ProtectedStateWrite,
+    StateConflict,
+)
+
+# Outcome attribution (primitive K)
+from .outcome_attribution_contracts import (
+    CAUSAL_ATTRIBUTION_METHODS,
+    AttributionMethod,
+    OutcomeAttribution,
+    OutcomeDefinition,
+    OutcomeDirection,
+    OutcomeObservation,
+)
+
+
 __all__ = [
     # Concept Intelligence — terminology + graph concept contracts (Phase 2)
     "ConceptType",
@@ -2217,4 +2277,37 @@ __all__ = [
     "AppAccessEffect",
     "AppAccessPolicy",
     "AppAccessDecision",
+    # Shared platform primitives (Wave 0)
+    # Human confirmation (primitive B)
+    "DECIDED_DISPOSITIONS",
+    "HumanConfirmationReceipt",
+    "HumanDisposition",
+    # Rule packs (primitive C)
+    "MUTABLE_RULE_PACK_STATES",
+    "RulePack",
+    "RulePackRule",
+    "RulePackState",
+    # Provider adapters (primitive D)
+    "RECONCILIATION_PROVIDER_STATES",
+    "TERMINAL_PROVIDER_STATES",
+    "ProviderOperationRecord",
+    "ProviderOperationState",
+    "ProviderRetryability",
+    "ProviderTransportResult",
+    # Exception inbox (primitive F)
+    "TERMINAL_EXCEPTION_STATUSES",
+    "ExceptionRecord",
+    "ExceptionSeverity",
+    "ExceptionStatus",
+    # Protected-state conflicts (primitive G)
+    "ProtectedStateKind",
+    "ProtectedStateWrite",
+    "StateConflict",
+    # Outcome attribution (primitive K)
+    "CAUSAL_ATTRIBUTION_METHODS",
+    "AttributionMethod",
+    "OutcomeAttribution",
+    "OutcomeDefinition",
+    "OutcomeDirection",
+    "OutcomeObservation",
 ]
