@@ -96,7 +96,9 @@ class CctCrewAssignedPayload(_CctEventPayload):
     mission_id: UUID
     cct_type: CctType
     assigned_crew_user_ids: list[str] = Field(default_factory=list)
-    assigned_crew_credential_levels: dict[str, CredentialLevel] = Field(default_factory=dict)
+    assigned_crew_credential_levels: dict[str, CredentialLevel] = Field(
+        default_factory=dict
+    )
     loadout_id: str | None = None
     assigned_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -172,7 +174,8 @@ def build_cct_mission_requested_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=idempotency_key or f"cct.mission.requested:{payload.mission_id}",
+        idempotency_key=idempotency_key
+        or f"cct.mission.requested:{payload.mission_id}",
         source_service=source_service,
     )
 
@@ -212,7 +215,9 @@ def build_cct_handoff_completed_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"cct.handoff.completed:{payload.handoff_id}"),
+        idempotency_key=(
+            idempotency_key or f"cct.handoff.completed:{payload.handoff_id}"
+        ),
         source_service=source_service,
     )
 
@@ -232,7 +237,9 @@ def build_cct_mission_completed_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"cct.mission.completed:{payload.mission_id}"),
+        idempotency_key=(
+            idempotency_key or f"cct.mission.completed:{payload.mission_id}"
+        ),
         source_service=source_service,
     )
 
