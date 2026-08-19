@@ -1,74 +1,148 @@
-[build-system]
-requires = ["setuptools>=84.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "adaptix-contracts"
-version = "2.23.0"
-description = "Shared cross-domain schemas and contracts for the Adaptix platform"
-readme = {file = "README.md", content-type = "text/markdown"}
-license = "Apache-2.0"
-requires-python = ">=3.11"
-keywords = ["adaptix", "contracts", "schemas", "pydantic", "ems", "dispatch", "healthcare"]
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Typing :: Typed",
-]
-dependencies = [
-    "pydantic>=2.6.0",
-    "fastapi>=0.141.1",
-    "httpx>=0.27.0",
-    "email-validator>=2.0.0",
-    "PyJWT>=2.8.0",
-    "cryptography>=50.0.0",
-    "PyYAML",
-    "SQLAlchemy",
-    "boto3",
-]
-
-[project.urls]
-Homepage = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts"
-Repository = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts"
-Changelog = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts/blob/main/CHANGELOG.md"
-
-[project.optional-dependencies]
-dev = [
-    "build>=1.2.2.post1,<2",
-    "pytest==9.1.1",
-    "pytest-cov==7.1.0",
-    "pytest-asyncio>=0.23.0",
-    "twine>=7.0.0,<8",
-]
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-# Test the SOURCE in this checkout, never a previously-installed copy of
-# adaptix_contracts that happens to be on the interpreter's site-packages.
-# Without this, `pytest` under an interpreter that has an older adaptix-contracts
-# installed validates that stale copy: the suite can pass while the repo source
-# is broken, and fail while it is correct. `pythonpath` entries are prepended to
-# sys.path, so the checkout always wins.
-pythonpath = ["."]
-
-[tool.setuptools]
-package-dir = {"" = "."}
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["adaptix_contracts*"]
-exclude = ["build*", "dist*", "tests*", "scripts*", "tools*", "docs*"]
-namespaces = false
-
-[tool.mypy]
-plugins = ["pydantic.mypy"]
-ignore_missing_imports = true
-# Type-check library/source only. Test files intentionally construct models via
-# camelCase aliases (validated at runtime by populate_by_name) which the pydantic
-# mypy plugin cannot model on the synthesized __init__; excluding tests scopes
-# strict typing to shipped code without hiding any source/production error.
-exclude = "(^|/)(tests|build|dist)/"
+[build-system]
+
+requires = ["setuptools>=84.0.0", "wheel"]
+
+build-backend = "setuptools.build_meta"
+
+
+
+[project]
+
+name = "adaptix-contracts"
+
+version = "2.22.0"
+
+description = "Shared cross-domain schemas and contracts for the Adaptix platform"
+
+readme = {file = "README.md", content-type = "text/markdown"}
+
+license = "Apache-2.0"
+
+requires-python = ">=3.11"
+
+keywords = ["adaptix", "contracts", "schemas", "pydantic", "ems", "dispatch", "healthcare"]
+
+classifiers = [
+
+    "Development Status :: 5 - Production/Stable",
+
+    "Intended Audience :: Developers",
+
+    "Programming Language :: Python :: 3",
+
+    "Programming Language :: Python :: 3.11",
+
+    "Programming Language :: Python :: 3.12",
+
+    "Topic :: Software Development :: Libraries :: Python Modules",
+
+    "Typing :: Typed",
+
+]
+
+dependencies = [
+
+    "pydantic>=2.6.0",
+
+    "fastapi>=0.141.1",
+
+    "httpx>=0.27.0",
+
+    "email-validator>=2.0.0",
+
+    "PyJWT>=2.8.0",
+
+    "cryptography>=50.0.0",
+
+    "PyYAML",
+
+    "SQLAlchemy",
+
+    "boto3",
+
+]
+
+
+
+[project.urls]
+
+Homepage = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts"
+
+Repository = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts"
+
+Changelog = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts/blob/main/CHANGELOG.md"
+
+
+
+[project.optional-dependencies]
+
+dev = [
+
+    "build>=1.2.2.post1,<2",
+
+    "pytest==9.1.1",
+
+    "pytest-cov==7.1.0",
+
+    "pytest-asyncio>=0.23.0",
+
+    "twine>=7.0.0,<8",
+
+]
+
+
+
+[tool.pytest.ini_options]
+
+asyncio_mode = "auto"
+
+# Test the SOURCE in this checkout, never a previously-installed copy of
+
+# adaptix_contracts that happens to be on the interpreter's site-packages.
+
+# Without this, `pytest` under an interpreter that has an older adaptix-contracts
+
+# installed validates that stale copy: the suite can pass while the repo source
+
+# is broken, and fail while it is correct. `pythonpath` entries are prepended to
+
+# sys.path, so the checkout always wins.
+
+pythonpath = ["."]
+
+
+
+[tool.setuptools]
+
+package-dir = {"" = "."}
+
+
+
+[tool.setuptools.packages.find]
+
+where = ["."]
+
+include = ["adaptix_contracts*"]
+
+exclude = ["build*", "dist*", "tests*", "scripts*", "tools*", "docs*"]
+
+namespaces = false
+
+
+
+[tool.mypy]
+
+plugins = ["pydantic.mypy"]
+
+ignore_missing_imports = true
+
+# Type-check library/source only. Test files intentionally construct models via
+
+# camelCase aliases (validated at runtime by populate_by_name) which the pydantic
+
+# mypy plugin cannot model on the synthesized __init__; excluding tests scopes
+
+# strict typing to shipped code without hiding any source/production error.
+
+exclude = "(^|/)(tests|build|dist)/"
+
