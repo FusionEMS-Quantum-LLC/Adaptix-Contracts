@@ -278,6 +278,15 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-fire",
         source="Web-App MODULES ('fire_rms'); Core signup_pricing ('fire_response')",
     ),
+    _m(
+        "crr",
+        "Community Risk Reduction",
+        aliases=("crr", "vision2020"),
+        purchasable=True,
+        audience="adaptix-fire",
+        implies=("fire",),
+        source="adaptix-crr",
+    ),
     # ── Air medical ──────────────────────────────────────────────────────
     _m(
         "air",
