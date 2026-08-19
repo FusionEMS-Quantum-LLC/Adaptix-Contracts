@@ -86,4 +86,9 @@ __all__ = [
     "ReviewOutcome",
     "ReviewerAssignment",
     "ReviewerRole",
+    "build_qa_cqi_metric_computed_event",
+    "build_qa_finding_recorded_event",
+    "build_qa_finding_resolved_event",
+    "build_qa_review_assigned_event",
+    "build_qa_review_completed_event",
 ]
