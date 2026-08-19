@@ -1,0 +1,98 @@
+"""Adaptix AR/XR Remote Physician Overwatch + Training contracts (Play P04).
+
+Re-exports the models, enums, event names/payloads/envelope factories, and
+service error contracts for the XR service (AR/XR remote physician
+overwatch and training simulations).
+"""
+
+from adaptix_contracts.xr.enums import (
+    AnnotationType,
+    RecordingStatus,
+    SessionStatus,
+    SessionType,
+    TrainingDifficulty,
+    XrDevice,
+)
+from adaptix_contracts.xr.errors import (
+    XrAnnotationNotFoundError,
+    XrAnnotationSessionNotActiveError,
+    XrErrorCode,
+    XrErrorEnvelope,
+    XrRecordingAlreadyPurgedError,
+    XrRecordingConsentRequiredError,
+    XrRecordingNotFoundError,
+    XrRecordingProcessingFailedError,
+    XrSessionAlreadyActiveError,
+    XrSessionDeviceUnsupportedError,
+    XrSessionInvalidStateTransitionError,
+    XrSessionNotFoundError,
+    XrSessionPhysicianRequiredError,
+    XrTrainingScenarioInactiveError,
+    XrTrainingScenarioNotFoundError,
+    to_adaptix_error_code,
+)
+from adaptix_contracts.xr.events import (
+    XR_ANNOTATION_CREATED,
+    XR_EVENTS,
+    XR_RECORDING_COMPLETED,
+    XR_SESSION_ENDED,
+    XR_SESSION_STARTED,
+    XR_SOURCE_SERVICE,
+    XrAnnotationCreatedPayload,
+    XrRecordingCompletedPayload,
+    XrSessionEndedPayload,
+    XrSessionStartedPayload,
+    build_xr_annotation_created_event,
+    build_xr_recording_completed_event,
+    build_xr_session_ended_event,
+    build_xr_session_started_event,
+)
+from adaptix_contracts.xr.models import (
+    PhysicianAnnotation,
+    RecordingManifest,
+    TrainingScenario,
+    XrSession,
+)
+
+__all__ = [
+    "AnnotationType",
+    "PhysicianAnnotation",
+    "RecordingManifest",
+    "RecordingStatus",
+    "SessionStatus",
+    "SessionType",
+    "TrainingDifficulty",
+    "TrainingScenario",
+    "XR_ANNOTATION_CREATED",
+    "XR_EVENTS",
+    "XR_RECORDING_COMPLETED",
+    "XR_SESSION_ENDED",
+    "XR_SESSION_STARTED",
+    "XR_SOURCE_SERVICE",
+    "XrAnnotationCreatedPayload",
+    "XrAnnotationNotFoundError",
+    "XrAnnotationSessionNotActiveError",
+    "XrDevice",
+    "XrErrorCode",
+    "XrErrorEnvelope",
+    "XrRecordingAlreadyPurgedError",
+    "XrRecordingCompletedPayload",
+    "XrRecordingConsentRequiredError",
+    "XrRecordingNotFoundError",
+    "XrRecordingProcessingFailedError",
+    "XrSession",
+    "XrSessionAlreadyActiveError",
+    "XrSessionDeviceUnsupportedError",
+    "XrSessionEndedPayload",
+    "XrSessionInvalidStateTransitionError",
+    "XrSessionNotFoundError",
+    "XrSessionPhysicianRequiredError",
+    "XrSessionStartedPayload",
+    "XrTrainingScenarioInactiveError",
+    "XrTrainingScenarioNotFoundError",
+    "build_xr_annotation_created_event",
+    "build_xr_recording_completed_event",
+    "build_xr_session_ended_event",
+    "build_xr_session_started_event",
+    "to_adaptix_error_code",
+]
