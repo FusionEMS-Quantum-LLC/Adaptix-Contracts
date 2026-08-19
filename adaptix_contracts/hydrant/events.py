@@ -220,7 +220,9 @@ def build_hydrant_tested_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"hydrant.tested:{payload.hydrant_test_id}"),
+        idempotency_key=(
+            idempotency_key or f"hydrant.tested:{payload.hydrant_test_id}"
+        ),
         source_service=source_service,
     )
 
@@ -241,7 +243,8 @@ def build_hydrant_maintenance_logged_event(
         actor_id=actor_id,
         causation_id=causation_id,
         idempotency_key=(
-            idempotency_key or f"hydrant.maintenance_logged:{payload.hydrant_maintenance_id}"
+            idempotency_key
+            or f"hydrant.maintenance_logged:{payload.hydrant_maintenance_id}"
         ),
         source_service=source_service,
     )
