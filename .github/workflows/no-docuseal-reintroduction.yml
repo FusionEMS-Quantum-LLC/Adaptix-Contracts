@@ -1,0 +1,75 @@
+name: No DocuSeal Reintroduction
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  guard-no-docuseal:
+    name: Guard against DocuSeal reintroduction
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for DocuSeal references
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REPO_NAME="$(basename "${GITHUB_REPOSITORY:-}")"
+
+          # (1) The DocuSeal service repo itself is fully exempt.
+          if [ "$REPO_NAME" = "Adaptix-DocuSeal-Service" ]; then
+            echo "Exempt repository ($REPO_NAME) — skipping scan."
+            exit 0
+          fi
+
+          # Build the set of tracked files, excluding permitted exceptions:
+          #   (2) historical docs/audits/ledgers under Adaptix-Governance
+          #   (3) test_no_legacy_esign_alb_route.py (asserts the route is gone)
+          #   (4) any file whose path signals it's a deprecated-reference doc is still scanned,
+          #       but DEPRECATED-tagged docstrings are excluded at the line level below.
+          MATCHES=""
+          while IFS= read -r -d '' file; do
+            # Skip binary files
+            if ! git grep -Iq '' -- "$file" 2>/dev/null; then
+              continue
+            fi
+
+            case "$file" in
+              */test_no_legacy_esign_alb_route.py|test_no_legacy_esign_alb_route.py)
+                continue
+                ;;
+            esac
+
+            if [ "$REPO_NAME" = "Adaptix-Governance" ]; then
+              case "$file" in
+                docs/*|audits/*|ledgers/*|*/docs/*|*/audits/*|*/ledgers/*)
+                  continue
+                  ;;
+              esac
+            fi
+
+            # Case-insensitive grep for 'docuseal', excluding lines that are part of a
+            # DEPRECATED-tagged docstring/comment referencing DocuSeal by name.
+            HITS="$(grep -inE 'docuseal' "$file" 2>/dev/null || true)"
+            if [ -n "$HITS" ]; then
+              LIVE_HITS="$(echo "$HITS" | grep -viE 'deprecated' || true)"
+              if [ -n "$LIVE_HITS" ]; then
+                MATCHES="${MATCHES}${file}:\n${LIVE_HITS}\n"
+              fi
+            fi
+          done < <(git ls-files -z)
+
+          if [ -n "$MATCHES" ]; then
+            echo "::error::DocuSeal is retired per founder decision 2026-08-18. Use TrustSign. See Adaptix-DocuSeal-Service#48."
+            printf '%b\n' "$MATCHES"
+            exit 1
+          fi
+
+          echo "No disallowed DocuSeal references found."
