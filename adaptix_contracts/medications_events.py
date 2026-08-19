@@ -219,12 +219,20 @@ class MedicationShortageAlert(BaseModel):
     presentation: Optional[str] = Field(None, description="Presentation as listed")
     status: str = Field(..., description="FDA status as published, e.g. Current")
     availability: Optional[str] = Field(None, description="Availability as published")
-    shortage_reason: Optional[str] = Field(None, description="Shortage reason as published")
+    shortage_reason: Optional[str] = Field(
+        None, description="Shortage reason as published"
+    )
 
     match_basis: str = Field(..., description="rxcui | generic_name")
-    matched_value: str = Field(..., description="The RxCUI or normalised name that matched")
-    on_hand_units: Optional[int] = Field(None, description="Tenant on-hand units at evaluation; None when unknown")
-    source_update_date: Optional[str] = Field(None, description="FDA update_date (ISO date)")
+    matched_value: str = Field(
+        ..., description="The RxCUI or normalised name that matched"
+    )
+    on_hand_units: Optional[int] = Field(
+        None, description="Tenant on-hand units at evaluation; None when unknown"
+    )
+    source_update_date: Optional[str] = Field(
+        None, description="FDA update_date (ISO date)"
+    )
     detected_at: datetime = Field(..., description="When the match was first made")
 
     timestamp: datetime = Field(...)

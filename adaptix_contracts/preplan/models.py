@@ -199,13 +199,19 @@ class FloorPlan(_PreplanBase):
     occupancy_id: UUID
 
     level_label: str = Field(
-        ..., min_length=1, max_length=100, description="e.g. 'Ground Floor', 'B1', 'Roof'."
+        ...,
+        min_length=1,
+        max_length=100,
+        description="e.g. 'Ground Floor', 'B1', 'Roof'.",
     )
     level_order: int = Field(
         default=0, description="Sort order for stacking levels; 0 = grade/ground."
     )
     artifact_object_key: str = Field(
-        ..., min_length=1, max_length=1000, description="Object-storage key for the diagram."
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="Object-storage key for the diagram.",
     )
     artifact_content_type: str | None = Field(default=None, max_length=150)
     egress_points: list[str] = Field(default_factory=list)

@@ -229,8 +229,7 @@ class XrRecordingConsentRequiredError(XrErrorEnvelope):
     ) -> "XrRecordingConsentRequiredError":
         return cls(
             message=(
-                f"XR session {session_id} cannot record: consent has not been "
-                "recorded"
+                f"XR session {session_id} cannot record: consent has not been recorded"
             ),
             trace=trace,
         )
@@ -282,9 +281,7 @@ class XrTrainingScenarioNotFoundError(XrErrorEnvelope):
     def for_scenario(
         cls, scenario_id: str, trace: AdaptixTraceContext | None = None
     ) -> "XrTrainingScenarioNotFoundError":
-        return cls(
-            message=f"XR training scenario {scenario_id} not found", trace=trace
-        )
+        return cls(message=f"XR training scenario {scenario_id} not found", trace=trace)
 
 
 class XrTrainingScenarioInactiveError(XrErrorEnvelope):

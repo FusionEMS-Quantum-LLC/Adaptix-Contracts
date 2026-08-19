@@ -263,7 +263,9 @@ class QhinAcknowledgment(_QhinBase):
     )
     message: str | None = Field(default=None, max_length=2000)
 
-    acknowledged_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    acknowledged_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

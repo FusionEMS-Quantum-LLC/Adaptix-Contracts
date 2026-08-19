@@ -246,8 +246,7 @@ def build_xr_recording_completed_event(
         actor_id=actor_id,
         causation_id=causation_id,
         idempotency_key=(
-            idempotency_key
-            or f"xr.recording.completed:{payload.recording_manifest_id}"
+            idempotency_key or f"xr.recording.completed:{payload.recording_manifest_id}"
         ),
         source_service=source_service,
     )

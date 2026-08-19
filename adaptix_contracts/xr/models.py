@@ -78,7 +78,9 @@ class XrSession(_XrBase):
     device: XrDevice
 
     field_provider_id: str = Field(
-        ..., min_length=1, description="User id of the field-side operator wearing/holding the device."
+        ...,
+        min_length=1,
+        description="User id of the field-side operator wearing/holding the device.",
     )
     remote_physician_id: str | None = Field(
         default=None,
@@ -129,16 +131,22 @@ class PhysicianAnnotation(_XrBase):
     content: str = Field(..., min_length=1, max_length=4000)
 
     spatial_anchor_x: float | None = Field(
-        default=None, description="Normalized X coordinate (0.0-1.0) in the field-of-view frame."
+        default=None,
+        description="Normalized X coordinate (0.0-1.0) in the field-of-view frame.",
     )
     spatial_anchor_y: float | None = Field(
-        default=None, description="Normalized Y coordinate (0.0-1.0) in the field-of-view frame."
+        default=None,
+        description="Normalized Y coordinate (0.0-1.0) in the field-of-view frame.",
     )
     session_timestamp_ms: int = Field(
-        ..., ge=0, description="Milliseconds from session start when the annotation was placed."
+        ...,
+        ge=0,
+        description="Milliseconds from session start when the annotation was placed.",
     )
 
-    created_by: str = Field(..., min_length=1, description="User id of the remote physician.")
+    created_by: str = Field(
+        ..., min_length=1, description="User id of the remote physician."
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     acknowledged_by_field_provider: bool = False
@@ -169,7 +177,8 @@ class RecordingManifest(_XrBase):
     status: RecordingStatus = RecordingStatus.PENDING
 
     storage_uri: str | None = Field(
-        default=None, description="Object storage URI. Populated once status is AVAILABLE."
+        default=None,
+        description="Object storage URI. Populated once status is AVAILABLE.",
     )
     duration_seconds: float | None = Field(default=None, ge=0)
     size_bytes: int | None = Field(default=None, ge=0)

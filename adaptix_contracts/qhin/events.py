@@ -232,7 +232,9 @@ def build_qhin_bundle_received_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"qhin.bundle.received:{payload.bundle_id}"),
+        idempotency_key=(
+            idempotency_key or f"qhin.bundle.received:{payload.bundle_id}"
+        ),
         source_service=source_service,
     )
 
@@ -252,7 +254,9 @@ def build_qhin_bundle_published_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"qhin.bundle.published:{payload.bundle_id}"),
+        idempotency_key=(
+            idempotency_key or f"qhin.bundle.published:{payload.bundle_id}"
+        ),
         source_service=source_service,
     )
 

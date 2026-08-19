@@ -208,7 +208,8 @@ def build_preplan_published_event(
         actor_id=actor_id,
         causation_id=causation_id,
         idempotency_key=(
-            idempotency_key or f"preplan.published:{payload.preplan_id}:{payload.version}"
+            idempotency_key
+            or f"preplan.published:{payload.preplan_id}:{payload.version}"
         ),
         source_service=source_service,
     )
@@ -229,7 +230,9 @@ def build_preplan_hazard_recorded_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"preplan.hazard.recorded:{payload.hazard_id}"),
+        idempotency_key=(
+            idempotency_key or f"preplan.hazard.recorded:{payload.hazard_id}"
+        ),
         source_service=source_service,
     )
 
