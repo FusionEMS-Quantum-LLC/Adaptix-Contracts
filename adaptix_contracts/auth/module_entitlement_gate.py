@@ -45,6 +45,7 @@ from collections.abc import Callable
 import jwt as pyjwt
 from fastapi import Header, HTTPException, Request, status
 
+from adaptix_contracts.auth.capability_registry import module_for_capability
 from adaptix_contracts.auth.cognito import AdaptixCognitoConfig
 from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
@@ -598,3 +599,42 @@ __all__ = [
     "require_any_module_entitlement",
     "AUDIT_ACTION",
 ]
+
+
+def require_capability_entitlement(capability_code: str) -> Callable:
+    """Return a FastAPI dependency that gates a route on a capability code.
+
+    Shared platform primitive I. A capability is one shipped feature
+    (``epcr.ambient_capture``, ``billing.rsnat_prior_auth``); it resolves through
+    ``adaptix_contracts.auth.capability_registry`` to the canonical module a
+    tenant must hold, and is then enforced by the same gate a module route uses.
+    One enforcement path, not two.
+
+    Usage::
+
+        from adaptix_contracts.auth.module_entitlement_gate import (
+            require_capability_entitlement,
+        )
+
+        app.include_router(
+            ambient_router,
+            prefix="/api/v1/epcr/ambient",
+            dependencies=[
+                Depends(require_capability_entitlement("epcr.ambient_capture"))
+            ],
+        )
+
+    Raises:
+        UnknownCapabilityError: at import time, when the capability code is not
+            registered. Deliberately loud and early — a route silently gated on
+            a capability nobody defined would be a route gated on nothing.
+
+    Returns:
+        A callable suitable for ``Depends()``.
+    """
+    module_slug = module_for_capability(capability_code)
+    gate = require_module_entitlement(module_slug)
+    gate.__name__ = "require_capability_entitlement_" + capability_code.replace(
+        ".", "_"
+    ).replace("-", "_")
+    return gate
