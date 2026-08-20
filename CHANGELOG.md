@@ -9,6 +9,45 @@ after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
 package version is `2.16.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
+## [2.32.0]
+
+### Fixed
+
+- **Domain error envelopes were a Liskov violation the type checker rejected.**
+  `EdgeErrorEnvelope` and `QaErrorEnvelope` subclassed `AdaptixErrorEnvelope`
+  and re-declared `error_code` as a wider union, so a function handed an
+  `AdaptixErrorEnvelope` could receive a domain code it cannot handle. `mypy`
+  reported this on `main` for both files.
+
+  Fixed by extracting `AdaptixErrorEnvelopeBase` — every field except
+  `error_code`, plus the factory helpers and `to_http_response`. Each concrete
+  envelope now declares its own `error_code`, making the domain envelopes
+  SIBLINGS of `AdaptixErrorEnvelope` rather than subclasses. `mypy` is clean
+  across all 280 source files, down from 2 errors.
+
+  The two obvious alternatives were rejected deliberately. Widening
+  `AdaptixErrorEnvelope.error_code` would silence the checker but make **every**
+  service's envelope accept Edge and QA codes at runtime — Pydantic validates
+  from the annotation — which weakens validation platform-wide and inverts the
+  import direction. Converting Edge and QA to the separate-field pattern the
+  other seven subclasses use (`hydrant_error_code`, `mih_error_code`, …) would
+  change the serialized `error_code` value on a published wire contract.
+
+  **Behavior preserved, and verified rather than asserted.** The observable
+  shape of all three classes was dumped before and after and diffed. Field set,
+  required/optional state, annotations, values, factory helpers, and — the one
+  that matters — which code families each class ACCEPTS and REJECTS are all
+  identical. The platform envelope still refuses Edge and QA codes, which is the
+  assertion that distinguishes this fix from the widening alternative.
+
+  **One known delta:** `error_code` now serializes last rather than second,
+  because it moved from the shared parent to each concrete class. JSON object
+  key order is not contract for any consumer that parses the payload. Nothing
+  else differs.
+
+  These envelopes had no test coverage at all. `tests/test_error_envelope_sibling_bases.py`
+  adds it, pinning validation strength in both directions.
+
 ## [2.31.0]
 
 ### Security

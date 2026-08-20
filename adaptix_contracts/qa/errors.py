@@ -27,7 +27,7 @@ from pydantic import Field
 
 from adaptix_contracts.errors.envelope import (
     AdaptixErrorCode,
-    AdaptixErrorEnvelope,
+    AdaptixErrorEnvelopeBase,
     AdaptixTraceContext,
 )
 
@@ -191,10 +191,10 @@ class QaTenantMismatchError(QaError):
     code = QaErrorCode.QA_TENANT_MISMATCH
 
 
-class QaErrorEnvelope(AdaptixErrorEnvelope):
+class QaErrorEnvelope(AdaptixErrorEnvelopeBase):
     """Adaptix HTTP error envelope widened for QA-specific codes.
 
-    Overrides only ``error_code`` (widened to accept
+    Declares ``error_code`` widened to accept
     :class:`QaErrorCode`) and adds ``qa_context`` for structured
     QA-scoped fields (``review_id``, ``finding_id`` …). The envelope
     shape, timestamp field, trace context, and inherited factory

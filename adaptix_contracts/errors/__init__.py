@@ -6,6 +6,7 @@ from adaptix_contracts.errors.envelope import (
     AdaptixProviderErrorDetail,
     AdaptixTraceContext,
     AdaptixErrorEnvelope,
+    AdaptixErrorEnvelopeBase,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "AdaptixProviderErrorDetail",
     "AdaptixTraceContext",
     "AdaptixErrorEnvelope",
+    "AdaptixErrorEnvelopeBase",
 ]
