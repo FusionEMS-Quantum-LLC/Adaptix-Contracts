@@ -204,22 +204,28 @@ class GatewayClaims:
         Raises:
             GatewaySignatureError: On a malformed UUID or an empty persona.
         """
-        for name, raw in (
-            ("demo_session_id", self.demo_session_id),
-            ("demo_lease_id", self.demo_lease_id),
-        ):
-            try:
-                uuid.UUID(str(raw or "").strip())
-            except (ValueError, AttributeError, TypeError) as exc:
-                raise GatewaySignatureError(
-                    f"{name} must be a UUID when is_demo is set; the verifier "
-                    "rejects a demo context with malformed claims"
-                ) from exc
+        self._require_uuid_claim("demo_session_id", self.demo_session_id)
+        self._require_uuid_claim("demo_lease_id", self.demo_lease_id)
         if not (self.demo_persona or "").strip():
             raise GatewaySignatureError(
                 "demo_persona is required when is_demo is set; the verifier "
                 "rejects a demo context with an empty persona"
             )
+
+    @staticmethod
+    def _require_uuid_claim(name: str, raw: str | None) -> None:
+        """Require ``raw`` to parse as a UUID.
+
+        Raises:
+            GatewaySignatureError: If it does not.
+        """
+        try:
+            uuid.UUID(str(raw or "").strip())
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise GatewaySignatureError(
+                f"{name} must be a UUID when is_demo is set; the verifier "
+                "rejects a demo context with malformed claims"
+            ) from exc
 
     def payload(self) -> dict[str, Any]:
         """Return the canonical context payload for these claims."""
