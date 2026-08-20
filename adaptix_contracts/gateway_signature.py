@@ -81,17 +81,18 @@ from adaptix_contracts.gateway_keys import (
     GATEWAY_PUBLIC_KEYS_ENV,
     GATEWAY_SIGNING_ALGORITHM,
     GatewayKeyError,
-    asymmetric_verification_configured,
     b64url_decode,
+    has_verification_keys,
+    load_public_keyset,
     public_key_for_kid,
 )
 from adaptix_contracts.service_audiences import is_known_service_audience
 
 logger = logging.getLogger(__name__)
 
-# One-shot guard so the unpinned-audience warning below does not flood logs on
-# every request. Reset only on process restart.
-_warned_audience_unpinned = False
+# One-shot log guards (reset only on process restart), kept in one mutable
+# mapping so no function rebinds module globals.
+_WARN_ONCE = {"audience_unpinned": False}
 
 # Environment-variable NAMES (never values) — single source of truth for the
 # consumer side, and the only definition of these names in the package.
@@ -183,9 +184,7 @@ def gateway_trust_mode() -> str:
     """
     raw = os.environ.get(GATEWAY_TRUST_MODE_ENV, "").strip().lower()
     if not raw:
-        return (
-            TRUST_MODE_DUAL if asymmetric_verification_configured() else TRUST_MODE_HMAC
-        )
+        return TRUST_MODE_DUAL if has_verification_keys() else TRUST_MODE_HMAC
     if raw not in _TRUST_MODES:
         raise GatewayVerifierConfigurationError(
             f"{GATEWAY_TRUST_MODE_ENV}={raw!r} is not a known trust mode "
@@ -232,30 +231,14 @@ def _expected_audience() -> str | None:
     return aud
 
 
-def assert_gateway_verifier_ready() -> None:
-    """Validate this service's verifier configuration. Call at startup/readiness.
-
-    Fails the process (or its readiness probe) rather than letting a
-    misconfiguration surface later as an unexplained 401 storm, and rather than
-    letting a missing audience pin silently disable replay protection (D-034).
-
-    Checks, in order:
-
-    * ``ADAPTIX_GATEWAY_TRUST_MODE`` names a real mode.
-    * ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` is set (production) and names a live
-      service audience.
-    * The mode's key material is actually present: ``asymmetric``/``dual``
-      require a parseable ``ADAPTIX_GATEWAY_PUBLIC_KEYS``; ``asymmetric``
-      additionally requires it, and ``hmac``/``dual`` require the shared secret.
+def _assert_key_material_ready(mode: str) -> None:
+    """Validate that ``mode``'s key material is present and parseable.
 
     Raises:
-        GatewayVerifierConfigurationError: on the first problem found.
+        GatewayVerifierConfigurationError: on missing/malformed material.
     """
-    mode = gateway_trust_mode()
-    _expected_audience()
-
     if mode in (TRUST_MODE_ASYMMETRIC, TRUST_MODE_DUAL):
-        if not asymmetric_verification_configured():
+        if not has_verification_keys():
             if mode == TRUST_MODE_ASYMMETRIC:
                 raise GatewayVerifierConfigurationError(
                     f"{GATEWAY_TRUST_MODE_ENV}={mode!r} requires "
@@ -264,8 +247,6 @@ def assert_gateway_verifier_ready() -> None:
                 )
         else:
             try:
-                from adaptix_contracts.gateway_keys import load_public_keyset
-
                 load_public_keyset()
             except GatewayKeyError as exc:
                 raise GatewayVerifierConfigurationError(str(exc)) from exc
@@ -277,10 +258,15 @@ def assert_gateway_verifier_ready() -> None:
             "but it is not configured"
         )
 
+
+def _warn_if_symmetric_in_production(mode: str) -> None:
+    """Log the D-053 residual-risk warning for non-asymmetric production modes.
+
+    Not fatal — ``dual`` is the deliberate migration state — but it must be
+    enumerable from CloudWatch so the fleet-wide cutover can be driven from
+    evidence rather than from a spreadsheet.
+    """
     if is_production() and mode != TRUST_MODE_ASYMMETRIC:
-        # Not fatal — ``dual`` is the deliberate migration state — but it must
-        # be enumerable from CloudWatch so the fleet-wide cutover can be driven
-        # from evidence rather than from a spreadsheet.
         logger.warning(
             "gateway verifier running in %s=%r in production: legacy symmetric "
             "gateway-v1 contexts are still accepted, so any holder of %s can "
@@ -291,6 +277,22 @@ def assert_gateway_verifier_ready() -> None:
             GATEWAY_SHARED_SECRET_ENV,
             TRUST_MODE_ASYMMETRIC,
         )
+
+
+def assert_gateway_verifier_ready() -> None:
+    """Validate this service's verifier configuration. Call at startup/readiness.
+
+    Fails the process (or its readiness probe) rather than letting a
+    misconfiguration surface later as an unexplained 401 storm, and rather than
+    letting a missing audience pin silently disable replay protection (D-034).
+
+    Raises:
+        GatewayVerifierConfigurationError: on the first problem found.
+    """
+    mode = gateway_trust_mode()
+    _expected_audience()
+    _assert_key_material_ready(mode)
+    _warn_if_symmetric_in_production(mode)
 
 
 def _audience_names_a_live_service(aud: Any) -> bool:
@@ -312,11 +314,6 @@ def _audience_names_a_live_service(aud: Any) -> bool:
     return False
 
 
-def _b64url_decode(value: str) -> bytes:
-    # Restore padding exactly as the producer/Core verifier do.
-    return b64url_decode(value)
-
-
 def has_gateway_signature(
     *,
     context_b64: str | None,
@@ -336,10 +333,23 @@ def _is_v2_request(auth_path: str | None, key_id: str | None) -> bool:
     check below. There is no header an attacker can set that downgrades a
     verifier.
     """
-    path = (auth_path or "").strip()
-    if path == _GATEWAY_V2_PATH:
+    if (auth_path or "").strip() == _GATEWAY_V2_PATH:
         return True
     return bool((key_id or "").strip())
+
+
+def _decoded_v2_signature(signature_b64: str) -> bytes:
+    """Decode a gateway-v2 signature header value.
+
+    Raises:
+        GatewaySignatureError: when the value is not base64url.
+    """
+    try:
+        return b64url_decode(signature_b64)
+    except (ValueError, TypeError) as exc:
+        raise GatewaySignatureError(
+            "gateway-v2 signature is not base64url-encoded"
+        ) from exc
 
 
 def _verify_asymmetric(
@@ -359,19 +369,12 @@ def _verify_asymmetric(
         raise GatewaySignatureError(
             "gateway-v2 context carries no key id; cannot select a verification key"
         )
-
     try:
         public_key = public_key_for_kid(kid)
     except GatewayKeyError as exc:
         raise GatewayVerifierConfigurationError(str(exc)) from exc
 
-    try:
-        signature = b64url_decode(signature_b64)
-    except (ValueError, TypeError) as exc:
-        raise GatewaySignatureError(
-            "gateway-v2 signature is not base64url-encoded"
-        ) from exc
-
+    signature = _decoded_v2_signature(signature_b64)
     if not public_key.verify(signature=signature, message=context_b64.encode("ascii")):
         raise GatewaySignatureError(
             f"{GATEWAY_SIGNING_ALGORITHM} signature mismatch — context may be "
@@ -394,17 +397,119 @@ def _verify_hmac(
             f"{GATEWAY_SHARED_SECRET_ENV} is not configured; this service cannot "
             "verify legacy gateway-v1 contexts"
         )
-    try:
-        expected = hmac.new(
-            secret.encode("utf-8"),
-            context_b64.encode("ascii"),
-            hashlib.sha256,
-        ).hexdigest()
-    except Exception as exc:
-        raise GatewaySignatureError(f"HMAC computation failed: {exc}") from exc
-
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        context_b64.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
     if not hmac.compare_digest(expected.lower(), signature_hex.lower()):
         raise GatewaySignatureError("signature mismatch — context may be tampered")
+
+
+def _verify_signature_for_scheme(
+    *,
+    context_b64: str,
+    signature_value: str,
+    shared_secret: str | None,
+    auth_path: str | None,
+    key_id: str | None,
+    is_v2: bool,
+) -> None:
+    """Route to the correct signature check, gated by the trust mode.
+
+    A header can only ever select a STRICTER path: claiming v2 forces
+    asymmetric verification; claiming v1 runs into the ``asymmetric``-mode
+    rejection below.
+
+    Raises:
+        GatewaySignatureError / GatewayVerifierConfigurationError: as the
+            underlying checks do.
+    """
+    mode = gateway_trust_mode()
+    if is_v2:
+        if mode == TRUST_MODE_HMAC:
+            raise GatewayVerifierConfigurationError(
+                f"a gateway-v2 (asymmetric) context was presented but this "
+                f"service runs {GATEWAY_TRUST_MODE_ENV}={mode!r}; install "
+                f"{GATEWAY_PUBLIC_KEYS_ENV} so it can be verified"
+            )
+        _verify_asymmetric(
+            context_b64=context_b64, signature_b64=signature_value, key_id=key_id
+        )
+        return
+
+    if mode == TRUST_MODE_ASYMMETRIC:
+        raise GatewaySignatureError(
+            "legacy gateway-v1 (symmetric HMAC) context rejected: this "
+            f"service runs {GATEWAY_TRUST_MODE_ENV}="
+            f"{TRUST_MODE_ASYMMETRIC!r} and accepts only contexts signed by "
+            "the gateway's private key (D-053)"
+        )
+    path = (auth_path or "").strip()
+    if path and path != _GATEWAY_V1_PATH:
+        raise GatewaySignatureError(f"auth path not gateway-v1 (got {path!r})")
+    _verify_hmac(
+        context_b64=context_b64,
+        signature_hex=signature_value,
+        shared_secret=shared_secret,
+    )
+
+
+def _decoded_payload(context_b64: str) -> dict[str, Any]:
+    """Decode the (already signature-verified) context payload.
+
+    Raises:
+        GatewaySignatureError: when the payload is not a JSON object.
+    """
+    try:
+        payload: Any = json.loads(b64url_decode(context_b64).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise GatewaySignatureError(f"payload decode failed: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise GatewaySignatureError("payload is not a JSON object")
+    return payload
+
+
+def _verify_replay_window(payload: dict[str, Any], clock_skew_seconds: int) -> None:
+    """Enforce the ``iat``/``exp`` freshness window.
+
+    Raises:
+        GatewaySignatureError: on missing/non-integer/expired/future claims.
+    """
+    exp, iat = payload.get("exp"), payload.get("iat")
+    if exp is None or iat is None:
+        raise GatewaySignatureError("context missing exp or iat claim")
+    try:
+        exp_i, iat_i = int(exp), int(iat)
+    except (TypeError, ValueError) as exc:
+        raise GatewaySignatureError("exp/iat claims are not integers") from exc
+
+    now = int(time.time())
+    if now > exp_i + clock_skew_seconds:
+        raise GatewaySignatureError(
+            f"context expired (exp={exp_i}, now={now}, skew={clock_skew_seconds}s)"
+        )
+    if iat_i > now + clock_skew_seconds:
+        raise GatewaySignatureError(
+            f"context issued in the future (iat={iat_i}, now={now})"
+        )
+
+
+def _verify_identity_claims(payload: dict[str, Any], *, is_v2: bool) -> None:
+    """Require the identity claims the platform depends on.
+
+    ``jti`` is required on v2 only: v1 producers predate it and requiring it
+    there would 401 traffic this migration exists to keep alive. On v2 it is
+    the anti-replay handle, so a context without one is refused outright.
+
+    Raises:
+        GatewaySignatureError: on a missing claim.
+    """
+    for claim in ("user_id", "tenant_id"):
+        if not payload.get(claim):
+            raise GatewaySignatureError(f"context missing required claim: {claim!r}")
+    if is_v2 and not payload.get("jti"):
+        raise GatewaySignatureError("gateway-v2 context missing required claim: 'jti'")
 
 
 def verify_gateway_signature(
@@ -430,8 +535,7 @@ def verify_gateway_signature(
        production — D-034).
     3. ``iat``/``exp`` replay window with ``clock_skew_seconds`` tolerance.
     4. ``user_id``/``tenant_id`` must be present; ``jti`` is additionally
-       required on gateway-v2 so a service that keeps a replay cache has a key
-       to cache on.
+       required on gateway-v2.
 
     Args:
         context_b64: Value of ``X-Adaptix-Auth-Context``.
@@ -461,86 +565,74 @@ def verify_gateway_signature(
     if not ctx or not sig:
         raise GatewaySignatureError("context or signature header missing")
 
-    mode = gateway_trust_mode()
-    v2 = _is_v2_request(auth_path, key_id)
+    is_v2 = _is_v2_request(auth_path, key_id)
+    _verify_signature_for_scheme(
+        context_b64=ctx,
+        signature_value=sig,
+        shared_secret=shared_secret,
+        auth_path=auth_path,
+        key_id=key_id,
+        is_v2=is_v2,
+    )
 
-    if v2:
-        if mode == TRUST_MODE_HMAC:
-            raise GatewayVerifierConfigurationError(
-                f"a gateway-v2 (asymmetric) context was presented but this "
-                f"service runs {GATEWAY_TRUST_MODE_ENV}={mode!r}; install "
-                f"{GATEWAY_PUBLIC_KEYS_ENV} so it can be verified"
-            )
-        _verify_asymmetric(context_b64=ctx, signature_b64=sig, key_id=key_id)
-    else:
-        if mode == TRUST_MODE_ASYMMETRIC:
-            raise GatewaySignatureError(
-                "legacy gateway-v1 (symmetric HMAC) context rejected: this "
-                f"service runs {GATEWAY_TRUST_MODE_ENV}="
-                f"{TRUST_MODE_ASYMMETRIC!r} and accepts only contexts signed by "
-                "the gateway's private key (D-053)"
-            )
-        path = (auth_path or "").strip()
-        if path and path != _GATEWAY_V1_PATH:
-            raise GatewaySignatureError(f"auth path not gateway-v1 (got {path!r})")
-        _verify_hmac(context_b64=ctx, signature_hex=sig, shared_secret=shared_secret)
-
-    # Decode + parse payload. Only reached once the signature is proven, so the
-    # payload below is authenticated bytes, not attacker-chosen JSON.
-    try:
-        raw = _b64url_decode(ctx)
-        payload: Any = json.loads(raw.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise GatewaySignatureError(f"payload decode failed: {exc}") from exc
-
-    if not isinstance(payload, dict):
-        raise GatewaySignatureError("payload is not a JSON object")
-
-    # Issuer.
+    # Only reached once the signature is proven, so the payload below is
+    # authenticated bytes, not attacker-chosen JSON.
+    payload = _decoded_payload(ctx)
     if payload.get("iss") != _EXPECTED_ISSUER:
         raise GatewaySignatureError(
             f"unexpected issuer {payload.get('iss')!r} (expected {_EXPECTED_ISSUER!r})"
         )
-
     _verify_audience(payload)
-
-    # Replay window.
-    exp = payload.get("exp")
-    iat = payload.get("iat")
-    if exp is None or iat is None:
-        raise GatewaySignatureError("context missing exp or iat claim")
-    try:
-        exp_i = int(exp)
-        iat_i = int(iat)
-    except (TypeError, ValueError) as exc:
-        raise GatewaySignatureError("exp/iat claims are not integers") from exc
-
-    now = int(time.time())
-    if now > exp_i + clock_skew_seconds:
-        raise GatewaySignatureError(
-            f"context expired (exp={exp_i}, now={now}, skew={clock_skew_seconds}s)"
-        )
-    if iat_i > now + clock_skew_seconds:
-        raise GatewaySignatureError(
-            f"context issued in the future (iat={iat_i}, now={now})"
-        )
-
-    # Required identity claims.
-    for claim in ("user_id", "tenant_id"):
-        if not payload.get(claim):
-            raise GatewaySignatureError(f"context missing required claim: {claim!r}")
-
-    # ``jti`` is required on v2 only: v1 producers predate it and requiring it
-    # there would 401 traffic this migration exists to keep alive. On v2 it is
-    # the anti-replay handle, so a context without one is refused outright.
-    if v2 and not payload.get("jti"):
-        raise GatewaySignatureError("gateway-v2 context missing required claim: 'jti'")
-
+    _verify_replay_window(payload, clock_skew_seconds)
+    _verify_identity_claims(payload, is_v2=is_v2)
     return payload
+
+
+def _check_audience_pin(signed_aud: Any, expected_aud: str) -> None:
+    """Enforce the exact per-service audience pin.
+
+    Raises:
+        GatewaySignatureError: when the signed audience is not this service's.
+    """
+    if isinstance(signed_aud, list):
+        if expected_aud not in signed_aud:
+            raise GatewaySignatureError(
+                f"audience {signed_aud!r} does not include {expected_aud!r}"
+            )
+    elif signed_aud != expected_aud:
+        raise GatewaySignatureError(
+            f"unexpected audience {signed_aud!r} (expected {expected_aud!r})"
+        )
+
+
+def _warn_audience_unpinned(signed_aud: Any) -> None:
+    """Warn once per process that the audience pin is not configured.
+
+    Non-production only: warn so the services still missing the variable can
+    be enumerated from CloudWatch before they are promoted.
+    """
+    if _WARN_ONCE["audience_unpinned"]:
+        return
+    logger.warning(
+        "gateway context carries a signed audience %r but %s is not "
+        "configured, so the audience is NOT verified; a context minted "
+        "for another service would be accepted here. Set %s to this "
+        "service's audience to close cross-service replay.",
+        signed_aud,
+        GATEWAY_EXPECTED_AUDIENCE_ENV,
+        GATEWAY_EXPECTED_AUDIENCE_ENV,
+    )
+    _WARN_ONCE["audience_unpinned"] = True
 
 
 def _verify_audience(payload: dict[str, Any]) -> None:
     """Apply the three audience layers to a verified payload.
+
+    Layers 1-2 (presence, registry membership) are enforced for every service,
+    pinned or not — every legitimate producer already satisfies them, so this
+    rejects only contexts no Adaptix producer emits. Layer 3 (exact pin) is the
+    only layer that stops cross-service replay and is mandatory in production
+    (D-034).
 
     Raises:
         GatewaySignatureError: when the signed audience is absent, unknown, or
@@ -548,10 +640,6 @@ def _verify_audience(payload: dict[str, Any]) -> None:
         GatewayVerifierConfigurationError: when the pin itself is unusable
             (unset in production, or naming a service that does not exist).
     """
-    # Layers 1-2 — PRESENCE and REGISTRY MEMBERSHIP, enforced for every service,
-    # pinned or not. Safe to enforce unconditionally because every legitimate
-    # producer already satisfies them, so this rejects only contexts no Adaptix
-    # producer emits.
     signed_aud = payload.get("aud")
     if not signed_aud:
         raise GatewaySignatureError("context missing required claim: 'aud'")
@@ -560,37 +648,11 @@ def _verify_audience(payload: dict[str, Any]) -> None:
             f"audience {signed_aud!r} does not name a live Adaptix service"
         )
 
-    # Layer 3 — EXACT PIN. This is the only layer that stops cross-service
-    # replay (a context minted for A presented to B); the two above bound the
-    # blast radius but cannot tell A from B. Mandatory in production (D-034):
-    # ``_expected_audience`` raises rather than returning None there.
     expected_aud = _expected_audience()
     if expected_aud is not None:
-        if isinstance(signed_aud, list):
-            if expected_aud not in signed_aud:
-                raise GatewaySignatureError(
-                    f"audience {signed_aud!r} does not include {expected_aud!r}"
-                )
-        elif signed_aud != expected_aud:
-            raise GatewaySignatureError(
-                f"unexpected audience {signed_aud!r} (expected {expected_aud!r})"
-            )
-        return
-
-    # Non-production only: warn once so the services still missing the variable
-    # can be enumerated from CloudWatch before they are promoted.
-    global _warned_audience_unpinned
-    if not _warned_audience_unpinned:
-        logger.warning(
-            "gateway context carries a signed audience %r but %s is not "
-            "configured, so the audience is NOT verified; a context minted "
-            "for another service would be accepted here. Set %s to this "
-            "service's audience to close cross-service replay.",
-            signed_aud,
-            GATEWAY_EXPECTED_AUDIENCE_ENV,
-            GATEWAY_EXPECTED_AUDIENCE_ENV,
-        )
-        _warned_audience_unpinned = True
+        _check_audience_pin(signed_aud, expected_aud)
+    else:
+        _warn_audience_unpinned(signed_aud)
 
 
 __all__ = [

@@ -17,6 +17,9 @@ property end-to-end at the contracts layer:
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac as hmac_mod
 import json
 import time
 
@@ -45,8 +48,9 @@ from adaptix_contracts.gateway_signature import (
     verify_gateway_signature,
 )
 from adaptix_contracts.gateway_signing import (
+    GatewayClaims,
     build_gateway_signed_headers,
-    sign_gateway_context_asymmetric,
+    sign_claims_asymmetric,
 )
 
 KID = "gw-test-1"
@@ -68,7 +72,7 @@ def _clean_env(monkeypatch):
     ):
         monkeypatch.delenv(var, raising=False)
     reset_public_keyset_cache()
-    gateway_signature._warned_audience_unpinned = False
+    gateway_signature._WARN_ONCE["audience_unpinned"] = False
     yield
     reset_public_keyset_cache()
 
@@ -84,8 +88,7 @@ def keypair(monkeypatch):
     return pem, jwks_entry
 
 
-def _sign_v2(**overrides):
-    """Sign a well-formed v2 context as the gateway would."""
+def _claims(**overrides) -> GatewayClaims:
     kwargs = {
         "user_id": "user-1",
         "tenant_id": "tenant-1",
@@ -93,7 +96,25 @@ def _sign_v2(**overrides):
         "jti": "jti-1",
     }
     kwargs.update(overrides)
-    return sign_gateway_context_asymmetric(**kwargs)
+    return GatewayClaims(**kwargs)
+
+
+def _sign_v2(**overrides):
+    """Sign a well-formed v2 context as the gateway would."""
+    return sign_claims_asymmetric(_claims(**overrides))
+
+
+def _hmac_context(payload: dict, secret: str) -> tuple[str, str]:
+    """Mint a raw legacy-HMAC (context, signature) pair for attack scenarios."""
+    b64 = (
+        base64.urlsafe_b64encode(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        )
+        .rstrip(b"=")
+        .decode()
+    )
+    sig = hmac_mod.new(secret.encode(), b64.encode(), hashlib.sha256).hexdigest()
+    return b64, sig
 
 
 class TestAsymmetricRoundTrip:
@@ -123,13 +144,14 @@ class TestAsymmetricRoundTrip:
             key_id=headers["X-Adaptix-Auth-Key-Id"],
         )
         assert payload["tenant_id"] == "tenant-1"
+        # jti auto-generated when not supplied — required on v2.
+        assert payload["jti"]
 
     def test_tampered_context_rejected(self, monkeypatch, keypair):
         monkeypatch.setenv(GATEWAY_EXPECTED_AUDIENCE_ENV, "adaptix-epcr")
         ctx, sig, kid = _sign_v2()
         # Re-encode with is_founder=true — signature no longer matches.
-        raw = gateway_keys.b64url_decode(ctx)
-        doc = json.loads(raw)
+        doc = json.loads(gateway_keys.b64url_decode(ctx))
         doc["is_founder"] = True
         forged = gateway_keys.b64url_encode(
             json.dumps(doc, separators=(",", ":"), sort_keys=True).encode()
@@ -154,8 +176,15 @@ class TestAsymmetricRoundTrip:
             )
 
     def test_v2_requires_jti(self, monkeypatch, keypair):
+        """A v2 context missing jti is refused, even correctly signed.
+
+        ``sign_claims_asymmetric`` always fills jti, so the jti-less context is
+        signed by hand here with the same private key.
+        """
         monkeypatch.setenv(GATEWAY_EXPECTED_AUDIENCE_ENV, "adaptix-epcr")
-        ctx, sig, kid = _sign_v2(jti=None)
+        ctx = _claims(jti=None).context_b64()
+        kid, private_key = load_signing_key()
+        sig = gateway_keys.b64url_encode(private_key.sign(ctx.encode("ascii")))
         with pytest.raises(GatewaySignatureError, match="jti"):
             verify_gateway_signature(
                 context_b64=ctx,
@@ -175,7 +204,6 @@ class TestVerifierCompromiseYieldsNothing:
     """
 
     def test_public_material_cannot_sign(self, monkeypatch, keypair):
-        _pem, _jwks_entry = keypair
         # Attacker holds everything Service A holds: public JWKS + legacy secret.
         monkeypatch.setenv(GATEWAY_SHARED_SECRET_ENV, SHARED_SECRET)
         # Strip the private key — Service A never had it.
@@ -191,34 +219,20 @@ class TestVerifierCompromiseYieldsNothing:
 
         # 2. Best remaining move: HMAC-sign a founder context with the shared
         #    secret (exactly what D-053 allowed). Service B refuses it.
-        import base64
-        import hashlib
-        import hmac as hmac_mod
-
-        forged_payload = {
-            "iss": "adaptix-gateway",
-            "aud": "adaptix-billing",
-            "user_id": "attacker",
-            "tenant_id": "tenant-1",
-            "is_founder": True,
-            "roles": ["founder"],
-            "iat": int(time.time()),
-            "exp": int(time.time()) + 60,
-            "jti": "forged",
-        }
-        forged_b64 = (
-            base64.urlsafe_b64encode(
-                json.dumps(
-                    forged_payload, separators=(",", ":"), sort_keys=True
-                ).encode()
-            )
-            .rstrip(b"=")
-            .decode()
+        forged_b64, forged_sig = _hmac_context(
+            {
+                "iss": "adaptix-gateway",
+                "aud": "adaptix-billing",
+                "user_id": "attacker",
+                "tenant_id": "tenant-1",
+                "is_founder": True,
+                "roles": ["founder"],
+                "iat": int(time.time()),
+                "exp": int(time.time()) + 60,
+                "jti": "forged",
+            },
+            SHARED_SECRET,
         )
-        forged_sig = hmac_mod.new(
-            SHARED_SECRET.encode(), forged_b64.encode(), hashlib.sha256
-        ).hexdigest()
-
         with pytest.raises(GatewaySignatureError):
             verify_gateway_signature(
                 context_b64=forged_b64,
@@ -240,7 +254,7 @@ class TestVerifierCompromiseYieldsNothing:
         monkeypatch.setenv(GATEWAY_TRUST_MODE_ENV, "asymmetric")
         monkeypatch.setenv(GATEWAY_EXPECTED_AUDIENCE_ENV, "adaptix-epcr")
 
-        attacker_pem, _ = generate_signing_keypair(KID)  # same kid, wrong key
+        attacker_pem, _entry = generate_signing_keypair(KID)  # same kid, wrong key
         monkeypatch.setenv(GATEWAY_SIGNING_PRIVATE_KEY_ENV, attacker_pem)
         ctx, sig, kid = _sign_v2()
         with pytest.raises(GatewaySignatureError, match="signature mismatch"):
@@ -261,9 +275,6 @@ class TestNoHeaderDowngrade:
 
         ctx, _sig, kid = _sign_v2()
         # HMAC "signature" over the v2 context using the fleet secret.
-        import hashlib
-        import hmac as hmac_mod
-
         hmac_sig = hmac_mod.new(
             SHARED_SECRET.encode(), ctx.encode(), hashlib.sha256
         ).hexdigest()
@@ -280,31 +291,18 @@ class TestNoHeaderDowngrade:
         monkeypatch.setenv(GATEWAY_EXPECTED_AUDIENCE_ENV, "adaptix-epcr")
         monkeypatch.setenv(GATEWAY_SHARED_SECRET_ENV, SHARED_SECRET)
 
-        import base64
-        import hashlib
-        import hmac as hmac_mod
-
-        payload = {
-            "iss": "adaptix-gateway",
-            "aud": "adaptix-epcr",
-            "user_id": "u",
-            "tenant_id": "t",
-            "iat": int(time.time()),
-            "exp": int(time.time()) + 60,
-        }
-        b64 = (
-            base64.urlsafe_b64encode(
-                json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-            )
-            .rstrip(b"=")
-            .decode()
+        b64, sig = _hmac_context(
+            {
+                "iss": "adaptix-gateway",
+                "aud": "adaptix-epcr",
+                "user_id": "u",
+                "tenant_id": "t",
+                "iat": int(time.time()),
+                "exp": int(time.time()) + 60,
+            },
+            SHARED_SECRET,
         )
-        sig = hmac_mod.new(
-            SHARED_SECRET.encode(), b64.encode(), hashlib.sha256
-        ).hexdigest()
-        with pytest.raises(
-            GatewaySignatureError, match="gateway-v1.*rejected|rejected"
-        ):
+        with pytest.raises(GatewaySignatureError, match="rejected"):
             verify_gateway_signature(
                 context_b64=b64, signature_hex=sig, auth_path="gateway-v1"
             )

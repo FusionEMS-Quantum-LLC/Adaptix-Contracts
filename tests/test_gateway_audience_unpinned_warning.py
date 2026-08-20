@@ -41,7 +41,7 @@ _SECRET = "aud-test-shared-secret"  # noqa: S105 — test-only fixture, not a re
 def _reset_warning_guard(monkeypatch: pytest.MonkeyPatch) -> None:
     """The guard is one-shot per process; reset it so each test is independent."""
     monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
-    monkeypatch.setattr(gs, "_warned_audience_unpinned", False)
+    monkeypatch.setitem(gs._WARN_ONCE, "audience_unpinned", False)
 
 
 def _sign(*, aud: object = "adaptix-core") -> tuple[str, str]:

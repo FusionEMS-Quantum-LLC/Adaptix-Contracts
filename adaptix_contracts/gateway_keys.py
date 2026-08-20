@@ -140,10 +140,88 @@ def b64url_encode(raw: bytes) -> str:
 # path. Cache by the RAW env value so a rotated keyset is picked up the moment
 # the variable changes (which in ECS means a new task, but tests and any future
 # in-process refresh get correct behaviour for free) without ever serving a
-# stale key after a change.
-_keyset_lock = threading.Lock()
-_keyset_cache_source: str | None = None
-_keyset_cache: dict[str, GatewayPublicKey] = {}
+# stale key after a change. State lives in one mutable mapping so no function
+# needs to rebind module globals.
+_KEYSET_LOCK = threading.Lock()
+_KEYSET_CACHE: dict[str, Any] = {"source": None, "keys": {}}
+
+
+def _jwks_entries(raw: str) -> list[Any]:
+    """Return the raw entry list from a JWKS document string.
+
+    Raises:
+        GatewayKeyError: when the document is not JSON, not a JWKS shape, or
+            has no keys.
+    """
+    try:
+        doc: Any = json.loads(raw)
+    except ValueError as exc:
+        raise GatewayKeyError(
+            f"{GATEWAY_PUBLIC_KEYS_ENV} is not valid JSON: {exc}"
+        ) from exc
+
+    entries = doc.get("keys") if isinstance(doc, dict) else doc
+    if not isinstance(entries, list) or not entries:
+        raise GatewayKeyError(
+            f"{GATEWAY_PUBLIC_KEYS_ENV} must be a JWKS object with a non-empty "
+            "'keys' array"
+        )
+    return entries
+
+
+def _entry_public_key(entry: dict[str, Any], kid: str, index: int) -> Ed25519PublicKey:
+    """Decode one JWKS entry's ``x`` member into an Ed25519 public key.
+
+    Raises:
+        GatewayKeyError: when ``x`` is missing, not base64url, or wrong length.
+    """
+    x_b64 = str(entry.get("x") or "").strip()
+    if not x_b64:
+        raise GatewayKeyError(
+            f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) has no 'x'"
+        )
+    try:
+        raw_key = b64url_decode(x_b64)
+    except (ValueError, TypeError) as exc:
+        raise GatewayKeyError(
+            f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) 'x' is not base64url"
+        ) from exc
+    if len(raw_key) != _ED25519_RAW_PUBLIC_KEY_BYTES:
+        raise GatewayKeyError(
+            f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) 'x' decodes to "
+            f"{len(raw_key)} bytes, expected {_ED25519_RAW_PUBLIC_KEY_BYTES}"
+        )
+    return Ed25519PublicKey.from_public_bytes(raw_key)
+
+
+def _parse_jwks_entry(entry: Any, index: int) -> GatewayPublicKey:
+    """Validate one JWKS entry and return its key.
+
+    Raises:
+        GatewayKeyError: on any malformed field. Only OKP/Ed25519/EdDSA entries
+            are accepted — a foreign key type is a provisioning mistake, not a
+            key to silently skip.
+    """
+    if not isinstance(entry, dict):
+        raise GatewayKeyError(f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] is not an object")
+
+    kid = str(entry.get("kid") or "").strip()
+    if not kid:
+        raise GatewayKeyError(
+            f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] has no 'kid'; a keyset without "
+            "key ids cannot support rotation"
+        )
+
+    kty = str(entry.get("kty") or "").strip()
+    crv = str(entry.get("crv") or "").strip()
+    alg = str(entry.get("alg") or GATEWAY_SIGNING_ALGORITHM).strip()
+    if (kty, crv, alg) != ("OKP", "Ed25519", GATEWAY_SIGNING_ALGORITHM):
+        raise GatewayKeyError(
+            f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) is "
+            f"kty={kty!r} crv={crv!r} alg={alg!r}; only "
+            f"OKP/Ed25519/{GATEWAY_SIGNING_ALGORITHM} is accepted"
+        )
+    return GatewayPublicKey(kid=kid, key=_entry_public_key(entry, kid, index))
 
 
 def _parse_jwks(raw: str) -> dict[str, GatewayPublicKey]:
@@ -154,74 +232,14 @@ def _parse_jwks(raw: str) -> dict[str, GatewayPublicKey]:
             never returned — accepting "the keys that happened to parse" is how a
             rotation silently drops the active key and 401s production.
     """
-    try:
-        doc: Any = json.loads(raw)
-    except ValueError as exc:
-        raise GatewayKeyError(
-            f"{GATEWAY_PUBLIC_KEYS_ENV} is not valid JSON: {exc}"
-        ) from exc
-
-    if isinstance(doc, dict) and "keys" in doc:
-        entries = doc.get("keys")
-    elif isinstance(doc, list):
-        entries = doc
-    else:
-        raise GatewayKeyError(
-            f"{GATEWAY_PUBLIC_KEYS_ENV} must be a JWKS object with a 'keys' array"
-        )
-
-    if not isinstance(entries, list) or not entries:
-        raise GatewayKeyError(f"{GATEWAY_PUBLIC_KEYS_ENV} contains no keys")
-
     keyset: dict[str, GatewayPublicKey] = {}
-    for index, entry in enumerate(entries):
-        if not isinstance(entry, dict):
+    for index, entry in enumerate(_jwks_entries(raw)):
+        parsed = _parse_jwks_entry(entry, index)
+        if parsed.kid in keyset:
             raise GatewayKeyError(
-                f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] is not an object"
+                f"{GATEWAY_PUBLIC_KEYS_ENV} declares duplicate kid {parsed.kid!r}"
             )
-
-        kid = str(entry.get("kid") or "").strip()
-        if not kid:
-            raise GatewayKeyError(
-                f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] has no 'kid'; a keyset without "
-                "key ids cannot support rotation"
-            )
-        if kid in keyset:
-            raise GatewayKeyError(
-                f"{GATEWAY_PUBLIC_KEYS_ENV} declares duplicate kid {kid!r}"
-            )
-
-        kty = str(entry.get("kty") or "").strip()
-        crv = str(entry.get("crv") or "").strip()
-        alg = str(entry.get("alg") or GATEWAY_SIGNING_ALGORITHM).strip()
-        if kty != "OKP" or crv != "Ed25519" or alg != GATEWAY_SIGNING_ALGORITHM:
-            raise GatewayKeyError(
-                f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) is "
-                f"kty={kty!r} crv={crv!r} alg={alg!r}; only "
-                f"OKP/Ed25519/{GATEWAY_SIGNING_ALGORITHM} is accepted"
-            )
-
-        x = str(entry.get("x") or "").strip()
-        if not x:
-            raise GatewayKeyError(
-                f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) has no 'x'"
-            )
-        try:
-            raw_key = b64url_decode(x)
-        except (ValueError, TypeError) as exc:
-            raise GatewayKeyError(
-                f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) 'x' is not base64url"
-            ) from exc
-        if len(raw_key) != _ED25519_RAW_PUBLIC_KEY_BYTES:
-            raise GatewayKeyError(
-                f"{GATEWAY_PUBLIC_KEYS_ENV}[{index}] (kid={kid!r}) 'x' decodes to "
-                f"{len(raw_key)} bytes, expected {_ED25519_RAW_PUBLIC_KEY_BYTES}"
-            )
-
-        keyset[kid] = GatewayPublicKey(
-            kid=kid, key=Ed25519PublicKey.from_public_bytes(raw_key)
-        )
-
+        keyset[parsed.kid] = parsed
     return keyset
 
 
@@ -245,18 +263,14 @@ def load_public_keyset() -> dict[str, GatewayPublicKey]:
     raw = _raw_public_keys()
     if not raw:
         return {}
-
-    global _keyset_cache_source, _keyset_cache
-    with _keyset_lock:
-        if _keyset_cache_source == raw:
-            return _keyset_cache
-        parsed = _parse_jwks(raw)
-        _keyset_cache_source = raw
-        _keyset_cache = parsed
-        return parsed
+    with _KEYSET_LOCK:
+        if _KEYSET_CACHE["source"] != raw:
+            _KEYSET_CACHE["keys"] = _parse_jwks(raw)
+            _KEYSET_CACHE["source"] = raw
+        return _KEYSET_CACHE["keys"]
 
 
-def asymmetric_verification_configured() -> bool:
+def has_verification_keys() -> bool:
     """Return whether this process has gateway public keys to verify with."""
     return bool(_raw_public_keys())
 
@@ -289,10 +303,9 @@ def public_key_for_kid(kid: str) -> GatewayPublicKey:
 
 def reset_public_keyset_cache() -> None:
     """Drop the parsed-keyset cache. For tests and explicit rotation refresh."""
-    global _keyset_cache_source, _keyset_cache
-    with _keyset_lock:
-        _keyset_cache_source = None
-        _keyset_cache = {}
+    with _KEYSET_LOCK:
+        _KEYSET_CACHE["source"] = None
+        _KEYSET_CACHE["keys"] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -305,16 +318,37 @@ def signing_key_id() -> str | None:
     return os.environ.get(GATEWAY_SIGNING_KEY_ID_ENV, "").strip() or None
 
 
-def asymmetric_signing_configured() -> bool:
+def has_signing_material() -> bool:
     """Return whether this process holds gateway signing material.
 
     A domain service should ALWAYS see ``False`` here. It returning ``True``
     outside the gateway means the private key was injected somewhere it must not
     be, which is the D-053 defect reintroduced.
     """
-    return bool(
-        os.environ.get(GATEWAY_SIGNING_PRIVATE_KEY_ENV, "").strip() and signing_key_id()
-    )
+    pem = os.environ.get(GATEWAY_SIGNING_PRIVATE_KEY_ENV, "").strip()
+    return bool(pem and signing_key_id())
+
+
+def _private_key_from_pem(pem: str) -> Ed25519PrivateKey:
+    """Parse the configured private-key PEM.
+
+    Raises:
+        GatewayKeyError: when the PEM is unreadable or not Ed25519. The
+            underlying parse error is chained but key bytes never appear in the
+            message.
+    """
+    try:
+        key = serialization.load_pem_private_key(pem.encode("utf-8"), password=None)
+    except Exception as exc:
+        raise GatewayKeyError(
+            f"{GATEWAY_SIGNING_PRIVATE_KEY_ENV} is not a readable PEM private key"
+        ) from exc
+    if not isinstance(key, Ed25519PrivateKey):
+        raise GatewayKeyError(
+            f"{GATEWAY_SIGNING_PRIVATE_KEY_ENV} is not an Ed25519 key; only "
+            f"{GATEWAY_SIGNING_ALGORITHM} signing is accepted"
+        )
+    return key
 
 
 def load_signing_key() -> tuple[str, Ed25519PrivateKey]:
@@ -336,20 +370,7 @@ def load_signing_key() -> tuple[str, Ed25519PrivateKey]:
             f"{GATEWAY_SIGNING_KEY_ID_ENV} is not configured; a signed context "
             "without a key id cannot be verified after rotation"
         )
-
-    try:
-        key = serialization.load_pem_private_key(pem.encode("utf-8"), password=None)
-    except Exception as exc:
-        raise GatewayKeyError(
-            f"{GATEWAY_SIGNING_PRIVATE_KEY_ENV} is not a readable PEM private key"
-        ) from exc
-
-    if not isinstance(key, Ed25519PrivateKey):
-        raise GatewayKeyError(
-            f"{GATEWAY_SIGNING_PRIVATE_KEY_ENV} is not an Ed25519 key; only "
-            f"{GATEWAY_SIGNING_ALGORITHM} signing is accepted"
-        )
-    return kid, key
+    return kid, _private_key_from_pem(pem)
 
 
 # ---------------------------------------------------------------------------
@@ -409,12 +430,12 @@ __all__ = [
     "GATEWAY_SIGNING_PRIVATE_KEY_ENV",
     "GatewayKeyError",
     "GatewayPublicKey",
-    "asymmetric_signing_configured",
-    "asymmetric_verification_configured",
     "b64url_decode",
     "b64url_encode",
     "build_jwks",
     "generate_signing_keypair",
+    "has_signing_material",
+    "has_verification_keys",
     "load_public_keyset",
     "load_signing_key",
     "public_jwks_entry",

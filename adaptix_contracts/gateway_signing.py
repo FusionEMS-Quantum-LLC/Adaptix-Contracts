@@ -60,11 +60,12 @@ import json
 import os
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 from adaptix_contracts.gateway_keys import (
-    asymmetric_signing_configured,
     b64url_encode,
+    has_signing_material,
     load_signing_key,
 )
 from adaptix_contracts.gateway_signature import (
@@ -94,86 +95,89 @@ HEADER_AUTH_KEY_ID = "X-Adaptix-Auth-Key-Id"
 _DEFAULT_TTL_SECONDS = 60
 
 
-def _build_context_b64(
-    *,
-    user_id: str,
-    tenant_id: str,
-    aud: str,
-    sub: str | None,
-    agency_id: str | None,
-    email: str | None,
-    roles: list[str] | None,
-    scopes: list[str] | None,
-    jti: str | None,
-    ttl_seconds: int,
-    now: int | None,
-) -> str:
-    """Serialize the canonical context payload to unpadded base64url.
+@dataclass(frozen=True)
+class GatewayClaims:
+    """The identity a signed context forwards, independent of signing scheme.
 
-    Shared by both schemes so the payload bytes are identical regardless of how
-    they are signed — the signature is the only difference between v1 and v2.
+    ``user_id``, ``tenant_id`` and ``aud`` are required (the verifier rejects a
+    context missing any of them — and a context without a target audience would
+    recreate the cross-service replay hole the audience pin closes). Everything
+    else is an optional forwarded claim.
     """
-    if not (user_id or "").strip():
-        raise GatewaySignatureError("user_id is required to sign a context")
-    if not (tenant_id or "").strip():
-        raise GatewaySignatureError("tenant_id is required to sign a context")
-    if not (aud or "").strip():
-        raise GatewaySignatureError("aud (target service audience) is required")
-    if ttl_seconds <= 0:
-        raise GatewaySignatureError("ttl_seconds must be a positive integer")
 
-    issued = int(time.time()) if now is None else int(now)
-    payload: dict[str, Any] = {
-        "iss": _GATEWAY_ISS,
-        "aud": aud,
-        "user_id": user_id,
-        "tenant_id": tenant_id,
-        "iat": issued,
-        "exp": issued + int(ttl_seconds),
-    }
-    if sub is not None:
-        payload["sub"] = sub
-    if agency_id is not None:
-        payload["agency_id"] = agency_id
-    if email is not None:
-        payload["email"] = email
-    if roles is not None:
-        payload["roles"] = list(roles)
-    if scopes is not None:
-        payload["scopes"] = list(scopes)
-    if jti is not None:
-        payload["jti"] = jti
+    user_id: str
+    tenant_id: str
+    aud: str
+    sub: str | None = None
+    agency_id: str | None = None
+    email: str | None = None
+    roles: list[str] | None = None
+    scopes: list[str] | None = None
+    jti: str | None = None
+    ttl_seconds: int = _DEFAULT_TTL_SECONDS
+    now: int | None = None
 
-    serialized = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-    return (
-        base64.urlsafe_b64encode(serialized.encode("utf-8")).decode("ascii").rstrip("=")
-    )
+    def validated(self) -> GatewayClaims:
+        """Return ``self`` after checking required fields.
+
+        Raises:
+            GatewaySignatureError: on a missing required field or bad TTL.
+        """
+        if not (self.user_id or "").strip():
+            raise GatewaySignatureError("user_id is required to sign a context")
+        if not (self.tenant_id or "").strip():
+            raise GatewaySignatureError("tenant_id is required to sign a context")
+        if not (self.aud or "").strip():
+            raise GatewaySignatureError("aud (target service audience) is required")
+        if self.ttl_seconds <= 0:
+            raise GatewaySignatureError("ttl_seconds must be a positive integer")
+        return self
+
+    def payload(self) -> dict[str, Any]:
+        """Return the canonical context payload for these claims."""
+        issued = int(time.time()) if self.now is None else int(self.now)
+        payload: dict[str, Any] = {
+            "iss": _GATEWAY_ISS,
+            "aud": self.aud,
+            "user_id": self.user_id,
+            "tenant_id": self.tenant_id,
+            "iat": issued,
+            "exp": issued + int(self.ttl_seconds),
+        }
+        optional: dict[str, Any] = {
+            "sub": self.sub,
+            "agency_id": self.agency_id,
+            "email": self.email,
+            "jti": self.jti,
+        }
+        payload.update({k: v for k, v in optional.items() if v is not None})
+        if self.roles is not None:
+            payload["roles"] = list(self.roles)
+        if self.scopes is not None:
+            payload["scopes"] = list(self.scopes)
+        return payload
+
+    def context_b64(self) -> str:
+        """Serialize the payload to the unpadded-base64url context string.
+
+        Shared by both schemes so the payload bytes are identical regardless of
+        how they are signed — the signature is the only v1/v2 difference.
+        """
+        serialized = json.dumps(
+            self.validated().payload(), separators=(",", ":"), sort_keys=True
+        )
+        return (
+            base64.urlsafe_b64encode(serialized.encode("utf-8"))
+            .decode("ascii")
+            .rstrip("=")
+        )
 
 
-def sign_gateway_context_asymmetric(
-    *,
-    user_id: str,
-    tenant_id: str,
-    aud: str,
-    sub: str | None = None,
-    agency_id: str | None = None,
-    email: str | None = None,
-    roles: list[str] | None = None,
-    scopes: list[str] | None = None,
-    jti: str | None = "",
-    ttl_seconds: int = _DEFAULT_TTL_SECONDS,
-    now: int | None = None,
-) -> tuple[str, str, str]:
+def sign_claims_asymmetric(claims: GatewayClaims) -> tuple[str, str, str]:
     """Mint an Ed25519-signed gateway-v2 context. Gateway-side only.
 
-    Args:
-        user_id / tenant_id / aud: Required identity and destination. See
-            :func:`sign_gateway_context` for semantics.
-        jti: Anti-replay id, REQUIRED on gateway-v2 (the verifier rejects a v2
-            context without one). The default sentinel ``""`` means "generate a
-            UUID for me"; pass ``None`` explicitly only in tests that exercise
-            the verifier's rejection.
-        ttl_seconds / now: Lifetime and issue-time override (tests).
+    A ``claims.jti`` of ``None`` is replaced with a fresh UUID: ``jti`` is the
+    anti-replay handle and is REQUIRED on gateway-v2 by the verifier.
 
     Returns:
         ``(context_b64, signature_b64, kid)``.
@@ -183,23 +187,34 @@ def sign_gateway_context_asymmetric(
         GatewayKeyError: when this process holds no signing material — i.e. it
             is not the gateway. Domain services must not call this.
     """
-    effective_jti = str(uuid.uuid4()) if jti == "" else jti
+    if claims.jti is None:
+        claims = GatewayClaims(**{**claims.__dict__, "jti": str(uuid.uuid4())})
     kid, private_key = load_signing_key()
-    context_b64 = _build_context_b64(
-        user_id=user_id,
-        tenant_id=tenant_id,
-        aud=aud,
-        sub=sub,
-        agency_id=agency_id,
-        email=email,
-        roles=roles,
-        scopes=scopes,
-        jti=effective_jti,
-        ttl_seconds=ttl_seconds,
-        now=now,
-    )
+    context_b64 = claims.context_b64()
     signature = private_key.sign(context_b64.encode("ascii"))
     return context_b64, b64url_encode(signature), kid
+
+
+def sign_claims_hmac(claims: GatewayClaims, *, shared_secret: str) -> tuple[str, str]:
+    """Mint a LEGACY HMAC gateway-v1 ``(context_b64, signature_hex)`` pair.
+
+    Deprecated by D-053: every caller of this function necessarily holds the
+    fleet-wide symmetric secret, which is the defect. Retained byte-for-byte for
+    the migration window; new code paths must not adopt it.
+
+    Raises:
+        GatewaySignatureError: on an empty secret or missing required claims.
+    """
+    secret = (shared_secret or "").strip()
+    if not secret:
+        raise GatewaySignatureError("shared_secret is empty — cannot sign a context")
+    context_b64 = claims.context_b64()
+    signature_hex = hmac.new(
+        secret.encode("utf-8"),
+        context_b64.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    return context_b64, signature_hex
 
 
 def sign_gateway_context(
@@ -217,35 +232,13 @@ def sign_gateway_context(
     ttl_seconds: int = _DEFAULT_TTL_SECONDS,
     now: int | None = None,
 ) -> tuple[str, str]:
-    """Mint a LEGACY HMAC gateway-v1 ``(context_b64, signature_hex)`` pair.
+    """Legacy kwargs wrapper over :func:`sign_claims_hmac`.
 
-    Deprecated by D-053: every caller of this function necessarily holds the
-    fleet-wide symmetric secret, which is the defect. Retained byte-for-byte for
-    the migration window; new code paths must not adopt it.
-
-    Args:
-        shared_secret: ``ADAPTIX_GATEWAY_SHARED_SECRET`` value. Never logged.
-        user_id: Verified user id being forwarded. Required (the verifier
-            rejects a context missing it).
-        tenant_id: Verified tenant id being forwarded. Required.
-        aud: The TARGET service's audience string (e.g. ``"adaptix-ai"``).
-            Required — signing a context without a target audience would
-            recreate the cross-service replay hole the audience pin closes.
-        sub, agency_id, email, roles, scopes, jti: Optional forwarded claims.
-        ttl_seconds: Context lifetime; ``exp = iat + ttl_seconds``. Must be > 0.
-        now: Override issue time in epoch seconds (for tests).
-
-    Returns:
-        ``(context_b64, signature_hex)``.
-
-    Raises:
-        GatewaySignatureError: if a required argument is empty/invalid.
-    """
-    secret = (shared_secret or "").strip()
-    if not secret:
-        raise GatewaySignatureError("shared_secret is empty — cannot sign a context")
-
-    context_b64 = _build_context_b64(
+    Kept with its historical signature so existing v1 call sites are unchanged;
+    new code should build a :class:`GatewayClaims` and use the claims-based
+    functions.
+    """  # pylint: disable=too-many-arguments
+    claims = GatewayClaims(
         user_id=user_id,
         tenant_id=tenant_id,
         aud=aud,
@@ -258,12 +251,41 @@ def sign_gateway_context(
         ttl_seconds=ttl_seconds,
         now=now,
     )
-    signature_hex = hmac.new(
-        secret.encode("utf-8"),
-        context_b64.encode("ascii"),
-        hashlib.sha256,
-    ).hexdigest()
-    return context_b64, signature_hex
+    return sign_claims_hmac(claims, shared_secret=shared_secret)
+
+
+def _v2_headers(claims: GatewayClaims) -> dict[str, str]:
+    """Return gateway-v2 headers for ``claims``."""
+    context_b64, signature_b64, kid = sign_claims_asymmetric(claims)
+    return {
+        HEADER_AUTH_CONTEXT: context_b64,
+        HEADER_AUTH_SIGNATURE: signature_b64,
+        HEADER_AUTH_PATH: _GATEWAY_V2_PATH,
+        HEADER_AUTH_KEY_ID: kid,
+    }
+
+
+def _v1_headers(claims: GatewayClaims, shared_secret: str | None) -> dict[str, str]:
+    """Return legacy gateway-v1 headers for ``claims``.
+
+    Raises:
+        GatewaySignatureError: when no shared secret is available either as an
+            argument or in the environment.
+    """
+    secret = (shared_secret or "").strip() or os.environ.get(
+        GATEWAY_SHARED_SECRET_ENV, ""
+    ).strip()
+    if not secret:
+        raise GatewaySignatureError(
+            "no signing scheme configured: neither gateway signing material "
+            f"nor {GATEWAY_SHARED_SECRET_ENV} is available"
+        )
+    context_b64, signature_hex = sign_claims_hmac(claims, shared_secret=secret)
+    return {
+        HEADER_AUTH_CONTEXT: context_b64,
+        HEADER_AUTH_SIGNATURE: signature_hex,
+        HEADER_AUTH_PATH: _GATEWAY_V1_PATH,
+    }
 
 
 def build_gateway_signed_headers(
@@ -285,50 +307,20 @@ def build_gateway_signed_headers(
 
     Scheme selection is by configuration:
 
-    * Signing material configured (``asymmetric_signing_configured()``) →
+    * Signing material configured (``has_signing_material()``) →
       **gateway-v2** headers, including ``X-Adaptix-Auth-Key-Id``. The
       ``shared_secret`` argument is ignored.
     * Otherwise → legacy **gateway-v1** HMAC headers, using ``shared_secret``
       or, when omitted, ``ADAPTIX_GATEWAY_SHARED_SECRET`` from the environment.
 
-    ``shared_secret`` moved from required-positional to optional keyword when
-    v2 landed; existing v1 callers that pass it keep working unchanged.
+    ``shared_secret`` moved from required to optional keyword when v2 landed;
+    existing v1 callers that pass it keep working unchanged.
 
     Raises:
         GatewaySignatureError: on missing required identity fields, or when
             neither signing scheme is configured.
-    """
-    if asymmetric_signing_configured():
-        context_b64, signature_b64, kid = sign_gateway_context_asymmetric(
-            user_id=user_id,
-            tenant_id=tenant_id,
-            aud=aud,
-            sub=sub,
-            agency_id=agency_id,
-            email=email,
-            roles=roles,
-            scopes=scopes,
-            jti=jti if jti is not None else "",
-            ttl_seconds=ttl_seconds,
-            now=now,
-        )
-        return {
-            HEADER_AUTH_CONTEXT: context_b64,
-            HEADER_AUTH_SIGNATURE: signature_b64,
-            HEADER_AUTH_PATH: _GATEWAY_V2_PATH,
-            HEADER_AUTH_KEY_ID: kid,
-        }
-
-    secret = (shared_secret or "").strip() or os.environ.get(
-        GATEWAY_SHARED_SECRET_ENV, ""
-    ).strip()
-    if not secret:
-        raise GatewaySignatureError(
-            "no signing scheme configured: neither gateway signing material "
-            f"nor {GATEWAY_SHARED_SECRET_ENV} is available"
-        )
-    context_b64, signature_hex = sign_gateway_context(
-        shared_secret=secret,
+    """  # pylint: disable=too-many-arguments
+    claims = GatewayClaims(
         user_id=user_id,
         tenant_id=tenant_id,
         aud=aud,
@@ -341,11 +333,9 @@ def build_gateway_signed_headers(
         ttl_seconds=ttl_seconds,
         now=now,
     )
-    return {
-        HEADER_AUTH_CONTEXT: context_b64,
-        HEADER_AUTH_SIGNATURE: signature_hex,
-        HEADER_AUTH_PATH: _GATEWAY_V1_PATH,
-    }
+    if has_signing_material():
+        return _v2_headers(claims)
+    return _v1_headers(claims, shared_secret)
 
 
 def gateway_secret_env_name() -> str:
@@ -362,8 +352,10 @@ __all__ = [
     "HEADER_AUTH_KEY_ID",
     "HEADER_AUTH_PATH",
     "HEADER_AUTH_SIGNATURE",
+    "GatewayClaims",
     "build_gateway_signed_headers",
     "gateway_secret_env_name",
+    "sign_claims_asymmetric",
+    "sign_claims_hmac",
     "sign_gateway_context",
-    "sign_gateway_context_asymmetric",
 ]
