@@ -237,20 +237,43 @@ def _assert_key_material_ready(mode: str) -> None:
     Raises:
         GatewayVerifierConfigurationError: on missing/malformed material.
     """
-    if mode in (TRUST_MODE_ASYMMETRIC, TRUST_MODE_DUAL):
-        if not has_verification_keys():
-            if mode == TRUST_MODE_ASYMMETRIC:
-                raise GatewayVerifierConfigurationError(
-                    f"{GATEWAY_TRUST_MODE_ENV}={mode!r} requires "
-                    f"{GATEWAY_PUBLIC_KEYS_ENV} but it is not configured; this "
-                    "service would reject every gateway request"
-                )
-        else:
-            try:
-                load_public_keyset()
-            except GatewayKeyError as exc:
-                raise GatewayVerifierConfigurationError(str(exc)) from exc
+    _assert_public_keys_ready(mode)
+    _assert_shared_secret_ready(mode)
 
+
+def _assert_public_keys_ready(mode: str) -> None:
+    """Validate the gateway-v2 public keyset for modes that verify EdDSA.
+
+    ``dual`` tolerates an absent keyset — that is the migration state, where a
+    service still verifies gateway-v1 by HMAC while the public keyset is being
+    distributed. ``asymmetric`` does not: with no keyset it would reject every
+    request.
+
+    Raises:
+        GatewayVerifierConfigurationError: on missing/malformed material.
+    """
+    if mode not in (TRUST_MODE_ASYMMETRIC, TRUST_MODE_DUAL):
+        return
+    if not has_verification_keys():
+        if mode == TRUST_MODE_ASYMMETRIC:
+            raise GatewayVerifierConfigurationError(
+                f"{GATEWAY_TRUST_MODE_ENV}={mode!r} requires "
+                f"{GATEWAY_PUBLIC_KEYS_ENV} but it is not configured; this "
+                "service would reject every gateway request"
+            )
+        return
+    try:
+        load_public_keyset()
+    except GatewayKeyError as exc:
+        raise GatewayVerifierConfigurationError(str(exc)) from exc
+
+
+def _assert_shared_secret_ready(mode: str) -> None:
+    """Validate the legacy shared secret for modes that verify gateway-v1.
+
+    Raises:
+        GatewayVerifierConfigurationError: if the secret is not configured.
+    """
     if mode in (TRUST_MODE_HMAC, TRUST_MODE_DUAL) and gateway_shared_secret() is None:
         raise GatewayVerifierConfigurationError(
             f"{GATEWAY_TRUST_MODE_ENV}={mode!r} requires "

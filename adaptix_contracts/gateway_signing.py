@@ -159,14 +159,31 @@ class GatewayClaims:
                 claims, or demo detail set without ``is_demo``.
         """
         if not self.is_demo:
-            if self.demo_session_id or self.demo_lease_id or self.demo_persona:
-                raise GatewaySignatureError(
-                    "demo_session_id / demo_lease_id / demo_persona require "
-                    "is_demo=True; the verifier reads them only on a demo "
-                    "context, so emitting them alone would silently downgrade a "
-                    "demo session to an ordinary one"
-                )
+            self._reject_demo_detail_without_flag()
             return
+        self._reject_demo_founder()
+        self._require_demo_claim_shape()
+
+    def _reject_demo_detail_without_flag(self) -> None:
+        """Reject demo detail claims emitted without ``is_demo``.
+
+        Raises:
+            GatewaySignatureError: If any demo detail claim is set.
+        """
+        if self.demo_session_id or self.demo_lease_id or self.demo_persona:
+            raise GatewaySignatureError(
+                "demo_session_id / demo_lease_id / demo_persona require "
+                "is_demo=True; the verifier reads them only on a demo "
+                "context, so emitting them alone would silently downgrade a "
+                "demo session to an ordinary one"
+            )
+
+    def _reject_demo_founder(self) -> None:
+        """Reject a demo context carrying founder privilege by flag or by role.
+
+        Raises:
+            GatewaySignatureError: If founder privilege is present.
+        """
         # The verifier derives founder from EITHER the is_founder claim or a
         # "founder" role (auth_contracts: ``bool(is_founder) or "founder" in
         # roles``). Checking only the flag here would let a founder-by-role demo
@@ -180,6 +197,13 @@ class GatewayClaims:
                 "isolated leased demo tenant must never escape (the verifier "
                 "rejects this with 401)"
             )
+
+    def _require_demo_claim_shape(self) -> None:
+        """Require well-formed demo identifiers and a non-empty persona.
+
+        Raises:
+            GatewaySignatureError: On a malformed UUID or an empty persona.
+        """
         for name, raw in (
             ("demo_session_id", self.demo_session_id),
             ("demo_lease_id", self.demo_lease_id),
@@ -208,27 +232,50 @@ class GatewayClaims:
             "iat": issued,
             "exp": issued + int(self.ttl_seconds),
         }
+        payload.update(self._optional_claims())
+        return payload
+
+    def _optional_claims(self) -> dict[str, Any]:
+        """Return only the claims that are actually set on these claims.
+
+        Emitted-only-when-set is what keeps a context that uses none of these
+        byte-identical to the pre-gateway-v2 payload, so the migration does not
+        change a single signature input for callers that never set them.
+        """
         optional: dict[str, Any] = {
             "sub": self.sub,
             "agency_id": self.agency_id,
             "email": self.email,
             "jti": self.jti,
         }
-        payload.update({k: v for k, v in optional.items() if v is not None})
+        claims: dict[str, Any] = {k: v for k, v in optional.items() if v is not None}
         if self.roles is not None:
-            payload["roles"] = list(self.roles)
+            claims["roles"] = list(self.roles)
         if self.scopes is not None:
-            payload["scopes"] = list(self.scopes)
+            claims["scopes"] = list(self.scopes)
+        claims.update(self._privilege_claims())
+        return claims
+
+    def _privilege_claims(self) -> dict[str, Any]:
+        """Return the privilege/demo claims the verifier reads for authorization.
+
+        Kept together because they are exactly the claims that change what the
+        far end is allowed to do: founder lifts tenant scoping, mfa_verified
+        satisfies step-up gates, and the demo trio binds a session to its leased
+        tenant. Omitting any of them degrades authorization silently rather than
+        loudly, which is why the producer must be able to carry all of them.
+        """
+        claims: dict[str, Any] = {}
         if self.is_founder:
-            payload["is_founder"] = True
+            claims["is_founder"] = True
         if self.mfa_verified:
-            payload["mfa_verified"] = True
+            claims["mfa_verified"] = True
         if self.is_demo:
-            payload["is_demo"] = True
-            payload["demo_session_id"] = str(self.demo_session_id).strip()
-            payload["demo_lease_id"] = str(self.demo_lease_id).strip()
-            payload["demo_persona"] = str(self.demo_persona).strip()
-        return payload
+            claims["is_demo"] = True
+            claims["demo_session_id"] = str(self.demo_session_id).strip()
+            claims["demo_lease_id"] = str(self.demo_lease_id).strip()
+            claims["demo_persona"] = str(self.demo_persona).strip()
+        return claims
 
     def context_b64(self) -> str:
         """Serialize the payload to the unpadded-base64url context string.
