@@ -159,12 +159,12 @@ class GatewayClaims:
                 claims, or demo detail set without ``is_demo``.
         """
         if not self.is_demo:
-            self._reject_demo_detail_without_flag()
+            self._reject_unflagged_demo_detail()
             return
         self._reject_demo_founder()
         self._require_demo_claim_shape()
 
-    def _reject_demo_detail_without_flag(self) -> None:
+    def _reject_unflagged_demo_detail(self) -> None:
         """Reject demo detail claims emitted without ``is_demo``.
 
         Raises:
