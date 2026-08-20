@@ -329,6 +329,7 @@ def _sign_gateway_context(
     scopes: list[str] | None = None,
     is_founder: bool = False,
     mfa_verified: bool = False,
+    extra_claims: dict[str, object] | None = None,
 ) -> tuple[str, str]:
     """Produce (context_b64, signature_hex) exactly like the gateway producer."""
     now = int(time.time())
@@ -348,6 +349,8 @@ def _sign_gateway_context(
         "exp": (now + 60) if exp is None else exp,
         "jti": str(uuid4()),
     }
+    if extra_claims:
+        payload.update(extra_claims)
     serialized = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode(
         "utf-8"
     )
@@ -1072,3 +1075,245 @@ def test_appsec_production_audience_match_allowed(
 
     assert auth.user_id == user_id
     assert "device" in auth.roles
+
+
+# ---------------------------------------------------------------------------
+# Cortex Live demo context (is_demo / demo_session_id / demo_lease_id /
+# demo_persona) — populated ONLY from a VERIFIED signed gateway context.
+# ---------------------------------------------------------------------------
+
+
+def _demo_claims(
+    *,
+    session_id: str | None,
+    lease_id: str | None,
+    persona: str | None,
+) -> dict[str, object]:
+    claims: dict[str, object] = {"is_demo": True}
+    if session_id is not None:
+        claims["demo_session_id"] = session_id
+    if lease_id is not None:
+        claims["demo_lease_id"] = lease_id
+    if persona is not None:
+        claims["demo_persona"] = persona
+    return claims
+
+
+def test_demo_claims_surface_from_verified_signed_context(
+    _gateway_secret: str,
+) -> None:
+    """A well-formed signed demo context surfaces all four demo fields."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    demo_session = uuid4()
+    demo_lease = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        roles=["agency_admin"],
+        extra_claims=_demo_claims(
+            session_id=str(demo_session),
+            lease_id=str(demo_lease),
+            persona="agency_admin",
+        ),
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.is_demo is True
+    assert auth.demo_session_id == demo_session
+    assert auth.demo_lease_id == demo_lease
+    assert auth.demo_persona == "agency_admin"
+    assert auth.is_founder is False
+
+
+def test_demo_context_with_malformed_session_id_is_rejected_not_downgraded(
+    _gateway_secret: str,
+) -> None:
+    """Malformed demo_session_id -> 401, never a silent ordinary token."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims=_demo_claims(
+            session_id="not-a-uuid",
+            lease_id=str(uuid4()),
+            persona="agency_admin",
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_demo_context_with_missing_lease_id_is_rejected(
+    _gateway_secret: str,
+) -> None:
+    """is_demo without demo_lease_id -> 401 (no half-formed demo identity)."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims=_demo_claims(
+            session_id=str(uuid4()),
+            lease_id=None,
+            persona="agency_admin",
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_demo_context_with_empty_persona_is_rejected(
+    _gateway_secret: str,
+) -> None:
+    """is_demo with an empty demo_persona -> 401."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims=_demo_claims(
+            session_id=str(uuid4()),
+            lease_id=str(uuid4()),
+            persona="   ",
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_demo_context_claiming_founder_is_rejected(
+    _gateway_secret: str,
+) -> None:
+    """A signed context with is_demo AND founder -> 401. Demo is never founder."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        is_founder=True,
+        extra_claims=_demo_claims(
+            session_id=str(uuid4()),
+            lease_id=str(uuid4()),
+            persona="agency_admin",
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx_b64,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+            )
+        )
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_unsigned_request_never_carries_demo_status() -> None:
+    """The unsigned/legacy header path always yields a non-demo context."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_roles="agency_admin",
+        )
+    )
+
+    assert auth.is_demo is False
+    assert auth.demo_session_id is None
+    assert auth.demo_lease_id is None
+    assert auth.demo_persona is None
+
+
+def test_signed_non_demo_context_ignores_stray_demo_identifiers(
+    _gateway_secret: str,
+) -> None:
+    """Without is_demo=true, stray demo identifiers in the payload stay unset.
+
+    Prevents a half-demo state where demo_session_id is populated on an
+    ordinary authenticated context.
+    """
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        roles=["agency_admin"],
+        extra_claims={
+            "demo_session_id": str(uuid4()),
+            "demo_lease_id": str(uuid4()),
+            "demo_persona": "agency_admin",
+        },
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.is_demo is False
+    assert auth.demo_session_id is None
+    assert auth.demo_lease_id is None
+    assert auth.demo_persona is None
+
+
+def test_auth_context_demo_fields_default_for_existing_constructors() -> None:
+    """Backward compatibility: existing construction sites need no new fields."""
+    from adaptix_contracts.auth_contracts import AuthContext
+
+    auth = AuthContext(user_id=uuid4(), tenant_id=uuid4())
+    assert auth.is_demo is False
+    assert auth.demo_session_id is None
+    assert auth.demo_lease_id is None
+    assert auth.demo_persona is None

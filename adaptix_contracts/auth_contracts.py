@@ -187,6 +187,16 @@ class AuthContext(BaseModel):
             reach the service.
         mfa_verified: Verified MFA evidence carried only from a signed gateway
             context. Unsigned/legacy identity headers never grant MFA status.
+        is_demo: True when this request runs inside a Cortex Live public demo
+            session. Populated ONLY from a VERIFIED signed gateway context —
+            the unsigned/legacy header path always yields ``False``, so no raw
+            header (e.g. ``X-Is-Demo``) can ever grant demo status.
+        demo_session_id: Cortex Live demo session UUID. Set only when
+            ``is_demo`` is true on a verified signed context; ``None`` otherwise.
+        demo_lease_id: Demo tenant lease UUID for the leased demo tenant. Set
+            only when ``is_demo`` is true on a verified signed context.
+        demo_persona: Active demo persona key (e.g. ``agency_admin``). Set only
+            when ``is_demo`` is true on a verified signed context.
     """
 
     user_id: UUID
@@ -196,6 +206,10 @@ class AuthContext(BaseModel):
     is_founder: bool = False
     scopes: list[str] = []
     mfa_verified: bool = False
+    is_demo: bool = False
+    demo_session_id: UUID | None = None
+    demo_lease_id: UUID | None = None
+    demo_persona: str | None = None
 
     model_config = {"frozen": True}
 
@@ -448,14 +462,69 @@ async def get_auth_context(
             else []
         )
         mfa_verified = verified_payload.get("mfa_verified") is True
+
+        # Cortex Live demo context — honoured ONLY from the verified signed
+        # payload. A demo context that is present but malformed is REJECTED
+        # rather than silently downgraded to an ordinary authenticated context:
+        # every downstream demo safety gate (side-effect policy, tenant lease
+        # checks, reset scoping) keys off these fields, so "demo token quietly
+        # becomes a normal token" would strip those protections while keeping
+        # the session alive. A demo principal may also never be founder — the
+        # founder role lifts tenant scoping, which is exactly what an isolated
+        # leased demo tenant must never escape.
+        is_demo = verified_payload.get("is_demo") is True
+        demo_session_id: UUID | None = None
+        demo_lease_id: UUID | None = None
+        demo_persona: str | None = None
+        if is_demo:
+            raw_demo_session = str(
+                verified_payload.get("demo_session_id") or ""
+            ).strip()
+            raw_demo_lease = str(verified_payload.get("demo_lease_id") or "").strip()
+            raw_demo_persona = str(verified_payload.get("demo_persona") or "").strip()
+            try:
+                demo_session_id = UUID(raw_demo_session)
+                demo_lease_id = UUID(raw_demo_lease)
+            except (ValueError, AttributeError) as exc:
+                logger.warning(
+                    "signed demo context has malformed demo_session_id/"
+                    "demo_lease_id; rejecting (no silent downgrade)."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Demo auth context claims are malformed.",
+                ) from exc
+            if not raw_demo_persona:
+                logger.warning("signed demo context has empty demo_persona; rejecting.")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Demo auth context claims are malformed.",
+                )
+            if is_founder_flag:
+                logger.warning(
+                    "signed demo context claims founder; rejecting "
+                    "(demo principals are never founder)."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Demo auth context may not carry founder privilege.",
+                )
+            demo_persona = raw_demo_persona
     else:
         # Unsigned / legacy path (no verifiable signature): trust the injected
         # headers exactly as before. Reachable only when the absent-signature
         # path is allowed (enforcement off) or no shared secret is configured.
         # There is no unsigned scopes header, so scopes stay empty on this path.
+        # Demo status is NEVER derivable here: only a verified signed context
+        # can mark a request as a Cortex Live demo session, so a raw
+        # ``X-Is-Demo: true`` (or any other unsigned input) grants nothing.
         roles = _parse_roles(x_user_roles)
         scopes = []
         mfa_verified = False
+        is_demo = False
+        demo_session_id = None
+        demo_lease_id = None
+        demo_persona = None
         email = (x_user_email or "").strip()
         is_founder_flag = (x_is_founder or "false").strip().lower() in (
             "true",
@@ -523,6 +592,10 @@ async def get_auth_context(
         is_founder=is_founder_flag,
         scopes=scopes,
         mfa_verified=mfa_verified,
+        is_demo=is_demo,
+        demo_session_id=demo_session_id,
+        demo_lease_id=demo_lease_id,
+        demo_persona=demo_persona,
     )
 
 
