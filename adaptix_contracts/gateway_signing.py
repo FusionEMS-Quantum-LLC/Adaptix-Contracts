@@ -167,11 +167,18 @@ class GatewayClaims:
                     "demo session to an ordinary one"
                 )
             return
-        if self.is_founder:
+        # The verifier derives founder from EITHER the is_founder claim or a
+        # "founder" role (auth_contracts: ``bool(is_founder) or "founder" in
+        # roles``). Checking only the flag here would let a founder-by-role demo
+        # context through the producer and straight into the verifier's 401.
+        if self.is_founder or "founder" in {
+            str(r).strip().lower() for r in (self.roles or [])
+        }:
             raise GatewaySignatureError(
-                "a demo context may not carry founder privilege: founder lifts "
-                "tenant scoping, which an isolated leased demo tenant must never "
-                "escape (the verifier rejects this with 401)"
+                "a demo context may not carry founder privilege (by is_founder "
+                "or by a 'founder' role): founder lifts tenant scoping, which an "
+                "isolated leased demo tenant must never escape (the verifier "
+                "rejects this with 401)"
             )
         for name, raw in (
             ("demo_session_id", self.demo_session_id),
