@@ -9,6 +9,72 @@ after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
 package version is `2.16.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
+## [2.31.0]
+
+### Security
+
+- **Issuer-bound asymmetric gateway trust (D-053).** The gateway's symmetric
+  HMAC signing key was distributed to every verifying service, so a signature
+  proved only possession of a fleet-wide secret — never gateway identity.
+  Compromise of any single service yielded the ability to mint arbitrary
+  contexts, including `is_founder=true`, accepted by every other service.
+  Trust now rests on Ed25519: the gateway alone holds the private key
+  (`ADAPTIX_GATEWAY_SIGNING_PRIVATE_KEY` + `_SIGNING_KEY_ID`); services hold
+  only a public JWKS (`ADAPTIX_GATEWAY_PUBLIC_KEYS`) selected by `kid`, with
+  active+previous rotation. `ADAPTIX_GATEWAY_TRUST_MODE` (`hmac` → `dual` →
+  `asymmetric`) gates scheme selection; a v2 context is never verified by HMAC
+  and no request header can downgrade a verifier.
+- **Mandatory production audience pin (D-034).** Exact audience enforcement was
+  conditional on `ADAPTIX_GATEWAY_EXPECTED_AUDIENCE` being configured, so a
+  forgotten task-definition variable silently disabled cross-service replay
+  protection. The pin is now required in production and fails closed at request
+  time, and `assert_gateway_verifier_ready()` fails startup/readiness on missing
+  keys or a missing production pin.
+
+### Fixed
+
+- **The gateway producer could not carry every claim the verifier consumes.**
+  `GatewayClaims` is the only way to mint a signed context under either scheme,
+  but its payload allowlist omitted `is_founder`, `mfa_verified` and the four
+  Cortex Live demo claims added in 2.30.0. Because gateway-v2 is the only
+  producer path in asymmetric mode, those claims became unmintable at
+  migration: `is_founder`/`mfa_verified` degrade closed, but `is_demo` degrades
+  **open** — a Cortex Live demo session would silently become an ordinary
+  session, losing the demo side-effect policy that keeps it inside its leased
+  tenant. Each claim is emitted only when set, so a context that does not use
+  them is byte-identical to one minted before this change. `validated()` now
+  mirrors the verifier's demo rules exactly (founder — by flag *or* by a
+  `founder` role — rejected alongside demo; session/lease must be UUIDs;
+  persona non-empty; demo detail without `is_demo` rejected) so a producer
+  mistake fails at signing instead of becoming an opaque 401 storm downstream.
+- **`get_auth_context` could not verify a gateway-v2 context at all.** The
+  dependency every Adaptix service depends on neither accepted nor forwarded
+  `X-Adaptix-Auth-Key-Id`, which `verify_gateway_signature` requires on
+  gateway-v2 to select the public key by `kid`.
+- **Removing the shared secret would have 503'd every migrated service.**
+  Verification was gated on a shared secret existing, but a service in the
+  asymmetric end-state holds only public keys. The gate now asks whether any
+  verification material is present; scheme selection and trust-mode gating stay
+  inside `verify_gateway_signature`. Production with a signature and no
+  verification material still fails closed with 503.
+
+### Rollout
+
+Ordered, and the order matters — step 3 is safe only from 2.31.0 onward:
+
+1. Generate the keypair; private key into Secrets Manager, referenced by the
+   **gateway task definition only**; publish the public JWKS fleet-wide.
+2. Services move `hmac` → `dual` automatically on receiving the keyset (unset
+   `ADAPTIX_GATEWAY_TRUST_MODE` resolves to `dual` when public keys are
+   present, `hmac` when they are not). The gateway begins signing v2.
+3. Flip services to `asymmetric`, then remove `ADAPTIX_GATEWAY_SHARED_SECRET`
+   from domain-service task definitions.
+
+**Adoption prerequisite:** every service must carry
+`ADAPTIX_GATEWAY_EXPECTED_AUDIENCE` naming its own audience *before* it
+upgrades to 2.31.0. The pin is mandatory in production and fails closed, and it
+resolves from that environment variable only — there is no fallback source.
+
 ## [2.30.0]
 
 ### Added
