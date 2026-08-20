@@ -74,6 +74,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import time
 from typing import Any
 
@@ -375,6 +376,34 @@ def _decoded_v2_signature(signature_b64: str) -> bytes:
         ) from exc
 
 
+#: A hex digest and nothing else. Validated BEFORE ``hmac.compare_digest``,
+#: which raises TypeError -- not a verification failure -- on a str containing
+#: any non-ASCII character.
+_HEX_DIGEST = re.compile(r"\A[0-9a-fA-F]+\Z")
+
+
+def _require_ascii_header(value: str, what: str) -> None:
+    """Reject a header value that cannot be ASCII-encoded.
+
+    Starlette decodes header bytes as latin-1, so a caller controls whether a
+    header contains a byte above 0x7F. Both verification paths encode the
+    context as ASCII, and the HMAC path compares digests with
+    ``hmac.compare_digest``; each raises a bare ``UnicodeEncodeError`` or
+    ``TypeError`` on such input. Those are not ``GatewaySignatureError``, so
+    they escape the contract every caller relies on and surface as an
+    UNAUTHENTICATED 500 on every gateway-authenticated route rather than a 401.
+
+    Raises:
+        GatewaySignatureError: when ``value`` is not ASCII.
+    """
+    try:
+        value.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise GatewaySignatureError(
+            f"{what} contains non-ASCII characters"
+        ) from exc
+
+
 def _verify_asymmetric(
     *, context_b64: str, signature_b64: str, key_id: str | None
 ) -> None:
@@ -420,12 +449,17 @@ def _verify_hmac(
             f"{GATEWAY_SHARED_SECRET_ENV} is not configured; this service cannot "
             "verify legacy gateway-v1 contexts"
         )
+    signature = signature_hex.strip()
+    if not _HEX_DIGEST.match(signature):
+        # compare_digest raises TypeError on a str with any non-ASCII
+        # character, so the shape is checked before it is reached.
+        raise GatewaySignatureError("signature is not a hex digest")
     expected = hmac.new(
         secret.encode("utf-8"),
         context_b64.encode("ascii"),
         hashlib.sha256,
     ).hexdigest()
-    if not hmac.compare_digest(expected.lower(), signature_hex.lower()):
+    if not hmac.compare_digest(expected.lower(), signature.lower()):
         raise GatewaySignatureError("signature mismatch — context may be tampered")
 
 
@@ -587,6 +621,9 @@ def verify_gateway_signature(
     sig = (signature_hex or "").strip()
     if not ctx or not sig:
         raise GatewaySignatureError("context or signature header missing")
+    # Both schemes sign the context as ASCII bytes; a non-ASCII character here
+    # raises UnicodeEncodeError deep inside either path.
+    _require_ascii_header(ctx, "auth context header")
 
     is_v2 = _is_v2_request(auth_path, key_id)
     _verify_signature_for_scheme(
