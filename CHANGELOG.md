@@ -7,7 +7,39 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.33.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.34.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.34.0]
+
+### Fixed
+
+- **One non-ASCII byte in a header turned a 401 into an unauthenticated 500.**
+  Starlette decodes header bytes as latin-1, so a caller controls whether a
+  header carries a byte above `0x7F`. Two places in the verifier crashed on
+  that rather than rejecting it:
+
+  - `hmac.compare_digest` raises `TypeError` — not a verification failure —
+    when either argument is a `str` containing a non-ASCII character;
+  - both schemes encode the context as ASCII, raising `UnicodeEncodeError`.
+
+  Neither is a `GatewaySignatureError`, so both escaped the contract every
+  caller relies on. A caller that catches `GatewaySignatureError` and answers
+  401 instead saw a bare exception propagate, which FastAPI turns into a **500
+  — on every gateway-authenticated route, from an unauthenticated request**.
+
+  The context is now validated as ASCII once, before scheme dispatch (covering
+  gateway-v1 and gateway-v2 alike), and the HMAC path validates that the
+  signature is a hex digest before `compare_digest` is reached. Both produce
+  the ordinary `GatewaySignatureError` → 401.
+
+  **Found by migrating Core-Service onto this verifier.** Core had already hit
+  this defect in its own verifier copy and fixed it there; the canonical
+  verifier never had, so adopting it fleet-wide would have reintroduced the
+  crash everywhere Core had closed it — including in services that had already
+  adopted it. Covered by `tests/test_gateway_verifier_malformed_input.py`.
+
+  No legitimate traffic is affected: a valid hex digest still verifies in
+  either case, and surrounding whitespace is still tolerated.
 
 ## [2.33.0]
 
