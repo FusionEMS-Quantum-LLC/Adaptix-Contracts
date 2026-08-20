@@ -106,10 +106,19 @@ class GatewayClaims:
 
     ``is_founder``, ``mfa_verified`` and the four Cortex Live demo claims are
     consumed by ``auth_contracts.get_auth_context`` off the VERIFIED payload, so
-    the producer has to be able to express them: this dataclass is the only way
-    to mint a context under either scheme, and a claim it cannot carry is a
-    claim the fleet silently loses. Each is emitted only when set, so a context
-    that does not use them is byte-identical to one minted before they existed.
+    the producer has to be able to express them: a claim this dataclass cannot
+    carry is a claim its callers silently lose. Each is emitted only when set,
+    so a context that does not use them is byte-identical to one minted before
+    they existed.
+
+    NOT the only producer on the platform. The gateway itself
+    (``adaptix-gateway .../services/auth_context.py``) builds its own payload
+    and always emits the full claim set -- including ``is_founder: false``,
+    ``session_jti`` and ``module_entitlements``, which this dataclass either
+    omits when falsy or does not model at all. Do not "migrate" the gateway
+    onto this class expecting byte-compatibility: the two payload shapes
+    differ, and downstream verifiers that strict-key the gateway's shape would
+    break. The signing SCHEME is shared; the payload shape is not.
     """
 
     user_id: str

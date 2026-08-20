@@ -7,7 +7,48 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.16.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.33.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+
+## [2.33.0]
+
+### Fixed
+
+- **The module-entitlement gate was a second, unrepaired gateway verifier.**
+  `auth_contracts.get_auth_context` is the well-known verifier and got the
+  D-053/D-034 repair in 2.31.0.
+  `auth.module_entitlement_gate._gateway_context_claims` verifies the same
+  `X-Adaptix-Auth-*` headers for the 402 entitlement decision and was missed,
+  so it still carried both original defects:
+
+  - it never forwarded `X-Adaptix-Auth-Key-Id` to `verify_gateway_signature`,
+    so a **gateway-v2 context could not select a public key** and was pinned to
+    the legacy HMAC path;
+  - it gated verification on `ADAPTIX_GATEWAY_SHARED_SECRET` alone, so a
+    service holding only the public keyset — the state rollout step 3 creates
+    by withdrawing the shared secret — answered **503 on every gated route**.
+
+  Together these made the gate the component that would have broken the fleet
+  by following the migration's own instructions. It now forwards the key id and
+  gates on verification MATERIAL (`secret or has_verification_keys()`), matching
+  `get_auth_context` exactly.
+
+  Fail-closed posture is unchanged: a signed request that cannot be verified
+  still 503s in production and still falls back to the bearer path with a
+  CRITICAL log elsewhere. Covered by `tests/test_module_gate_v2_seam.py`, which
+  exercises the real FastAPI dependency through a gated route; 5 of its 9 cases
+  fail against the pre-fix gate.
+
+### Documentation
+
+- **`GatewayClaims` no longer claims to be the only context producer.** Its
+  docstring said it "is the only way to mint a context under either scheme".
+  The gateway has always built its own payload and always emits the full claim
+  set — including `is_founder: false`, `session_jti` and `module_entitlements`,
+  which `GatewayClaims` either omits when falsy or does not model at all. The
+  two payload shapes are **not** interchangeable and a context minted by one is
+  not byte-compatible with the other; only the signing SCHEME is shared.
+  Migrating the gateway onto `GatewayClaims` would silently change the payload
+  on every request and break any verifier that strict-keys the gateway shape.
 
 ## [2.32.0]
 

@@ -47,6 +47,7 @@ from fastapi import Header, HTTPException, Request, status
 
 from adaptix_contracts.auth.capability_registry import module_for_capability
 from adaptix_contracts.auth.cognito import AdaptixCognitoConfig
+from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
     gateway_shared_secret,
@@ -77,6 +78,9 @@ def _is_production() -> bool:
 _HEADER_AUTH_CONTEXT = "x-adaptix-auth-context"
 _HEADER_AUTH_SIGNATURE = "x-adaptix-auth-signature"
 _HEADER_AUTH_PATH = "x-adaptix-auth-path"
+# gateway-v2 only: names WHICH gateway public key signed this context. Omitting
+# it from the verify call silently pins every request to the legacy HMAC path.
+_HEADER_AUTH_KEY_ID = "x-adaptix-auth-key-id"
 
 # Canonical platform system-principal tenant (Core core_app.auth.system_identity
 # SYSTEM_TENANT_ID). A gateway-verified context for this tenant is platform
@@ -95,9 +99,11 @@ _PLATFORM_BYPASS_ROLES = frozenset({"founder", "system"})
 def _gateway_context_claims(request: Request) -> Optional[dict]:
     """Return verified gateway-context claims, or ``None`` when absent.
 
-    Reads the gateway's HMAC-signed ``X-Adaptix-Auth-Context`` headers. When
-    both context+signature are present, the signature is cryptographically
-    verified against ``ADAPTIX_GATEWAY_SHARED_SECRET``:
+    Reads the gateway's signed ``X-Adaptix-Auth-Context`` headers. When both
+    context+signature are present, the signature is cryptographically verified
+    against the gateway public keyset (``ADAPTIX_GATEWAY_PUBLIC_KEYS``) for a
+    gateway-v2 context, or ``ADAPTIX_GATEWAY_SHARED_SECRET`` for legacy
+    gateway-v1. ``X-Adaptix-Auth-Key-Id`` selects the public key:
 
     * verified  -> returns the verified payload dict (no raw bearer needed).
     * present but invalid -> raises :class:`GatewaySignatureError` (the caller
@@ -105,7 +111,7 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
       path when a tampered signature is present).
     * absent -> returns ``None`` (caller falls back to the legacy bearer path,
       keeping existing direct-bearer callers unaffected = non-breaking).
-    * present but no shared secret configured -> PRODUCTION: 503 fail-closed
+    * present but no verification material configured -> PRODUCTION: 503 fail-closed
       (a signed request that cannot be verified must not be trusted — same
       posture as ``get_auth_context`` behavior 3). NON-PRODUCTION: returns
       ``None`` (fail-open to the legacy path; a CRITICAL is logged so the gap
@@ -119,13 +125,18 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
         return None
 
     secret = gateway_shared_secret()
-    if not secret:
+    # Verification material is EITHER the legacy shared secret OR the gateway
+    # public keyset. Under D-053 a migrated service holds only the keyset, so
+    # gating on the secret alone would 503 every gated route the moment the
+    # shared secret is withdrawn -- i.e. by following the rollout's own steps.
+    # Mirrors the same gate in ``auth_contracts.get_auth_context``.
+    if not (secret or has_verification_keys()):
         if _is_production():
             logger.error(
-                "module_entitlement_gate: gateway signature present but "
-                "ADAPTIX_GATEWAY_SHARED_SECRET is not configured in production; "
-                "refusing to trust an unverifiable signed context (fail-closed). "
-                "Inject the shared secret via Secrets Manager."
+                "module_entitlement_gate: gateway signature present but neither "
+                "ADAPTIX_GATEWAY_SHARED_SECRET nor ADAPTIX_GATEWAY_PUBLIC_KEYS "
+                "is configured in production; refusing to trust an unverifiable "
+                "signed context (fail-closed). Inject one via Secrets Manager."
             )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -133,15 +144,15 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
                     "code": "gateway_secret_not_configured",
                     "message": (
                         "Gateway auth context signature present but the service "
-                        "shared secret is not configured; cannot verify."
+                        "has no verification material configured; cannot verify."
                     ),
                 },
             )
         logger.critical(
-            "module_entitlement_gate: gateway signature present but "
-            "ADAPTIX_GATEWAY_SHARED_SECRET is unset — cannot verify; falling "
-            "back to bearer path (non-production only). Inject the shared "
-            "secret via Secrets Manager."
+            "module_entitlement_gate: gateway signature present but neither "
+            "ADAPTIX_GATEWAY_SHARED_SECRET nor ADAPTIX_GATEWAY_PUBLIC_KEYS is "
+            "set — cannot verify; falling back to bearer path (non-production "
+            "only). Inject one via Secrets Manager."
         )
         return None
 
@@ -150,6 +161,7 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
         signature_hex=sig_hex or "",
         shared_secret=secret,
         auth_path=headers.get(_HEADER_AUTH_PATH),
+        key_id=headers.get(_HEADER_AUTH_KEY_ID),
     )
     # Normalise the verified payload into the claims shape the gate's
     # founder/entitlement helpers already understand.
