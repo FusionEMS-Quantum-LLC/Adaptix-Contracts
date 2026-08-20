@@ -27,7 +27,7 @@ from pydantic import Field
 
 from adaptix_contracts.errors.envelope import (
     AdaptixErrorCode,
-    AdaptixErrorEnvelope,
+    AdaptixErrorEnvelopeBase,
     AdaptixTraceContext,
 )
 
@@ -203,15 +203,20 @@ class EdgeTenantMismatchError(EdgeError):
     code = EdgeErrorCode.EDGE_TENANT_MISMATCH
 
 
-class EdgeErrorEnvelope(AdaptixErrorEnvelope):
+class EdgeErrorEnvelope(AdaptixErrorEnvelopeBase):
     """Adaptix HTTP error envelope widened for Edge-specific codes.
 
-    Overrides only ``error_code`` (widened to accept
+    Declares ``error_code`` widened to accept
     :class:`EdgeErrorCode`) and adds ``edge_context`` for structured
     Edge-scoped fields (``node_id``, ``deployment_id`` …). The
-    envelope shape, timestamp field, trace context, and ``to_http_response``
-    behaviour are inherited unchanged from
+    envelope shape, timestamp field, trace context, factory helpers and
+    ``to_http_response`` behaviour are inherited unchanged from
+    :class:`~adaptix_contracts.errors.envelope.AdaptixErrorEnvelopeBase`,
+    which is the SIBLING base it shares with
     :class:`~adaptix_contracts.errors.envelope.AdaptixErrorEnvelope`.
+    Widening a field on a subclass is a Liskov violation the type
+    checker rejects; widening the platform envelope itself would make
+    every service accept these codes. Siblings avoid both.
     """
 
     error_code: EdgeErrorCode | AdaptixErrorCode

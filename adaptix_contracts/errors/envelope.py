@@ -8,7 +8,7 @@ No raw exception text may be returned to clients.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, Self
 from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime, timezone
@@ -103,16 +103,34 @@ class AdaptixTraceContext(BaseModel):
     duration_ms: float | None = None
 
 
-class AdaptixErrorEnvelope(BaseModel):
-    """
-    Standard error response envelope for ALL Adaptix services.
+class AdaptixErrorEnvelopeBase(BaseModel):
+    """Every part of the Adaptix error envelope EXCEPT ``error_code``.
 
-    Every error response MUST use this model.
-    No raw exception text, stack traces, or internal details may be returned.
+    Domain subpackages (Edge, QA) need an envelope whose ``error_code`` accepts
+    their own code enum in addition to the platform-wide one. Expressing that by
+    subclassing :class:`AdaptixErrorEnvelope` and re-declaring ``error_code`` as
+    a wider union is a Liskov violation — a function handed an
+    ``AdaptixErrorEnvelope`` could receive a domain code it cannot handle — and
+    the type checker rejects it.
+
+    The two available alternatives are both worse:
+
+    * widening ``AdaptixErrorEnvelope.error_code`` to include domain codes would
+      make EVERY service's envelope accept Edge and QA codes at runtime, since
+      Pydantic validates from the annotation. That weakens validation
+      platform-wide, and it inverts the import direction — ``errors.envelope``
+      would have to import from the subpackages that import it.
+    * making the envelope generic in its code type is a remodel of a contract
+      with nine subclasses and every downstream consumer.
+
+    So the shared parts live here and each concrete envelope declares its own
+    ``error_code``. The domain envelopes become SIBLINGS of
+    :class:`AdaptixErrorEnvelope` rather than subclasses. Fields, validation,
+    the factory helpers and ``to_http_response`` are all inherited unchanged, so
+    every concrete class behaves exactly as it did before.
     """
 
     success: bool = False
-    error_code: AdaptixErrorCode
     message: str
     detail: str | None = None
     validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None
@@ -127,7 +145,7 @@ class AdaptixErrorEnvelope(BaseModel):
         cls,
         message: str = "Authentication required",
         trace: AdaptixTraceContext | None = None,
-    ) -> "AdaptixErrorEnvelope":
+    ) -> Self:
         return cls(
             error_code=AdaptixErrorCode.UNAUTHORIZED,
             message=message,
@@ -139,7 +157,7 @@ class AdaptixErrorEnvelope(BaseModel):
         cls,
         message: str = "Access denied",
         trace: AdaptixTraceContext | None = None,
-    ) -> "AdaptixErrorEnvelope":
+    ) -> Self:
         return cls(
             error_code=AdaptixErrorCode.FORBIDDEN,
             message=message,
@@ -151,7 +169,7 @@ class AdaptixErrorEnvelope(BaseModel):
         cls,
         resource: str,
         trace: AdaptixTraceContext | None = None,
-    ) -> "AdaptixErrorEnvelope":
+    ) -> Self:
         return cls(
             error_code=AdaptixErrorCode.NOT_FOUND,
             message=f"{resource} not found",
@@ -164,7 +182,7 @@ class AdaptixErrorEnvelope(BaseModel):
         errors: list[AdaptixValidationErrorDetail],
         message: str = "Validation failed",
         trace: AdaptixTraceContext | None = None,
-    ) -> "AdaptixErrorEnvelope":
+    ) -> Self:
         return cls(
             error_code=AdaptixErrorCode.VALIDATION_FAILED,
             message=message,
@@ -179,7 +197,7 @@ class AdaptixErrorEnvelope(BaseModel):
         message: str,
         retryable: bool = False,
         trace: AdaptixTraceContext | None = None,
-    ) -> "AdaptixErrorEnvelope":
+    ) -> Self:
         return cls(
             error_code=AdaptixErrorCode.PROVIDER_UNAVAILABLE,
             message=f"Provider unavailable: {provider}",
@@ -197,7 +215,7 @@ class AdaptixErrorEnvelope(BaseModel):
         cls,
         provider: str,
         trace: AdaptixTraceContext | None = None,
-    ) -> "AdaptixErrorEnvelope":
+    ) -> Self:
         return cls(
             error_code=AdaptixErrorCode.CREDENTIAL_GATED,
             message=f"Provider {provider} requires credentials not configured in this environment",
@@ -215,7 +233,7 @@ class AdaptixErrorEnvelope(BaseModel):
         cls,
         message: str = "An internal error occurred",
         trace: AdaptixTraceContext | None = None,
-    ) -> "AdaptixErrorEnvelope":
+    ) -> Self:
         return cls(
             error_code=AdaptixErrorCode.INTERNAL_ERROR,
             message=message,
@@ -225,3 +243,18 @@ class AdaptixErrorEnvelope(BaseModel):
     def to_http_response(self) -> dict[str, Any]:
         """Return dict suitable for FastAPI JSONResponse."""
         return self.model_dump(exclude_none=True)
+
+
+class AdaptixErrorEnvelope(AdaptixErrorEnvelopeBase):
+    """
+    Standard error response envelope for ALL Adaptix services.
+
+    Every error response MUST use this model.
+    No raw exception text, stack traces, or internal details may be returned.
+
+    ``error_code`` accepts platform-wide codes only. A domain subpackage that
+    also needs its own codes subclasses :class:`AdaptixErrorEnvelopeBase` and
+    declares the wider union there — see ``edge.errors.EdgeErrorEnvelope``.
+    """
+
+    error_code: AdaptixErrorCode
