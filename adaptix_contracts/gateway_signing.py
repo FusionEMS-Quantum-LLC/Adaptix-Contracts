@@ -103,6 +103,13 @@ class GatewayClaims:
     context missing any of them — and a context without a target audience would
     recreate the cross-service replay hole the audience pin closes). Everything
     else is an optional forwarded claim.
+
+    ``is_founder``, ``mfa_verified`` and the four Cortex Live demo claims are
+    consumed by ``auth_contracts.get_auth_context`` off the VERIFIED payload, so
+    the producer has to be able to express them: this dataclass is the only way
+    to mint a context under either scheme, and a claim it cannot carry is a
+    claim the fleet silently loses. Each is emitted only when set, so a context
+    that does not use them is byte-identical to one minted before they existed.
     """
 
     user_id: str
@@ -116,6 +123,12 @@ class GatewayClaims:
     jti: str | None = None
     ttl_seconds: int = _DEFAULT_TTL_SECONDS
     now: int | None = None
+    is_founder: bool = False
+    mfa_verified: bool = False
+    is_demo: bool = False
+    demo_session_id: str | None = None
+    demo_lease_id: str | None = None
+    demo_persona: str | None = None
 
     def validated(self) -> GatewayClaims:
         """Return ``self`` after checking required fields.
@@ -131,7 +144,51 @@ class GatewayClaims:
             raise GatewaySignatureError("aud (target service audience) is required")
         if self.ttl_seconds <= 0:
             raise GatewaySignatureError("ttl_seconds must be a positive integer")
+        self._validate_demo_claims()
         return self
+
+    def _validate_demo_claims(self) -> None:
+        """Reject demo claim shapes the verifier answers with 401.
+
+        These rules mirror ``auth_contracts.get_auth_context`` exactly. Minting
+        a context the verifier will refuse turns a producer-side mistake into an
+        opaque 401 storm at the far end of the call, so it is caught here.
+
+        Raises:
+            GatewaySignatureError: On founder+demo, malformed or missing demo
+                claims, or demo detail set without ``is_demo``.
+        """
+        if not self.is_demo:
+            if self.demo_session_id or self.demo_lease_id or self.demo_persona:
+                raise GatewaySignatureError(
+                    "demo_session_id / demo_lease_id / demo_persona require "
+                    "is_demo=True; the verifier reads them only on a demo "
+                    "context, so emitting them alone would silently downgrade a "
+                    "demo session to an ordinary one"
+                )
+            return
+        if self.is_founder:
+            raise GatewaySignatureError(
+                "a demo context may not carry founder privilege: founder lifts "
+                "tenant scoping, which an isolated leased demo tenant must never "
+                "escape (the verifier rejects this with 401)"
+            )
+        for name, raw in (
+            ("demo_session_id", self.demo_session_id),
+            ("demo_lease_id", self.demo_lease_id),
+        ):
+            try:
+                uuid.UUID(str(raw or "").strip())
+            except (ValueError, AttributeError, TypeError) as exc:
+                raise GatewaySignatureError(
+                    f"{name} must be a UUID when is_demo is set; the verifier "
+                    "rejects a demo context with malformed claims"
+                ) from exc
+        if not (self.demo_persona or "").strip():
+            raise GatewaySignatureError(
+                "demo_persona is required when is_demo is set; the verifier "
+                "rejects a demo context with an empty persona"
+            )
 
     def payload(self) -> dict[str, Any]:
         """Return the canonical context payload for these claims."""
@@ -155,6 +212,15 @@ class GatewayClaims:
             payload["roles"] = list(self.roles)
         if self.scopes is not None:
             payload["scopes"] = list(self.scopes)
+        if self.is_founder:
+            payload["is_founder"] = True
+        if self.mfa_verified:
+            payload["mfa_verified"] = True
+        if self.is_demo:
+            payload["is_demo"] = True
+            payload["demo_session_id"] = str(self.demo_session_id).strip()
+            payload["demo_lease_id"] = str(self.demo_lease_id).strip()
+            payload["demo_persona"] = str(self.demo_persona).strip()
         return payload
 
     def context_b64(self) -> str:
