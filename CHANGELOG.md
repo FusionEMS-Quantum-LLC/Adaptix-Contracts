@@ -9,6 +9,27 @@ after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
 package version is `2.16.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
 
+## [2.30.0]
+
+### Added
+
+- **Cortex Live demo auth context:** `AuthContext` gains backward-compatible
+  `is_demo`, `demo_session_id`, `demo_lease_id`, `demo_persona` fields.
+  Populated ONLY from a VERIFIED signed gateway context; the unsigned/legacy
+  header path always yields non-demo defaults, so no raw header can grant
+  demo status. A signed context with `is_demo=true` but malformed
+  session/lease UUIDs, an empty persona, or founder privilege is rejected
+  with 401 — never silently downgraded to an ordinary token.
+- **`demo_contracts.DemoSideEffectClass`** (`read` / `local_demo_write` /
+  `sandbox_external` / `production_external`) plus
+  `demo_side_effect_allowed(...)` implementing the platform-default demo
+  side-effect policy: demo sessions may read and write synthetic records in
+  their leased tenant, reach provider sandboxes only when explicitly
+  configured, and never trigger production-external side effects.
+
+(Entries for 2.17.0–2.29.1 were not recorded when those versions shipped;
+see git history for those releases.)
+
 ## [2.16.0]
 
 ### Fixed
