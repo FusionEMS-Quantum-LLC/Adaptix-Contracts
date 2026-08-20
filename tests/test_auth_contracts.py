@@ -917,7 +917,11 @@ def test_appsec_production_valid_signed_allowed_signed_authoritative(
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _F24_SECRET)
     monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
-    monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
+    # D-034: the audience pin is MANDATORY in production. This test previously
+    # deleted the pin and still expected the request to pass - that unpinned
+    # state is now a hard verifier-configuration failure by design, so the
+    # production happy path pins the audience the context is minted for.
+    monkeypatch.setenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", "adaptix-core")
     user_id = uuid4()
     tenant_id = uuid4()
     # Signed context: non-founder paramedic. Headers try to escalate.

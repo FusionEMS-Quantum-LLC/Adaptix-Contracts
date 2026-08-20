@@ -76,6 +76,7 @@ from uuid import UUID
 from fastapi import Header, HTTPException, status
 from pydantic import BaseModel
 
+from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
     GATEWAY_SHARED_SECRET_ENV,
     GatewaySignatureError,
@@ -265,6 +266,9 @@ async def get_auth_context(
     x_adaptix_auth_path: Annotated[
         str | None, Header(alias="X-Adaptix-Auth-Path")
     ] = None,
+    x_adaptix_auth_key_id: Annotated[
+        str | None, Header(alias="X-Adaptix-Auth-Key-Id")
+    ] = None,
 ) -> AuthContext:
     """FastAPI dependency: extract authenticated identity from API Gateway headers.
 
@@ -283,6 +287,16 @@ async def get_auth_context(
         x_user_email: Authenticated user email (X-User-Email header).
         x_user_roles: Comma-separated role list (X-User-Roles header).
         x_is_founder: "true" / "false" founder flag (X-Is-Founder header).
+        x_adaptix_auth_context: Signed gateway context (X-Adaptix-Auth-Context).
+        x_adaptix_auth_signature: Its signature (X-Adaptix-Auth-Signature) —
+            hex on gateway-v1, base64url on gateway-v2.
+        x_adaptix_auth_path: Signing scheme (X-Adaptix-Auth-Path).
+        x_adaptix_auth_key_id: ``kid`` of the gateway signing key
+            (X-Adaptix-Auth-Key-Id). REQUIRED to verify a gateway-v2 context —
+            it selects the public key. Both routing headers are
+            attacker-controlled and can only ever select a STRICTER scheme;
+            ``verify_gateway_signature`` gates the final choice on this
+            service's trust mode, so no header downgrades a verifier.
 
     Returns:
         AuthContext with verified identity.
@@ -339,9 +353,17 @@ async def get_auth_context(
         signature_hex=x_adaptix_auth_signature,
     )
     secret = gateway_shared_secret()
+    # D-053: verification capability is no longer "a shared secret exists".
+    # A service in the asymmetric end-state holds ONLY public verification keys
+    # — the rollout removes ADAPTIX_GATEWAY_SHARED_SECRET from its task
+    # definition. Gating on the secret alone would take every migrated service
+    # to the 503 branch below on its first signed request. Scheme selection and
+    # trust-mode gating stay inside ``verify_gateway_signature``; this only asks
+    # whether there is any material to verify WITH.
+    can_verify = secret is not None or has_verification_keys()
 
     if signature_present:
-        if secret is not None:
+        if can_verify:
             # Behavior 1: present + secret -> verify. Failure -> 401.
             # ``verify_gateway_signature`` also enforces audience pinning on this
             # verified path when ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` is set
@@ -354,6 +376,7 @@ async def get_auth_context(
                     signature_hex=x_adaptix_auth_signature or "",
                     shared_secret=secret,
                     auth_path=x_adaptix_auth_path,
+                    key_id=x_adaptix_auth_key_id,
                 )
             except GatewaySignatureError as exc:
                 logger.warning("gateway HMAC verification failed: %s", exc)
@@ -388,29 +411,34 @@ async def get_auth_context(
             # the authoritative source for roles / email / founder status.
             verified_payload = verified
         else:
-            # Behavior 3: signature present but no secret to verify with.
-            # A signed request that cannot be verified must not be trusted.
-            # Production: fail-closed (503 — misconfiguration, not the caller's
-            # fault, but we refuse to trust an unverifiable signed context).
-            # Non-production: allow as before, warn once (dev ergonomics).
+            # Behavior 3: signature present but NO verification material at all
+            # — neither a shared secret (gateway-v1) nor public keys
+            # (gateway-v2). A signed request that cannot be verified must not be
+            # trusted. Production: fail-closed (503 — misconfiguration, not the
+            # caller's fault, but we refuse to trust an unverifiable signed
+            # context). Non-production: allow as before, warn once (dev
+            # ergonomics).
             if _is_production():
                 logger.error(
-                    "gateway signature present but ADAPTIX_GATEWAY_SHARED_SECRET "
-                    "is not configured in production; refusing to trust an "
+                    "gateway signature present but neither "
+                    "ADAPTIX_GATEWAY_SHARED_SECRET nor ADAPTIX_GATEWAY_PUBLIC_KEYS "
+                    "is configured in production; refusing to trust an "
                     "unverifiable signed context (fail-closed)."
                 )
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=(
                         "Gateway auth context signature present but the service "
-                        "shared secret is not configured; cannot verify."
+                        "has no verification material configured; cannot verify."
                     ),
                 )
             if not _warned_missing_secret:
                 logger.warning(
-                    "gateway signature present but ADAPTIX_GATEWAY_SHARED_SECRET "
-                    "is not configured; cannot verify. Allowing request "
-                    "(non-production; configure the secret to enable verification)."
+                    "gateway signature present but neither "
+                    "ADAPTIX_GATEWAY_SHARED_SECRET nor ADAPTIX_GATEWAY_PUBLIC_KEYS "
+                    "is configured; cannot verify. Allowing request "
+                    "(non-production; configure verification material to enable "
+                    "verification)."
                 )
                 _warned_missing_secret = True
     else:

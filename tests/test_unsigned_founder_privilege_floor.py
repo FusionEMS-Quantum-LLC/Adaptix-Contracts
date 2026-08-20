@@ -210,6 +210,8 @@ def test_signed_founder_context_still_grants_founder_in_production(
     """
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _SECRET)
+    # D-034: the audience pin is mandatory in production; the happy path pins it.
+    monkeypatch.setenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", "adaptix-core")
     user_id, tenant_id = str(uuid4()), str(uuid4())
     ctx, sig = _sign_context(
         user_id=user_id,
@@ -234,6 +236,8 @@ def test_signed_founder_survives_even_with_the_escape_hatch_on(
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", "false")
     monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _SECRET)
+    # D-034: the audience pin is mandatory in production; the happy path pins it.
+    monkeypatch.setenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", "adaptix-core")
     user_id, tenant_id = str(uuid4()), str(uuid4())
     ctx, sig = _sign_context(
         user_id=user_id, tenant_id=tenant_id, roles=["founder"], is_founder=True
