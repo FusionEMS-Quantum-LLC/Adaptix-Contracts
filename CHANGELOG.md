@@ -58,6 +58,27 @@ package version is `2.16.0` (see `pyproject.toml` and `adaptix_contracts/__init_
   inside `verify_gateway_signature`. Production with a signature and no
   verification material still fails closed with 503.
 
+### Changed — one deliberate behavior change, stated plainly
+
+`get_auth_context` now reads and forwards `X-Adaptix-Auth-Key-Id`. This is
+required — without it no gateway-v2 context can be verified at all — but it has
+one observable consequence that is NOT a no-op, so it is recorded here rather
+than left to be discovered:
+
+`_is_v2_request()` treats **any** non-empty `key_id` as a claim of gateway-v2.
+Previously `get_auth_context` always passed `key_id=None`, so routing depended
+on `X-Adaptix-Auth-Path` alone. A legacy v1 HMAC request that carries a stray
+key-id header is therefore now **rejected** (401) on an `hmac`-mode service,
+where before it verified and passed.
+
+This is deliberate and in the safe direction. Claiming v2 can only ever force
+*stricter* verification, never weaker — that is the property that guarantees no
+header downgrades a verifier. Verified against a real request: a v1 context with
+`auth_path=gateway-v1` or `None` and no key-id still passes unchanged; only the
+stray-header case changes. Nothing emits that header today — no service holds
+public keys and the gateway does not sign v2 yet — so no live traffic is
+affected at the time of release.
+
 ### Rollout
 
 Ordered, and the order matters — step 3 is safe only from 2.31.0 onward:

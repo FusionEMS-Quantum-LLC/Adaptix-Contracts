@@ -24,6 +24,11 @@ keys only.
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
+import json
+import time
 from uuid import uuid4
 
 import pytest
@@ -99,6 +104,34 @@ def _call(user_id, tenant_id, ctx, sig, kid):
             x_adaptix_auth_key_id=kid,
         )
     )
+
+
+def _sign_v1(user_id: str, tenant_id: str) -> tuple[str, str]:
+    """Mint a legacy HMAC (v1) context, as the pre-v2 gateway does."""
+    now = int(time.time())
+    payload = {
+        "sub": user_id,
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "email": "u@example.test",
+        "roles": ["paramedic"],
+        "scopes": [],
+        "is_founder": False,
+        "mfa_verified": False,
+        "iss": "adaptix-gateway",
+        "aud": AUDIENCE,
+        "iat": now,
+        "exp": now + 60,
+    }
+    b64 = (
+        base64.urlsafe_b64encode(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+        )
+        .rstrip(b"=")
+        .decode()
+    )
+    sig = hmac.new("s".encode() * 48, b64.encode(), hashlib.sha256).hexdigest()
+    return b64, sig
 
 
 def _sign(user_id, tenant_id, **overrides):
@@ -318,6 +351,52 @@ class TestPayloadByteCompatibility:
         assert "is_founder" not in payload
         assert "mfa_verified" not in payload
         assert "is_demo" not in payload
+
+
+class TestStrayKeyIdRoutesStricter:
+    """Forwarding the key-id header has one deliberate, non-no-op consequence.
+
+    ``_is_v2_request`` treats any non-empty ``key_id`` as a claim of gateway-v2.
+    Before the header was forwarded, routing depended on ``auth_path`` alone, so
+    a legacy v1 request carrying a stray key-id used to verify by HMAC and pass.
+    It is now rejected on an hmac-mode service.
+
+    That is the intended direction: claiming v2 can only ever force STRICTER
+    verification, never weaker, which is what guarantees no header downgrades a
+    verifier. Pinned here so the change stays deliberate.
+    """
+
+    @pytest.fixture()
+    def hmac_service(self, monkeypatch):
+        monkeypatch.setenv(GATEWAY_SHARED_SECRET_ENV, "s" * 48)
+        monkeypatch.setenv(GATEWAY_TRUST_MODE_ENV, "hmac")
+
+    def _v1_request(self, key_id):
+        user_id, tenant_id = uuid4(), uuid4()
+        ctx, sig = _sign_v1(str(user_id), str(tenant_id))
+        return asyncio.run(
+            get_auth_context(
+                x_user_id=str(user_id),
+                x_tenant_id=str(tenant_id),
+                x_adaptix_auth_context=ctx,
+                x_adaptix_auth_signature=sig,
+                x_adaptix_auth_path="gateway-v1",
+                x_adaptix_auth_key_id=key_id,
+            )
+        )
+
+    def test_v1_without_key_id_still_passes_unchanged(self, hmac_service):
+        """The normal legacy path must be untouched."""
+        auth = self._v1_request(None)
+
+        assert auth.roles == ["paramedic"]
+
+    def test_v1_with_stray_key_id_is_now_rejected(self, hmac_service):
+        """Documented in CHANGELOG 2.31.0 under 'one deliberate behavior change'."""
+        with pytest.raises(HTTPException) as exc:
+            self._v1_request("some-kid")
+
+        assert exc.value.status_code == 401
 
 
 class TestNoVerificationMaterialStillFailsClosed:
