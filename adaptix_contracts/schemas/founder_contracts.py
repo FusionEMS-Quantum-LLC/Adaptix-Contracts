@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime, date
+from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
@@ -21,9 +22,9 @@ class RevenueTimePeriod(str, enum.Enum):
 class FounderRevenueMetricContract(BaseModel):
     tenant_id: UUID
     period: RevenueTimePeriod
-    total_revenue: float
-    total_collected: float
-    total_outstanding: float
+    total_revenue: Decimal
+    total_collected: Decimal
+    total_outstanding: Decimal
     denial_rate: float
     appeal_success_rate: float
     average_days_to_payment: float
@@ -32,7 +33,7 @@ class FounderRevenueMetricContract(BaseModel):
     claims_aging_61_90: int = 0
     claims_aging_90_plus: int = 0
     ai_high_risk_percentage: float = 0.0
-    stripe_net_revenue: float = 0.0
+    stripe_net_revenue: Decimal = Decimal("0")
     snapshot_at: datetime
 
 
@@ -41,7 +42,7 @@ class FounderOperatingExpenseContract(BaseModel):
     tenant_id: UUID
     category: str
     description: str
-    amount: float
+    amount: Decimal
     incurred_date: date
     vendor: Optional[str] = None
     created_at: datetime
@@ -51,7 +52,7 @@ class FounderRevenueEntryContract(BaseModel):
     id: UUID
     tenant_id: UUID
     source: str
-    amount: float
+    amount: Decimal
     description: Optional[str] = None
     entry_date: date
     claim_id: Optional[UUID] = None
@@ -63,7 +64,7 @@ class FounderFinancialTransactionContract(BaseModel):
     id: UUID
     tenant_id: UUID
     transaction_type: str
-    amount: float
+    amount: Decimal
     description: str
     reference_id: Optional[UUID] = None
     reference_type: Optional[str] = None

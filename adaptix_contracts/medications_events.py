@@ -13,6 +13,7 @@ cross-service correlation and audit.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Optional, Any
 from uuid import UUID
@@ -66,7 +67,7 @@ class MedicationLotEvent(BaseModel):
     storage_location: str = Field(..., description="Storage location")
     storage_temperature: Optional[str] = Field(None, description="Storage conditions")
     unit_of_measure: str = Field(..., description="Unit of measure")
-    cost_per_unit: float = Field(..., description="Cost per unit")
+    cost_per_unit: Decimal = Field(..., description="Cost per unit")
 
     # Before/after for updates
     before_state: Optional[dict[str, Any]] = Field(None)
@@ -94,8 +95,8 @@ class MedicationAdministrationEvent(BaseModel):
 
     quantity_administered: int = Field(..., description="Amount given")
     unit_of_measure: str = Field(...)
-    cost_per_unit: float = Field(...)
-    total_cost: float = Field(..., description="Cost of administration")
+    cost_per_unit: Decimal = Field(...)
+    total_cost: Decimal = Field(..., description="Cost of administration")
 
     administered_by: Optional[str] = Field(None, description="Clinician")
     administered_date: datetime = Field(...)
@@ -122,8 +123,8 @@ class MedicationWasteEvent(BaseModel):
     waste_reason: str = Field(
         ..., description="Reason: expired/damaged/contaminated/other"
     )
-    cost_per_unit: float = Field(...)
-    waste_cost: float = Field(..., description="Value of wasted medication")
+    cost_per_unit: Decimal = Field(...)
+    waste_cost: Decimal = Field(..., description="Value of wasted medication")
 
     disposed_by: Optional[str] = Field(None, description="Person performing disposal")
     witness: Optional[str] = Field(
@@ -183,8 +184,8 @@ class MedicationExpirationAlert(BaseModel):
     expiration_date: datetime = Field(...)
     days_until_expiration: int = Field(...)
     current_quantity: int = Field(...)
-    cost_per_unit: float = Field(...)
-    waste_forecast: float = Field(..., description="Est. cost if expired")
+    cost_per_unit: Decimal = Field(...)
+    waste_forecast: Decimal = Field(..., description="Est. cost if expired")
 
     notify_role: str = Field(default="pharmacy_manager", description="Role to notify")
     severity: str = Field(..., description="Severity: low/medium/high")
@@ -252,7 +253,7 @@ class MedicationAnalyticsEvent(BaseModel):
 
     # Generic metrics
     quantity: Optional[int] = Field(None)
-    cost: Optional[float] = Field(None)
+    cost: Optional[Decimal] = Field(None)
 
     # Custom metadata
     metadata: Optional[dict[str, Any]] = Field(None)

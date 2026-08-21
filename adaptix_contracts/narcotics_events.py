@@ -13,6 +13,7 @@ cross-service correlation and audit. Chain-of-custody is immutable.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Optional, Any
 from uuid import UUID
@@ -68,8 +69,8 @@ class NarcoticsVialEvent(BaseModel):
 
     quantity: int = Field(..., description="Quantity (in base units)")
     unit_of_measure: str = Field(..., description="Unit of measure (mg, mL, etc)")
-    cost_per_unit: float = Field(..., description="Cost per unit")
-    total_cost: float = Field(..., description="Total vial cost")
+    cost_per_unit: Decimal = Field(..., description="Cost per unit")
+    total_cost: Decimal = Field(..., description="Total vial cost")
 
     # For transfers
     from_unit_id: Optional[str] = Field(None, description="Source unit")
@@ -220,7 +221,7 @@ class NarcoticsAnalyticsEvent(BaseModel):
 
     # Generic metrics
     quantity: Optional[int] = Field(None)
-    cost: Optional[float] = Field(None)
+    cost: Optional[Decimal] = Field(None)
 
     # Risk indicators
     risk_score: Optional[float] = Field(None, description="Diversion risk 0-100")

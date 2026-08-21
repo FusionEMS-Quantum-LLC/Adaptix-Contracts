@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Literal
 import uuid
 
@@ -20,7 +21,7 @@ class InventoryItemCreateRequest(BaseModel):
     reorder_quantity: int = 0
     storage_location: str | None = None
     supplier_id: uuid.UUID | None = None
-    cost_per_unit: float | None = None
+    cost_per_unit: Decimal | None = None
     current_stock: int = 0
     expiration_date: date | None = None
     lot_number: str | None = None
@@ -36,7 +37,7 @@ class InventoryItemUpdateRequest(BaseModel):
     reorder_quantity: int | None = None
     storage_location: str | None = None
     supplier_id: uuid.UUID | None = None
-    cost_per_unit: float | None = None
+    cost_per_unit: Decimal | None = None
     status: Any = None
     current_stock: int | None = None
     barcode: str | None = None
@@ -58,7 +59,7 @@ class InventoryItemResponse(BaseModel):
     reorder_quantity: int
     storage_location: str | None
     supplier_id: uuid.UUID | None
-    cost_per_unit: float | None
+    cost_per_unit: Decimal | None
     status: str
     current_stock: int
     barcode: str | None
@@ -91,7 +92,7 @@ class InventoryTransactionCreateRequest(BaseModel):
     location_to: uuid.UUID | None = None
     reference_incident_id: uuid.UUID | None = None
     reference_po_id: uuid.UUID | None = None
-    unit_cost: float | None = None
+    unit_cost: Decimal | None = None
     notes: str | None = None
 
 
@@ -110,7 +111,7 @@ class InventoryTransactionResponse(BaseModel):
     location_to: uuid.UUID | None
     reference_incident_id: uuid.UUID | None
     reference_po_id: uuid.UUID | None
-    unit_cost: float | None
+    unit_cost: Decimal | None
     notes: str | None
     created_at: datetime
     updated_at: datetime
@@ -218,7 +219,7 @@ class InventoryStatsByTypeEntry(BaseModel):
     """Count and value rollup entry."""
 
     count: int
-    value: float
+    value: Decimal
 
 
 class InventoryMonthlyUsageEntry(BaseModel):
@@ -226,14 +227,14 @@ class InventoryMonthlyUsageEntry(BaseModel):
 
     month: str
     total_transactions: int
-    total_cost: float
+    total_cost: Decimal
 
 
 class InventoryStatsResponse(BaseModel):
     """Operational inventory dashboard statistics."""
 
     total_items: int
-    total_value: float
+    total_value: Decimal
     low_stock_count: int
     out_of_stock_count: int
     expiring_soon_count: int
@@ -335,7 +336,7 @@ class EquipmentAssetCreateRequest(BaseModel):
     assigned_location_id: uuid.UUID | None = None
     manufacturer: str | None = None
     model: str | None = None
-    purchase_price: float | None = None
+    purchase_price: Decimal | None = None
     description: str | None = None
 
 
@@ -365,7 +366,7 @@ class EquipmentAssetResponse(BaseModel):
     status: str
     manufacturer: str | None
     model: str | None
-    purchase_price: float | None
+    purchase_price: Decimal | None
     description: str | None
     created_at: datetime
     updated_at: datetime
@@ -388,7 +389,7 @@ class MaintenanceRecordCreateRequest(BaseModel):
     maintenance_type: Any
     maintenance_date: datetime
     next_due_date: date | None = None
-    cost: float | None = None
+    cost: Decimal | None = None
     notes: str | None = None
     work_performed: str | None = None
     parts_used: dict[str, Any] | None = None
@@ -404,7 +405,7 @@ class MaintenanceRecordResponse(BaseModel):
     performed_by: uuid.UUID
     maintenance_date: datetime
     next_due_date: date | None
-    cost: float | None
+    cost: Decimal | None
     notes: str | None
     work_performed: str | None
     parts_used: dict[str, Any]
@@ -465,7 +466,7 @@ class PurchaseOrderItemRequest(BaseModel):
 
     item_id: uuid.UUID
     quantity: int
-    unit_cost: float
+    unit_cost: Decimal
 
 
 class PurchaseOrderCreateRequest(BaseModel):
@@ -498,7 +499,7 @@ class PurchaseOrderResponse(BaseModel):
     expected_delivery: date | None
     actual_delivery: date | None
     status: str
-    total_cost: float
+    total_cost: Decimal
     items_json: dict[str, Any]
     notes: str | None
     created_by: uuid.UUID
@@ -675,7 +676,7 @@ class InventoryStockUsageRecordedEvent(BaseModel):
 
     tenant_id: uuid.UUID
     incident_id: uuid.UUID
-    total_cost: float
+    total_cost: Decimal
     actor_user_id: uuid.UUID
     occurred_at: datetime
 
@@ -691,7 +692,7 @@ class InventoryStockTransferCompletedEvent(BaseModel):
     quantity: int
     from_location_id: uuid.UUID
     to_location_id: uuid.UUID
-    unit_cost: float | None = None
+    unit_cost: Decimal | None = None
     actor_user_id: uuid.UUID
     occurred_at: datetime
 
@@ -706,7 +707,7 @@ class InventoryPurchaseOrderReceivedEvent(BaseModel):
     po_number: str
     supplier_id: uuid.UUID
     has_variance: bool
-    total_cost: float
+    total_cost: Decimal
     actor_user_id: uuid.UUID
     occurred_at: datetime
 
@@ -821,7 +822,7 @@ class AutoDraftPoSummaryEntry(BaseModel):
     po_id: uuid.UUID
     po_number: str
     item_count: int
-    total_cost: float
+    total_cost: Decimal
 
 
 class AutoDraftPoSummaryResponse(BaseModel):
@@ -841,8 +842,8 @@ class IncidentCostLineItem(BaseModel):
     item_name: str
     sku: str
     quantity: int
-    unit_cost: float
-    total_cost: float
+    unit_cost: Decimal
+    total_cost: Decimal
     transaction_date: datetime
 
 
@@ -850,7 +851,7 @@ class IncidentCostReportResponse(BaseModel):
     """Incident cost rollup response."""
 
     incident_id: uuid.UUID
-    total_cost: float
+    total_cost: Decimal
     transaction_count: int
     line_items: list[IncidentCostLineItem]
 
