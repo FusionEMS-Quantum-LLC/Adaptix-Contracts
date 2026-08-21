@@ -7,8 +7,28 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.35.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `2.36.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
+
+## [2.36.0]
+
+### Added
+
+- **`adaptix_contracts.cct.models.BloodProduct`** — chain-of-custody record
+  for a single blood-product unit issued on a Critical Care Transport (CCT,
+  Play P05) mission: issue/transit/infuse/waste/return status, an ordered
+  `witness_chain`, and a `cold_chain_log`. Deliberately carries no
+  donor-identifying data — only the issuing blood bank's own unit id.
+- **`adaptix_contracts.cct.models.InfusionRun`** — the start-to-stop
+  infusion-pump record for a CCT mission (rate changes, VTBI, line, pump
+  identity), distinct from the point-in-time snapshot already carried on
+  `ExtendedVital`.
+
+  Both models close a gap between the CCT service README (which describes
+  blood-product chain-of-custody and infusion pump-run capture as
+  first-class) and the `adaptix_contracts.cct` subpackage, which had not yet
+  shipped either. Purely additive: no existing `cct` field, model, or event
+  was removed, renamed, or retyped.
 
 ## [2.35.0]
 
