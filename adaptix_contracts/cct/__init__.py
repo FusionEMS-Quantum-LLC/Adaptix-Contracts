@@ -42,10 +42,12 @@ from adaptix_contracts.cct.events import (
     build_cct_mission_requested_event,
 )
 from adaptix_contracts.cct.models import (
+    BloodProduct,
     CamtsChecklistItem,
     CctEquipmentLoadout,
     CctMission,
     ExtendedVital,
+    InfusionRun,
     InterfacilityHandoff,
     ReceivingPhysician,
     SendingPhysician,
@@ -58,6 +60,7 @@ __all__ = [
     "CCT_MISSION_COMPLETED",
     "CCT_MISSION_REQUESTED",
     "CCT_SOURCE_SERVICE",
+    "BloodProduct",
     "CamtsChecklistItem",
     "CctCamtsChecklistIncompleteError",
     "CctCamtsStandardUnsatisfiedError",
@@ -81,6 +84,7 @@ __all__ = [
     "CctType",
     "CredentialLevel",
     "ExtendedVital",
+    "InfusionRun",
     "InterfacilityHandoff",
     "ReceivingPhysician",
     "SendingPhysician",
