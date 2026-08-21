@@ -6,8 +6,13 @@ the internal module split.
 """
 
 from adaptix_contracts.cct.enums import (
+    AboGroup,
+    BloodProductStatus,
+    BloodProductType,
     CctType,
     CredentialLevel,
+    InfusionRunStatus,
+    RhFactor,
     VentMode,
 )
 from adaptix_contracts.cct.errors import (
@@ -42,16 +47,24 @@ from adaptix_contracts.cct.events import (
     build_cct_mission_requested_event,
 )
 from adaptix_contracts.cct.models import (
+    BloodProduct,
     CamtsChecklistItem,
     CctEquipmentLoadout,
     CctMission,
+    ColdChainReading,
+    CustodyEvent,
     ExtendedVital,
+    InfusionRun,
     InterfacilityHandoff,
     ReceivingPhysician,
     SendingPhysician,
 )
 
 __all__ = [
+    "AboGroup",
+    "BloodProduct",
+    "BloodProductStatus",
+    "BloodProductType",
     "CCT_CREW_ASSIGNED",
     "CCT_EVENTS",
     "CCT_HANDOFF_COMPLETED",
@@ -79,10 +92,15 @@ __all__ = [
     "CctMissionNotFoundError",
     "CctMissionRequestedPayload",
     "CctType",
+    "ColdChainReading",
     "CredentialLevel",
+    "CustodyEvent",
     "ExtendedVital",
+    "InfusionRun",
+    "InfusionRunStatus",
     "InterfacilityHandoff",
     "ReceivingPhysician",
+    "RhFactor",
     "SendingPhysician",
     "VentMode",
     "build_cct_crew_assigned_event",
