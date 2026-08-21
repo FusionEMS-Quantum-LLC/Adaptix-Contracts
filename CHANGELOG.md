@@ -7,8 +7,46 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.35.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `2.36.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
+
+## [2.36.0]
+
+### Fixed
+
+- **A signed gateway context was accepted no matter how long its own issued
+  lifetime was.** `_verify_replay_window` bounded only *expired* (`now > exp`)
+  and *issued-in-the-future* (`iat > now`) against the current clock. It never
+  bounded `exp - iat`, so a context minted with `exp = iat + 10 years` passed
+  every check and verified successfully for a decade.
+
+  The gateway-v1 shared HMAC secret is held by every service that verifies
+  gateway-v1 contexts, so any one of them could mint itself a forever-valid
+  identity — including `is_founder` and arbitrary roles/entitlements — that
+  every consumer running `TRUST_MODE_HMAC` or `TRUST_MODE_DUAL` accepted.
+  Revocation could not reach it: the freshness window was the only bound on a
+  signed context and that window was unbounded by construction.
+
+  `_verify_replay_window` now rejects, before consulting the clock at all:
+
+  - `exp < iat` — a malformed or hostile window; and
+  - `exp - iat > _MAX_CONTEXT_LIFETIME_SECONDS` (300s) — an over-long lifetime.
+
+  Both checks are clock-independent, so an over-long context is refused
+  regardless of when it is presented. 300s matches Core's own verifier constant
+  (`core_app.auth.gateway_context._MAX_CONTEXT_LIFETIME_SECONDS`).
+
+  Landed in #208, which did not carry a version bump — the fixed and unfixed
+  trees therefore both reported `2.35.0` and a consumer could not tell from the
+  version which one it had resolved. **2.36.0 exists to make that distinguishable
+  and is the first version string that guarantees the cap is present.** Pin
+  `>= 2.36.0` (or the 2.36.0 commit) to depend on it.
+
+  **Compatibility:** every Adaptix producer already mints well inside the cap —
+  `Adaptix-Gateway` `app/services/auth_context.py` `CONTEXT_TTL_SECONDS = 60`
+  with no call site overriding it. A consumer moving to 2.36.0 rejects only
+  contexts whose issued lifetime exceeds 300s, which no legitimate producer
+  emits.
 
 ## [2.35.0]
 
