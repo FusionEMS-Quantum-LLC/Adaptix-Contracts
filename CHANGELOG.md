@@ -17,6 +17,7 @@ _Nothing unreleased._
 ## [2.37.0]
 
 ### Added
+
 - **CCT (`adaptix_contracts.cct`) — blood-product chain-of-custody and infusion-run
   contracts required by the CCT service (Play P05).** The existing CCT surface
   already covered mission, equipment loadout, extended vitals (which absorb
@@ -24,6 +25,7 @@ _Nothing unreleased._
   handoff. The two remaining first-class critical-care structures called out
   in the CCT play spec are now shared here rather than re-invented per
   consumer:
+
   - `BloodProduct` — a single unit carried on a mission with unit id / ISBT
     128 code / product code, ABO group + Rh, expiration, issuing facility,
     lifecycle `BloodProductStatus` (`issued` → `accepted` → `infused` /
@@ -42,8 +44,10 @@ _Nothing unreleased._
     lifecycle (`ordered` → `running` → `paused` / `completed` /
     `discontinued`), and the two-clinician witness field for high-alert
     infusions.
+
   Supporting enums added: `BloodProductType`, `AboGroup`, `RhFactor`,
   `BloodProductStatus`, `InfusionRunStatus`.
+
   The CCT addition itself is additive only: no existing CCT symbol is renamed,
   moved, or has its shape changed. **But 2.37.0 as a whole is not a safe
   drop-in** — it also carries the money/controlled-substance `Decimal`
