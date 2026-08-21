@@ -399,9 +399,7 @@ def _require_ascii_header(value: str, what: str) -> None:
     try:
         value.encode("ascii")
     except UnicodeEncodeError as exc:
-        raise GatewaySignatureError(
-            f"{what} contains non-ASCII characters"
-        ) from exc
+        raise GatewaySignatureError(f"{what} contains non-ASCII characters") from exc
 
 
 def _verify_asymmetric(
@@ -519,12 +517,30 @@ def _decoded_payload(context_b64: str) -> dict[str, Any]:
         GatewaySignatureError: when the payload is not a JSON object.
     """
     try:
-        payload: Any = json.loads(b64url_decode(context_b64).decode("utf-8"))
+        payload: Any = json.loads(
+            b64url_decode(context_b64).decode("utf-8"),
+            # Python's decoder accepts Infinity/-Infinity/NaN, which RFC 8259
+            # does not define and no Adaptix producer emits. Left enabled they
+            # put a float in a claim that every consumer treats as a number it
+            # can compare or cast -- int(inf) raises OverflowError, which is
+            # not a ValueError and so escapes this module's error contract.
+            # Rejected at the boundary so it cannot reach any claim.
+            parse_constant=_reject_json_constant,
+        )
     except (ValueError, UnicodeDecodeError) as exc:
         raise GatewaySignatureError(f"payload decode failed: {exc}") from exc
     if not isinstance(payload, dict):
         raise GatewaySignatureError("payload is not a JSON object")
     return payload
+
+
+def _reject_json_constant(constant: str) -> None:
+    """Refuse Infinity/-Infinity/NaN in a signed context.
+
+    Raises:
+        GatewaySignatureError: always; these are never valid in a context.
+    """
+    raise GatewaySignatureError(f"context contains invalid JSON constant: {constant}")
 
 
 def _verify_replay_window(payload: dict[str, Any], clock_skew_seconds: int) -> None:
@@ -538,7 +554,10 @@ def _verify_replay_window(payload: dict[str, Any], clock_skew_seconds: int) -> N
         raise GatewaySignatureError("context missing exp or iat claim")
     try:
         exp_i, iat_i = int(exp), int(iat)
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, OverflowError) as exc:
+        # OverflowError is int(float("inf")). Unreachable now that the decoder
+        # rejects those constants, but this cast is the load-bearing one and an
+        # uncaught type here is an unauthenticated 500 rather than a 401.
         raise GatewaySignatureError("exp/iat claims are not integers") from exc
 
     now = int(time.time())
