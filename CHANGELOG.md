@@ -20,16 +20,21 @@ from the installed package metadata).
   producer emits them. A context with `{"exp": Infinity}` therefore decoded to
   a float, and the replay-window check casts that claim:
 
-  ```
-  int(float("inf")) -> OverflowError
+  ```python
+  int(float("inf"))  # -> OverflowError
   ```
 
   `OverflowError` is not a `ValueError`, so the guard around that cast did not
   catch it. It escaped `verify_gateway_signature`, passed every caller's
   `except GatewaySignatureError`, and surfaced as a **500 instead of a 401** —
-  the same failure class as 2.34.0, reached by a different route. `NaN` passed
-  the same cast successfully and then made every downstream comparison
-  silently return `False`.
+  the same failure class as 2.34.0, reached by a different route.
+
+  `NaN` was NOT part of that crash: `int(float("nan"))` raises `ValueError`,
+  which the existing guard already caught correctly. It is rejected here anyway
+  because `NaN` in any claim OTHER than `exp`/`iat` decodes cleanly and then
+  makes every comparison against it silently return `False` — including
+  equality with itself. That is the general reason the fix belongs at the
+  decode boundary rather than at one cast.
 
   Rejected at the decode boundary via `json.loads(parse_constant=...)`, so
   these values cannot reach *any* claim rather than being defended against one
