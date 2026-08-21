@@ -283,11 +283,161 @@ class CctMission(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class BloodProduct(BaseModel):
+    """A single blood-product unit issued for a CCT mission, tracked end to end.
+
+    Chain-of-custody spans issuing facility through transport to infusion
+    (or waste/return). Every custody transition is captured as an ordered
+    entry in ``witness_chain`` so a transfusion-safety or CAMTS audit can
+    reconstruct exactly who held custody and when.
+
+    Deliberately does NOT carry donor-identifying information. Only the
+    platform unit identifier, product type, and the ABO/Rh label needed for
+    a bedside compatibility check are modeled here; the issuing blood bank
+    remains the system of record for donor traceability and is referenced
+    only by ``issuing_blood_bank_unit_id``. Consumers (services, logs,
+    audit trails) MUST treat every field on this model as protected data —
+    never log raw field values, only ``blood_product_id`` / ``status``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    blood_product_id: str
+    tenant_id: str = Field(
+        ..., description="Tenant scope — required for every CCT record"
+    )
+    correlation_id: str = Field(
+        ...,
+        description=(
+            "Correlation ID used to trace this record across services (Signal Bus, "
+            "audit, analytics). Must match the correlation ID stamped on the "
+            "originating request/event."
+        ),
+    )
+
+    mission_id: str
+    product_type: str = Field(
+        ...,
+        description=(
+            "e.g. 'prbc', 'ffp', 'platelets', 'cryoprecipitate', 'whole_blood'"
+        ),
+    )
+    abo_rh: str | None = Field(
+        default=None, description="e.g. 'O_NEG', 'A_POS' — bedside compatibility label."
+    )
+    issuing_blood_bank_unit_id: str = Field(
+        ...,
+        description=(
+            "The issuing blood bank's own unit identifier. No donor PII is "
+            "carried on this contract — donor traceability stays in the "
+            "blood bank's system of record."
+        ),
+    )
+    issuing_facility_name: str
+    issued_at: datetime | None = None
+    expiration_at: datetime | None = None
+
+    status: str = Field(
+        default="issued",
+        description="issued|in_transit|infused|wasted|returned",
+    )
+
+    cold_chain_log: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Ordered cold-chain telemetry/checks, each entry shaped like "
+            "{'recorded_at': iso8601, 'temperature_c': float, "
+            "'recorded_by_user_id': str}."
+        ),
+    )
+    witness_chain: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Ordered custody/witness attestations, each entry shaped like "
+            "{'action': 'issued'|'received'|'infused'|'wasted'|'returned', "
+            "'user_id': str, 'witness_user_id': str | None, "
+            "'occurred_at': iso8601}."
+        ),
+    )
+
+    linked_infusion_run_id: str | None = None
+    wasted_reason: str | None = None
+    returned_reason: str | None = None
+
+    created_at: datetime
+    updated_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class InfusionRun(BaseModel):
+    """A single infusion-pump run during a CCT mission.
+
+    Covers vasopressor / inotrope / analgesic / sedation / blood-product
+    infusions as the start-to-stop pump record (rate changes, volume to be
+    infused, line, pump identity) — distinct from the point-in-time
+    snapshot captured on :class:`ExtendedVital`, which only carries the
+    currently-active rate at the moment a vital set was recorded.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    infusion_run_id: str
+    tenant_id: str = Field(
+        ..., description="Tenant scope — required for every CCT record"
+    )
+    correlation_id: str = Field(
+        ...,
+        description=(
+            "Correlation ID used to trace this record across services (Signal Bus, "
+            "audit, analytics). Must match the correlation ID stamped on the "
+            "originating request/event."
+        ),
+    )
+
+    mission_id: str
+    drug_label: str
+    concentration: str | None = Field(default=None, description="e.g. '4mg/250mL'")
+    rate_value: float | None = None
+    rate_unit: str | None = Field(
+        default=None, description="e.g. 'mcg/kg/min', 'mL/hr'"
+    )
+    vtbi_ml: float | None = Field(
+        default=None, description="Volume to be infused, mL"
+    )
+    line: str | None = Field(
+        default=None, description="e.g. 'peripheral_iv_left', 'central_line'"
+    )
+    pump_identity: str | None = None
+
+    linked_blood_product_id: str | None = None
+
+    started_at: datetime
+    stopped_at: datetime | None = None
+    rate_changes: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Ordered rate-change log, each entry shaped like "
+            "{'changed_at': iso8601, 'new_rate_value': float, "
+            "'changed_by_user_id': str}."
+        ),
+    )
+
+    started_by_user_id: str | None = None
+    stopped_by_user_id: str | None = None
+    stop_reason: str | None = None
+
+    created_at: datetime
+    updated_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 __all__ = [
+    "BloodProduct",
     "CamtsChecklistItem",
     "CctEquipmentLoadout",
     "CctMission",
     "ExtendedVital",
+    "InfusionRun",
     "InterfacilityHandoff",
     "ReceivingPhysician",
     "SendingPhysician",
