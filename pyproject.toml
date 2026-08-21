@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 
 name = "adaptix-contracts"
 
-version = "2.35.0"
+version = "2.35.1"
 
 description = "Shared cross-domain schemas and contracts for the Adaptix platform"
 
