@@ -129,6 +129,17 @@ _TRUST_MODES = frozenset({TRUST_MODE_ASYMMETRIC, TRUST_MODE_DUAL, TRUST_MODE_HMA
 # uses 5s; Core's ``verify_gateway_context`` uses 5s. Match them exactly.
 GATEWAY_CLOCK_SKEW_SECONDS = 5
 
+# Maximum lifetime (exp - iat) the verifier will accept, in seconds. The gateway
+# producer mints 60s contexts (gateway_signing._DEFAULT_TTL_SECONDS = 60), so no
+# legitimate context comes close. The ceiling exists because replay protection
+# that the token's own author can opt out of is not replay protection: without
+# it, any holder of the shared secret (every service verifying gateway-v1)
+# could mint a context with exp = iat + 10 years — a forever-valid forged
+# identity, is_founder included. Enforced at the verifier, never trusted from
+# the emitter. Matches core_app.auth.gateway_context._MAX_CONTEXT_LIFETIME_SECONDS
+# so the shared verifier and Core's own hand-rolled verifier agree (D-053).
+_MAX_CONTEXT_LIFETIME_SECONDS = 300
+
 
 class GatewaySignatureError(ValueError):
     """Raised when a present gateway signature cannot be verified.
@@ -559,6 +570,20 @@ def _verify_replay_window(payload: dict[str, Any], clock_skew_seconds: int) -> N
         # rejects those constants, but this cast is the load-bearing one and an
         # uncaught type here is an unauthenticated 500 rather than a 401.
         raise GatewaySignatureError("exp/iat claims are not integers") from exc
+
+    # exp must not precede iat (a malformed or hostile window), and the issued
+    # lifetime must not exceed the ceiling — both independent of the current
+    # clock, so a forged long-lived context is rejected regardless of when it
+    # is presented. Core's verifier enforces the identical pair.
+    if exp_i < iat_i:
+        raise GatewaySignatureError(
+            f"context exp precedes iat (exp={exp_i}, iat={iat_i})"
+        )
+    if exp_i - iat_i > _MAX_CONTEXT_LIFETIME_SECONDS:
+        raise GatewaySignatureError(
+            f"context lifetime {exp_i - iat_i}s exceeds the maximum "
+            f"{_MAX_CONTEXT_LIFETIME_SECONDS}s (exp={exp_i}, iat={iat_i})"
+        )
 
     now = int(time.time())
     if now > exp_i + clock_skew_seconds:
