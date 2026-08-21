@@ -66,8 +66,75 @@ class CredentialLevel(StrEnum):
     PHYSICIAN = "physician"
 
 
+class BloodProductType(StrEnum):
+    """Blood-product categories tracked through CCT chain-of-custody.
+
+    Values follow AABB / ISBT 128 labeling conventions at the category
+    level; the concrete component/product code (E0139, E0141, etc.) is
+    carried separately on the ``BloodProduct.product_code`` field so this
+    enum stays a stable, small category set that Web/Field apps can
+    render as filters.
+    """
+
+    PACKED_RBC = "packed_rbc"
+    WHOLE_BLOOD = "whole_blood"
+    FRESH_FROZEN_PLASMA = "fresh_frozen_plasma"
+    PLATELETS = "platelets"
+    CRYOPRECIPITATE = "cryoprecipitate"
+    FACTOR_CONCENTRATE = "factor_concentrate"
+    ALBUMIN = "albumin"
+    OTHER = "other"
+
+
+class AboGroup(StrEnum):
+    """ABO blood group on a unit or a patient record."""
+
+    A = "A"
+    B = "B"
+    AB = "AB"
+    O = "O"  # noqa: E741 — canonical single-letter blood-bank code
+
+
+class RhFactor(StrEnum):
+    """Rh (D) factor on a unit or a patient record."""
+
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+
+
+class BloodProductStatus(StrEnum):
+    """Chain-of-custody status of a single blood-product unit in transit.
+
+    A unit is ``ISSUED`` by the sending blood bank, ``ACCEPTED`` when the
+    CCT crew signs custody, ``INFUSED`` at bedside, ``RETURNED`` to the
+    sending or receiving blood bank unused, or ``WASTED`` when the
+    cold-chain or product integrity failed and it cannot be transfused.
+    """
+
+    ISSUED = "issued"
+    ACCEPTED = "accepted"
+    INFUSED = "infused"
+    RETURNED = "returned"
+    WASTED = "wasted"
+
+
+class InfusionRunStatus(StrEnum):
+    """Lifecycle state of a single medication infusion during transport."""
+
+    ORDERED = "ordered"
+    RUNNING = "running"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    DISCONTINUED = "discontinued"
+
+
 __all__ = [
+    "AboGroup",
+    "BloodProductStatus",
+    "BloodProductType",
     "CctType",
     "CredentialLevel",
+    "InfusionRunStatus",
+    "RhFactor",
     "VentMode",
 ]
