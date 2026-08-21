@@ -180,3 +180,43 @@ def test_surrounding_whitespace_on_a_signature_is_still_tolerated() -> None:
         auth_path="gateway-v1",
     )
     assert payload["user_id"] == "11111111-1111-1111-1111-111111111111"
+
+
+@pytest.mark.parametrize(
+    "literal", ["Infinity", "-Infinity", "NaN"], ids=["inf", "-inf", "nan"]
+)
+@pytest.mark.parametrize("claim", ["exp", "iat", "roles"], ids=["exp", "iat", "other"])
+def test_a_non_rfc_json_constant_is_rejected(literal: str, claim: str) -> None:
+    """Python's JSON decoder accepts constants RFC 8259 does not define.
+
+    ``int(float("inf"))`` raises ``OverflowError`` -- not a ``ValueError`` --
+    so a context carrying ``{"exp": Infinity}`` escaped this module's error
+    contract entirely and surfaced as a 500 rather than a 401. ``NaN`` reached
+    the same cast and every downstream comparison silently returned False.
+
+    No Adaptix producer emits these, so they are refused at the decode boundary
+    rather than defended against at each individual claim -- checked here on an
+    unrelated claim too, since the next consumer to cast a claim should not have
+    to rediscover this.
+    """
+    now = int(time.time())
+    fields = {
+        "iss": '"adaptix-gateway"',
+        "aud": f'"{AUDIENCE}"',
+        "user_id": '"11111111-1111-1111-1111-111111111111"',
+        "tenant_id": '"22222222-2222-2222-2222-222222222222"',
+        "iat": str(now),
+        "exp": str(now + 60),
+        "roles": '["admin"]',
+    }
+    fields[claim] = literal
+    raw = "{" + ",".join(f'"{k}":{v}' for k, v in fields.items()) + "}"
+    ctx = base64.urlsafe_b64encode(raw.encode()).decode("ascii").rstrip("=")
+
+    with pytest.raises(GatewaySignatureError):
+        verify_gateway_signature(
+            context_b64=ctx,
+            signature_hex=_hmac(ctx),
+            shared_secret=SECRET,
+            auth_path="gateway-v1",
+        )
