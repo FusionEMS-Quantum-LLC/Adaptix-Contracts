@@ -7,7 +7,50 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.34.0` (see `pyproject.toml` and `adaptix_contracts/__init__.py`).
+package version is `2.35.0` (see `pyproject.toml`; `__version__` resolves it
+from the installed package metadata).
+
+## [2.35.0]
+
+### Fixed
+
+- **A signed context carrying `Infinity`, `-Infinity` or `NaN` escaped the
+  verifier's error contract as an unauthenticated 500.** Python's JSON decoder
+  accepts these three constants; RFC 8259 does not define them and no Adaptix
+  producer emits them. A context with `{"exp": Infinity}` therefore decoded to
+  a float, and the replay-window check casts that claim:
+
+  ```python
+  int(float("inf"))  # -> OverflowError
+  ```
+
+  `OverflowError` is not a `ValueError`, so the guard around that cast did not
+  catch it. It escaped `verify_gateway_signature`, passed every caller's
+  `except GatewaySignatureError`, and surfaced as a **500 instead of a 401** —
+  the same failure class as 2.34.0, reached by a different route.
+
+  `NaN` was NOT part of that crash: `int(float("nan"))` raises `ValueError`,
+  which the existing guard already caught correctly. It is rejected here anyway
+  because `NaN` in any claim OTHER than `exp`/`iat` decodes cleanly and then
+  makes every comparison against it silently return `False` — including
+  equality with itself. That is the general reason the fix belongs at the
+  decode boundary rather than at one cast.
+
+  Rejected at the decode boundary via `json.loads(parse_constant=...)`, so
+  these values cannot reach *any* claim rather than being defended against one
+  cast at a time — the next consumer to cast a claim should not have to
+  rediscover this. `OverflowError` is also added to the caught tuple at the
+  cast itself, which is now unreachable but is the load-bearing conversion.
+
+  **Found by migrating Core-Service onto this verifier**, specifically by
+  writing a regression test to answer a static-analysis claim that delegation
+  had dropped Core's `user_id`/`tenant_id` checks. It had not —
+  `_verify_identity_claims` enforces both unconditionally on the gateway-v1 and
+  gateway-v2 paths alike — but proving it empirically surfaced this. Covered by
+  `tests/test_gateway_verifier_malformed_input.py` (PR #206).
+
+  No behaviour change for legitimate traffic: every rejection added here was
+  previously a crash or a silently-false comparison.
 
 ## [2.34.0]
 
