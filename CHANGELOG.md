@@ -7,8 +7,46 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.35.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `2.35.1` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
+
+## [2.35.1]
+
+### Added
+
+- **CCT (`adaptix_contracts.cct`) — blood-product chain-of-custody and infusion-run
+  contracts required by the CCT service (Play P05).** The existing CCT surface
+  already covered mission, equipment loadout, extended vitals (which absorb
+  ventilator/IABP/ECMO in-transit parameters), CAMTS checklist and physician
+  handoff. The two remaining first-class critical-care structures called out
+  in the CCT play spec are now shared here rather than re-invented per
+  consumer:
+
+  - `BloodProduct` — a single unit carried on a mission with unit id / ISBT
+    128 code / product code, ABO group + Rh, expiration, issuing facility,
+    lifecycle `BloodProductStatus` (`issued` → `accepted` → `infused` /
+    `returned` / `wasted`), and two append-only sub-records: `ColdChainReading`
+    (temperature log, one entry per reading, with an evaluated
+    `within_tolerance` flag) and `CustodyEvent` (transfer of custody with
+    releasing party, accepting party, witness — matching the two-person
+    verification AABB standards require at issue and infusion). Waste requires
+    a `waste_reason`; expiration is required (a unit with no expiration cannot
+    legitimately be transported).
+  - `InfusionRun` — a single running infusion with drug (+ optional RxNorm
+    RXCUI), concentration as numerator (`concentration_amount` /
+    `concentration_amount_unit`) over denominator (`concentration_volume_ml`),
+    programmed rate (`rate_amount` / `rate_amount_unit`), optional VTBI and
+    weight-normalized dosing weight, line/pump identity, `InfusionRunStatus`
+    lifecycle (`ordered` → `running` → `paused` / `completed` /
+    `discontinued`), and the two-clinician witness field for high-alert
+    infusions.
+
+  Supporting enums added: `BloodProductType`, `AboGroup`, `RhFactor`,
+  `BloodProductStatus`, `InfusionRunStatus`.
+
+  Additive only: no existing CCT symbol is renamed, moved, or has its shape
+  changed, and no consumer that pins `adaptix_contracts>=2.35.0` breaks under
+  2.35.1.
 
 ## [2.35.0]
 
