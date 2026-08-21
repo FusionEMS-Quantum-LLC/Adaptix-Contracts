@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
@@ -219,7 +220,7 @@ class MedicationCreateRequest(BaseModel):
     strength: str = Field(min_length=1, max_length=64)
     form: str = Field(min_length=1, max_length=64)
     vault_id: UUID
-    quantity: float = Field(ge=0)
+    quantity: Decimal = Field(ge=Decimal("0"))
     lot_number: str = Field(min_length=1, max_length=128)
     expiration_date: datetime
     concentration: str | None = Field(default=None, max_length=64)
@@ -237,7 +238,7 @@ class MedicationUpdateRequest(BaseModel):
     """Request to update a narcotic medication inventory record."""
 
     version: int = Field(ge=1)
-    quantity: float | None = Field(default=None, ge=0)
+    quantity: Decimal | None = Field(default=None, ge=Decimal("0"))
     status: NarcoticMedicationStatus | None = None
     expiration_date: datetime | None = None
     seal_number: str | None = Field(default=None, max_length=128)
@@ -257,7 +258,7 @@ class MedicationResponse(BaseModel):
     formulation: str | None
     route: str | None
     vault_id: UUID
-    quantity: float
+    quantity: Decimal
     lot_number: str
     serial_number: str | None
     ndc_code: str | None
@@ -288,7 +289,7 @@ class IssueNarcoticRequest(BaseModel):
     """Request to issue a narcotic from a vault."""
 
     medication_id: UUID
-    quantity: float = Field(gt=0)
+    quantity: Decimal = Field(gt=Decimal("0"))
     issued_to_user_id: UUID
     witnessed_by: UUID | None = None
     notes: str | None = Field(default=None, max_length=1000)
@@ -298,7 +299,7 @@ class ReturnNarcoticRequest(BaseModel):
     """Request to return a narcotic to a vault."""
 
     medication_id: UUID
-    quantity: float = Field(gt=0)
+    quantity: Decimal = Field(gt=Decimal("0"))
     returned_by_user_id: UUID
     witnessed_by: UUID | None = None
     reason: str | None = Field(default=None, max_length=1000)
@@ -308,11 +309,11 @@ class AdministerNarcoticRequest(BaseModel):
     """Request to document narcotic administration."""
 
     medication_id: UUID
-    dose: float = Field(gt=0)
+    dose: Decimal = Field(gt=Decimal("0"))
     administered_by: UUID
     patient_incident_id: UUID
     witnessed_by: UUID | None = None
-    waste_amount: float | None = Field(default=None, ge=0)
+    waste_amount: Decimal | None = Field(default=None, ge=Decimal("0"))
     waste_witnessed_by: UUID | None = None
     notes: str | None = Field(default=None, max_length=1000)
 
@@ -321,7 +322,7 @@ class WasteNarcoticRequest(BaseModel):
     """Request to waste an unused narcotic quantity."""
 
     medication_id: UUID
-    waste_amount: float = Field(gt=0)
+    waste_amount: Decimal = Field(gt=Decimal("0"))
     wasted_by: UUID
     witnessed_by: UUID
     reason: str = Field(min_length=1, max_length=1000)
@@ -333,7 +334,7 @@ class TransferNarcoticRequest(BaseModel):
     medication_id: UUID
     from_vault_id: UUID
     to_vault_id: UUID
-    quantity: float = Field(gt=0)
+    quantity: Decimal = Field(gt=Decimal("0"))
     transferred_by: UUID
     witnessed_by: UUID | None = None
     notes: str | None = Field(default=None, max_length=1000)
@@ -346,14 +347,14 @@ class TransactionResponse(BaseModel):
     tenant_id: UUID
     medication_id: UUID
     transaction_type: NarcoticTransactionType
-    quantity: float
+    quantity: Decimal
     administered_by: UUID
     witnessed_by: UUID | None
     patient_incident_id: UUID | None
     transaction_time: datetime
-    pre_count: float
-    post_count: float
-    waste_amount: float | None
+    pre_count: Decimal
+    post_count: Decimal
+    waste_amount: Decimal | None
     waste_witnessed_by: UUID | None
     signature_required: bool
     signature_captured: bool
@@ -379,7 +380,7 @@ class ConductAuditRequest(BaseModel):
     vault_id: UUID
     auditor_id: UUID
     witness_id: UUID
-    medication_counts: dict[str, float] = Field(default_factory=dict)
+    medication_counts: dict[str, Decimal] = Field(default_factory=dict)
     notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -416,9 +417,9 @@ class RecordDiscrepancyRequest(BaseModel):
 
     audit_id: UUID
     medication_id: UUID
-    expected_count: float = Field(ge=0)
-    actual_count: float = Field(ge=0)
-    variance: float
+    expected_count: Decimal = Field(ge=Decimal("0"))
+    actual_count: Decimal = Field(ge=Decimal("0"))
+    variance: Decimal
 
 
 class ResolveDiscrepancyRequest(BaseModel):
@@ -436,9 +437,9 @@ class DiscrepancyResponse(BaseModel):
     tenant_id: UUID
     audit_id: UUID
     medication_id: UUID
-    expected_count: float
-    actual_count: float
-    variance: float
+    expected_count: Decimal
+    actual_count: Decimal
+    variance: Decimal
     investigation_status: NarcoticInvestigationStatus
     resolved_by: UUID | None
     resolution_date: datetime | None
@@ -470,7 +471,7 @@ class ExpiringMedicationResponse(BaseModel):
     vault_id: UUID
     drug_name: str
     lot_number: str
-    quantity: float
+    quantity: Decimal
     expiration_date: datetime
     days_until_expiration: int
     status: NarcoticMedicationStatus
@@ -490,8 +491,8 @@ class DEAReportResponse(BaseModel):
     report_period_end: datetime
     generated_at: datetime
     total_transactions: int
-    total_administered_quantity: float
-    total_wasted_quantity: float
+    total_administered_quantity: Decimal
+    total_wasted_quantity: Decimal
     discrepancies_found: int
     audits_conducted: int
     report_data: dict = Field(default_factory=dict)
@@ -541,7 +542,7 @@ class NarcoticMedicationAddedEvent(BaseModel):
     tenant_id: UUID
     vault_id: UUID
     drug_name: str
-    quantity: float
+    quantity: Decimal
     occurred_at: datetime
 
 
@@ -553,7 +554,7 @@ class NarcoticTransactionRecordedEvent(BaseModel):
     tenant_id: UUID
     medication_id: UUID
     transaction_type: NarcoticTransactionType
-    quantity: float
+    quantity: Decimal
     occurred_at: datetime
 
 
@@ -565,5 +566,5 @@ class NarcoticDiscrepancyRecordedEvent(BaseModel):
     tenant_id: UUID
     audit_id: UUID
     medication_id: UUID
-    variance: float
+    variance: Decimal
     occurred_at: datetime

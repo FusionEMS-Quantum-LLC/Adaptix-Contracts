@@ -10,6 +10,43 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `2.36.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [Unreleased]
+
+### Changed - BREAKING on read
+
+- **79 money and controlled-substance quantity fields moved from `float` to
+  `Decimal`.** `payment_contracts.py` has stated the package convention since
+  it was written - "Monetary amounts are represented as `Decimal` in major
+  currency units" - and `payment_contracts.py` / `finance_contracts.py`
+  followed it. Eight other modules did not.
+
+  Modules: `schemas/narcotic.py`, `schemas/inventory_contracts.py`,
+  `schemas/founder_contracts.py`, `schemas/crm_contracts.py`,
+  `inventory_events.py`, `medications_events.py`, `narcotics_events.py`,
+  `supply_integrations.py`.
+
+  **The JSON wire type changes on output.** Pydantic serialises `Decimal` to a
+  JSON string, so a field that emitted `2.675` now emits `"2.675"`.
+  Deserialisation is unaffected - a JSON number is still accepted - so an
+  unmigrated *producer* keeps working against a migrated consumer, but a
+  consumer that does arithmetic on the parsed value, or validates
+  `type: number`, breaks. Every consumer that reads these fields must move.
+
+  All of `narcotic.py` moved together, not only the waste fields. `Decimal`
+  minus `float` raises `TypeError` in Python, so a half-converted
+  controlled-substance ledger turns a wrong reconciliation into a crashing
+  one.
+
+  Rates, percentages, scores and durations were deliberately left as `float`:
+  `churn_rate`, `net_retention_rate`, `denial_rate`, `appeal_success_rate`,
+  `average_days_to_payment`, `variance_pct`, `funding_percentage`,
+  `likelihood_percentage`, `readiness_score`, `risk_score`, and the trend
+  lists. They are neither money nor a counted quantity.
+
+  **No version is cut for this yet.** Releasing it before consumers are ready
+  would strand 63 repositories one major behind on a package whose gateway
+  audience pin is fail-closed in production.
+
 ## [2.36.0]
 
 ### Fixed

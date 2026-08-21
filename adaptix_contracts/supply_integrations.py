@@ -70,6 +70,7 @@ from __future__ import annotations
 
 import logging
 import os
+from decimal import Decimal
 from typing import Optional, Any
 from datetime import datetime, timezone
 from uuid import UUID
@@ -145,7 +146,7 @@ class NotificationClient:
         item_name: str,
         expiration_date: datetime,
         current_stock: int,
-        waste_forecast: float,
+        waste_forecast: Decimal,
     ) -> bool:
         """Send expiration alert."""
         payload = {
@@ -282,7 +283,7 @@ class AnalyticsClient:
         unit_id: Optional[str],
         waste_reason: str,
         quantity: int,
-        cost: float,
+        cost: Decimal,
     ) -> bool:
         """Publish waste event to Analytics Service."""
         payload = {

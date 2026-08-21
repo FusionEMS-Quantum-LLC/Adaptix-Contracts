@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 from datetime import date, datetime
+from decimal import Decimal
 
 from uuid import UUID
 
@@ -168,7 +169,9 @@ class InvestorRoundCreateRequest(BaseModel):
     round_name: str = Field(
         ..., min_length=1, description="Round name, e.g. Seed, Series A."
     )
-    target_amount: float = Field(..., gt=0, description="Target raise amount in USD.")
+    target_amount: Decimal = Field(
+        ..., gt=Decimal("0"), description="Target raise amount in USD."
+    )
     close_date: date | None = Field(None, description="Expected close date.")
     status: str = Field(
         default="open",
@@ -183,7 +186,7 @@ class InvestorRoundResponse(BaseModel):
     id: UUID
     tenant_id: UUID
     round_name: str
-    target_amount: float
+    target_amount: Decimal
     close_date: date | None = None
     status: str
     notes: str | None = None
@@ -196,7 +199,9 @@ class InvestorCommitmentCreateRequest(BaseModel):
 
     investor_id: UUID = Field(..., description="UUID of the committing investor.")
     round_id: UUID = Field(..., description="UUID of the funding round.")
-    committed_amount: float = Field(..., gt=0, description="Committed amount in USD.")
+    committed_amount: Decimal = Field(
+        ..., gt=Decimal("0"), description="Committed amount in USD."
+    )
     status: CommitmentStatus = Field(
         default=CommitmentStatus.PLEDGED,
         description="Commitment status.",
@@ -211,8 +216,8 @@ class InvestorCommitmentResponse(BaseModel):
     tenant_id: UUID
     investor_id: UUID
     round_id: UUID
-    committed_amount: float
-    funded_amount: float = 0.0
+    committed_amount: Decimal
+    funded_amount: Decimal = Decimal("0")
     status: str = "pledged"
     created_at: datetime
     updated_at: datetime
@@ -223,8 +228,8 @@ class InvestorRoundSummaryResponse(BaseModel):
 
     round: InvestorRoundResponse
     commitments: list[InvestorCommitmentResponse]
-    total_pledged: float
-    total_funded: float
+    total_pledged: Decimal
+    total_funded: Decimal
     funding_percentage: float
 
 
@@ -322,7 +327,7 @@ class PartnerDashboardResponse(BaseModel):
     total_partners: int
     active_partners: int
     top_performers: list[PartnerPerformanceResponse]
-    total_revenue_attributed: float
+    total_revenue_attributed: Decimal
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ cross-service correlation and audit.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Optional, Any
 from uuid import UUID
@@ -56,7 +57,7 @@ class InventoryItemEvent(BaseModel):
     par_level: int = Field(..., description="Par stock level")
     current_stock: int = Field(..., description="Current stock count")
     unit: str = Field(..., description="Unit of measure")
-    cost_per_unit: float = Field(..., description="Cost per unit")
+    cost_per_unit: Decimal = Field(..., description="Cost per unit")
 
     # Before/after for updates
     before_state: Optional[dict[str, Any]] = Field(
@@ -91,8 +92,8 @@ class InventoryStockAdjustmentEvent(BaseModel):
     adjustment_reason: str = Field(..., description="Reason for adjustment")
 
     par_level: int = Field(..., description="Par stock level")
-    cost_per_unit: float = Field(..., description="Cost per unit")
-    adjustment_cost: float = Field(..., description="Cost impact of adjustment")
+    cost_per_unit: Decimal = Field(..., description="Cost per unit")
+    adjustment_cost: Decimal = Field(..., description="Cost impact of adjustment")
 
     actor_user_id: Optional[str] = Field(None, description="User performing action")
     timestamp: datetime = Field(..., description="Event timestamp")
@@ -118,8 +119,8 @@ class InventoryLowStockAlert(BaseModel):
         ..., description="Recommended reorder amount"
     )
 
-    cost_per_unit: float = Field(..., description="Cost per unit")
-    total_reorder_cost: float = Field(
+    cost_per_unit: Decimal = Field(..., description="Cost per unit")
+    total_reorder_cost: Decimal = Field(
         ..., description="Est. cost of recommended reorder"
     )
 
@@ -149,8 +150,8 @@ class InventoryExpirationAlert(BaseModel):
     expiration_date: datetime = Field(..., description="Item expiration date")
     days_until_expiration: int = Field(..., description="Days until expiration")
     current_stock: int = Field(..., description="Stock count")
-    cost_per_unit: float = Field(..., description="Cost per unit")
-    waste_forecast: float = Field(..., description="Est. cost of waste if not used")
+    cost_per_unit: Decimal = Field(..., description="Cost per unit")
+    waste_forecast: Decimal = Field(..., description="Est. cost of waste if not used")
 
     notify_role: str = Field(default="supply_officer", description="Role to notify")
     severity: str = Field(
@@ -201,7 +202,7 @@ class InventoryAnalyticsEvent(BaseModel):
 
     # Generic metrics
     quantity: Optional[int] = Field(None, description="Quantity involved")
-    cost: Optional[float] = Field(None, description="Cost impact")
+    cost: Optional[Decimal] = Field(None, description="Cost impact")
 
     # Custom fields for different event types
     metadata: Optional[dict[str, Any]] = Field(
