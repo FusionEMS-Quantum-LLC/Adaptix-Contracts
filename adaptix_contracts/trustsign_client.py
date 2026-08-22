@@ -379,18 +379,12 @@ class TrustSignClient:
     async def download_archive(self, request_id: str) -> bytes:
         """Stream the archived signed PDF. Caller must persist or display it.
 
-        NOT YET IMPLEMENTED on the standalone Adaptix-TrustSign-Service
-        (verified 2026-08-05: no matching route in
-        ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``). This
-        path exists only on Adaptix-Billing-Service's deprecated legacy
-        router (``billing_app/api/trustsign_routes.py``), which the gateway
-        no longer forwards ``/api/v1/trustsign/*`` traffic to. Calling this
-        against the real gateway-routed ``base_url`` today raises
-        ``TrustSignValidationError(404, ...)`` — a clean typed failure, not
-        a silent one, but the capability itself does not exist server-side
-        yet. Use ``Adaptix-TrustSign-Service``'s
-        ``/api/v1/verifications/signature/{verification_id}`` route for
-        verification instead until this is built.
+        Calls ``GET /api/v1/trustsign/archives/by-request/{request_id}/download``
+        on Adaptix-TrustSign-Service with gateway identity headers. A missing
+        or not-yet-archived request returns 404 (``archive_not_found``). A
+        stored file that no longer matches the recorded hash is refused by
+        the service (409). Public verification remains
+        ``GET /api/v1/verifications/signature/{verification_id}``.
         """
         url = self._config.base_url.rstrip("/") + (
             f"/api/v1/trustsign/archives/by-request/{request_id}/download"
@@ -416,16 +410,10 @@ class TrustSignClient:
     async def void_request(self, request_id: str, *, reason: str | None = None) -> None:
         """Cancel a pending signing request.
 
-        NOT YET IMPLEMENTED on the standalone Adaptix-TrustSign-Service
-        (verified 2026-08-05: no matching route in
-        ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``). This
-        path exists only on Adaptix-Billing-Service's deprecated legacy
-        router (``billing_app/api/trustsign_routes.py``), which the gateway
-        no longer forwards ``/api/v1/trustsign/*`` traffic to. Calling this
-        against the real gateway-routed ``base_url`` today raises
-        ``TrustSignValidationError(404, ...)`` — a clean typed failure, not
-        a silent one, but the capability itself does not exist server-side
-        yet.
+        Calls ``POST /api/v1/trustsign/requests/{request_id}/void`` on
+        Adaptix-TrustSign-Service. Unused signing links are revoked. An
+        already-finished archived request is refused (409). Cross-tenant
+        callers receive 404.
         """
         body = {"reason": reason} if reason else {}
         await self._request(
