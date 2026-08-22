@@ -22,10 +22,44 @@ def _load_project_version() -> str:
     return project_config["project"]["version"]
 
 
+def _load_lockfile_self_version() -> str:
+    """Return the version ``uv.lock`` records for this package's own entry.
+
+    ``uv.lock`` carries an editable self-entry for ``adaptix-contracts``. A
+    release that bumps ``pyproject.toml`` without re-locking leaves that entry
+    naming the previous version, so a consumer resolving from the lock is told
+    it has an older package than the tree actually contains.
+    """
+
+    lock_path = Path(__file__).resolve().parents[1] / "uv.lock"
+    lock = tomllib.loads(lock_path.read_text(encoding="utf-8"))
+    for package in lock["package"]:
+        if package["name"] == "adaptix-contracts":
+            return package["version"]
+    raise AssertionError("uv.lock has no self-entry for adaptix-contracts")
+
+
 def test_package_version_matches_pyproject_metadata() -> None:
     """Keep runtime and packaging versions aligned for reproducible releases."""
 
     assert adaptix_contracts.__version__ == _load_project_version()
+
+
+def test_lockfile_self_version_matches_pyproject_metadata() -> None:
+    """The lock's own entry must move with every version bump.
+
+    This exists because it did not. ``2.37.0`` (PR #213) bumped
+    ``pyproject.toml`` and left ``uv.lock`` declaring ``2.36.0``, so the two
+    files named different versions of the same tree. The bump before it
+    (``2.36.0``, PR #211) did move the lock, so this is the convention being
+    restored rather than a new rule.
+
+    ``test_package_version_matches_pyproject_metadata`` could not catch it: it
+    compares the runtime ``__version__`` against ``pyproject.toml`` and never
+    reads the lock.
+    """
+
+    assert _load_lockfile_self_version() == _load_project_version()
 
 
 def test_schema_public_exports_are_unique_and_resolvable() -> None:
