@@ -335,11 +335,17 @@ async def get_auth_context(
     # ------------------------------------------------------------------
     # F-24: gateway HMAC signature verification (see module header).
     #
-    # This block NEVER changes the default unsigned behavior: with no
-    # signature header and ADAPTIX_GATEWAY_HMAC_ENFORCE unset/false the
-    # request falls through unchanged. It only adds 401s for (a) a present
-    # but invalid signature, and (b) an absent signature when enforcement
-    # is explicitly turned on.
+    # This block adds 401s for (a) a present but invalid signature, and
+    # (b) an ABSENT signature whenever ``_gateway_hmac_enforce()`` is true.
+    #
+    # Read that resolver, not this comment, for the default: an unset or
+    # blank ADAPTIX_GATEWAY_HMAC_ENFORCE resolves to ``_is_production()``.
+    # So in production the absent-signature path is fail-CLOSED by default
+    # and a service keeps its unsigned intra-VPC callers only by setting the
+    # variable false-y; outside production the default stays off so local
+    # development and test suites work without a running gateway. That is
+    # the APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST behaviour described in the
+    # module header.
     # ------------------------------------------------------------------
     global _warned_absent_signature, _warned_missing_secret
     # Holds the verified gateway payload when (and only when) a present signature
