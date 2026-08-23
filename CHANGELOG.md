@@ -7,12 +7,24 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `2.37.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `3.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
 
 _Nothing unreleased._
+
+## [3.0.0]
+
+### Removed
+
+- **DocuSeal contracts removed.** TrustSign is the only AdaptixCore signer.
+  Deleted `adaptix_contracts.schemas.docuseal_contracts` (`DocuSealPackageCreateRequest`,
+  `DocuSealPackageResponse`) and its eager export from `adaptix_contracts.schemas`.
+  Replacements remain `SignaturePackageCreateRequest` / `SignaturePackageResponse`
+  in `adaptix_contracts.schemas.trustsign_contracts`. Zero consumers confirmed
+  before removal (org-wide GitHub search of the two model names returned only
+  this package). Closes FusionEMS-Quantum-LLC/Adaptix-Contracts#199.
 
 ## [2.37.0]
 

@@ -259,15 +259,8 @@ independently in multiple repos:
 | --- | --- | --- |
 | Signature package create/response | `adaptix_contracts.schemas.trustsign_contracts` (`SignaturePackageCreateRequest`, `SignaturePackageResponse`) | Contracts for the standalone `Adaptix-TrustSign-Service`, the sole runtime owner of signature creation, execution, verification, evidence, and audit. |
 
-Deprecated (import path preserved, fully functional; emits
-`DeprecationWarning` on instantiation — see DEPRECATION_POLICY.md):
-
-- `adaptix_contracts.schemas.docuseal_contracts`
-  (`DocuSealPackageCreateRequest`, `DocuSealPackageResponse`) — non-canonical,
-  zero consumers confirmed 2026-08-16 (repo-wide grep, org-wide GitHub code
-  search, and an 8-repo direct clone-and-grep spot check, including
-  `Adaptix-DocuSeal-Service` itself, which defines and uses its own local
-  schema instead of these contracts). Slated for removal in 3.0.0.
+Removed in 3.0.0: `adaptix_contracts.schemas.docuseal_contracts`. Do not add
+DocuSeal contracts, adapters, or handoff shapes back to this package.
 
 Adaptix-Gateway's README also names `Adaptix-DocuSeal-Service` itself and
 Dropbox Sign as non-canonical. This package's own
