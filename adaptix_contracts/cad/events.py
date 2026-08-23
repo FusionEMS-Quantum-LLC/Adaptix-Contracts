@@ -4,12 +4,14 @@ All CAD events must be imported from this module.
 """
 
 from __future__ import annotations
+
 from typing import Final
 
 # Medical transport intake events
 CAD_INTAKE_CREATED: Final[str] = "cad.medical_transport.intake.created"
 CAD_INTAKE_UPDATED: Final[str] = "cad.medical_transport.intake.updated"
-CAD_INTAKE_CANCELLED: Final[str] = "cad.medical_transport.intake.cancelled"
+# CAD live outbox family is cad.intake.* (Adaptix-CAD-Service).
+CAD_INTAKE_CANCELLED: Final[str] = "cad.intake.cancelled"
 
 # Assessment events
 CAD_LEVEL_OF_CARE_ASSESSED: Final[str] = "cad.medical_transport.level_of_care.assessed"
