@@ -475,6 +475,35 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-medications",
         source="Core signup_pricing command_v1; Core MODULE_CATALOG",
     ),
+    # Social (MagicPost) and Vision are live routed services with audiences in
+    # KNOWN_SERVICE_AUDIENCES and gateway ROUTE_TABLE entries, but were missing
+    # module-registry rows. Provisioning could persist ``social`` / ``vision``
+    # entitlements while Core's token mint skipped those audiences
+    # (``_MODULE_TO_AUDIENCE.get`` miss) → live 403 jwt_audience_mismatch on
+    # /api/v1/social and Vision requests missing gateway identity headers.
+    # Observed 2026-08-24 with a provisioned session that listed both modules
+    # in module_entitlements but not in JWT aud.
+    _m(
+        "social",
+        "Social / MagicPost",
+        aliases=("magicpost",),
+        purchasable=True,
+        audience="adaptix-social",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/social audience=adaptix-social; "
+            "Adaptix-Social-Service; KNOWN_SERVICE_AUDIENCES"
+        ),
+    ),
+    _m(
+        "vision",
+        "Adaptix Vision",
+        purchasable=True,
+        audience="adaptix-vision",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/vision audience=adaptix-vision; "
+            "Adaptix-Vision-Service; KNOWN_SERVICE_AUDIENCES"
+        ),
+    ),
     _m(
         "inventory",
         "Inventory",
