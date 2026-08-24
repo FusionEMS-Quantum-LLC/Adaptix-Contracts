@@ -252,6 +252,7 @@ class Keyring:
 
     @property
     def primary_key(self) -> bytes:
+        """The key bytes for :attr:`primary_key_id` — the key ``encode()`` uses."""
         return self.keys[self.primary_key_id]
 
     def key_for(self, key_id: str) -> bytes:
@@ -304,46 +305,56 @@ class Keyring:
                 f"{PAYLOAD_CODEC_KEY_ENV} is empty — no payload encryption "
                 "key is configured."
             )
-
         if value.startswith("{"):
-            try:
-                parsed = json.loads(value)
-            except json.JSONDecodeError as exc:
-                raise PayloadCodecError(
-                    f"{PAYLOAD_CODEC_KEY_ENV} starts with '{{' but is not "
-                    "valid JSON. Expected "
-                    '{"primary_key_id": "...", "keys": {"...": "<base64>"}}.'
-                ) from exc
-            if not isinstance(parsed, dict):
-                raise PayloadCodecError(
-                    f"{PAYLOAD_CODEC_KEY_ENV} JSON must be an object"
-                )
+            return cls._from_keyring_json(value)
+        return cls._from_bare_key(value)
 
-            raw_keys = parsed.get("keys")
-            if not isinstance(raw_keys, dict) or not raw_keys:
-                raise PayloadCodecError(
-                    f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a non-empty "
-                    "'keys' object mapping key id -> base64 key"
-                )
-            primary = parsed.get("primary_key_id")
-            if not isinstance(primary, str) or not primary.strip():
-                raise PayloadCodecError(
-                    f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a "
-                    "'primary_key_id' string"
-                )
+    @classmethod
+    def _from_keyring_json(cls, value: str) -> Keyring:
+        """Parse the keyring-JSON secret shape (the production shape)."""
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise PayloadCodecError(
+                f"{PAYLOAD_CODEC_KEY_ENV} starts with '{{' but is not "
+                "valid JSON. Expected "
+                '{"primary_key_id": "...", "keys": {"...": "<base64>"}}.'
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise PayloadCodecError(f"{PAYLOAD_CODEC_KEY_ENV} JSON must be an object")
+        return cls._keyring_from_parsed_json(parsed)
 
-            keys = {
-                str(key_id): cls._decode_key(str(key_id), encoded)
-                for key_id, encoded in raw_keys.items()
-            }
-            return cls(primary_key_id=primary.strip(), keys=keys)
+    @classmethod
+    def _keyring_from_parsed_json(cls, parsed: dict) -> Keyring:
+        """Validate the parsed keyring object and build the Keyring."""
+        raw_keys = parsed.get("keys")
+        if not isinstance(raw_keys, dict) or not raw_keys:
+            raise PayloadCodecError(
+                f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a non-empty "
+                "'keys' object mapping key id -> base64 key"
+            )
+        primary = parsed.get("primary_key_id")
+        if not isinstance(primary, str) or not primary.strip():
+            raise PayloadCodecError(
+                f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a 'primary_key_id' string"
+            )
+        keys = {
+            str(key_id): cls._decode_key(str(key_id), encoded)
+            for key_id, encoded in raw_keys.items()
+        }
+        return cls(primary_key_id=primary.strip(), keys=keys)
 
-        # Bare base64 key. Derive a stable, non-secret id from the key bytes
-        # so payload metadata still names the key that encrypted it. This
-        # derivation is part of the wire contract: every consumer of this
-        # module must compute the same id for the same bare key, or a client
-        # and a worker sharing one bare key would tag payloads with ids the
-        # other side cannot resolve.
+    @classmethod
+    def _from_bare_key(cls, value: str) -> Keyring:
+        """Parse the bare base64 secret shape (local-development convenience).
+
+        Derives a stable, non-secret id from the key bytes so payload
+        metadata still names the key that encrypted it. This derivation is
+        part of the wire contract: every consumer of this module must
+        compute the same id for the same bare key, or a client and a worker
+        sharing one bare key would tag payloads with ids the other side
+        cannot resolve.
+        """
         raw = cls._decode_key("derived", value)
         key_id = hashlib.sha256(raw).hexdigest()[:16]
         return cls(primary_key_id=key_id, keys={key_id: raw})
@@ -405,28 +416,21 @@ class EncryptionPayloadCodec(PayloadCodec):
                 f"permitted in production. Remove the flag and provision "
                 f"{PAYLOAD_CODEC_KEY_ENV}."
             )
+        return cls._build_from_resolved_environment(
+            secret_value=secret_value,
+            plaintext_requested=plaintext_requested,
+            environment=environment,
+        )
 
+    @classmethod
+    def _build_from_resolved_environment(
+        cls, *, secret_value: str, plaintext_requested: bool, environment: str
+    ) -> EncryptionPayloadCodec:
+        """Build the codec once the plaintext-in-production guard has passed."""
         if secret_value.strip():
-            keyring = Keyring.from_secret_value(secret_value)
-            logger.info(
-                "payload_codec.enabled algorithm=%s primary_key_id=%s "
-                "decrypt_key_count=%d; key material not logged",
-                ALGORITHM.decode(),
-                keyring.primary_key_id,
-                len(keyring.keys),
-            )
-            return cls(keyring)
-
+            return cls._encrypting_codec_from_secret(secret_value)
         if plaintext_requested:
-            logger.warning(
-                "payload_codec.plaintext_passthrough_enabled environment=%s "
-                "— Temporal payloads are NOT encrypted. This is permitted "
-                "only for local development and tests; PII must never be "
-                "sent through this process in this mode.",
-                environment or "unset",
-            )
-            return cls(None, plaintext_passthrough=True)
-
+            return cls._plaintext_passthrough_codec(environment)
         raise PayloadCodecError(
             f"{PAYLOAD_CODEC_KEY_ENV} is not configured, so Temporal "
             "payloads cannot be encrypted. Provision the payload codec key "
@@ -434,6 +438,34 @@ class EncryptionPayloadCodec(PayloadCodec):
             f"definition. For local development only, set "
             f"{PAYLOAD_CODEC_PLAINTEXT_ENV}=true."
         )
+
+    @classmethod
+    def _encrypting_codec_from_secret(cls, secret_value: str) -> EncryptionPayloadCodec:
+        """Build an encrypting codec and log its (non-secret) key metadata."""
+        keyring = Keyring.from_secret_value(secret_value)
+        logger.info(
+            "payload_codec.enabled algorithm=%s primary_key_id=%s "
+            "decrypt_key_count=%d; key material not logged",
+            ALGORITHM.decode(),
+            keyring.primary_key_id,
+            len(keyring.keys),
+        )
+        return cls(keyring)
+
+    @classmethod
+    def _plaintext_passthrough_codec(cls, environment: str) -> EncryptionPayloadCodec:
+        """Build the local-development plaintext-passthrough codec.
+
+        Always logs a warning — this mode must never be quietly in effect.
+        """
+        logger.warning(
+            "payload_codec.plaintext_passthrough_enabled environment=%s "
+            "— Temporal payloads are NOT encrypted. This is permitted "
+            "only for local development and tests; PII must never be "
+            "sent through this process in this mode.",
+            environment or "unset",
+        )
+        return cls(None, plaintext_passthrough=True)
 
     # -- introspection ----------------------------------------------------- #
     @property
@@ -459,25 +491,27 @@ class EncryptionPayloadCodec(PayloadCodec):
             return list(payloads)
 
         keyring = self._keyring
-        key = keyring.primary_key
+        aesgcm = AESGCM(keyring.primary_key)
         key_id = keyring.primary_key_id
-        aesgcm = AESGCM(key)
+        return [self._encrypt_one(payload, aesgcm, key_id) for payload in payloads]
 
-        encoded: list[Payload] = []
-        for payload in payloads:
-            nonce = os.urandom(NONCE_LENGTH_BYTES)
-            ciphertext = aesgcm.encrypt(nonce, payload.SerializeToString(), None)
-            encoded.append(
-                Payload(
-                    metadata={
-                        "encoding": ENCRYPTED_ENCODING,
-                        METADATA_KEY_ID: key_id.encode("utf-8"),
-                        METADATA_ALGORITHM: ALGORITHM,
-                    },
-                    data=nonce + ciphertext,
-                )
-            )
-        return encoded
+    @staticmethod
+    def _encrypt_one(payload: Payload, aesgcm: AESGCM, key_id: str) -> Payload:
+        """Encrypt one inner ``Payload`` into its encrypted-envelope ``Payload``.
+
+        A fresh nonce is drawn per payload — required for AES-GCM safety,
+        since reusing a (key, nonce) pair breaks its authentication guarantee.
+        """
+        nonce = os.urandom(NONCE_LENGTH_BYTES)
+        ciphertext = aesgcm.encrypt(nonce, payload.SerializeToString(), None)
+        return Payload(
+            metadata={
+                "encoding": ENCRYPTED_ENCODING,
+                METADATA_KEY_ID: key_id.encode("utf-8"),
+                METADATA_ALGORITHM: ALGORITHM,
+            },
+            data=nonce + ciphertext,
+        )
 
     async def decode(self, payloads):  # type: ignore[no-untyped-def]
         """Decrypt payloads this codec produced; pass through everything else.
@@ -487,54 +521,64 @@ class EncryptionPayloadCodec(PayloadCodec):
         it predates this codec's adoption on this call site and was never
         encrypted (see the module docstring).
         """
-        decoded: list[Payload] = []
-        for payload in payloads:
-            if payload.metadata.get("encoding") != ENCRYPTED_ENCODING:
-                decoded.append(payload)
-                continue
+        return [self._decode_one(payload) for payload in payloads]
 
-            algorithm = payload.metadata.get(METADATA_ALGORITHM, b"")
-            if algorithm != ALGORITHM:
-                raise PayloadCodecError(
-                    "encrypted payload declares unsupported algorithm "
-                    f"'{algorithm.decode('utf-8', 'replace')}'; this codec "
-                    f"implements {ALGORITHM.decode()} only."
-                )
+    def _decode_one(self, payload: Payload) -> Payload:
+        """Decrypt a single payload, or pass it through unencrypted history."""
+        if payload.metadata.get("encoding") != ENCRYPTED_ENCODING:
+            return payload
 
-            if self._keyring is None:
-                raise PayloadCodecError(
-                    "received an encrypted Temporal payload but this "
-                    "process has no payload codec key. Provision "
-                    f"{PAYLOAD_CODEC_KEY_ENV} — plaintext passthrough "
-                    "cannot read encrypted history."
-                )
+        key_id, key = self._resolve_decrypt_key(payload)
+        nonce, ciphertext = self._split_ciphertext(payload.data, key_id)
+        plaintext = self._decrypt(nonce, ciphertext, key, key_id)
 
-            key_id = payload.metadata.get(METADATA_KEY_ID, b"").decode(
-                "utf-8", "replace"
+        restored = Payload()
+        restored.ParseFromString(plaintext)
+        return restored
+
+    def _resolve_decrypt_key(self, payload: Payload) -> tuple[str, bytes]:
+        """Validate the algorithm marker and look up the decrypting key.
+
+        Raises :class:`PayloadCodecError` for an unsupported algorithm, a
+        missing keyring, or a key id this process does not hold.
+        """
+        algorithm = payload.metadata.get(METADATA_ALGORITHM, b"")
+        if algorithm != ALGORITHM:
+            raise PayloadCodecError(
+                "encrypted payload declares unsupported algorithm "
+                f"'{algorithm.decode('utf-8', 'replace')}'; this codec "
+                f"implements {ALGORITHM.decode()} only."
             )
-            key = self._keyring.key_for(key_id)
+        if self._keyring is None:
+            raise PayloadCodecError(
+                "received an encrypted Temporal payload but this process "
+                f"has no payload codec key. Provision {PAYLOAD_CODEC_KEY_ENV} "
+                "— plaintext passthrough cannot read encrypted history."
+            )
+        key_id = payload.metadata.get(METADATA_KEY_ID, b"").decode("utf-8", "replace")
+        return key_id, self._keyring.key_for(key_id)
 
-            raw = payload.data
-            if len(raw) <= NONCE_LENGTH_BYTES:
-                raise PayloadCodecError(
-                    f"encrypted payload (key id '{key_id}') is truncated: "
-                    f"{len(raw)} bytes cannot hold a nonce plus ciphertext."
-                )
+    @staticmethod
+    def _split_ciphertext(raw: bytes, key_id: str) -> tuple[bytes, bytes]:
+        """Split an encrypted payload's data into its nonce and ciphertext."""
+        if len(raw) <= NONCE_LENGTH_BYTES:
+            raise PayloadCodecError(
+                f"encrypted payload (key id '{key_id}') is truncated: "
+                f"{len(raw)} bytes cannot hold a nonce plus ciphertext."
+            )
+        return raw[:NONCE_LENGTH_BYTES], raw[NONCE_LENGTH_BYTES:]
 
-            nonce, ciphertext = raw[:NONCE_LENGTH_BYTES], raw[NONCE_LENGTH_BYTES:]
-            try:
-                plaintext = AESGCM(key).decrypt(nonce, ciphertext, None)
-            except InvalidTag as exc:
-                raise PayloadCodecError(
-                    f"encrypted payload (key id '{key_id}') failed its "
-                    "authentication tag. The ciphertext was modified or the "
-                    "key under that id is not the key that encrypted it."
-                ) from exc
-
-            restored = Payload()
-            restored.ParseFromString(plaintext)
-            decoded.append(restored)
-        return decoded
+    @staticmethod
+    def _decrypt(nonce: bytes, ciphertext: bytes, key: bytes, key_id: str) -> bytes:
+        """Run AES-GCM decryption, translating a failed auth tag to our error."""
+        try:
+            return AESGCM(key).decrypt(nonce, ciphertext, None)
+        except InvalidTag as exc:
+            raise PayloadCodecError(
+                f"encrypted payload (key id '{key_id}') failed its "
+                "authentication tag. The ciphertext was modified or the "
+                "key under that id is not the key that encrypted it."
+            ) from exc
 
 
 # --------------------------------------------------------------------------
