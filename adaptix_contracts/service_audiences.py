@@ -89,6 +89,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-forms",
         "adaptix-founder",
         "adaptix-geo",
+        "adaptix-governance",
         "adaptix-graph",
         "adaptix-hl7",
         "adaptix-hospital",
