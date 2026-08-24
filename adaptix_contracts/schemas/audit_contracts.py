@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AuditActorType(str, Enum):
@@ -51,6 +51,22 @@ class AuditSeverity(str, Enum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
+
+class AuditOutcome(str, Enum):
+    """Three-value outcome of an audited action.
+
+    ``success`` is a two-value projection of this field and cannot represent a
+    deliberate authorization denial. Core's canonical ``core_audit_logs.status``
+    column has carried ``success | failure | denied`` since its introduction, so
+    a producer replicating a Core row MUST send ``outcome`` — sending only
+    ``success`` silently rewrites every ``denied`` row as a plain failure, which
+    is a material misstatement on a legal record.
+    """
+
+    SUCCESS = "success"
+    FAILURE = "failure"
+    DENIED = "denied"
 
 
 class ComplianceReviewStatus(str, Enum):
@@ -313,6 +329,14 @@ class AuditEvent(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime
 
+    # --- Core parity fields (added 3.2.0, all optional; see AuditIngestRequest) ---
+    outcome: Optional[AuditOutcome] = None
+    ip_address: Optional[str] = Field(None, max_length=45)
+    user_agent: Optional[str] = Field(None, max_length=500)
+    error_message: Optional[str] = Field(None, max_length=500)
+    changes: Optional[dict[str, Any]] = None
+    payload_schema_version: Optional[str] = Field(None, max_length=16)
+
 
 class AuditSearchQuery(BaseModel):
     """Query parameters for searching immutable audit events."""
@@ -363,7 +387,7 @@ class AuditIngestRequest(BaseModel):
     actor_user_id: Optional[UUID] = None
     actor_type: AuditActorType = AuditActorType.USER
     action: str = Field(..., min_length=1, max_length=160)
-    resource_type: str = Field(..., min_length=1, max_length=120)
+    resource_type: Optional[str] = Field(None, max_length=120)
     resource_id: Optional[str] = Field(None, max_length=255)
     severity: AuditSeverity = AuditSeverity.LOW
     success: bool = True
@@ -371,6 +395,68 @@ class AuditIngestRequest(BaseModel):
     idempotency_key: Optional[str] = Field(None, max_length=255)
     metadata: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime
+
+    # --- Core parity fields (added 3.2.0) --------------------------------
+    # Every column of Core's canonical ``core_audit_logs`` now has a lossless
+    # home here. Without these, replicating a Core row into the Audit service
+    # forces the producer to either drop the value or invent one; both are
+    # defects on an immutable legal record.
+    outcome: Optional[AuditOutcome] = None
+    ip_address: Optional[str] = Field(None, max_length=45)
+    user_agent: Optional[str] = Field(None, max_length=500)
+    error_message: Optional[str] = Field(None, max_length=500)
+    changes: Optional[dict[str, Any]] = Field(
+        None,
+        description=(
+            "Before/after state for update operations (Core ``changes_json``). "
+            "Distinct from ``metadata``: ``changes`` is the structured diff, "
+            "``metadata`` is arbitrary producer context. Do not conflate them."
+        ),
+    )
+    payload_schema_version: Optional[str] = Field(None, max_length=16)
+    source_service: Optional[str] = Field(None, max_length=120)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reconcile_outcome_and_success(cls, data: Any) -> Any:
+        """Keep ``outcome`` and ``success`` consistent without retyping either.
+
+        ``success`` predates ``outcome`` and stays a plain bool, so existing
+        producers and readers are untouched. The two are reconciled here:
+
+        * ``outcome`` given, ``success`` omitted -> derive ``success``
+          (``denied`` and ``failure`` both derive False).
+        * ``success`` given, ``outcome`` omitted -> derive the two-value
+          ``outcome``. A producer that can distinguish ``denied`` must send
+          ``outcome`` explicitly; nothing can recover that distinction here.
+        * Both given and contradictory -> raise. Silently preferring one would
+          make the record disagree with itself.
+        """
+        if not isinstance(data, dict):
+            return data
+        has_outcome = data.get("outcome") is not None
+        has_success = "success" in data and data["success"] is not None
+        if not has_outcome and not has_success:
+            # Neither supplied: both take the documented ``success`` default.
+            # Leaving ``outcome`` None here would emit a record whose two
+            # outcome representations disagree.
+            data["outcome"] = AuditOutcome.SUCCESS
+            return data
+        if has_outcome and not has_success:
+            data["success"] = AuditOutcome(data["outcome"]) is AuditOutcome.SUCCESS
+            return data
+        if has_success and not has_outcome:
+            data["outcome"] = (
+                AuditOutcome.SUCCESS if data["success"] else AuditOutcome.FAILURE
+            )
+            return data
+        derived = AuditOutcome(data["outcome"]) is AuditOutcome.SUCCESS
+        if bool(data["success"]) != derived:
+            raise ValueError(
+                f"success={data['success']!r} contradicts outcome="
+                f"{data['outcome']!r}; send one or send agreeing values"
+            )
+        return data
 
 
 class AuditIngestResponse(BaseModel):
