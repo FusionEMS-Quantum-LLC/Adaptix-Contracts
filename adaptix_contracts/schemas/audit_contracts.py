@@ -167,13 +167,20 @@ class ComplianceReviewItem(BaseModel):
 
 
 class AuditRecordCreatedEvent(BaseModel):
-    """Published when an audit record is created."""
+    """Published when an audit record is created.
+
+    ``resource_type`` is optional for the same reason it is optional on
+    :class:`AuditIngestRequest`: Core's ``core_audit_logs.resource_type`` is
+    nullable, and this event describes the record that was just written. A
+    required field here would make the Audit service either drop the publish or
+    invent a value every time it appends such a row.
+    """
 
     event_type: str = "audit.record.created"
 
     audit_id: str
     tenant_id: str
-    resource_type: str
+    resource_type: Optional[str] = None
     resource_id: Optional[str] = None
 
     occurred_at: datetime
