@@ -252,6 +252,8 @@ class Keyring:
 
     @property
     def primary_key(self) -> bytes:
+        """Return the raw bytes of the primary encryption key."""
+        return self.keys[self.primary_key_id]
         """The key bytes for :attr:`primary_key_id` — the key ``encode()`` uses."""
         return self.keys[self.primary_key_id]
 
