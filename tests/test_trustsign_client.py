@@ -8,6 +8,10 @@ Coverage:
 * ``download_archive`` returns raw bytes and surfaces 404 as
   ``TrustSignValidationError``.
 * ``void_request`` + ``resend_request`` round-trip with optional bodies.
+* ``start_chart_signature`` / ``complete_chart_signature`` post the exact
+  server shapes, carry no body tenant, and surface every refusal the
+  service can raise (403 signer mismatch, 409 hash mismatch/replay,
+  410 expiry, 422 consent) as a typed error rather than a silent success.
 * Webhook signature verification accepts a correct HMAC and rejects
   every malformed shape (no header, wrong prefix, tampered hex, wrong
   length, wrong secret).
@@ -26,8 +30,12 @@ import json
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from adaptix_contracts.trustsign_client import (
+    ChartSignatureCompleteInput,
+    ChartSignatureConsent,
+    ChartSignatureStartInput,
     CreateRequestInput,
     SignerSpec,
     TrustSignClient,
@@ -351,6 +359,169 @@ async def test_resend_request_posts_optional_expiration() -> None:
         async with TrustSignClient(_cfg(), http_client=raw) as client:
             await client.resend_request("req_resend", expiration_days=21)
     assert captured["body"] == {"expiration_days": 21}
+
+
+# ── chart signature lifecycle ─────────────────────────────────────────────
+
+
+_HASH = "a" * 64
+
+
+def _complete_payload(document_hash: str = _HASH) -> ChartSignatureCompleteInput:
+    return ChartSignatureCompleteInput(
+        document_hash=document_hash,
+        signature_type="drawn",
+        signature_value="data:image/png;base64,iVBORw0KGgo=",
+        consent=ChartSignatureConsent(
+            consent_accepted=True, consent_text_sha256="b" * 64
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_start_chart_signature_posts_server_shape() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/v1/trustsign/chart-signatures"
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            201,
+            json={
+                "request_id": "req_chart_1",
+                "verification_id": "ver_1",
+                "chart_id": "chart_1",
+                "document_hash": _HASH,
+                "intent": "Author attestation",
+                "status": "pending",
+                "expires_at": "2026-09-01T00:00:00Z",
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as raw:
+        async with TrustSignClient(_cfg(), http_client=raw) as client:
+            out = await client.start_chart_signature(
+                ChartSignatureStartInput(
+                    chart_id="chart_1",
+                    document_hash=_HASH,
+                    intent="Author attestation",
+                    signer_full_name="Dana Medic",
+                )
+            )
+
+    assert captured["body"] == {
+        "chart_id": "chart_1",
+        "document_hash": _HASH,
+        "intent": "Author attestation",
+        "signer_full_name": "Dana Medic",
+    }
+    assert out.request_id == "req_chart_1"
+    assert out.document_hash == _HASH
+
+
+def test_chart_signature_start_rejects_body_tenant() -> None:
+    """Tenant comes from the authenticated session, never the request body."""
+    with pytest.raises(ValidationError):
+        ChartSignatureStartInput(
+            chart_id="chart_1",
+            document_hash=_HASH,
+            intent="Author attestation",
+            signer_full_name="Dana Medic",
+            tenant_id="some-other-tenant",
+        )
+
+
+def test_chart_signature_complete_rejects_body_tenant() -> None:
+    with pytest.raises(ValidationError):
+        ChartSignatureCompleteInput(
+            document_hash=_HASH,
+            signature_type="drawn",
+            consent=ChartSignatureConsent(
+                consent_accepted=True, consent_text_sha256="b" * 64
+            ),
+            tenant_id="some-other-tenant",
+        )
+
+
+@pytest.mark.parametrize("bad_hash", ["", "zz", "g" * 64, "a" * 63, "a" * 65])
+def test_chart_signature_requires_a_sha256_document_hash(bad_hash: str) -> None:
+    with pytest.raises(ValidationError):
+        ChartSignatureStartInput(
+            chart_id="chart_1",
+            document_hash=bad_hash,
+            intent="Author attestation",
+            signer_full_name="Dana Medic",
+        )
+
+
+@pytest.mark.asyncio
+async def test_complete_chart_signature_returns_signed_artifact() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == (
+            "/api/v1/trustsign/chart-signatures/req_chart_1/complete"
+        )
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "request_id": "req_chart_1",
+                "verification_id": "ver_1",
+                "status": "completed",
+                "signer_signed_at": "2026-08-24T12:00:00Z",
+                "all_signers_complete": True,
+                "archive_s3_key": "tenant/chart_1/req_chart_1.pdf",
+                "final_pdf_sha256": "c" * 64,
+                "kms_key_id": "arn:aws:kms:us-east-1:1:key/abc",
+                "kms_signature": "AAAA",
+                "kms_signing_algorithm": "RSASSA_PSS_SHA_256",
+                "kms_signed_at": "2026-08-24T12:00:01Z",
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as raw:
+        async with TrustSignClient(_cfg(), http_client=raw) as client:
+            out = await client.complete_chart_signature(
+                "req_chart_1", _complete_payload()
+            )
+
+    assert captured["body"]["document_hash"] == _HASH
+    assert "tenant_id" not in captured["body"]
+    assert out.all_signers_complete is True
+    assert out.final_pdf_sha256 == "c" * 64
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [
+        (403, TrustSignUnauthorizedError),
+        (404, TrustSignValidationError),
+        (409, TrustSignValidationError),
+        (410, TrustSignValidationError),
+        (422, TrustSignValidationError),
+        (502, TrustSignServerError),
+        (503, TrustSignServerError),
+    ],
+)
+async def test_complete_chart_signature_refusals_are_typed(
+    status_code: int, expected: type[Exception]
+) -> None:
+    """Every service refusal must raise — never return a "signed" result."""
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status_code, json={"detail": "refused"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as raw:
+        async with TrustSignClient(_cfg(), http_client=raw) as client:
+            with pytest.raises(expected):
+                await client.complete_chart_signature(
+                    "req_chart_1", _complete_payload()
+                )
 
 
 # ── webhook signature verification ────────────────────────────────────────
