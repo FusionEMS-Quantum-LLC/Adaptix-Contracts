@@ -7,12 +7,58 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `4.0.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `4.1.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
 
 _Nothing unreleased._
+
+## [4.1.0]
+
+### Added
+
+- **`adaptix_contracts.security.temporal_payload_codec` — shared AES-256-GCM
+  Temporal `PayloadCodec`, installed via the new `temporal` extra
+  (`pip install adaptix-contracts[temporal]`).** Temporal requires the same
+  `PayloadCodec` on every side of a workflow: the worker that executes it and
+  every client that starts, signals, queries it, or reads its result. Before
+  this module existed, `Adaptix-Temporal-Service` carried its own encrypting
+  codec (`backend/temporal_app/codec.py`, that repo's PR #51, live since
+  2026-08-16) with no shared implementation for a Temporal CLIENT to adopt —
+  so a service that starts a workflow (e.g. `Adaptix-Billing-Service` calling
+  `start_workflow` with a claim id, tenant id, admin email, denial code, or
+  remittance file path) had no way to encrypt that input before the Temporal
+  SDK serialised and sent it, regardless of how the worker executing the
+  workflow was configured. This module gives every Temporal client and
+  worker in the fleet one canonical implementation to import instead of
+  hand-rolling or copy-pasting a second one.
+
+  `EncryptionPayloadCodec` is wire-format byte-for-byte compatible with
+  `Adaptix-Temporal-Service`'s existing codec: identical metadata keys
+  (`encoding`, `encryption-key-id`, `encryption-algorithm`), identical
+  12-byte-nonce-prefixed AES-256-GCM framing over the whole serialised inner
+  `Payload`, identical keyring JSON shape (`{"primary_key_id": ...,  "keys":
+  {...}}`) with the same bare-base64-key convenience fallback and the same
+  `sha256(key).hexdigest()[:16]` derived id for that fallback, identical
+  `TEMPORAL_PAYLOAD_CODEC_KEY` / `TEMPORAL_PAYLOAD_CODEC_PLAINTEXT_LOCAL` /
+  `ENVIRONMENT` environment variable names, and identical fail-closed rules
+  (encode never emits plaintext when a key is expected; decode passes
+  through only payloads that were never marked encrypted; the plaintext
+  escape hatch is refused outright when `ENVIRONMENT` names a production
+  environment). `tests/test_temporal_payload_codec.py` pins golden
+  ciphertext vectors produced by `Adaptix-Temporal-Service`'s own codec (both
+  the keyring-JSON and bare-key secret shapes) and asserts this module both
+  decodes them correctly and re-encodes the same plaintext, key, and nonce
+  to byte-identical ciphertext and metadata — verified against that
+  repository's `main` at commit `5de9ee9f955e6d4619a35f1e24b077fb25fe4119`.
+
+  Purely additive: no existing symbol, contract, or default changed.
+  `adaptix_contracts.security.temporal_payload_codec` is not imported by
+  `adaptix_contracts/__init__.py` and is not re-exported through
+  `adaptix_contracts.schemas`, so installing `adaptix-contracts` without the
+  `temporal` extra is completely unaffected — `temporalio` is not pulled in
+  and nothing about the existing package surface changes.
 
 ## [4.0.0]
 

@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 
 name = "adaptix-contracts"
 
-version = "4.0.0"
+version = "4.1.0"
 
 description = "Shared cross-domain schemas and contracts for the Adaptix platform"
 
@@ -87,6 +87,24 @@ dev = [
     "pytest-asyncio>=0.23.0",
 
     "twine>=7.0.0,<8",
+
+    # temporalio so `pytest tests` can collect and run
+    # tests/test_temporal_payload_codec.py locally and in CI without every
+    # contributor separately installing the `temporal` extra below.
+    "temporalio>=1.7.0,<2.0.0",
+
+]
+
+# Consumers that need adaptix_contracts.security.temporal_payload_codec — a
+# Temporal worker fleet (Adaptix-Temporal-Service) or a Temporal client
+# (Adaptix-Billing-Service and any future workflow-starting service) — install
+# `adaptix-contracts[temporal]`. This stays a separate extra rather than a
+# base dependency because most Contracts consumers never touch Temporal and
+# should not pull in temporalio (and its protobuf/grpc transitive graph) to
+# install this package.
+temporal = [
+
+    "temporalio>=1.7.0,<2.0.0",
 
 ]
 
