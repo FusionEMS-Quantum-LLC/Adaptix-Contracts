@@ -88,6 +88,24 @@ dev = [
 
     "twine>=7.0.0,<8",
 
+    "temporalio>=1.7.0,<2.0.0",
+
+]
+
+# Temporal payload codec (adaptix_contracts.temporal). An EXTRA, not a base
+# dependency: every Adaptix service imports adaptix_contracts, but only the ones
+# that run a Temporal worker or START a workflow need the SDK, and temporalio
+# pulls a compiled core. Services that need it install
+# `adaptix-contracts[temporal]`; everyone else is unaffected.
+#
+# Range matches Adaptix-Temporal-Service's own pin so the two cannot resolve to
+# incompatible SDK majors — they must agree on the Payload/PayloadCodec surface
+# this codec is written against.
+
+temporal = [
+
+    "temporalio>=1.7.0,<2.0.0",
+
 ]
 
 
