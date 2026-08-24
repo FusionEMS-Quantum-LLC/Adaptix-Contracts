@@ -15,8 +15,8 @@ those bytes were stored as plaintext JSON and "no PHI in workflow history" was a
 docstring convention with nothing enforcing it.
 
 This codec makes the boundary real: payload bytes are encrypted with
-AES-256-GCM before they leave the worker process and decrypted only inside a
-worker that holds the key. The Temporal server, its RDS instance, its backups,
+AES-256-GCM before they leave the encoding process and decrypted only inside a
+process that holds the key. The Temporal server, its RDS instance, its backups,
 and anyone reading history through the Temporal UI or ``tctl`` see ciphertext.
 
 Wire format
@@ -38,7 +38,7 @@ exactly on decode.
 Fail-closed rules — read before changing anything here
 ------------------------------------------------------
 1. ``encode()`` NEVER emits plaintext when a key is expected. With no usable
-   key it raises :class:`PayloadCodecError`. A worker that cannot encrypt does
+   key it raises :class:`PayloadCodecError`. A process that cannot encrypt does
    not get to write to history "just this once".
 2. ``decode()`` raises on any payload MARKED ``binary/encrypted`` that it
    cannot decrypt — unknown key id, missing key, or a failed GCM
@@ -56,9 +56,9 @@ Fail-closed rules — read before changing anything here
 
 Key material
 ------------
-The key arrives the same way every other Adaptix worker secret arrives: AWS
+The key arrives the same way every other Adaptix service secret arrives: AWS
 Secrets Manager -> ECS task definition ``secrets`` block -> environment
-variable. The worker reads ``TEMPORAL_PAYLOAD_CODEC_KEY`` and never calls
+variable. The process reads ``TEMPORAL_PAYLOAD_CODEC_KEY`` and never calls
 Secrets Manager itself, exactly as ``system_token_client`` reads
 ``CORE_PROVISIONING_TOKEN``.
 
@@ -184,7 +184,7 @@ class PayloadCodecError(RuntimeError):
 
 @dataclass(frozen=True)
 class Keyring:
-    """The set of AES-256 keys this worker can use, plus which one encrypts.
+    """The set of AES-256 keys a process can use, plus which one encrypts.
 
     ``keys`` maps key id -> 32 raw key bytes. ``primary_key_id`` must be a key
     in that mapping and is the one ``encode()`` uses. Every key in the mapping
@@ -210,11 +210,11 @@ class Keyring:
         return self.keys[self.primary_key_id]
 
     def key_for(self, key_id: str) -> bytes:
-        """Return the key for ``key_id`` or raise if this worker does not hold it."""
+        """Return the key for ``key_id`` or raise if it is not held."""
         key = self.keys.get(key_id)
         if key is None:
             raise PayloadCodecError(
-                f"payload was encrypted with key id '{key_id}', which this worker "
+                f"payload was encrypted with key id '{key_id}', which this process "
                 "does not hold. Add that key to the payload codec secret "
                 "(retired keys must stay in the keyring while any history that "
                 "used them is still readable)."
@@ -250,7 +250,7 @@ class Keyring:
 
         Accepts the production keyring JSON object or a bare base64 key (local
         development). Raises :class:`PayloadCodecError` on anything else — a
-        malformed secret must stop the worker, not silently degrade it.
+        malformed secret must stop the process, not silently degrade it.
         """
         value = (secret_value or "").strip()
         if not value:
@@ -307,7 +307,7 @@ class Keyring:
 class EncryptionPayloadCodec(PayloadCodec):
     """AES-256-GCM ``PayloadCodec`` for Adaptix Temporal payloads.
 
-    Construct with :meth:`from_environment` in worker startup paths. The
+    Construct with :meth:`from_environment` in worker and client startup paths. The
     explicit constructor exists for tests, which need to build a codec with a
     known keyring without touching process environment.
     """
@@ -332,7 +332,7 @@ class EncryptionPayloadCodec(PayloadCodec):
         """Build the codec from process environment, failing closed.
 
         Reads the environment live (rather than import-time constants) so a
-        worker started after its ECS secret injection, and a test using
+        process started after its ECS secret injection, and a test using
         ``monkeypatch.setenv``, both observe the same values.
 
         Raises :class:`PayloadCodecError` when:
@@ -371,7 +371,7 @@ class EncryptionPayloadCodec(PayloadCodec):
                 "payload_codec.plaintext_passthrough_enabled environment=%s — "
                 "Temporal payloads are NOT encrypted. This is permitted only for "
                 "local development and tests; PHI must never be sent through a "
-                "worker in this mode.",
+                "process in this mode.",
                 environment or "unset",
             )
             return cls(None, plaintext_passthrough=True)
@@ -444,13 +444,13 @@ class EncryptionPayloadCodec(PayloadCodec):
             if algorithm != ALGORITHM:
                 raise PayloadCodecError(
                     "encrypted payload declares unsupported algorithm "
-                    f"'{algorithm.decode('utf-8', 'replace')}'; this worker "
+                    f"'{algorithm.decode('utf-8', 'replace')}'; this process "
                     f"implements {ALGORITHM.decode()} only."
                 )
 
             if self._keyring is None:
                 raise PayloadCodecError(
-                    "received an encrypted Temporal payload but this worker has "
+                    "received an encrypted Temporal payload but this process has "
                     "no payload codec key. Provision "
                     f"{PAYLOAD_CODEC_KEY_ENV} — plaintext passthrough "
                     "cannot read encrypted history."

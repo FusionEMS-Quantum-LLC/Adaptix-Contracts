@@ -39,7 +39,7 @@ import json
 import pytest
 from temporalio.api.common.v1 import Payload
 
-from adaptix_contracts.temporal import (
+from adaptix_contracts.security.temporal_payload_codec import (
     ALGORITHM,
     ENCRYPTED_ENCODING,
     ENVIRONMENT_ENV,
@@ -450,3 +450,154 @@ async def test_data_converter_encrypts_real_values_end_to_end():
 
     (decoded,) = await converter.decode(payloads)
     assert decoded == value
+
+
+# ---------------------------------------------------------------------------
+# GOLDEN VECTORS — taken verbatim from Adaptix-Contracts PR #226.
+#
+# Credit to that PR's author. It proved the property this file could not: the
+# tests above are a ROUND TRIP (this module decodes what this module encoded),
+# which cannot detect the two implementations drifting apart together. These
+# vectors are BEHAVIOURAL — frozen ciphertext actually produced by
+# Adaptix-Temporal-Service's own codec, and a byte-identical re-encode of the
+# same input under a fixed nonce.
+#
+# That matters because this codec's job is decoding history ALREADY WRITTEN by
+# a production worker. The byte-identical source port is strong evidence it
+# will interoperate; only a golden vector FAILS on the day it stops being true.
+#
+# Verified against THIS module before being taken: all four pass, with no
+# change beyond the module path.
+# ---------------------------------------------------------------------------
+
+# Golden-vector interop with Adaptix-Temporal-Service's own codec
+#
+# Generated once, locally, by running BOTH codecs side by side against the
+# same synthetic key material and a fixed (monkeypatched os.urandom) nonce:
+#   - Adaptix-Temporal-Service backend/temporal_app/codec.py
+#     @ commit 5de9ee9f955e6d4619a35f1e24b077fb25fe4119 (2026-08-24, HEAD of
+#     main at verification time; the codec module itself was introduced by
+#     that repo's PR #51 on 2026-08-16 and is unchanged since)
+#   - this module (adaptix_contracts.security.temporal_payload_codec)
+#
+# The generation run asserted FOUR things live, in both directions, for both
+# secret shapes (not just what is re-asserted below from the frozen bytes):
+#   1. this module's decode() of Temporal-Service's encode() output recovers
+#      the exact original inner Payload,
+#   2. this module's encode() of the same input, key, and nonce is
+#      BYTE-IDENTICAL (ciphertext AND metadata) to Temporal-Service's own
+#      encode() output,
+#   3. Temporal-Service's own codec successfully decodes THIS module's
+#      encode() output back to the exact original inner Payload, and
+#   4. the derived key id for a bare base64 key matches on both sides.
+# All four passed. What is committed here is the golden-vector half of that
+# proof (1) plus the byte-identical re-encode half (2) — the two properties
+# a CI run in THIS repository can check without a runtime dependency on
+# Adaptix-Temporal-Service. Property (3) cannot be re-checked without that
+# repository's code present, but is implied by (1)+(2): if this module's
+# encode() output is byte-identical to Temporal-Service's, and
+# Temporal-Service can decode its own output (trivially true — this module's
+# round-trip tests above and Temporal-Service's own test suite both prove
+# that independently), then it can decode this module's output too.
+# ---------------------------------------------------------------------------
+
+
+class TestGoldenVectorInteropWithTemporalService:
+    # -- Case 1: production keyring-JSON secret shape ----------------------
+    _KEYRING_SECRET = (
+        '{"primary_key_id": "test-2026-08", '
+        '"keys": {"test-2026-08": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="}}'
+    )
+    _KEYRING_PRIMARY_KEY_ID = "test-2026-08"
+    _KEYRING_INNER_METADATA = {"encoding": b"json/plain"}
+    _KEYRING_INNER_DATA = b'"claim-golden-vector-abc123"'
+    _KEYRING_FIXED_NONCE = bytes(range(12))
+    _KEYRING_CIPHERTEXT_HEX = (
+        "000102030405060708090a0b4d14dc13a08ba174e928f9eca3e3121eecb8a8"
+        "449c1a36122a7bc7e6710869df2c77c190cba47cb502c11c99e7f505598c3a"
+        "51bf69f4e5e14734d2d3b05df480f2859eede0e3"
+    )
+    _KEYRING_OUTER_METADATA = {
+        "encryption-algorithm": b"AES-256-GCM",
+        "encryption-key-id": b"test-2026-08",
+        "encoding": b"binary/encrypted",
+    }
+
+    # -- Case 2: bare base64 local-development secret shape -----------------
+    _BARE_SECRET = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="
+    _BARE_PRIMARY_KEY_ID = "ae216c2ef5247a37"
+    _BARE_INNER_METADATA = {"encoding": b"json/plain"}
+    _BARE_INNER_DATA = b'"tenant-golden-vector-xyz789"'
+    _BARE_FIXED_NONCE = bytes(range(12))
+    _BARE_CIPHERTEXT_HEX = (
+        "000102030405060708090a0b7b260b9fadb302646b42dc2676929dfe46f992"
+        "e512fe1312df555fc939bb5355f285d58f2be19c4f1a256a4ec658c7631b65"
+        "9a99aaf3774ad1acfffe3191e0883d56bae32a7a84"
+    )
+    _BARE_OUTER_METADATA = {
+        "encryption-algorithm": b"AES-256-GCM",
+        "encryption-key-id": b"ae216c2ef5247a37",
+        "encoding": b"binary/encrypted",
+    }
+
+    async def test_decodes_temporal_service_keyring_json_ciphertext(self) -> None:
+        keyring = Keyring.from_secret_value(self._KEYRING_SECRET)
+        assert keyring.primary_key_id == self._KEYRING_PRIMARY_KEY_ID
+        codec = EncryptionPayloadCodec(keyring)
+
+        outer = Payload(
+            metadata=self._KEYRING_OUTER_METADATA,
+            data=bytes.fromhex(self._KEYRING_CIPHERTEXT_HEX),
+        )
+        decoded = await codec.decode([outer])
+
+        assert dict(decoded[0].metadata) == self._KEYRING_INNER_METADATA
+        assert decoded[0].data == self._KEYRING_INNER_DATA
+
+    async def test_encode_reproduces_temporal_service_keyring_json_ciphertext(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        keyring = Keyring.from_secret_value(self._KEYRING_SECRET)
+        codec = EncryptionPayloadCodec(keyring)
+        inner = Payload(
+            metadata=self._KEYRING_INNER_METADATA, data=self._KEYRING_INNER_DATA
+        )
+
+        monkeypatch.setattr(
+            "adaptix_contracts.security.temporal_payload_codec.os.urandom",
+            lambda n: self._KEYRING_FIXED_NONCE,
+        )
+        encoded = await codec.encode([inner])
+
+        assert encoded[0].data == bytes.fromhex(self._KEYRING_CIPHERTEXT_HEX)
+        assert dict(encoded[0].metadata) == self._KEYRING_OUTER_METADATA
+
+    async def test_decodes_temporal_service_bare_key_ciphertext(self) -> None:
+        keyring = Keyring.from_secret_value(self._BARE_SECRET)
+        assert keyring.primary_key_id == self._BARE_PRIMARY_KEY_ID
+        codec = EncryptionPayloadCodec(keyring)
+
+        outer = Payload(
+            metadata=self._BARE_OUTER_METADATA,
+            data=bytes.fromhex(self._BARE_CIPHERTEXT_HEX),
+        )
+        decoded = await codec.decode([outer])
+
+        assert dict(decoded[0].metadata) == self._BARE_INNER_METADATA
+        assert decoded[0].data == self._BARE_INNER_DATA
+
+    async def test_encode_reproduces_temporal_service_bare_key_ciphertext(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        keyring = Keyring.from_secret_value(self._BARE_SECRET)
+        codec = EncryptionPayloadCodec(keyring)
+        inner = Payload(metadata=self._BARE_INNER_METADATA, data=self._BARE_INNER_DATA)
+
+        monkeypatch.setattr(
+            "adaptix_contracts.security.temporal_payload_codec.os.urandom",
+            lambda n: self._BARE_FIXED_NONCE,
+        )
+        encoded = await codec.encode([inner])
+
+        assert encoded[0].data == bytes.fromhex(self._BARE_CIPHERTEXT_HEX)
+        assert dict(encoded[0].metadata) == self._BARE_OUTER_METADATA
