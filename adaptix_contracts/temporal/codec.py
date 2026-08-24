@@ -206,6 +206,7 @@ class Keyring:
 
     @property
     def primary_key(self) -> bytes:
+        """The key bytes for :attr:`primary_key_id` — the key ``encode()`` uses."""
         return self.keys[self.primary_key_id]
 
     def key_for(self, key_id: str) -> bytes:
