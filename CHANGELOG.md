@@ -7,12 +7,47 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `3.1.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `3.2.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
 
 _Nothing unreleased._
+
+## [3.2.0]
+
+### Added
+
+- `AuditOutcome` (`success` | `failure` | `denied`) — the three-value outcome
+  Core's canonical `core_audit_logs.status` column has always carried. The
+  pre-existing `success: bool` on `AuditIngestRequest` is a two-value
+  projection that cannot represent a deliberate authorization denial, so any
+  producer replicating a Core row into the Audit service was silently
+  rewriting every `denied` row as a plain failure.
+- Core-parity fields on `AuditIngestRequest` and `AuditEvent`, all optional:
+  `outcome`, `ip_address`, `user_agent`, `error_message`, `changes` and
+  `payload_schema_version` (plus `source_service` on the ingest request).
+  Every column of `core_audit_logs` now has a lossless home in the ingest
+  contract. `changes` is deliberately distinct from `metadata`: the former is
+  Core's structured before/after diff (`changes_json`), the latter arbitrary
+  producer context. Conflating them loses the diff.
+- `AuditIngestRequest` reconciles `outcome` and `success` in a `mode="before"`
+  validator: either one alone derives the other, and contradictory values
+  raise rather than silently preferring one.
+
+### Changed
+
+- `AuditIngestRequest.resource_type` is now optional. Core's
+  `core_audit_logs.resource_type` is nullable, so requiring it here forced a
+  replicating producer to invent a value for every Core row that has none.
+  Existing producers that always send it are unaffected; the only consumer of
+  this contract is Adaptix-Audit-Service, whose column is relaxed to nullable
+  in the same change.
+
+### Compatibility
+
+- Additive and backward compatible. No field was removed or retyped, no
+  default changed, and `success` keeps its existing type and meaning.
 
 ## [3.1.0]
 

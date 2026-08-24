@@ -58,6 +58,7 @@ from .duty_auth_contracts import (
 from .audit_contracts import (
     AuditActorType,
     AuditActionType,
+    AuditOutcome,
     AuditSeverity,
     ComplianceReviewStatus,
     AuditContext,
@@ -1350,6 +1351,7 @@ __all__ = [
     # Audit
     "AuditActorType",
     "AuditActionType",
+    "AuditOutcome",
     "AuditSeverity",
     "ComplianceReviewStatus",
     "AuditContext",
