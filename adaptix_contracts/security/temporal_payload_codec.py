@@ -327,22 +327,32 @@ class Keyring:
     @classmethod
     def _keyring_from_parsed_json(cls, parsed: dict) -> Keyring:
         """Validate the parsed keyring object and build the Keyring."""
-        raw_keys = parsed.get("keys")
+        raw_keys = cls._require_keys_mapping(parsed.get("keys"))
+        primary = cls._require_primary_key_id(parsed.get("primary_key_id"))
+        keys = {
+            str(key_id): cls._decode_key(str(key_id), encoded)
+            for key_id, encoded in raw_keys.items()
+        }
+        return cls(primary_key_id=primary, keys=keys)
+
+    @staticmethod
+    def _require_keys_mapping(raw_keys: object) -> dict:
+        """Validate the JSON secret's 'keys' field is a non-empty object."""
         if not isinstance(raw_keys, dict) or not raw_keys:
             raise PayloadCodecError(
                 f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a non-empty "
                 "'keys' object mapping key id -> base64 key"
             )
-        primary = parsed.get("primary_key_id")
+        return raw_keys
+
+    @staticmethod
+    def _require_primary_key_id(primary: object) -> str:
+        """Validate and return the JSON secret's 'primary_key_id' string."""
         if not isinstance(primary, str) or not primary.strip():
             raise PayloadCodecError(
                 f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a 'primary_key_id' string"
             )
-        keys = {
-            str(key_id): cls._decode_key(str(key_id), encoded)
-            for key_id, encoded in raw_keys.items()
-        }
-        return cls(primary_key_id=primary.strip(), keys=keys)
+        return primary.strip()
 
     @classmethod
     def _from_bare_key(cls, value: str) -> Keyring:
@@ -416,14 +426,14 @@ class EncryptionPayloadCodec(PayloadCodec):
                 f"permitted in production. Remove the flag and provision "
                 f"{PAYLOAD_CODEC_KEY_ENV}."
             )
-        return cls._build_from_resolved_environment(
+        return cls._codec_from_resolved_env(
             secret_value=secret_value,
             plaintext_requested=plaintext_requested,
             environment=environment,
         )
 
     @classmethod
-    def _build_from_resolved_environment(
+    def _codec_from_resolved_env(
         cls, *, secret_value: str, plaintext_requested: bool, environment: str
     ) -> EncryptionPayloadCodec:
         """Build the codec once the plaintext-in-production guard has passed."""
