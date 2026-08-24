@@ -7,12 +7,34 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `3.3.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `4.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
 
 _Nothing unreleased._
+
+## [4.0.0]
+
+### Removed
+
+- **`TrustSignClient.resend_request` removed** (A005 follow-up to #220).
+  The standalone Adaptix-TrustSign-Service has never implemented
+  `POST /api/v1/trustsign/requests/{request_id}/resend` — the client method
+  has been advertising a route that returns 404 in production since the
+  2026-07-15 cutover away from Billing-Service's legacy TrustSign router.
+  Removing the method is preferred over implementing the missing server
+  contract because no active consumer needs resend: an org-wide GitHub code
+  search for `resend_request` across `FusionEMS-Quantum-LLC` found only the
+  method itself, its unit test, Billing-Service's independent Phase-1
+  in-process mirror (a separate implementation, not a caller of this
+  client), and Billing-Service's own deprecated legacy `trustsign_routes.py`
+  server endpoint. A caller anywhere in the fleet that actually needs
+  resend can either reissue by cancelling and re-creating the signing
+  request, or a future PR can implement the full standalone server
+  contract (token revoke/reissue, expiry, audit, notification, abuse
+  limits). Bumped `test_trustsign_client_mirror_drift`'s
+  `EXPECTED_CLIENT_METHODS` and dropped the round-trip test.
 
 ## [3.3.0]
 

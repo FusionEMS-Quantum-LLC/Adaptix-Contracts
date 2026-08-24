@@ -72,7 +72,6 @@ EXPECTED_CLIENT_METHODS = {
     "get_request_status",
     "download_archive",
     "void_request",
-    "resend_request",
     "start_chart_signature",
     "verify_webhook_signature",
 }

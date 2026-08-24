@@ -7,7 +7,7 @@ Coverage:
 * ``get_request_status`` parses the server response into typed model.
 * ``download_archive`` returns raw bytes and surfaces 404 as
   ``TrustSignValidationError``.
-* ``void_request`` + ``resend_request`` round-trip with optional bodies.
+* ``void_request`` round-trip with optional bodies.
 * ``start_chart_signature`` / ``complete_chart_signature`` post the exact
   server shapes, carry no body tenant, and surface every refusal the
   service can raise (403 signer mismatch, 409 hash mismatch/replay,
@@ -327,7 +327,7 @@ async def test_download_archive_404_raises_validation_error() -> None:
             assert exc.value.status_code == 404
 
 
-# ── void + resend ─────────────────────────────────────────────────────────
+# ── void ──────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -344,21 +344,6 @@ async def test_void_request_posts_reason() -> None:
         async with TrustSignClient(_cfg(), http_client=raw) as client:
             await client.void_request("req_void", reason="caller cancelled")
     assert captured["body"] == {"reason": "caller cancelled"}
-
-
-@pytest.mark.asyncio
-async def test_resend_request_posts_optional_expiration() -> None:
-    captured: dict = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["body"] = json.loads(request.content)
-        return httpx.Response(200, json={"status": "pending"})
-
-    transport = httpx.MockTransport(handler)
-    async with httpx.AsyncClient(transport=transport) as raw:
-        async with TrustSignClient(_cfg(), http_client=raw) as client:
-            await client.resend_request("req_resend", expiration_days=21)
-    assert captured["body"] == {"expiration_days": 21}
 
 
 # ── chart signature lifecycle ─────────────────────────────────────────────

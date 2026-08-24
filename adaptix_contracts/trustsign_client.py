@@ -562,31 +562,6 @@ class TrustSignClient:
         )
         return ChartSignatureCompleteResponse.model_validate(response.json())
 
-    async def resend_request(
-        self, request_id: str, *, expiration_days: int | None = None
-    ) -> None:
-        """Re-issue the per-signer magic links (resets expiration).
-
-        NOT YET IMPLEMENTED on the standalone Adaptix-TrustSign-Service
-        (verified 2026-08-05: no matching route in
-        ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``). This
-        path exists only on Adaptix-Billing-Service's deprecated legacy
-        router (``billing_app/api/trustsign_routes.py``), which the gateway
-        no longer forwards ``/api/v1/trustsign/*`` traffic to. Calling this
-        against the real gateway-routed ``base_url`` today raises
-        ``TrustSignValidationError(404, ...)`` — a clean typed failure, not
-        a silent one, but the capability itself does not exist server-side
-        yet.
-        """
-        body = (
-            {"expiration_days": expiration_days} if expiration_days is not None else {}
-        )
-        await self._request(
-            "POST",
-            f"/api/v1/trustsign/requests/{request_id}/resend",
-            json_body=body,
-        )
-
     # ── webhook signature verification ──────────────────────────────────
 
     @staticmethod
