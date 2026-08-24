@@ -169,6 +169,94 @@ class RequestStatusResponse(BaseModel):
     signers: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ChartSignatureStartInput(BaseModel):
+    """Inbound parameters for ``TrustSignClient.start_chart_signature``.
+
+    Mirrors ``ChartSignatureStartIn`` on
+    ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``.
+
+    There is deliberately no ``tenant_id`` field. The standalone service
+    derives tenant, signer user id and signer email from the authenticated
+    signer session context (``get_signer_session_context``), so a body tenant
+    would be either ignored or an attempt to sign for someone else. Sending
+    one is forbidden by ``extra="forbid"`` rather than silently dropped.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    chart_id: str = Field(..., min_length=1, max_length=36)
+    document_hash: str = Field(..., pattern=r"^[0-9A-Fa-f]{64}$")
+    intent: str = Field(..., min_length=1, max_length=255)
+    signer_full_name: str = Field(..., min_length=1, max_length=255)
+    expiration_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class ChartSignatureStartResponse(BaseModel):
+    """``POST /api/v1/trustsign/chart-signatures`` 201 response.
+
+    ``document_hash`` comes back lower-cased: the service normalizes it on
+    the way in and binds the signature to that normalized value, so callers
+    must compare against this field rather than the casing they sent.
+    """
+
+    request_id: str
+    verification_id: str
+    chart_id: str
+    document_hash: str
+    intent: str
+    status: str
+    expires_at: str
+
+
+class ChartSignatureConsent(BaseModel):
+    """Signer consent block; both fields are required by the service."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    consent_accepted: bool
+    consent_text_sha256: str = Field(..., min_length=1)
+
+
+class ChartSignatureCompleteInput(BaseModel):
+    """Inbound parameters for ``TrustSignClient.complete_chart_signature``.
+
+    Mirrors ``ChartSignatureCompleteIn``. ``document_hash`` is re-sent so the
+    service can refuse a signature bound to a chart that changed underneath
+    it (409 ``DocumentHashMismatchError``); it is not a convenience echo.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    document_hash: str = Field(..., pattern=r"^[0-9A-Fa-f]{64}$")
+    signature_type: str = Field(..., min_length=1, max_length=64)
+    signature_value: str = ""
+    consent: ChartSignatureConsent
+    timezone_name: str | None = None
+    viewport: dict[str, Any] | None = None
+
+
+class ChartSignatureCompleteResponse(BaseModel):
+    """``POST /api/v1/trustsign/chart-signatures/{request_id}/complete`` response.
+
+    The KMS fields are populated once the service has signed the archived
+    document. They are optional because a multi-signer request that is not
+    yet complete has no final artifact to sign — ``all_signers_complete``
+    is what says which case this is.
+    """
+
+    request_id: str
+    verification_id: str
+    status: str
+    signer_signed_at: str
+    all_signers_complete: bool
+    archive_s3_key: str | None = None
+    final_pdf_sha256: str | None = None
+    kms_key_id: str | None = None
+    kms_signature: str | None = None
+    kms_signing_algorithm: str | None = None
+    kms_signed_at: str | None = None
+
+
 # ── Exceptions ────────────────────────────────────────────────────────────
 
 
@@ -421,6 +509,58 @@ class TrustSignClient:
             f"/api/v1/trustsign/requests/{request_id}/void",
             json_body=body,
         )
+
+    async def start_chart_signature(
+        self, payload: ChartSignatureStartInput
+    ) -> ChartSignatureStartResponse:
+        """Open a chart-signature request bound to a document hash.
+
+        Calls ``POST /api/v1/trustsign/chart-signatures`` on
+        Adaptix-TrustSign-Service. Tenant, signer user id and signer email are
+        taken by the service from the authenticated signer session — this
+        client sends identity only as the bearer token, never as a body field.
+
+        The returned ``request_id`` is what
+        :meth:`complete_chart_signature` completes. Nothing is signed yet: a
+        started request that is never completed leaves chart state untouched.
+        """
+        body = payload.model_dump(exclude_none=True, mode="json")
+        response = await self._request(
+            "POST", "/api/v1/trustsign/chart-signatures", json_body=body
+        )
+        return ChartSignatureStartResponse.model_validate(response.json())
+
+    async def complete_chart_signature(
+        self, request_id: str, payload: ChartSignatureCompleteInput
+    ) -> ChartSignatureCompleteResponse:
+        """Complete a started chart signature and obtain the signed artifact.
+
+        Calls ``POST /api/v1/trustsign/chart-signatures/{request_id}/complete``.
+        The service refuses rather than silently succeeding, and each refusal
+        arrives as a typed error carrying the service's status code:
+
+        * 404 -> unknown request (``TrustSignValidationError``); a cross-tenant
+          request_id is 404, never a 403 that would confirm it exists.
+        * 403 -> the authenticated signer is not the bound signer
+          (``TrustSignUnauthorizedError``).
+        * 409 -> document hash mismatch, or the request was already completed
+          (replay) (``TrustSignValidationError``).
+        * 410 -> the signing session expired (``TrustSignValidationError``).
+        * 422 -> consent not accepted, or invalid input
+          (``TrustSignValidationError``).
+        * 502/503 -> KMS unavailable or misconfigured (``TrustSignServerError``).
+
+        Callers must treat every one of these as "not signed" and leave prior
+        state unchanged. Only a returned response marks a chart signed, and
+        only when its ``document_hash`` binding was the one submitted.
+        """
+        body = payload.model_dump(exclude_none=True, mode="json")
+        response = await self._request(
+            "POST",
+            f"/api/v1/trustsign/chart-signatures/{request_id}/complete",
+            json_body=body,
+        )
+        return ChartSignatureCompleteResponse.model_validate(response.json())
 
     async def resend_request(
         self, request_id: str, *, expiration_days: int | None = None

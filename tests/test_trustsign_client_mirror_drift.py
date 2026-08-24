@@ -41,6 +41,11 @@ import adaptix_contracts.trustsign_client as canonical
 # its adaptix-contracts pin bumped to the new minor version.
 
 EXPECTED_PUBLIC_NAMES = {
+    "ChartSignatureCompleteInput",
+    "ChartSignatureCompleteResponse",
+    "ChartSignatureConsent",
+    "ChartSignatureStartInput",
+    "ChartSignatureStartResponse",
     "CreateRequestInput",
     "CreateRequestResponse",
     "RequestStatusResponse",
@@ -62,11 +67,13 @@ EXPECTED_CLIENT_METHODS = {
     "__aenter__",
     "__aexit__",
     "aclose",
+    "complete_chart_signature",
     "create_request",
     "get_request_status",
     "download_archive",
     "void_request",
     "resend_request",
+    "start_chart_signature",
     "verify_webhook_signature",
 }
 

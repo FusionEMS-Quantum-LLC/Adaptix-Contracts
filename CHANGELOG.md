@@ -7,12 +7,35 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `3.0.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `3.1.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
 
 _Nothing unreleased._
+
+## [3.1.0]
+
+### Added
+
+- `TrustSignClient.start_chart_signature` and
+  `TrustSignClient.complete_chart_signature`, with the typed models
+  `ChartSignatureStartInput`, `ChartSignatureStartResponse`,
+  `ChartSignatureConsent`, `ChartSignatureCompleteInput` and
+  `ChartSignatureCompleteResponse`. These are contracts for the chart
+  signature routes Adaptix-TrustSign-Service already serves
+  (`POST /api/v1/trustsign/chart-signatures` and
+  `.../{request_id}/complete`), which previously had no client contract at
+  all. Neither model carries a `tenant_id`: the service takes tenant, signer
+  user id and signer email from the authenticated signer session, so a body
+  tenant is rejected by `extra="forbid"` rather than silently dropped.
+
+### Fixed
+
+- `uv.lock` declared `2.37.0` while `pyproject.toml` declared `3.0.0`. The
+  `3.0.0` bump moved the project version and left the lock's own entry
+  behind — the same drift `test_lockfile_self_version_matches_pyproject_metadata`
+  was written to catch after `2.37.0`. Both now read `3.1.0`.
 
 ## [3.0.0]
 
