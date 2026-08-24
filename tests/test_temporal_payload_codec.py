@@ -35,8 +35,10 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 
 import pytest
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from temporalio.api.common.v1 import Payload
 
 from adaptix_contracts.security.temporal_payload_codec import (
@@ -381,6 +383,41 @@ async def test_decode_raises_on_truncated_payload():
         await codec.decode([truncated])
 
     assert "truncated" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_decode_raises_payload_codec_error_on_corrupt_plaintext():
+    """A GCM-authenticated payload whose plaintext is not a valid ``Payload``
+    message fails closed as PayloadCodecError, never as a raw protobuf
+    DecodeError.
+
+    This codec's own encode() cannot produce this case — it always encrypts a
+    real serialized Payload — but a version-skewed peer service sharing this
+    key could in principle produce ciphertext this codec authenticates but
+    cannot parse. decode() must not leak an untyped exception for that case:
+    every other decode failure mode already raises PayloadCodecError, and
+    this one must match.
+    """
+    raw_key = base64.b64decode(_KEY_A)
+    nonce = os.urandom(NONCE_LENGTH_BYTES)
+    # Authenticates fine under raw_key, but is not a valid serialized
+    # temporalio Payload message.
+    ciphertext = AESGCM(raw_key).encrypt(nonce, b"not-a-payload-message", None)
+
+    corrupt = Payload(
+        metadata={
+            "encoding": ENCRYPTED_ENCODING,
+            METADATA_KEY_ID: b"test-a",
+            METADATA_ALGORITHM: ALGORITHM,
+        },
+        data=nonce + ciphertext,
+    )
+
+    codec = EncryptionPayloadCodec(_keyring())
+    with pytest.raises(PayloadCodecError) as exc:
+        await codec.decode([corrupt])
+
+    assert "not a valid" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------
