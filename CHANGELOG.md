@@ -7,10 +7,15 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `4.0.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `4.1.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
-## [Unreleased]
+## [4.1.0]
+
+First tagged release of the 4.x line (v4.1.0). Additive on top of 4.0.0: two
+service-audience registrations and one new opt-in security module. No field,
+enum, default, or wire format changed; no consumer is forced to change code
+by moving from 4.0.0 to 4.1.0.
 
 ### Added
 
@@ -24,6 +29,40 @@ from the installed package metadata).
   "audience absent from the registry" failure that previously made `adaptix-audit`
   and `adaptix-vision` surfaces unreachable. Pinned by
   `test_signal_bus_audience_is_present`.
+
+- **`adaptix-governance` service audience** in `service_audiences.py` (#227).
+  Step 1 of the module's "Adding a new service" procedure, ahead of the
+  `Adaptix-Governance-Service` repo (Adaptix-Governance #45/#47: GitHub
+  webhook ingest for the `Adaptix-Governance-AI` GitHub App). Gateway's
+  `_validate_route_table()` startup check refuses any `/api/v1/governance/*`
+  `RouteEntry` until this audience exists. The paired Gateway `RouteEntry`
+  PR is held until the service is actually deployed; no service verifies
+  this audience yet (Phase 1 is a public GitHub-HMAC-signed webhook
+  receiver with no Cognito-JWT route). This entry was backfilled at release
+  time: #227 merged without a changelog entry.
+
+- **Canonical Temporal payload codec** —
+  `adaptix_contracts.security.temporal_payload_codec` plus a new optional
+  `temporal` extra carrying the SDK (#225). The AES-256-GCM encrypting
+  `PayloadCodec` previously private to Adaptix-Temporal-Service is promoted
+  here as the ONE definition of the Adaptix Temporal payload wire format,
+  because the starting client's converter (any service calling
+  `start_workflow`) and the worker's converter must agree byte-for-byte.
+  Verbatim port (19 differing lines, all docstrings/messages, zero logic),
+  same env vars (`TEMPORAL_PAYLOAD_CODEC_KEY`,
+  `TEMPORAL_PAYLOAD_CODEC_PLAINTEXT_LOCAL`, `ENVIRONMENT`), guarded by 46
+  ported tests plus 4 golden vectors of frozen production ciphertext.
+  Nothing attaches the converter in this release; enablement is per-service
+  work. `adaptix_contracts.security` still imports without `temporalio` —
+  only this module requires the extra. This entry was backfilled at release
+  time: #225 merged without a changelog entry, deliberately deferring the
+  release convention to the Contracts release owner.
+
+### Compatibility
+
+- Additive and backward compatible with 4.0.0. Audience registrations only
+  widen `KNOWN_SERVICE_AUDIENCES`; the codec module is new and imported by
+  nobody unless a consumer opts in via the `temporal` extra.
 
 ## [4.0.0]
 
