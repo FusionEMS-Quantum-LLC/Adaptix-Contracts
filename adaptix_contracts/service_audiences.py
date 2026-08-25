@@ -118,6 +118,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-reference-data",
         "adaptix-rtc",
         "adaptix-search",
+        "adaptix-signal-bus",
         "adaptix-social",
         "adaptix-telephony",
         "adaptix-telnyx",
