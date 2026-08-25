@@ -72,6 +72,24 @@ def test_audit_audience_is_present() -> None:
     assert "adaptix-audit" in KNOWN_SERVICE_AUDIENCES
 
 
+def test_signal_bus_audience_is_present() -> None:
+    """Adaptix-SignalCore-Service (the cross-service event bus) needs a DISTINCT
+    audience (A012 SSRF/identity hardening).
+
+    The service serves ``/api/v1/signal-bus`` — deliberately NOT ``/api/v1/signalcore``,
+    which is Core's separate Founder investor-signal (Wefunder) stream routed to Core
+    with ``audience="adaptix-core"`` (see ``Adaptix-Gateway`` routes.py). Its audience
+    must therefore be distinct from ``adaptix-core`` so the gateway can route the
+    event-bus prefix and stamp its own audience, and the downstream verifier
+    (``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-signal-bus``) can be installed without
+    colliding with the fundraising stream. Registered here (step 1 of "Adding a new
+    service") so the gateway route table can reference it without the "audience absent
+    from the registry -> prefix unroutable" failure that hit ``adaptix-audit`` and
+    ``adaptix-vision``.
+    """
+    assert "adaptix-signal-bus" in KNOWN_SERVICE_AUDIENCES
+
+
 @pytest.mark.parametrize(
     "value",
     ["adaptix-core", "  adaptix-core  ", "ADAPTIX-CORE"],

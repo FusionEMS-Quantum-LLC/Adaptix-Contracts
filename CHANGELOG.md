@@ -12,7 +12,18 @@ from the installed package metadata).
 
 ## [Unreleased]
 
-_Nothing unreleased._
+### Added
+
+- **`adaptix-signal-bus` service audience** in `service_audiences.py` (A012 —
+  SSRF/identity hardening for Adaptix-SignalCore-Service). The cross-service event
+  bus serves `/api/v1/signal-bus` — deliberately distinct from Core's separate
+  `/api/v1/signalcore` Founder investor-signal stream (routed to Core with
+  `audience="adaptix-core"`) — so it requires its own audience. Registering it here
+  is step 1 of the module's "Adding a new service" procedure: without it the gateway
+  refuses to route the prefix (`entry.audience not in KNOWN_AUDIENCES`), the same
+  "audience absent from the registry" failure that previously made `adaptix-audit`
+  and `adaptix-vision` surfaces unreachable. Pinned by
+  `test_signal_bus_audience_is_present`.
 
 ## [4.0.0]
 
