@@ -5,6 +5,8 @@ from typing import Final
 
 INTEROPERABILITY_PEER_CREATED: Final[str] = "interoperability.peer.created"
 INTEROPERABILITY_PEER_VERIFIED: Final[str] = "interoperability.peer.verified"
+INTEROPERABILITY_PEER_PAUSED: Final[str] = "interoperability.peer.paused"
+INTEROPERABILITY_PEER_RESUMED: Final[str] = "interoperability.peer.resumed"
 INTEROPERABILITY_PEER_REVOKED: Final[str] = "interoperability.peer.revoked"
 INTEROPERABILITY_TRUST_ACTIVATED: Final[str] = "interoperability.trust.activated"
 INTEROPERABILITY_TRUST_REVOKED: Final[str] = "interoperability.trust.revoked"
@@ -26,6 +28,8 @@ INTEROPERABILITY_EVENTS: Final[dict[str, dict[str, object]]] = {
     for event_type in (
         INTEROPERABILITY_PEER_CREATED,
         INTEROPERABILITY_PEER_VERIFIED,
+        INTEROPERABILITY_PEER_PAUSED,
+        INTEROPERABILITY_PEER_RESUMED,
         INTEROPERABILITY_PEER_REVOKED,
         INTEROPERABILITY_TRUST_ACTIVATED,
         INTEROPERABILITY_TRUST_REVOKED,
