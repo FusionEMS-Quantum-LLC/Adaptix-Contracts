@@ -14,7 +14,7 @@ from the installed package metadata).
 
 ### Added
 
-- **Tenant-less platform S2S token** —
+- **Tenant-less platform S2S token** (#231) —
   `adaptix_contracts.auth.platform_token` (`issue_platform_service_token`,
   `verify_platform_service_token`, `verify_platform_service_token_with_keyset`,
   `PlatformServiceTokenClaims`, `PlatformServiceTokenError`,
