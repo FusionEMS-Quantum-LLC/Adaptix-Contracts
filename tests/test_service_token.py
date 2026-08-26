@@ -192,6 +192,37 @@ def test_missing_tenant_claim_403(keys):
         _verify(token, pub)
 
 
+def test_missing_jti_claim_401_not_validationerror(keys):
+    """A validly signed token with no ``jti`` must fail as ServiceTokenError.
+
+    ``jti`` is a required field on ``ServiceTokenClaims``. Before ``jti`` was
+    required at decode time, such a token passed every explicit check here and
+    only failed at the closing ``ServiceTokenClaims(**raw)``, raising
+    ``pydantic.ValidationError`` — outside this module's documented contract,
+    so a caller catching only ServiceTokenError/ServiceTokenAuthzError saw an
+    unhandled 500 instead of a clean 401.
+    """
+    priv, pub = keys
+    now = int(datetime.now(UTC).timestamp())
+    payload = {
+        "iss": _ISS,
+        "aud": _AUD,
+        "sub": _SUB,
+        "tenant_id": _TENANT,
+        "scope": _SCOPE,
+        "iat": now,
+        "nbf": now,
+        "exp": now + 120,
+        "ver": SERVICE_TOKEN_VERSION,  # no jti
+    }
+    token = jwt.encode(payload, priv, algorithm="RS256")
+    # This assertion alone is the proof: pydantic.ValidationError is NOT a
+    # subclass of ServiceTokenError, so if the old behavior regressed the
+    # ValidationError would propagate uncaught and fail this test.
+    with pytest.raises(ServiceTokenError):
+        _verify(token, pub)
+
+
 def test_tenant_body_mismatch_403(keys):
     priv, pub = keys
     token = _issue(priv, tenant_id=_TENANT)

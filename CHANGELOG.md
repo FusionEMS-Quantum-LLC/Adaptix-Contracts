@@ -12,6 +12,31 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Fixed
+
+- **BEHAVIOR CHANGE — `verify_service_token` now requires `jti` at decode
+  time.** `adaptix_contracts.auth.service_token.verify_service_token` listed
+  `["exp", "iat", "aud", "iss", "sub"]` as required decode claims but omitted
+  `jti`, even though `ServiceTokenClaims.jti` is a required field. A validly
+  signed token missing `jti` therefore passed every explicit check and failed
+  only at the closing `ServiceTokenClaims(**raw)`, raising
+  `pydantic.ValidationError` — which is outside this module's documented
+  contract (`ServiceTokenError` -> 401, `ServiceTokenAuthzError` -> 403). A
+  caller correctly catching only those two saw an unhandled 500 instead of a
+  clean 401. Such a token now raises `ServiceTokenError`.
+
+  This is stated explicitly as a behavior change to an already-shipped module,
+  per this repo's conventions, and was authorized by the repo owner. It is
+  safe for live traffic: `issue_service_token` always sets
+  `jti` (`uuid.uuid4().hex`), so every legitimately issued token already
+  carries the claim — only malformed or hand-crafted tokens change outcome.
+  The production paths on this module (Operations->CAD/Air, MCP->EPCR) are
+  unaffected. `scope` was deliberately NOT added to the required list: a
+  missing scope must remain an authorization failure (403) via the existing
+  explicit comparison, not become an authentication failure (401). Matches
+  the same requirement already present in the sibling `platform_token`
+  verifier (#231).
+
 ### Added
 
 - **Tenant-less platform S2S token** (#231) —
