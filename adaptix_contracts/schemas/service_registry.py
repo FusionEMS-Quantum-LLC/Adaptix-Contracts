@@ -444,6 +444,17 @@ AUDIT_SERVICE = ServiceDefinition(
     ),
 )
 
+QHIN_SERVICE = ServiceDefinition(
+    name="Adaptix-QHIN-Service",
+    slug="qhin",
+    route_prefix="/api/v1/qhin",
+    port=8048,
+    description=(
+        "TEFCA/QHIN participant management, patient discovery, document exchange, "
+        "consent, subscriptions, and reciprocal FHIR orchestration"
+    ),
+)
+
 
 # ============================================================================
 # ALL SERVICES REGISTRY
@@ -501,6 +512,7 @@ ALL_SERVICES: list[ServiceDefinition] = [
     NEMSIS_SERVICE,
     NERIS_SERVICE,
     AUDIT_SERVICE,
+    QHIN_SERVICE,
 ]
 
 # Lookup by slug
