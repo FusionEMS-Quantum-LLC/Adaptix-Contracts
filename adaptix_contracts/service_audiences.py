@@ -115,6 +115,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-payments",
         "adaptix-policy",
         "adaptix-pricing",
+        "adaptix-qhin",
         "adaptix-reference-data",
         "adaptix-rtc",
         "adaptix-search",
@@ -142,7 +143,7 @@ def is_known_service_audience(audience: str | None) -> bool:
     ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` check both compare literally — so this
     only strips surrounding whitespace and lowercases; it never guesses at a
     near-miss. A caller that wants to be forgiving about an unknown audience
-    must decide that itself rather than have this helper decide for it.
+    must decide that itself rather than have this helper decide it.
     """
     if not audience:
         return False
