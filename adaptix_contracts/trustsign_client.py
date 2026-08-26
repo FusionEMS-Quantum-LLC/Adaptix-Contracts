@@ -5,26 +5,35 @@ the TrustSign engine at ``/api/v1/trustsign/*``. It is the **only**
 authorized signature integration path going forward. There is no fallback
 to Dropbox Sign / HelloSign.
 
-ROUTING REALITY (verified 2026-08-05): as of the 2026-07-15 cutover, the
-gateway (``Adaptix-Gateway/backend/app/config/routes.py``, the
-``/api/v1/trustsign`` and ``/api/v1/trustsign/sign`` ``RouteEntry`` rows)
-forwards ALL ``/api/v1/trustsign/*`` traffic to the standalone
-``Adaptix-TrustSign-Service`` engine — NOT to ``Adaptix-Billing-Service``.
-``Adaptix-Billing-Service`` still ships its own in-process mirror
-(``billing_app.trustsign.request_service`` / legacy
-``billing_app/api/trustsign_routes.py``) with an independently-migrated
-database of the same table names; that copy is no longer reachable via the
-gateway prefix this client calls. A caller anywhere in the fleet that mints
-a signing request through Billing's *internal* (non-HTTP) engine — as
-``Adaptix-Billing-Service``'s onboarding legal-packet dispatch
-(``billing_app.services.trustsign_legal_packet_service``) still does — will
-produce a magic-link token that this client (and the gateway-routed
-``/sign/{token}`` Web-App page) cannot resolve, because the standalone
-engine's database has never seen that token. See the confirmed BAA
-capture-and-persist journey gap logged 2026-08-05. This client itself only
-ever talks to the gateway/standalone engine, so it is not the broken hop —
-but do not assume every "TrustSign" caller in the fleet already goes
-through this client.
+ROUTING REALITY (corrected 2026-08-26 — the 2026-08-05 note below named the
+wrong authority; do not trust the 2026-08-05 claim in this docstring's prior
+revisions): production ALB listener rule 109 on ``adaptix-production``
+forwards ``/api/v1/trustsign/*`` directly to the BILLING target group, and
+the gateway (``Adaptix-Gateway/backend/app/config/routes.py``) route table
+points the same prefix at ``settings.billing_service_url``. The service that
+actually answers every call this client makes is therefore
+``Adaptix-Billing-Service`` (``billing_app/api/trustsign_routes.py`` /
+``billing_app/trustsign/request_service.py``), which is also where the
+signature records, archives and hash chain live. The standalone
+``Adaptix-TrustSign-Service`` engine implements look-alike routes but is
+NOT on the gateway path this client uses — pointing this client's
+``base_url`` at that engine's internal DNS name directly (bypassing the
+gateway) would make every existing Billing-held signature invisible to it.
+``Adaptix-EPCR-Service`` carried this exact wrong belief until it was
+corrected in PRs #401/#402 (2026-08-25); this file was not updated in
+lockstep, so any consumer that took its routing understanding from here
+instead of re-verifying against the live ALB/gateway inherited the same
+stale belief. The original 2026-08-05 note below (kept for incident
+history, not as current routing truth) additionally claimed that
+Billing's onboarding legal-packet dispatch
+(``billing_app.services.trustsign_legal_packet_service``) mints tokens
+this client cannot resolve because "the standalone engine's database has
+never seen that token" — that consequence was a direct product of the
+now-corrected routing premise and has NOT been independently re-verified
+under the corrected understanding; do not assume it is fixed, and do not
+assume it still reproduces as originally described. Re-verify against
+live ALB rules (``aws elbv2 describe-rules``) before relying on either
+version of this note.
 
 Design rules (per founder directive 2026-05-25):
 
@@ -172,14 +181,18 @@ class RequestStatusResponse(BaseModel):
 class ChartSignatureStartInput(BaseModel):
     """Inbound parameters for ``TrustSignClient.start_chart_signature``.
 
-    Mirrors ``ChartSignatureStartIn`` on
-    ``Adaptix-TrustSign-Service/backend/app/routes/trustsign.py``.
+    Mirrors ``ChartSignatureStartPayload`` on
+    ``Adaptix-Billing-Service/backend/billing_app/api/trustsign_routes.py``
+    (corrected 2026-08-26 — a prior revision of this docstring attributed
+    this shape to the standalone ``Adaptix-TrustSign-Service`` engine; that
+    service is not on the gateway path this client calls, see the module
+    docstring above).
 
-    There is deliberately no ``tenant_id`` field. The standalone service
-    derives tenant, signer user id and signer email from the authenticated
-    signer session context (``get_signer_session_context``), so a body tenant
-    would be either ignored or an attempt to sign for someone else. Sending
-    one is forbidden by ``extra="forbid"`` rather than silently dropped.
+    There is deliberately no ``tenant_id`` field. Billing derives tenant,
+    signer user id and signer email from the gateway-validated auth context
+    (``get_auth_context``), so a body tenant would be either ignored or an
+    attempt to sign for someone else. Sending one is forbidden by
+    ``extra="forbid"`` rather than silently dropped.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -303,11 +316,14 @@ class TrustSignClientConfig:
 
     base_url: str
     """Absolute base URL for the TrustSign API. In production this is
-    ``https://api.adaptixcore.com`` (the gateway), routing
-    ``/api/v1/trustsign/*`` to the standalone Adaptix-TrustSign-Service
-    (cutover 2026-07-15 — this no longer forwards to Adaptix-Billing-Service).
-    In service-mesh deployments this may point directly at the standalone
-    engine's internal service DNS name instead."""
+    ``https://api.adaptixcore.com`` (the gateway); production ALB rule 109
+    and the gateway route table both forward ``/api/v1/trustsign/*`` to
+    **Adaptix-Billing-Service** (corrected 2026-08-26 — a prior revision of
+    this docstring named the standalone ``Adaptix-TrustSign-Service`` engine
+    as the answering service; that was wrong and is not current routing
+    truth — see the module docstring above for the full correction). In
+    service-mesh deployments this may point directly at Billing's internal
+    service DNS name instead."""
 
     bearer_token: str
     """The caller's Adaptix JWT (Cognito or Core RS256). Tenant scoping
