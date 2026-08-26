@@ -91,13 +91,20 @@ class ThreadCloseReason(StrEnum):
 
 
 class SmsDeliveryStatus(StrEnum):
-    """Delivery result of an outbound SMS on a thread."""
+    """Delivery result of an outbound SMS on a thread.
+
+    ``SUPPRESSED`` is a policy outcome, not a provider outcome: the sender
+    consulted the tenant's suppression/consent list before dispatch and the
+    message was never handed to the SMS provider. A provider attempt that
+    fails is ``FAILED`` — never ``SUPPRESSED``.
+    """
 
     QUEUED = "queued"
     SENT = "sent"
     DELIVERED = "delivered"
     FAILED = "failed"
     UNDELIVERED = "undelivered"
+    SUPPRESSED = "suppressed"
 
 
 __all__ = [

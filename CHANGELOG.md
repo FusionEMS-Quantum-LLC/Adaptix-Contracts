@@ -39,6 +39,20 @@ from the installed package metadata).
 
 ### Added
 
+- **`SmsDeliveryStatus.SUPPRESSED`** —
+  `adaptix_contracts.family_bridge.enums.SmsDeliveryStatus` gains the value
+  `"suppressed"`: a Family-Bridge stage SMS was withheld because the tenant's
+  suppression/consent list blocked the destination, so the message was never
+  handed to the SMS provider (ACX-CORR-0013). This is a policy outcome,
+  distinct from `FAILED`, which remains reserved for a real provider attempt
+  that failed. Purely additive: no existing value, field, default, or event
+  name changed; `BridgeSmsSentPayload.delivery_status` still defaults to
+  `QUEUED`. Consumer census at time of change (org-wide code search for
+  `bridge.sms.sent`, `SmsDeliveryStatus`, `BridgeSmsSentPayload`):
+  Adaptix-Communications-Service is the only producer and no downstream
+  repository deserializes this enum, so no consumer repin is forced by this
+  value. Wire values are pinned by `tests/test_family_bridge_enums.py`.
+
 - **Tenant-less platform S2S token** (#231) —
   `adaptix_contracts.auth.platform_token` (`issue_platform_service_token`,
   `verify_platform_service_token`, `verify_platform_service_token_with_keyset`,
