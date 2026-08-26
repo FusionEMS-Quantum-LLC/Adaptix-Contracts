@@ -13,7 +13,22 @@ from pydantic import BaseModel, ConfigDict, Field
 from .provenance import DataProvenance
 
 
-class IncidentIdentity(BaseModel):
+# pylint too-few-public-methods (R0903) is disabled per class below. These are
+# declarative Pydantic wire contracts whose entire contract IS their field set,
+# exactly the shape pylint already exempts for @dataclass; the rule's intent (a
+# class doing so little it should be a function or a tuple) cannot apply to a
+# validated wire contract. Per class, never module-wide, so a future non-schema
+# class added to this module is still checked.
+class IncidentIdentity(BaseModel):  # pylint: disable=too-few-public-methods
+    """The stable identity of one canonical incident.
+
+    ``global_incident_id`` is what the incident graph is keyed on, while
+    ``originating_agency_id`` and ``primary_incident_number`` preserve the
+    identity the first-reporting agency already uses, so the canonical record
+    can always be traced back to a number that agency recognises. Frozen: an
+    incident's identity is not edited in place.
+    """
+
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
     global_incident_id: str = Field(..., min_length=1)
@@ -23,7 +38,16 @@ class IncidentIdentity(BaseModel):
     incident_status: str = Field(..., min_length=1)
 
 
-class IncidentLocation(BaseModel):
+class IncidentLocation(BaseModel):  # pylint: disable=too-few-public-methods
+    """Where the incident occurred, as reported by contributing agencies.
+
+    ``extra="allow"`` is deliberate: agencies carry location detail this
+    model does not enumerate, and silently discarding it would lose reported
+    operational fact. Latitude and longitude are range-bounded so a
+    transposed or unit-mangled coordinate fails validation instead of
+    landing on a map.
+    """
+
     model_config = ConfigDict(extra="allow", frozen=True)
 
     address: str | None = None
@@ -34,7 +58,16 @@ class IncidentLocation(BaseModel):
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
 
 
-class AgencyParticipation(BaseModel):
+class AgencyParticipation(BaseModel):  # pylint: disable=too-few-public-methods
+    """One agency's window of involvement in a multi-agency incident.
+
+    Each agency's participation is recorded independently rather than
+    collapsed into a single owning agency, which is what makes a mutual-aid
+    incident reconstructable. ``joined_at`` and ``cleared_at`` bound the
+    involvement in time; ``tenant_id`` is populated only where that agency is
+    an Adaptix tenant.
+    """
+
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
     agency_id: str = Field(..., min_length=1)
@@ -44,7 +77,15 @@ class AgencyParticipation(BaseModel):
     cleared_at: datetime | None = None
 
 
-class UnitParticipation(BaseModel):
+class UnitParticipation(BaseModel):  # pylint: disable=too-few-public-methods
+    """One responding unit's assignment window on an incident.
+
+    Scoped by ``agency_id`` as well as ``unit_id`` because unit designators
+    are only unique within an agency and repeat freely across them.
+    ``assigned_at`` and ``cleared_at`` bound the assignment; ``status`` is
+    the unit's last reported state within it.
+    """
+
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
     agency_id: str = Field(..., min_length=1)
@@ -55,7 +96,16 @@ class UnitParticipation(BaseModel):
     cleared_at: datetime | None = None
 
 
-class SourceRecordReference(BaseModel):
+class SourceRecordReference(BaseModel):  # pylint: disable=too-few-public-methods
+    """Citation of a source record that contributed to the canonical incident.
+
+    A citation, not a copy: the referenced record stays authoritative in its
+    own system, per this module's note that source records are never
+    overwritten. ``source_record_version`` tells a consumer which revision
+    was folded in, and ``source_standard`` / ``source_standard_version`` name
+    the format it was expressed in without that format becoming canonical.
+    """
+
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
     source_agency_id: str = Field(..., min_length=1)
@@ -67,7 +117,7 @@ class SourceRecordReference(BaseModel):
     source_standard_version: str | None = None
 
 
-class PublicSafetyIncident(BaseModel):
+class PublicSafetyIncident(BaseModel):  # pylint: disable=too-few-public-methods
     """Versioned canonical incident spanning multiple agencies and source records."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)

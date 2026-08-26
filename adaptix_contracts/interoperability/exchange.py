@@ -8,7 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .provenance import DataProvenance
 
 
-class PublicSafetyExchangeEnvelope(BaseModel):
+# pylint too-few-public-methods (R0903) is disabled per class below. These are
+# declarative Pydantic wire contracts whose entire contract IS their field set,
+# exactly the shape pylint already exempts for @dataclass; the rule's intent (a
+# class doing so little it should be a function or a tuple) cannot apply to a
+# validated wire contract. Per class, never module-wide, so a future non-schema
+# class added to this module is still checked.
+class PublicSafetyExchangeEnvelope(BaseModel):  # pylint: disable=too-few-public-methods
     """Reference-based, provenance-complete interagency exchange envelope.
 
     The authoritative payload lives behind ``payload_ref``. Core exchange
@@ -51,6 +57,14 @@ class PublicSafetyExchangeEnvelope(BaseModel):
 
     @model_validator(mode="after")
     def validate_expiry(self) -> "PublicSafetyExchangeEnvelope":
+        """Reject an expiry that is not strictly after creation.
+
+        An ``expires_at`` at or before ``created_at`` describes an envelope
+        that was already expired when it was built, so a recipient honouring
+        the window would drop a delivery that was never given a usable
+        validity period — far more likely a timezone or data-entry error
+        than an intent.
+        """
         if self.expires_at is not None and self.expires_at <= self.created_at:
             raise ValueError("expires_at must be after created_at")
         return self
