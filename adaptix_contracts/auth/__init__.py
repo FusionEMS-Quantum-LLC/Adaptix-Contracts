@@ -8,6 +8,12 @@ from adaptix_contracts.auth.context import (
     AdaptixServiceContext,
     AdaptixSignedInternalContext,
 )
+from adaptix_contracts.auth.interoperability import (
+    INTEROPERABILITY_CONSENT_READ_SCOPE,
+    INTEROPERABILITY_IDENTITY_READ_SCOPE,
+    INTEROPERABILITY_PAYLOAD_READ_SCOPE,
+    INTEROPERABILITY_SCOPES,
+)
 from adaptix_contracts.auth.module_entitlement_gate import (
     require_module_entitlement,
 )
@@ -40,6 +46,11 @@ __all__ = [
     "AdaptixServiceContext",
     "AdaptixSignedInternalContext",
     "require_module_entitlement",
+    # Canonical interoperability S2S scopes.
+    "INTEROPERABILITY_PAYLOAD_READ_SCOPE",
+    "INTEROPERABILITY_IDENTITY_READ_SCOPE",
+    "INTEROPERABILITY_CONSENT_READ_SCOPE",
+    "INTEROPERABILITY_SCOPES",
     # Canonical S2S service-identity token (Operations -> CAD/Air; MCP -> EPCR).
     # Tenant-BOUND — tenant_id is a required claim.
     "issue_service_token",
