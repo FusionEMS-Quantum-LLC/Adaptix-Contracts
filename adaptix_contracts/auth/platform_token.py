@@ -280,7 +280,7 @@ def verify_platform_service_token(
         expected_audience=expected_audience,
         leeway_seconds=leeway_seconds,
     )
-    _check_platform_token_use_and_version(raw)
+    _check_token_use_and_ver(raw)
     _authorize_platform_claims(
         raw, expected_subject=expected_subject, required_scope=required_scope
     )
@@ -340,7 +340,7 @@ def _decode_platform_jwt(
         ) from exc
 
 
-def _check_platform_token_use_and_version(raw: dict[str, Any]) -> None:
+def _check_token_use_and_ver(raw: dict[str, Any]) -> None:
     """Confirm the decoded payload is actually shaped like a platform token
     (correct discriminator, supported schema version). Authentication-level
     (401) checks: a token failing these is not trustworthy as a platform
