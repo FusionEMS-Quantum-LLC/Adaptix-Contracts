@@ -273,15 +273,53 @@ def verify_platform_service_token(
     if not token or not token.strip():
         raise PlatformServiceTokenError("missing platform service token")
 
+    raw = _decode_platform_jwt(
+        token,
+        public_key_pem=public_key_pem,
+        expected_issuer=expected_issuer,
+        expected_audience=expected_audience,
+        leeway_seconds=leeway_seconds,
+    )
+    _check_platform_token_use_and_version(raw)
+    _authorize_platform_claims(
+        raw, expected_subject=expected_subject, required_scope=required_scope
+    )
+    _reject_smuggled_tenant_id(raw)
+    _check_platform_replay(raw, reject_replayed_jti)
+
+    return PlatformServiceTokenClaims(**raw)
+
+
+def _decode_platform_jwt(
+    token: str,
+    *,
+    public_key_pem: str,
+    expected_issuer: str,
+    expected_audience: str,
+    leeway_seconds: int,
+) -> dict[str, Any]:
+    """Decode and cryptographically verify the JWT envelope (signature, exp,
+    nbf, iss, aud), translating PyJWT's exception taxonomy into the platform
+    token's own. Does not know anything about platform-specific claim shape
+    or authorization — see the other ``_check_platform_*`` /
+    ``_authorize_platform_*`` helpers below, which ``verify_platform_service_token``
+    calls in the same order this module always has.
+
+    ``jti`` is required at decode time (not merely checked later, conditionally,
+    by the replay hook): a token missing it would otherwise fail
+    ``PlatformServiceTokenClaims`` construction with an unhandled
+    ``pydantic.ValidationError`` instead of a clean ``PlatformServiceTokenError``,
+    even on the default (no replay hook) path.
+    """
     try:
-        raw: dict[str, Any] = jwt.decode(
+        return jwt.decode(
             token,
             public_key_pem,
             algorithms=[_ALGORITHM],
             audience=expected_audience,
             issuer=expected_issuer,
             leeway=leeway_seconds,
-            options={"require": ["exp", "iat", "aud", "iss", "sub"]},
+            options={"require": ["exp", "iat", "aud", "iss", "sub", "jti"]},
         )
     except jwt.ExpiredSignatureError as exc:
         raise PlatformServiceTokenError("platform service token expired") from exc
@@ -301,6 +339,12 @@ def verify_platform_service_token(
             f"invalid platform service token: {type(exc).__name__}"
         ) from exc
 
+
+def _check_platform_token_use_and_version(raw: dict[str, Any]) -> None:
+    """Confirm the decoded payload is actually shaped like a platform token
+    (correct discriminator, supported schema version). Authentication-level
+    (401) checks: a token failing these is not trustworthy as a platform
+    token at all, independent of who it claims to be or what it asks for."""
     if raw.get("token_use") != TOKEN_USE:
         raise PlatformServiceTokenError(
             f"not a platform service token (token_use={raw.get('token_use')!r})"
@@ -312,6 +356,12 @@ def verify_platform_service_token(
             f"unsupported platform service token version: {ver!r}"
         )
 
+
+def _authorize_platform_claims(
+    raw: dict[str, Any], *, expected_subject: str, required_scope: str
+) -> None:
+    """Confirm an authentic, correctly-shaped token actually authorizes this
+    caller for this action. Permission-level (403) checks."""
     if raw.get("sub") != expected_subject:
         raise PlatformServiceTokenAuthzError(
             "platform service token caller subject not authorized"
@@ -322,29 +372,37 @@ def verify_platform_service_token(
             f"platform service token missing required scope {required_scope!r}"
         )
 
+
+def _reject_smuggled_tenant_id(raw: dict[str, Any]) -> None:
+    """Defense in depth: a conforming issuer never sets ``tenant_id`` (see
+    ``issue_platform_service_token``, which has no ``tenant_id`` parameter),
+    so this only fires for a hand-crafted or buggy payload. Refuse rather
+    than silently drop it via ``PlatformServiceTokenClaims`` construction —
+    never let a token that looks like it might carry tenant trust pass
+    through this verifier under any interpretation."""
     if "tenant_id" in raw:
-        # Defense in depth: a conforming issuer never sets this (see
-        # issue_platform_service_token, which has no tenant_id parameter),
-        # so this only fires for a hand-crafted or buggy payload. Refuse
-        # rather than silently drop it via PlatformServiceTokenClaims —
-        # never let a token that looks like it might carry tenant trust
-        # pass through this verifier under any interpretation.
         raise PlatformServiceTokenError(
             "platform service token must not carry a tenant_id claim"
         )
 
-    if reject_replayed_jti is not None:
-        jti = raw.get("jti")
-        if not jti or not str(jti).strip():
-            raise PlatformServiceTokenError(
-                "platform service token missing jti (required for replay check)"
-            )
-        if reject_replayed_jti(str(jti)):
-            raise PlatformServiceTokenError(
-                "platform service token jti already used (replay rejected)"
-            )
 
-    return PlatformServiceTokenClaims(**raw)
+def _check_platform_replay(
+    raw: dict[str, Any], reject_replayed_jti: Callable[[str], bool] | None
+) -> None:
+    """Enforce the optional replay-dedupe hook. See the docstring on
+    ``verify_platform_service_token`` for the atomicity requirement this
+    depends on when a caller opts in."""
+    if reject_replayed_jti is None:
+        return
+    jti = raw.get("jti")
+    if not jti or not str(jti).strip():
+        raise PlatformServiceTokenError(
+            "platform service token missing jti (required for replay check)"
+        )
+    if reject_replayed_jti(str(jti)):
+        raise PlatformServiceTokenError(
+            "platform service token jti already used (replay rejected)"
+        )
 
 
 def verify_platform_service_token_with_keyset(

@@ -450,9 +450,17 @@ def test_replay_hook_does_not_affect_distinct_tokens():
     assert claims_a.jti != claims_b.jti
 
 
-def test_replay_hook_requires_jti_present():
-    # A token missing jti entirely can't be replay-checked meaningfully;
-    # must fail closed rather than silently treating "no jti" as "not seen".
+def test_missing_jti_rejected_before_replay_check_even_on_default_path():
+    """A token missing jti entirely can't be replay-checked meaningfully --
+    but more importantly, jti is REQUIRED at decode time (not merely
+    checked conditionally inside the replay hook), so this is rejected as a
+    clean PlatformServiceTokenError even on the DEFAULT path (no
+    reject_replayed_jti passed at all). Before this was enforced at decode
+    time, a missing jti would only be caught if a replay hook happened to
+    be in use -- on the default path it fell all the way through to
+    PlatformServiceTokenClaims(**raw), where jti is a required field, and
+    surfaced as an unhandled pydantic.ValidationError instead of the
+    documented PlatformServiceTokenError. This pins the fix."""
     priv, pub = _keypair()
     now = int(datetime.now(UTC).timestamp())
     payload = {
@@ -466,6 +474,31 @@ def test_replay_hook_requires_jti_present():
         "exp": now + 120,
         "ver": PLATFORM_TOKEN_VERSION,
         # no jti
+    }
+    token = jwt.encode(payload, priv, algorithm="RS256")
+
+    with pytest.raises(PlatformServiceTokenError, match="MissingRequiredClaimError"):
+        _verify(token, pub)  # no reject_replayed_jti -- default path
+
+
+def test_replay_hook_rejects_present_but_blank_jti():
+    """jti can be present-but-blank -- jwt.decode's `require` option only
+    checks that the key exists, not that its value is non-empty. The
+    replay hook's own explicit check catches that narrower case (decode
+    alone would let a blank jti through)."""
+    priv, pub = _keypair()
+    now = int(datetime.now(UTC).timestamp())
+    payload = {
+        "token_use": TOKEN_USE,
+        "iss": _ISS,
+        "aud": _AUD,
+        "sub": _SUB,
+        "scope": _SCOPE,
+        "jti": "   ",
+        "iat": now,
+        "nbf": now,
+        "exp": now + 120,
+        "ver": PLATFORM_TOKEN_VERSION,
     }
     token = jwt.encode(payload, priv, algorithm="RS256")
 
