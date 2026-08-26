@@ -39,6 +39,19 @@ from the installed package metadata).
 
 ### Added
 
+- **`SmsDeliveryStatus.SUPPRESSED`** — Family-Bridge's `_send_for_stage`
+  (Adaptix-Communications-Service) did not consult the platform-wide consent
+  ledger (STOP replies / do-not-contact) before sending a stage SMS, unlike
+  every other outbound SMS/email path in Communications-Service. There was
+  also no way to represent "blocked by consent, never sent" on the wire —
+  `SmsDeliveryStatus` only had `QUEUED` / `SENT` / `DELIVERED` / `FAILED` /
+  `UNDELIVERED`, none of which is honest for a send that never reached the
+  provider gateway. `SUPPRESSED` is additive: existing consumers that switch
+  on the four prior values are unaffected, and no field, event, or contract
+  shape changed. See `adaptix_contracts.family_bridge.enums.SmsDeliveryStatus`
+  and `adaptix_contracts.family_bridge.events.BridgeSmsSentPayload` for the
+  updated docstring guidance to consumers (never render as a failure).
+
 - **Tenant-less platform S2S token** (#231) —
   `adaptix_contracts.auth.platform_token` (`issue_platform_service_token`,
   `verify_platform_service_token`, `verify_platform_service_token_with_keyset`,

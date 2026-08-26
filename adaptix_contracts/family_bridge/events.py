@@ -102,7 +102,15 @@ class BridgeSmsSentPayload(_FamilyBridgeEventPayload):
     stage_at_send: ThreadStage
     provider: str = Field(default="telnyx")
     provider_message_id: str | None = None
-    delivery_status: SmsDeliveryStatus = SmsDeliveryStatus.QUEUED
+    delivery_status: SmsDeliveryStatus = Field(
+        default=SmsDeliveryStatus.QUEUED,
+        description=(
+            "Outcome of this send attempt. SUPPRESSED means the platform-wide "
+            "consent ledger blocked the send before the provider gateway was "
+            "ever contacted (provider_message_id is None) — a deliberate "
+            "policy outcome, never render it as a failure."
+        ),
+    )
     to_phone_last4: str | None = Field(
         default=None,
         min_length=4,
