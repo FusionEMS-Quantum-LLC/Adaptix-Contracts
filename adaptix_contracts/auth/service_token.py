@@ -35,6 +35,11 @@ from typing import Any
 import jwt
 from pydantic import BaseModel, Field
 
+from adaptix_contracts.auth._s2s_keyset import ALGORITHM as _SHARED_ALGORITHM
+from adaptix_contracts.auth._s2s_keyset import (
+    resolve_keyset_signing_key as _resolve_keyset_signing_key,
+)
+
 # Current claims schema version. Verifiers reject unknown major versions.
 SERVICE_TOKEN_VERSION = 1
 
@@ -43,7 +48,11 @@ DEFAULT_TTL_SECONDS = 120
 # Clock-skew tolerance (matches the platform's 5s gateway-signature leeway).
 LEEWAY_SECONDS = 5
 
-_ALGORITHM = "RS256"
+# The ONE approved S2S algorithm, defined once in _s2s_keyset and shared with
+# adaptix_contracts.auth.platform_token. Kept as a module-local alias (same
+# value, "RS256") so every existing reference to `_ALGORITHM` below is
+# unchanged — this is a source-of-definition move, not a behavior change.
+_ALGORITHM = _SHARED_ALGORITHM
 
 
 class ServiceTokenError(ValueError):
@@ -282,27 +291,13 @@ def verify_service_token_with_keyset(
     malformed/bad-signature/expired/untrusted-issuer; ``ServiceTokenAuthzError``
     (-> 403) for audience/subject/scope/tenant failures.
     """
-    if not token or not token.strip():
-        raise ServiceTokenError("SERVICE_TOKEN_MISSING")
-    if not trusted_keys:
-        raise ServiceTokenError("SERVICE_TOKEN_KEYSET_EMPTY")
-    try:
-        header = jwt.get_unverified_header(token)
-    except jwt.InvalidTokenError as exc:
-        raise ServiceTokenError("SERVICE_TOKEN_MALFORMED") from exc
-
-    alg = header.get("alg")
-    if alg != _ALGORITHM:
-        raise ServiceTokenError(f"SERVICE_TOKEN_ALGORITHM_REJECTED: {alg!r}")
-
-    kid = header.get("kid")
-    if not kid or not str(kid).strip():
-        raise ServiceTokenError("SERVICE_TOKEN_KID_MISSING")
-
-    public_key = trusted_keys.get(str(kid))
-    if not public_key:
-        raise ServiceTokenError("SERVICE_TOKEN_KID_UNKNOWN")
-
+    public_key = _resolve_keyset_signing_key(
+        token,
+        trusted_keys=trusted_keys,
+        algorithm=_ALGORITHM,
+        code_prefix="SERVICE_TOKEN",
+        error_type=ServiceTokenError,
+    )
     return verify_service_token(
         token,
         public_key_pem=public_key,
