@@ -10,6 +10,67 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `4.1.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [Unreleased]
+
+### Added
+
+- **Tenant-less platform S2S token** (#231) —
+  `adaptix_contracts.auth.platform_token` (`issue_platform_service_token`,
+  `verify_platform_service_token`, `verify_platform_service_token_with_keyset`,
+  `PlatformServiceTokenClaims`, `PlatformServiceTokenError`,
+  `PlatformServiceTokenAuthzError`; also re-exported from
+  `adaptix_contracts.auth`). A SEPARATE, additive primitive alongside
+  `adaptix_contracts.auth.service_token` for S2S calls that are genuinely
+  tenant-less by nature — e.g. Core-Service sending a pre-signup marketing
+  email through Calendar-Service's internal mail endpoint, before any
+  agency/tenant exists. Today that endpoint authenticates callers with a
+  bare fleet-wide shared secret held by dozens of services, which proves
+  only "holder of a widely-distributed secret", not caller identity.
+  Reuses `service_token`'s RS256/kid/keyset signing and verification
+  machinery (the key-selection algorithm was extracted into a new internal
+  `adaptix_contracts.auth._s2s_keyset` module that both now call — no new
+  crypto was introduced).
+
+  `ServiceTokenClaims.tenant_id` was deliberately NOT made optional to cover
+  this case: doing so would only preserve the tenant-binding guarantee
+  Operations->CAD/Air and MCP->EPCR depend on for as long as every existing
+  and future verifier's assumptions are re-audited, and the fleet's wide,
+  staggered pin range on this package means such a semantic change would
+  reach consumers as a rolling, partially-applied change nobody reviews
+  together as a security change. Instead `PlatformServiceTokenClaims` has
+  NO `tenant_id` field at all — structurally absent, not
+  present-but-optional — and carries a required `token_use = "platform-s2s"`
+  discriminator claim. A tenant-scoped verifier therefore rejects a platform
+  token, and the new platform verifier rejects a tenant token, by
+  construction. Both directions are pinned by real end-to-end tests (not
+  just source inspection) in `tests/test_platform_token_tenant_boundary.py`.
+
+  Replay resistance is TTL-bounded only by default, matching the current
+  fleet convention: neither `service_token` nor Adaptix-EPCR-Service's
+  `mcp_s2s.py` verifier dedupe `jti`; both rely on kid + signature +
+  exp/nbf + a short TTL. An optional `reject_replayed_jti` hook lets a call
+  site opt into rejecting a replay within the TTL window via an
+  ATOMIC check-and-record callback against a durable store (e.g. Redis
+  `SET NX EX`) — documented and tested, including a test that pins the
+  exact race a non-atomic callback fails to close.
+
+  `service_token.py`'s public behavior is unchanged; its existing tests
+  pass untouched. Its internal keyset key-selection logic was moved,
+  verbatim in behavior, into the new shared `_s2s_keyset` module — each
+  caller module keeps its own error-code prefix (`SERVICE_TOKEN_*` vs
+  `PLATFORM_TOKEN_*`) so the two verifiers' failure codes can never be
+  mistaken for each other in logs, alerts, or dashboards.
+
+### Compatibility
+
+- Purely additive. No existing field, model, function signature, or default
+  changed. `adaptix_contracts.auth.service_token`'s public behavior is
+  unchanged; only its internal keyset key-selection logic moved to a shared
+  internal helper (`adaptix_contracts.auth._s2s_keyset`, not part of the
+  public API — nothing outside `adaptix_contracts.auth` should import it).
+  No consumer is forced to change anything to move onto a commit or release
+  containing this change.
+
 ## [4.1.0]
 
 First tagged release of the 4.x line (v4.1.0). Additive on top of 4.0.0: two
