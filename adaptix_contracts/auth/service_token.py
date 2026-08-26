@@ -216,6 +216,18 @@ def verify_service_token(
         raise ServiceTokenError("missing service token")
 
     try:
+        # ``jti`` is required at decode time, not merely declared required on
+        # ``ServiceTokenClaims``. Without it here, a validly signed token that
+        # omits ``jti`` passes every explicit check below and only fails at the
+        # closing ``ServiceTokenClaims(**raw)``, raising ``pydantic.Validation
+        # Error`` — which is outside this module's documented contract, so a
+        # caller correctly catching only ServiceTokenError/ServiceTokenAuthzError
+        # sees an unhandled 500 instead of a clean 401. Matches the same
+        # requirement in the sibling ``platform_token`` verifier.
+        #
+        # ``scope`` is deliberately NOT required here: a missing scope must stay
+        # an authorization failure (403) via the explicit comparison below, not
+        # become an authentication failure (401).
         raw: dict[str, Any] = jwt.decode(
             token,
             public_key_pem,
@@ -223,7 +235,7 @@ def verify_service_token(
             audience=expected_audience,
             issuer=expected_issuer,
             leeway=leeway_seconds,
-            options={"require": ["exp", "iat", "aud", "iss", "sub"]},
+            options={"require": ["exp", "iat", "aud", "iss", "sub", "jti"]},
         )
     except jwt.ExpiredSignatureError as exc:
         raise ServiceTokenError("service token expired") from exc

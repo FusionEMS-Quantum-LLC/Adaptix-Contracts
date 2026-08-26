@@ -141,6 +141,36 @@ def test_wrong_algorithm_rejected():
     assert "ALGORITHM_REJECTED" in str(exc.value)
 
 
+def test_missing_jti_rejected_through_keyset_entry_point():
+    """Missing ``jti`` must fail as ServiceTokenError via the REAL entry point.
+
+    ``verify_service_token_with_keyset`` is what CAD/Air and MCP->EPCR actually
+    call in production, so the guarantee has to hold here and not only on the
+    lower-level verifier. A ``pydantic.ValidationError`` is not a subclass of
+    ServiceTokenError, so if this regressed it would propagate uncaught and
+    fail this test rather than being silently absorbed.
+    """
+    priv, pub = _keypair()
+    tenant = str(uuid.uuid4())
+    token = jwt.encode(
+        {
+            "iss": _ISS,
+            "sub": _SUB,
+            "aud": _AUD,
+            "tenant_id": tenant,
+            "scope": _SCOPE,
+            "iat": 1,
+            "exp": 9999999999,
+            "ver": 1,  # no jti
+        },
+        priv,
+        algorithm="RS256",
+        headers={"kid": "k1"},
+    )
+    with pytest.raises(ServiceTokenError):
+        _verify(token, {"k1": pub}, tenant)
+
+
 def test_empty_keyset_rejected():
     priv, _ = _keypair()
     tenant = str(uuid.uuid4())
