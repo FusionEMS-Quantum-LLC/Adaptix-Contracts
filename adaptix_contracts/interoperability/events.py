@@ -35,6 +35,9 @@ PATIENT_IDENTITY_FEDERATED_REFERENCE_CONFIRMED: Final[str] = (
 PATIENT_IDENTITY_FEDERATED_REFERENCE_REJECTED: Final[str] = (
     "patient.identity.federated_reference.rejected"
 )
+PATIENT_IDENTITY_FEDERATED_REFERENCE_UNLINKED: Final[str] = (
+    "patient.identity.federated_reference.unlinked"
+)
 
 _CORE_INTEROPERABILITY_EVENTS: Final[tuple[str, ...]] = (
     INTEROPERABILITY_PEER_CREATED,
@@ -73,6 +76,10 @@ INTEROPERABILITY_EVENTS.update(
             "source_service": "patient-identity",
         },
         PATIENT_IDENTITY_FEDERATED_REFERENCE_REJECTED: {
+            "version": "1.0",
+            "source_service": "patient-identity",
+        },
+        PATIENT_IDENTITY_FEDERATED_REFERENCE_UNLINKED: {
             "version": "1.0",
             "source_service": "patient-identity",
         },
