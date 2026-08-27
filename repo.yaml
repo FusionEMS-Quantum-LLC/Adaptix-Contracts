@@ -1,0 +1,24 @@
+repository: Adaptix-Contracts
+archetype: shared-python-library
+portfolioClassification: supporting
+defaultBranch: main
+runtime:
+  kind: python-library
+  target: "3.12"
+  compatibility: ">=3.11"
+validation:
+  mode: on-demand
+  authority: repo-native
+  command: python -m pip install -e ".[dev]" && python -m pytest
+deployment:
+  deployable: false
+  authority: none
+contracts:
+  consumesAdaptixContracts: false
+database:
+  engine: none
+  migrations: none
+health:
+  live: null
+  ready: null
+  version: null
