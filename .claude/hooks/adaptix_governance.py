@@ -8,7 +8,7 @@ from typing import Any
 
 ROOT = Path.cwd()
 PROTECTED_BRANCHES = {"main", "master"}
-LOCAL_COMMAND_TIMEOUT_SECONDS = 0.75
+LOCAL_COMMAND_TIMEOUT_SECONDS = 0.2
 
 
 def run(*args: str) -> tuple[int, str, str]:
@@ -39,14 +39,22 @@ def block(message: str) -> int:
     return 2
 
 
-def git_repo() -> bool:
+def git_repo() -> bool | None:
     code, out, _ = run("git", "rev-parse", "--is-inside-work-tree")
-    return code == 0 and out == "true"
+    if code == 0:
+        return out == "true"
+    if code == 128:
+        return False
+    return None
 
 
-def current_branch() -> str:
+def current_branch() -> str | None:
     code, out, _ = run("git", "symbolic-ref", "--quiet", "--short", "HEAD")
-    return out if code == 0 else ""
+    if code == 0:
+        return out
+    if code == 1:
+        return ""
+    return None
 
 
 def working_tree_changes() -> list[str]:
@@ -95,8 +103,11 @@ def branch_integrated() -> bool:
 
 
 def completion_gate() -> str:
-    if not git_repo():
+    repo_state = git_repo()
+    if repo_state is False:
         return ""
+    if repo_state is None:
+        return "AdaptixCore completion blocked: unable to verify Git repository state within the local hook time bound. Retry from a responsive checkout before stopping."
 
     changed = working_tree_changes()
     if changed:
@@ -107,6 +118,8 @@ def completion_gate() -> str:
         )
 
     branch = current_branch()
+    if branch is None:
+        return "AdaptixCore completion blocked: unable to determine the current branch within the local hook time bound. Retry from a responsive repository before stopping."
     if not branch:
         return "AdaptixCore completion blocked: detached HEAD. Return to the active task branch or canonical branch before stopping."
 
