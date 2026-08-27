@@ -1,0 +1,24 @@
+schema: 1
+repository: FusionEMS-Quantum-LLC/Adaptix-Contracts
+archetype: contract-library
+portfolioClassification: supporting
+defaultBranch: main
+
+runtime:
+  kind: python
+  target: "3.12"
+  compatibility: ">=3.11"
+
+validation:
+  command: "scripts/local-ci.sh python pr"
+
+deployment:
+  deployable: false
+  authority: none
+
+contracts:
+  consumesAdaptixContracts: false
+
+database:
+  engine: none
+  migrations: none
