@@ -1,0 +1,31 @@
+schema: 1
+repository: FusionEMS-Quantum-LLC/Adaptix-Contracts
+archetype: contract-library
+portfolioClassification: supporting
+defaultBranch: main
+
+runtime:
+  kind: python
+  target: "3.12"
+  compatibility: ">=3.11"
+
+validation:
+  mode: on-demand
+  authority: repo-native
+  command: "bash scripts/ci/verify-toolchain.sh"
+
+deployment:
+  deployable: false
+  authority: none
+
+contracts:
+  consumesAdaptixContracts: false
+
+database:
+  engine: none
+  migrations: none
+
+health:
+  live: null
+  ready: null
+  version: null
