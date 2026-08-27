@@ -142,13 +142,6 @@ def canonical_remote_branch() -> tuple[str, str] | None:
     return None
 
 
-def branch_integrated(remote_branch: str) -> bool:
-    code, _, _ = run(
-        "git", "merge-base", "--is-ancestor", "HEAD", remote_branch
-    )
-    return code == 0
-
-
 def completion_gate() -> str:
     repo_state = git_repo()
     if repo_state is False:
@@ -189,7 +182,7 @@ def completion_gate() -> str:
             "remote HEAD from local Git refs within the hook time bound. Repair "
             "the local remote HEAD/upstream configuration before stopping."
         )
-    remote_branch, canonical_branch = canonical
+    _, canonical_branch = canonical
 
     upstream = upstream_state()
     if upstream is not None:
@@ -213,17 +206,12 @@ def completion_gate() -> str:
         )
 
     if branch != canonical_branch:
-        if not branch_integrated(remote_branch):
-            return (
-                f"AdaptixCore completion blocked: active task branch '{branch}' "
-                f"is not proven integrated into '{remote_branch}'. Finish the "
-                "PR lifecycle before stopping."
-            )
         return (
-            f"AdaptixCore completion blocked: task branch '{branch}' is "
-            f"integrated into '{remote_branch}'. Switch to canonical branch "
-            f"'{canonical_branch}' and clean the completed task branch/worktree "
-            "before stopping."
+            f"AdaptixCore completion blocked: current checkout is task branch "
+            f"'{branch}'. Local Git ancestry cannot reliably prove squash or "
+            "rebase PR integration. Confirm the PR lifecycle through GitHub, "
+            f"then switch to canonical branch '{canonical_branch}' and clean "
+            "the completed task branch/worktree before stopping."
         )
 
     return ""
