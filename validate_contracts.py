@@ -339,7 +339,12 @@ def validate_domain_coverage(*, verbose: bool = True) -> dict[str, Any]:
 
     return {
         "name": "Domain Coverage",
-        "passed": True,
+        # A missing expected domain is a FAILURE, not a warning. This was
+        # hard-coded ``True``, so the phase printed "[WARN] Missing domains"
+        # and still reported success -- the gate could never fail, and
+        # tests/test_release_readiness.py asserting ``all_passed is True``
+        # was asserting a constant.
+        "passed": not missing,
         "details": {
             "schema_directory": str(schema_dir),
             "expected_domain_count": len(expected_domains),

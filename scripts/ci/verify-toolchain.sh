@@ -16,7 +16,7 @@ if [[ -f package-lock.json ]]; then
 fi
 
 if [[ -f pyproject.toml && -f uv.lock ]]; then
-  uv sync --frozen --all-groups
+  uv sync --frozen --all-extras
   uv run ruff format --check .
   uv run ruff check .
   uv run mypy .
