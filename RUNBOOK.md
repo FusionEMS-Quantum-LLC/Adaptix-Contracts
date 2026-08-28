@@ -20,7 +20,7 @@ Audit the wider workspace before release to detect shadow `adaptix_contracts`
 packages that can override the canonical package in service builds.
 
 ```bash
-python scripts/audit_workspace_contracts.py --workspace-root C:\Users\fusio\Desktop\workspace
+python scripts/audit_workspace_contracts.py --workspace-root /path/to/your/workspace
 ```
 
 ## Release

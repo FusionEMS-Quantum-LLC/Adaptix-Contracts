@@ -338,7 +338,7 @@ Audit a polyrepo workspace for shadow `adaptix_contracts` packages that can
 silently override the canonical repo during production builds:
 
 ```bash
-python scripts/audit_workspace_contracts.py --workspace-root C:\Users\fusio\Desktop\workspace
+python scripts/audit_workspace_contracts.py --workspace-root /path/to/your/workspace
 ```
 
 ## Versioning
@@ -354,8 +354,6 @@ Release governance artifacts:
 - [`CHANGELOG.md`](CHANGELOG.md) — authoritative release history
 - [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) — backward-compatibility and
   retirement rules
-- [`MARKET_READY_LEDGER.md`](MARKET_READY_LEDGER.md) — current proof ledger and
-  market-readiness verdict
 
 Contract changes are not considered releasable until the changelog is updated,
 deprecation impact is documented for public surface changes, and the validation
