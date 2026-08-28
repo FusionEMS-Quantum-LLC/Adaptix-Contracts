@@ -19,4 +19,4 @@
 
 Root rules: `AGENTS.md` and companion governance files.
 Local rules: nearest subsystem `AGENTS.md` selected by path.
-Runtime enforcement: `.github/hooks/agent-governance.json` -> `scripts/agent_governance_runtime.py`.
+Runtime enforcement: `.github/hooks/agent-governance.json` -> `.github/scripts/agent_governance_runtime.py`.
