@@ -12,6 +12,42 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-08-28
+
+First tagged release cut from this repository's history. `4.2.0` was set as
+the `pyproject.toml` version string but never tagged, and commit
+`889be634` is already pinned by 10 fleet consumers while claiming to be
+4.2.0 informally. Reusing 4.2.0 for the official tag would create the exact
+"multiple SHAs claiming one SemVer" condition this release process exists
+to prevent, so this cut is 4.3.0 instead — the first version number with an
+unambiguous single commit and an actual `v4.3.0` git tag behind it.
+
+### Added
+
+- Canonical MIH restricted-entitlement contract: `MIH_ENTITLEMENT_ID` and
+  `MIH_SERVICE_AUDIENCE` in `adaptix_contracts/mih`, plus regression
+  coverage pinning both identifiers and confirming `adaptix-mih` is a
+  registered service audience (#248).
+- `RELEASE_MANIFEST_v4.3.0.json` at repo root: machine-readable record of
+  this release's package name, version, tag, exact commit SHA, Python
+  compatibility baseline, and per-file hashes of every module under
+  `adaptix_contracts/schemas/`, so a consumer can verify what it pinned
+  actually matches this release without cloning the repository.
+
+### Removed
+
+- `FINALIZATION_SUMMARY.md`, `MARKET_READY_LEDGER.md`, `TEST_EVIDENCE.md`
+  — superseded snapshot documents, forbidden at the repository root by the
+  live `repository-shape.yml` policy in Adaptix-Governance (#248).
+
+### Fixed
+
+- `ARCHITECTURE_TRUTH.md` named `scripts/agent_governance_runtime.py` as
+  the governance hook's runtime target; `.github/hooks/agent-governance.json`
+  actually invokes `.github/scripts/agent_governance_runtime.py`. Both
+  scripts are real and both stay — this only corrects which one the doc
+  says the hook runs (#253).
+
 ## [4.2.0] - 2026-08-28
 
 ### Changed
