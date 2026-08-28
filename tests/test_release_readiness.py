@@ -31,9 +31,9 @@ def test_validate_contracts_json_report() -> None:
 
 
 def test_production_readiness_does_not_overclaim_platform_rollout() -> None:
-    readiness = (
-        REPO_ROOT / "docs" / "archive" / "PRODUCTION_READINESS.md"
-    ).read_text(encoding="utf-8")
+    readiness = (REPO_ROOT / "docs" / "archive" / "PRODUCTION_READINESS.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "Classification: NO-GO FOR PLATFORM ROLLOUT" in readiness
     assert "Consumer runtime verification is missing" in readiness

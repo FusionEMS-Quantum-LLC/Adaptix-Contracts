@@ -3,6 +3,7 @@
 This is not NEMSIS, NERIS, FHIR, or a vendor CAD schema. Source records remain
 independent members of the incident graph and are never overwritten.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

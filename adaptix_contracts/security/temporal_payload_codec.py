@@ -297,9 +297,7 @@ class Keyring:
                 '{"primary_key_id": "...", "keys": {"...": "<base64>"}}.'
             ) from exc
         if not isinstance(parsed, dict):
-            raise PayloadCodecError(
-                f"{PAYLOAD_CODEC_KEY_ENV} JSON must be an object"
-            )
+            raise PayloadCodecError(f"{PAYLOAD_CODEC_KEY_ENV} JSON must be an object")
         return parsed
 
     @staticmethod
@@ -317,8 +315,7 @@ class Keyring:
         primary = parsed.get("primary_key_id")
         if not isinstance(primary, str) or not primary.strip():
             raise PayloadCodecError(
-                f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a "
-                "'primary_key_id' string"
+                f"{PAYLOAD_CODEC_KEY_ENV} JSON must carry a 'primary_key_id' string"
             )
         return raw_keys, primary
 

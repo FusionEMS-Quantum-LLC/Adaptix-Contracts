@@ -1,4 +1,5 @@
 """Provenance contracts for the AdaptixCore interagency exchange fabric."""
+
 from __future__ import annotations
 
 from datetime import datetime

@@ -456,5 +456,23 @@
     "has_migrations": true,
     "owned_events": [],
     "status": "blocked"
+  },
+  "qhin": {
+    "canonical_repo": "FusionEMS-Quantum-LLC/Adaptix-QHIN-Service",
+    "service_name": "adaptix-qhin",
+    "package_name": "adaptix_qhin_service",
+    "backend_path": "backend",
+    "database_schema": null,
+    "api_prefixes": ["/api/v1/qhin"],
+    "frontend_routes": [],
+    "health_endpoint": null,
+    "ecr_repo": null,
+    "ecs_service": null,
+    "has_migrations": true,
+    "alembic_ini": "alembic.ini",
+    "dockerfile": "Dockerfile",
+    "owned_events": ["qhin.transaction.started", "qhin.transaction.completed", "qhin.bundle.received", "qhin.bundle.published", "qhin.acknowledgment.received"],
+    "status": "declared_not_deployed",
+    "notes": "TEFCA/QHIN participant management, patient discovery, document exchange, consent, subscriptions, and reciprocal FHIR orchestration (service_registry.QHIN_SERVICE, slug qhin, port 8048). canonical_repo is the CURRENT org path proven by Adaptix-QHIN-Service/repo.yaml (repository: FusionEMS-Quantum-LLC/Adaptix-QHIN-Service); it deliberately does NOT carry the pre-rename joshuawendorf21310/ prefix the older entries in this file use, because that is not the repository identity this repo declares for itself. service_name adaptix-qhin is the gateway audience proven present in adaptix_contracts.service_audiences.KNOWN_SERVICE_AUDIENCES. owned_events mirrors adaptix_contracts.qhin.events.QHIN_EVENTS, whose QHIN_SOURCE_SERVICE is the registry slug qhin. NOT DEPLOYED (verified 2026-08-28 from repo.yaml on main): portfolioClassification deferred, runtime.kind none, deployment.deployable false, deployment.authority none, health.live/ready/version all null - so ecr_repo, ecs_service and health_endpoint are null rather than guessed from the adaptix-<slug>-service convention. has_migrations is true on TREE evidence that contradicts that same repo.yaml: root alembic.ini plus backend/migrations/env.py and backend/migrations/versions/001_qhin_foundation.py exist, while repo.yaml declares database.engine none and database.migrations none. The tree is the stronger evidence and is recorded here; the stale repo.yaml database/migrations block is the QHIN repo owner to correct. database_schema stays null because no inspected source names the schema and guessing it would encode drift."
   }
 }

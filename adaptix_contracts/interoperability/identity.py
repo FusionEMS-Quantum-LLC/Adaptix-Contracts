@@ -3,6 +3,7 @@
 Patient matching remains owned by Adaptix-Patient-Identity-Service. These are
 references only; they deliberately do not implement matching logic.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
