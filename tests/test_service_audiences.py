@@ -27,35 +27,76 @@ def test_registry_is_an_immutable_frozenset() -> None:
 
 
 def test_every_audience_matches_the_platform_naming_pattern() -> None:
+    """``adaptix-<lowercase-hyphenated>``. A stray capital or underscore is a
+    silent 403: the gateway and the downstream verifier both compare literally,
+    so a near-miss never matches and never warns."""
     bad = sorted(a for a in KNOWN_SERVICE_AUDIENCES if not _AUDIENCE_RE.match(a))
     assert not bad, f"audiences violating the naming pattern: {bad}"
 
 
 def test_core_audience_is_present() -> None:
+    """Core is the identity issuer; its own audience must be routable."""
     assert "adaptix-core" in KNOWN_SERVICE_AUDIENCES
 
 
 def test_vision_audience_is_present() -> None:
-    """Regression pin for the 2026-08-04 vision audience drift."""
+    """Regression pin for the 2026-08-04 drift.
+
+    ``adaptix-vision`` was routed by the gateway (``/api/v1/vision``) with the
+    verifier live on ``adaptix-production-vision``
+    (``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-vision``) while Core's registry
+    did not know it — so every Vision surface returned 403
+    ``jwt_audience_mismatch`` for the founder.
+    """
     assert "adaptix-vision" in KNOWN_SERVICE_AUDIENCES
 
 
 def test_audit_audience_is_present() -> None:
-    """Audit is deployed and requires an explicit downstream identity."""
+    """Adaptix-Audit-Service is deployed and already expects this exact string.
+
+    Verified 2026-08-19 against the live account (793439286972, us-east-1): ECS
+    service ``adaptix-production-audit`` on cluster ``adaptix-production`` was
+    ACTIVE at 1/1 running, task definition revision 11, rollout COMPLETED, and
+    that task definition sets ``GATEWAY_AUDIENCE=adaptix-audit``.
+
+    Step 3 of this module's own "Adding a new service" procedure (install the
+    verifier downstream) was therefore already done in production while step 1
+    was missing here. That is the inverse of the 2026-08-04 ``adaptix-vision``
+    drift, with the same consequence: the gateway refuses to route any prefix
+    whose audience is absent from this registry
+    (``Adaptix-Gateway/backend/app/config/routes.py`` raises at
+    ``entry.audience not in KNOWN_AUDIENCES``), so no ``RouteEntry`` could be
+    written for the service at all, and its Evidence Graph surface
+    (``/api/v1/audit/evidence/...``) was unreachable at the edge as a result.
+    """
     assert "adaptix-audit" in KNOWN_SERVICE_AUDIENCES
 
 
 def test_signal_bus_audience_is_present() -> None:
-    """The cross-service signal bus owns a distinct service identity."""
+    """Adaptix-SignalCore-Service (the cross-service event bus) needs a DISTINCT
+    audience (A012 SSRF/identity hardening).
+
+    The service serves ``/api/v1/signal-bus`` — deliberately NOT ``/api/v1/signalcore``,
+    which is Core's separate Founder investor-signal (Wefunder) stream routed to Core
+    with ``audience="adaptix-core"`` (see ``Adaptix-Gateway`` routes.py). Its audience
+    must therefore be distinct from ``adaptix-core`` so the gateway can route the
+    event-bus prefix and stamp its own audience, and the downstream verifier
+    (``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-signal-bus``) can be installed without
+    colliding with the fundraising stream. Registered here (step 1 of "Adding a new
+    service") so the gateway route table can reference it without the "audience absent
+    from the registry -> prefix unroutable" failure that hit ``adaptix-audit`` and
+    ``adaptix-vision``.
+    """
     assert "adaptix-signal-bus" in KNOWN_SERVICE_AUDIENCES
 
 
 def test_mih_audience_is_present() -> None:
     """MIH is an active clinical service with a dedicated production identity.
 
-    The downstream service is configured to require
-    ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-mih``. The gateway route may
-    reference that audience only after this canonical registry recognizes it.
+    The downstream production task requires
+    ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-mih``. Registering it here is
+    step 1 of the shared service-identity transaction; Gateway routing and the
+    deployed verifier must use this exact value.
     """
     assert "adaptix-mih" in KNOWN_SERVICE_AUDIENCES
 
@@ -75,9 +116,15 @@ def test_is_known_service_audience_accepts_normalizable_forms(value: str) -> Non
     ids=["none", "empty", "blank", "unknown", "missing-prefix", "underscore"],
 )
 def test_is_known_service_audience_rejects_everything_else(value) -> None:
+    """Notably ``adaptix_core``: underscore is NOT normalized to a hyphen. A
+    helper that guessed at near-misses would let a typo'd audience pass here and
+    then fail at the real comparison downstream, which is worse than failing
+    here."""
     assert is_known_service_audience(value) is False
 
 
 def test_registry_has_no_duplicate_after_normalization() -> None:
+    """Two entries differing only by case or whitespace would both live in the
+    frozenset while being the same audience to every consumer."""
     normalized = [a.strip().lower() for a in KNOWN_SERVICE_AUDIENCES]
     assert len(normalized) == len(set(normalized))
