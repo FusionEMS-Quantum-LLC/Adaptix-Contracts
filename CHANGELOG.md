@@ -12,8 +12,6 @@ from the installed package metadata).
 
 ## [Unreleased]
 
-## [Unreleased]
-
 ### Changed
 
 - `RELEASE_MANIFEST_v4.3.0.json` moved from the repository root to
