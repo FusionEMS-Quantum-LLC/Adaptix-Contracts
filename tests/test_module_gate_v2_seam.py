@@ -159,7 +159,11 @@ def _sign_v2(payload: dict) -> tuple[str, str, str]:
         base64.urlsafe_b64encode(serialized.encode("utf-8")).decode("ascii").rstrip("=")
     )
     kid, private_key = load_signing_key()
-    return context_b64, b64url_encode(private_key.sign(context_b64.encode("ascii"))), kid
+    return (
+        context_b64,
+        b64url_encode(private_key.sign(context_b64.encode("ascii"))),
+        kid,
+    )
 
 
 def _v2_headers(ctx: str, sig: str, kid: str) -> dict[str, str]:
@@ -236,9 +240,7 @@ class TestKeyIdIsActuallyForwarded:
         self, gated_client: TestClient, asymmetric_only: None
     ) -> None:
         """A present-but-invalid signature never falls through to bearer."""
-        payload = _gateway_payload(
-            tenant_id=str(uuid4()), module_entitlements=["cad"]
-        )
+        payload = _gateway_payload(tenant_id=str(uuid4()), module_entitlements=["cad"])
         ctx, sig, kid = _sign_v2(payload)
         forged = dict(payload, module_entitlements=[MODULE])
         forged_ctx = (
@@ -270,7 +272,9 @@ class TestFailClosedPostureIsPreserved:
         assert resp.json()["detail"]["code"] == "gateway_secret_not_configured"
 
     def test_hmac_trust_mode_refuses_a_v2_claiming_context(
-        self, gated_client: TestClient, asymmetric_only: None,
+        self,
+        gated_client: TestClient,
+        asymmetric_only: None,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Headers may select a STRICTER scheme, never a weaker one.

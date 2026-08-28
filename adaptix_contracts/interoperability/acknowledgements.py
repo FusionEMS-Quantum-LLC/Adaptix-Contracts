@@ -1,4 +1,5 @@
 """Semantic acknowledgement contracts for exchange delivery."""
+
 from __future__ import annotations
 
 from datetime import datetime

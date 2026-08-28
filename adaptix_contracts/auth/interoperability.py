@@ -4,6 +4,7 @@ These constants centralize the tenant-bound Core -> service claims used by the
 interagency exchange fabric. Keep them action-style because they are used with
 ``adaptix_contracts.auth.service_token`` scopes, not user-facing RBAC scopes.
 """
+
 from __future__ import annotations
 
 INTEROPERABILITY_PAYLOAD_READ_SCOPE = "interoperability-payload:read"

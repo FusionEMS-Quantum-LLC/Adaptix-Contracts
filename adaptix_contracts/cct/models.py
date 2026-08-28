@@ -443,7 +443,9 @@ class InfusionRun(BaseModel):
     )
 
     concentration_amount: float = Field(
-        ..., gt=0, description="Numerator of the concentration (e.g. 4 for 4 mg / 250 mL)."
+        ...,
+        gt=0,
+        description="Numerator of the concentration (e.g. 4 for 4 mg / 250 mL).",
     )
     concentration_amount_unit: str = Field(
         ...,

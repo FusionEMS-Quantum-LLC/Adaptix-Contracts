@@ -1,4 +1,5 @@
 """Adaptix Public Safety Canonical Model and interagency exchange contracts."""
+
 from .acknowledgements import AcknowledgementType, ExchangeAcknowledgement
 from .encounter import EncounterLinkStatus, PublicSafetyEncounter
 from .exchange import PublicSafetyExchangeEnvelope

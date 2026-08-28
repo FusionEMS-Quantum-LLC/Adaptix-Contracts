@@ -1,4 +1,5 @@
 """Versioned semantic mapping contracts between source standards and canonical data."""
+
 from __future__ import annotations
 
 from datetime import datetime

@@ -1,4 +1,5 @@
 """Sharing policy contracts. Trust and disclosure policy are intentionally separate."""
+
 from __future__ import annotations
 
 from enum import Enum
