@@ -2,6 +2,12 @@
 
 Re-exports the models, enums, event names/payloads/envelope factories,
 and service error contracts for the MIH-CP service.
+
+``MIH_ENTITLEMENT_ID`` and ``MIH_SERVICE_AUDIENCE`` are the canonical
+cross-repository identifiers used while the state-restricted MIH entitlement
+is activated in Core and routed through Gateway. Keeping both values in the
+shared contract package prevents Core, Gateway, and MIH from inventing their
+own spellings while the broader module registry remains deliberately strict.
 """
 
 from adaptix_contracts.mih.enums import (
@@ -52,11 +58,16 @@ from adaptix_contracts.mih.models import (
     MihVisitVitalSigns,
 )
 
+MIH_ENTITLEMENT_ID = "mih_community_paramedicine"
+MIH_SERVICE_AUDIENCE = "adaptix-mih"
+
 __all__ = [
     "EnrollmentStatus",
     "MIH_DISCHARGED",
     "MIH_ENROLLED",
+    "MIH_ENTITLEMENT_ID",
     "MIH_EVENTS",
+    "MIH_SERVICE_AUDIENCE",
     "MIH_SOURCE_SERVICE",
     "MIH_VISIT_COMPLETED",
     "MIH_VISIT_SCHEDULED",
