@@ -7,10 +7,22 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `4.1.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `4.3.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
+
+### Changed
+
+- `RELEASE_MANIFEST_v4.3.0.json` moved from the repository root to
+  `docs/archive/`. `repos/repository-shape.yml` in Adaptix-Governance is the
+  fleet authority for repository root shape, and its
+  `stale-session-artifact` rule forbids `*MANIFEST*.json` at a root while
+  naming `docs/archive/` (`archive_location`) as the canonical destination.
+  The file's content is unchanged and the `v4.3.0` tag never contained it —
+  it landed on `main` in #255, after the tag was cut — so no released
+  artifact is affected. Nothing in this repository or the fleet reads the
+  file by path; the only reference was the 4.3.0 entry below.
 
 ## [4.3.0] - 2026-08-28
 
