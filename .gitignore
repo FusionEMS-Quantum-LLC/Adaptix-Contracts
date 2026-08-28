@@ -42,6 +42,15 @@ htmlcov/
 .tox/
 .hypothesis/
 
+coverage.xml
+.ruff_cache/
+
+# Merge/patch and editor scratch residue
+*.bak
+*.orig
+*.rej
+*.discarded
+
 # Type checking
 .mypy_cache/
 .dmypy.json

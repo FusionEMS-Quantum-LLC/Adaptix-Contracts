@@ -12,6 +12,61 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-08-28
+
+### Changed
+
+- **`validate_contracts.py` domain-coverage phase can now actually fail.** The
+  phase returned a hard-coded `"passed": True`, so a missing expected domain
+  printed `[WARN] Missing domains: [...]` and the overall report still said
+  `all_passed: true`. `tests/test_release_readiness.py` asserts
+  `payload["all_passed"] is True`, so it was asserting a constant rather than
+  the repository's contract surface. Now `"passed": not missing`. Verified
+  against the shipped package at this revision: 79 domains present, 0 of the
+  29 expected domains missing, so the gate stays green on correct content and
+  can fail on incorrect content.
+
+- **`ruff` and `mypy` are now declared dependencies.** `repo.yaml` names
+  `bash scripts/ci/verify-toolchain.sh` as this repository's validation
+  authority, and that script runs `uv run ruff format --check .`,
+  `uv run ruff check .` and `uv run mypy .`. Neither tool appeared in
+  `pyproject.toml` or `uv.lock`, so the declared validation command could not
+  execute in a clean environment. Both are pinned to the versions
+  Adaptix-Gateway already uses (`ruff==0.16.4`, `mypy==2.3.1`). They are in
+  the existing `dev` extra -- the single dev-tooling authority this repo
+  already documents in CONTRIBUTING.md (`pip install -e .[dev]`) -- so no
+  second dev-dependency declaration was introduced, and consumers installing
+  `adaptix-contracts` are unaffected.
+
+- **`scripts/ci/verify-toolchain.sh` syncs the dev tooling it then runs.** It
+  called `uv sync --frozen --all-groups`, but this project declares its dev
+  tooling as a PEP 621 extra (`[project.optional-dependencies]`), not a
+  PEP 735 dependency group. `--all-groups` therefore installed none of it and
+  the script died at the first `uv run ruff` under `set -euo pipefail` --
+  taking `mypy` and `pytest` with it. Changed to `--all-extras`.
+
+- **`PRODUCTION_READINESS.md` moved to `docs/archive/`.** It is a dated
+  point-in-time snapshot (`Date: 2026-08-14`) whose recorded counts
+  (`export_count=881`, `model_count=677`, `enum_count=191`,
+  `actual_domain_count=73`) no longer match this revision (954 / 717 / 209 /
+  79). `tests/test_release_readiness.py` still guards it against
+  over-claiming platform rollout; that test's path moved in the same commit,
+  so the guard is preserved rather than dropped.
+
+- `.gitignore` now also covers `.ruff_cache/`, `coverage.xml`, and
+  `*.bak` / `*.orig` / `*.rej` / `*.discarded`. No files of these classes were
+  committed; this prevents the class rather than cleaning one up.
+
+- **A second `## [Unreleased]` heading in released history was relabelled.**
+  This file carried two. The lower one sits between the `[2.3.0]` and
+  `[2.1.0]` sections -- below the tagged 4.1.0 -- so its content had shipped
+  while the heading still called it unreleased, and anything scanning for the
+  live section found two matches. It is now
+  `## [Unversioned] - shipped between 2.1.0 and 2.3.0; version heading never
+  assigned`. No version number was invented for it: the file is strictly
+  descending, so the shipping range is all that is provable from the record.
+
+
 ### Fixed
 
 - **BEHAVIOR CHANGE — `verify_service_token` now requires `jti` at decode
@@ -101,8 +156,17 @@ from the installed package metadata).
 
 ### Compatibility
 
-- Purely additive. No existing field, model, function signature, or default
-  changed. `adaptix_contracts.auth.service_token`'s public behavior is
+- Additive except for the `verify_service_token` error-taxonomy fix recorded
+  under **Fixed** above. No existing field, model, function signature, or
+  default changed, and the SET OF ACCEPTED TOKENS IS UNCHANGED: a token
+  without `jti` failed before this release too, by raising
+  `pydantic.ValidationError` from the closing `ServiceTokenClaims(**raw)`.
+  Only the exception TYPE changed, to the `ServiceTokenError` this module
+  documents. The one caller shape that observes a difference is a caller
+  catching `pydantic.ValidationError` around `verify_service_token` -- an
+  exception this module never documented raising. This is why the release is
+  MINOR under DEPRECATION_POLICY.md rather than MAJOR: nothing that was
+  accepted is now rejected, so no accepted value was narrowed. `adaptix_contracts.auth.service_token`'s public behavior is
   unchanged; only its internal keyset key-selection logic moved to a shared
   internal helper (`adaptix_contracts.auth._s2s_keyset`, not part of the
   public API — nothing outside `adaptix_contracts.auth` should import it).
@@ -1040,7 +1104,7 @@ Limitation, stated explicitly: none of this validates event PAYLOAD shape. Both
 envelopes carry `payload: dict[str, Any]`, so payload compatibility between a
 producer and a consumer remains unguarded by contract.
 
-## [Unreleased]
+## [Unversioned] - shipped between 2.1.0 and 2.3.0; version heading never assigned
 
 ### Changed
 
