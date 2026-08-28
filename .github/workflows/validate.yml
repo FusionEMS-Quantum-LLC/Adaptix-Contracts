@@ -1,0 +1,59 @@
+name: Contracts Validation
+
+# Analysis-only, per CONTRIBUTING.md: "Treat GitHub Actions as analysis-only.
+# Authoritative release/publish automation for this repo runs through CodeBuild."
+# This workflow executes the validation authority that `repo.yaml` already
+# declares (`validation.command: bash scripts/ci/verify-toolchain.sh`) and adds
+# no release, publish, or deployment behaviour. Adaptix-Contracts is a
+# non-deployable contract library (`deployment.deployable: false`).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # repo.yaml declares runtime.target "3.12"; pin the project interpreter so
+      # the suite cannot silently move to whatever uv resolves for ">=3.11".
+      UV_PYTHON: '3.12'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        env:
+          # Digest is the entry this repository already publishes as the single
+          # source of truth for CI tool downloads:
+          # adaptix_contracts/security/ci_digests.py -> VERIFIED_DIGESTS
+          # ("uv 0.12.3 uv-x86_64-unknown-linux-gnu.tar.gz").
+          UV_VERSION: '0.12.3'
+          UV_SHA256: "600cf9a742aca00d292673b16b5acffaa7b8c269a364ad0c2e79498dcb1fe101"
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --output /tmp/uv.tar.gz \
+            "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-gnu.tar.gz"
+          echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum --check --strict -
+          mkdir -p "${HOME}/.local/bin"
+          tar -xzf /tmp/uv.tar.gz -C "${HOME}/.local/bin" --strip-components=1
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Run declared repository validation
+        run: bash scripts/ci/verify-toolchain.sh
