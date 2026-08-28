@@ -104,9 +104,27 @@ from dataclasses import dataclass
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from google.protobuf.message import DecodeError
-from temporalio.api.common.v1 import Payload
-from temporalio.converter import DataConverter, PayloadCodec
+
+# temporalio (and the protobuf runtime it pulls in) is an EXTRA, not a base
+# dependency of adaptix-contracts - see the `[project.optional-dependencies]`
+# `temporal` table in pyproject.toml. Importing this module without that extra
+# installed otherwise fails with a bare "No module named 'google'", which names
+# protobuf's namespace package and gives the caller nothing to act on. Re-raise
+# with the actual remedy, preserving the original exception type and cause so
+# `except ModuleNotFoundError` and `except ImportError` both still behave as
+# before for callers that already handle a missing optional dependency.
+try:
+    from google.protobuf.message import DecodeError
+    from temporalio.api.common.v1 import Payload
+    from temporalio.converter import DataConverter, PayloadCodec
+except ModuleNotFoundError as exc:  # pragma: no cover - import-time guard
+    raise ModuleNotFoundError(
+        f"{exc.msg}. adaptix_contracts.security.temporal_payload_codec requires "
+        "the Temporal SDK, which adaptix-contracts declares as an optional "
+        "extra. Install it with: pip install 'adaptix-contracts[temporal]'",
+        name=exc.name,
+        path=exc.path,
+    ) from exc
 
 #: Environment variable names this codec reads. Declared here rather than
 #: imported from any one service, because the codec is now shared: the variable
