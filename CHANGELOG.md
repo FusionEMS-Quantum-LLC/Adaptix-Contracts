@@ -12,7 +12,56 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+Housekeeping only. No contract, model, field, enum or public import path
+changed in any of the entries below, so nothing here requires a consumer to
+re-pin. Verified: the public surface diff between `v4.1.0` and `v4.3.0` is
+47 additions and 0 removals, and no commit below touches
+`adaptix_contracts/**/*.py` except the import guard in #264.
+
+### Fixed
+
+- `uv.lock` recorded `adaptix-contracts` 4.2.0 while `pyproject.toml`
+  declared 4.3.0; #254 bumped the manifest without regenerating the lock, and
+  `uv lock --check` failed on that tree. The lock is regenerated — one line,
+  the project's own version entry; 76 packages resolved, none moved (#257).
+- Importing `adaptix_contracts.security.temporal_payload_codec` without the
+  `temporal` extra failed with `No module named 'google'` — protobuf's
+  namespace package, naming neither the real requirement nor the remedy. It
+  now names the extra: `pip install 'adaptix-contracts[temporal]'`. The
+  exception type stays `ModuleNotFoundError`, `name`/`path` are forwarded and
+  the original error is kept as `__cause__`, so existing handlers are
+  unaffected (#264).
+- `README.md` linked to `MARKET_READY_LEDGER.md`, deleted in #249 — the only
+  broken relative link in the repository. `README.md` and `RUNBOOK.md` both
+  documented a personal absolute path in a public repository (#260).
+- `audit_contracts.py` justified its retention by naming Adaptix-Fire-Service
+  `fire_app/audit_service.py` as a live consumer. That path returns 404, and
+  the real file never imports this module. The remaining consumer,
+  Adaptix-CAD-Service, is genuine and unchanged (#262).
+- `test_trustsign_client_mirror_drift.py` named the repos to notify on a
+  public-surface change as Core/Transport/Integrations/Founder. None of the
+  three checkable ones import the client; the real importers are EPCR,
+  Device, TrustSign and Billing (#263).
+- `pyproject.toml` lines 1-98 had every newline doubled (92 of 225 lines
+  blank). Repaired with the exact inverse; `tomllib` parses the old and new
+  forms to equal dicts (#259).
+
 ### Changed
+
+- The declared validation authority (`scripts/ci/verify-toolchain.sh`) now
+  fails closed on two classes it previously passed. `uv lock --check` catches
+  lock/manifest drift, which `uv sync --frozen` exits 0 on (#257). And
+  `python validate_contracts.py` — listed under "Required release evidence"
+  in `DEPRECATION_POLICY.md` and instructed in `CONTRIBUTING.md`,
+  `README.md` and `RUNBOOK.md`, but invoked by no automated path — now
+  actually runs (#265).
+- `.gitignore` covers `reports/toolchain-inventory.json`, which the declared
+  gate generates on every run and previously left untracked (#258).
+- `.gitleaks.toml` records four verified false positives: three git blob
+  SHA-1 hashes in the release manifest (all 81 recomputed with
+  `git rev-parse` and matched) and one deterministic golden-vector test key.
+  Detection is unchanged — a planted AWS key and secret in ordinary source is
+  still reported (#261).
 
 - `RELEASE_MANIFEST_v4.3.0.json` moved from the repository root to
   `docs/archive/`. `repos/repository-shape.yml` in Adaptix-Governance is the
