@@ -2,9 +2,15 @@
 # Inherit gitleaks built-in default ruleset.
 useDefault = true
 
-[allowlist]
-description = "Adaptix-Contracts allowlist for documented false positives"
+# Every entry below is a DOCUMENTED, VERIFIED false positive. This file must
+# never be used to silence a real credential.
+#
+# gitleaks 8.x replaced the single `[allowlist]` table with repeatable
+# `[[allowlists]]`, and refuses to load a config that mixes the two ("[allowlist]
+# is deprecated, it cannot be used alongside [[allowlists]]"). The original entry
+# is therefore carried over verbatim in the new form.
 
+# ---------------------------------------------------------------------------
 # Historical placeholder in SUPPLY_INTEGRATION_QUICK_START.md. The original
 # committed text used `<service-token>` placeholders in an env-var example
 # block; gitleaks generic-api-key heuristic matched on the angle-bracketed
@@ -13,13 +19,56 @@ description = "Adaptix-Contracts allowlist for documented false positives"
 # leak persists in git history (commit 112b0a0). No real secret was ever
 # present — these were always documentation placeholders. Cannot rewrite
 # history without destructive operations.
+[[allowlists]]
+description = "Adaptix-Contracts allowlist for documented false positives"
 commits = [
   "112b0a0c8f485e0dd6d76b30baa87d9d138f85c1",
 ]
-
 # Belt-and-suspenders: also ignore the path even if the false-positive
 # pattern reappears in documentation rewrites.
 paths = [
   '''SUPPLY_INTEGRATION_QUICK_START\.md''',
   '''SUPPLY_DOMAIN_INTEGRATION_GUIDE\.md''',
+]
+
+# ---------------------------------------------------------------------------
+# Release manifests hold git blob SHA-1 hashes, not credentials.
+#
+# RELEASE_MANIFEST_v*.json records the git blob SHA-1 of every file under
+# adaptix_contracts/schemas/ at a tagged commit, so a consumer can verify what
+# it pinned without cloning. The generic-api-key heuristic fires on three of
+# those hex values only because the KEY NAME beside them contains "access" or
+# "auth" (app_access_contracts.py, billing_auth_contracts.py,
+# duty_auth_contracts.py) while the VALUE is high-entropy hex.
+#
+# Verified, not assumed: all 81 hashes in RELEASE_MANIFEST_v4.3.0.json were
+# recomputed with `git rev-parse <commit_sha>:<path>` and all 81 matched
+# exactly. They are public hashes of public files in a public repository, so
+# disclosing them discloses nothing.
+#
+# Scoped by filename rather than by commit because this is structural: every
+# future release manifest is hash-only by construction and trips the same
+# heuristic.
+[[allowlists]]
+description = "Release manifests are git blob SHA-1 records, never secrets"
+paths = [
+  '''RELEASE_MANIFEST_v.*\.json''',
+]
+
+# ---------------------------------------------------------------------------
+# Deterministic golden-vector test key in the Temporal payload codec suite.
+#
+# tests/test_temporal_payload_codec.py sets
+# `_BARE_SECRET = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="`, which is
+# base64 of the bytes 0x01..0x20 — a fixed test vector pinning the codec's
+# encrypt/decrypt output, labelled in-file as a "bare base64 local-development
+# secret shape". It is not a credential and grants access to nothing.
+#
+# Pinned to the single historical commit that introduced it rather than to the
+# file path, deliberately: a NEW secret committed to that same test file in any
+# future commit must still fail the scan.
+[[allowlists]]
+description = "Golden-vector codec test key (commit-pinned, not path-wide)"
+commits = [
+  "304b099fd63052e5e93437fc8862fd0a3213e815",
 ]
