@@ -14,12 +14,20 @@
     client.
 
     This module is retained for backward compatibility only — it is still
-    imported by live consumers (Adaptix-CAD-Service ``cad_app/audit_service.py``
-    and migration ``019_add_audit_log_entries``; Adaptix-Fire-Service
-    ``fire_app/audit_service.py``). Per the deprecation policy the import path
+    imported by one live consumer: Adaptix-CAD-Service
+    ``cad_app/audit_service.py`` (``from adaptix_contracts.audit_contracts
+    import AuditServiceClient``) and its migration
+    ``019_add_audit_log_entries``. Per the deprecation policy the import path
     and behaviour are preserved and will be removed only in the next major
-    version, after those consumers migrate to the Audit service. Do not add
+    version, after that consumer migrates to the Audit service. Do not add
     new callers.
+
+    This list previously also named Adaptix-Fire-Service
+    ``fire_app/audit_service.py``. Verified 2026-08-28 against GitHub: no file
+    exists at that path, and the real file
+    ``backend/fire_app/services/audit_service.py`` imports its own
+    ``fire_app.models.operational.FireAuditEntry``, never this module. Fire
+    does depend on adaptix-contracts, but not on this client.
 
 Provides a canonical AuditServiceClient used by all domain services to
 write structured, tenant-scoped audit records into the Core audit log
