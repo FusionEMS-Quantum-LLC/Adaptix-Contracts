@@ -21,7 +21,7 @@ from typing import Optional
 
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # ─── Cognito Configuration ────────────────────────────────────────────────────
 
@@ -108,9 +108,10 @@ class AdaptixCognitoClaims(BaseModel):
     # Optional Microsoft federation fields (when Entra is federated through Cognito)
     identities: Optional[list[dict]] = None
 
-    class Config:
-        populate_by_name = True
-        extra = "allow"  # Allow additional Cognito claims
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="allow",  # Allow additional Cognito claims
+    )
 
     @classmethod
     def from_raw_claims(cls, claims: dict) -> "AdaptixCognitoClaims":
@@ -174,8 +175,7 @@ class AdaptixAuthContext(BaseModel):
     correlation_id: str | None = None
     trace_id: str | None = None
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     @property
     def is_authenticated(self) -> bool:

@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CareGraphNodeTypeDTO(str, Enum):
@@ -83,8 +83,7 @@ class CareGraphNodeDTO(BaseModel):
     created_at: datetime
     version: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CareGraphEdgeDTO(BaseModel):
@@ -101,8 +100,7 @@ class CareGraphEdgeDTO(BaseModel):
     provider_id: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OPQRSTSymptomDTO(BaseModel):
@@ -130,8 +128,7 @@ class OPQRSTSymptomDTO(BaseModel):
     provider_id: str
     documented_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReassessmentDeltaDTO(BaseModel):
@@ -148,5 +145,4 @@ class ReassessmentDeltaDTO(BaseModel):
     reassessed_at: datetime
     provider_id: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
