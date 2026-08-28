@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # ===========================================================================
@@ -51,8 +51,7 @@ class PhysicalFindingDTO(BaseModel):
     observed_at: datetime
     version: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FindingReassessmentDTO(BaseModel):
@@ -69,8 +68,7 @@ class FindingReassessmentDTO(BaseModel):
     provider_id: str
     reassessed_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -98,8 +96,7 @@ class VASOverlayDTO(BaseModel):
     rendered_at: datetime
     version: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VASProjectionReviewDTO(BaseModel):
@@ -119,8 +116,7 @@ class VASProjectionReviewDTO(BaseModel):
     reviewed_at: Optional[datetime] = None  # None until reviewed
     proposed_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -142,8 +138,7 @@ class VisionArtifactDTO(BaseModel):
     uploaded_at: datetime
     version: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VisionExtractionDTO(BaseModel):
@@ -163,8 +158,7 @@ class VisionExtractionDTO(BaseModel):
     accepted_chart_field: Optional[str] = None
     extracted_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VisionReviewQueueDTO(BaseModel):
@@ -179,8 +173,7 @@ class VisionReviewQueueDTO(BaseModel):
     assigned_to_user_id: Optional[str] = None
     queued_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VisionProvenanceDTO(BaseModel):
@@ -193,8 +186,7 @@ class VisionProvenanceDTO(BaseModel):
     provenance_detail: dict
     recorded_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -219,8 +211,7 @@ class InfusionRunDTO(BaseModel):
     ended_at: Optional[datetime] = None
     provider_id: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VentilatorSessionDTO(BaseModel):
@@ -239,8 +230,7 @@ class VentilatorSessionDTO(BaseModel):
     started_at: datetime
     provider_id: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ResponseWindowDTO(BaseModel):
@@ -259,8 +249,7 @@ class ResponseWindowDTO(BaseModel):
     escalation_triggered: bool
     provider_id: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -291,8 +280,7 @@ class ImpressionBindingDTO(BaseModel):
     provider_id: str
     documented_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -320,8 +308,7 @@ class SmartTextProposalDTO(BaseModel):
     contradiction_detail: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -346,8 +333,7 @@ class SyncEventDTO(BaseModel):
     idempotency_key: str  # REQUIRED — safe for retry
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SyncHealthDTO(BaseModel):
@@ -364,8 +350,7 @@ class SyncHealthDTO(BaseModel):
     degraded_reason: Optional[str] = None
     last_successful_sync_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UploadQueueItemDTO(BaseModel):
@@ -382,8 +367,7 @@ class UploadQueueItemDTO(BaseModel):
     idempotency_key: str
     queued_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -405,8 +389,7 @@ class DashboardProfileDTO(BaseModel):
     hidden_cards: Optional[list[str]] = None
     # No clinical fields — dashboard cannot affect clinical truth
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkspaceProfileDTO(BaseModel):
@@ -423,8 +406,7 @@ class WorkspaceProfileDTO(BaseModel):
     show_infusion_panel: bool
     # hide_mandatory_blockers is intentionally absent — cannot be hidden
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ===========================================================================
@@ -495,8 +477,7 @@ class MappingTraceDTO(BaseModel):
     created_at: datetime
     version: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuditEventDTO(BaseModel):
@@ -510,8 +491,7 @@ class AuditEventDTO(BaseModel):
     detail: Optional[dict] = None
     performed_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DerivedOutputDTO(BaseModel):
@@ -526,8 +506,7 @@ class DerivedOutputDTO(BaseModel):
     generated_by_user_id: str
     is_authoritative_truth: bool = False  # ALWAYS False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChartReviewDTO(BaseModel):
