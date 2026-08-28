@@ -4,8 +4,13 @@ There are intentionally TWO copies of the TrustSign HTTP client in the
 Adaptix codebase:
 
 1. ``adaptix_contracts/trustsign_client.py`` (this package) — the canonical
-   import path for every consumer service (Core, Transport, Integrations,
-   Founder).
+   import path for every consumer service. Verified 2026-08-28 against
+   GitHub, the importers are Adaptix-EPCR-Service, Adaptix-Device-Service,
+   Adaptix-TrustSign-Service and Adaptix-Billing-Service. (This list
+   previously named Core, Transport, Integrations and Founder; a code search
+   for ``adaptix_contracts.trustsign_client`` returns zero hits in
+   Adaptix-Core-Service, Adaptix-Transport-Service and
+   Adaptix-Integrations-Service.)
 2. ``Adaptix-Billing-Service:backend/billing_app/trustsign/http_client.py``
    — the Billing-internal copy so Billing doesn't take a self-dependency
    on adaptix-contracts at runtime.
@@ -37,8 +42,10 @@ import adaptix_contracts.trustsign_client as canonical
 #   - Adaptix-Billing-Service:backend/billing_app/trustsign/http_client.py
 #   - Adaptix-Billing-Service:backend/billing_app/trustsign/__init__.py
 #     (re-export list)
-# Every consumer repo PR (Core/Transport/Integrations/Founder) then needs
-# its adaptix-contracts pin bumped to the new minor version.
+# Every consumer repo PR then needs its adaptix-contracts pin bumped to the
+# new minor version. The consumers to notify are the verified importers named
+# in the module docstring above — Adaptix-EPCR-Service, Adaptix-Device-Service
+# and Adaptix-TrustSign-Service — plus Billing via its mirror copy.
 
 EXPECTED_PUBLIC_NAMES = {
     "ChartSignatureCompleteInput",
