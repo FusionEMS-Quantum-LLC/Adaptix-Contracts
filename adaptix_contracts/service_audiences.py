@@ -104,6 +104,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-marketing",
         "adaptix-media",
         "adaptix-medications",
+        "adaptix-mih",
         "adaptix-narcotics",
         "adaptix-nemsis",
         "adaptix-neris",
