@@ -168,3 +168,57 @@ ignore_missing_imports = true
 
 exclude = "(^|/)(tests|build|dist)/"
 
+
+[tool.ruff]
+# EXPLICIT, PINNED CONFIGURATION - do not remove.
+#
+# Until now this repository declared NO [tool.ruff] table at all, so `ruff check`
+# enforced whatever rule set the installed ruff version happened to default to.
+# Ruff 0.16.0 (2026-07-23) grew that built-in default from 59 rules to 413; on
+# unchanged source that is 2371 findings across 29 rules under the ruff 0.16.4
+# pinned in [project.optional-dependencies].dev - and ZERO of them in
+# E4/E7/E9/F. The entire delta was default-set drift, not code rot. Selecting
+# explicitly makes `ruff check` depend on this file rather than on ruff's
+# release notes.
+#
+# `line-length` is deliberately NOT set. Adaptix-Core-Service and
+# Adaptix-Billing-Service both set 120, but that knob is shared with
+# `ruff format`, and this tree was formatted (commit 5cc18303) under ruff's
+# default of 88 with `ruff format --check` currently passing. Raising it here
+# would reflow shipped source and break a green formatter gate for no lint
+# benefit - E501 is not in the selected set. Adopt 120 only together with a
+# reformat commit.
+#
+# `target-version` is pinned to the FLOOR this library supports, not the runtime
+# it is developed against. repo.yaml declares runtime.target "3.12" but
+# runtime.compatibility ">=3.11", and `requires-python` above is ">=3.11": this
+# package is installed into services still on 3.11. ruff's target-version means
+# "minimum supported version", so py311 is correct and is identical to what ruff
+# infers from requires-python today. Pinning only stops that from drifting
+# silently if requires-python changes.
+target-version = "py311"
+
+[tool.ruff.lint]
+# These four prefixes are exactly ruff's pre-0.16 default selection, and exactly
+# what Adaptix-Core-Service (core/backend/.ruff.toml - the authoritative file
+# there, which shadows its own pyproject table) and Adaptix-Billing-Service
+# (backend/pyproject.toml) both declare. This is the house rule set.
+select = ["E4", "E7", "E9", "F"]
+
+# No `ignore` list. Core and Billing each carry one (E402/F841/E712/E741/F811),
+# but those suppress findings that genuinely exist in those trees. This tree has
+# ZERO findings in the selected set, so importing their ignores would silently
+# pre-authorize defect classes this repository does not have.
+#
+# Rules that ruff 0.16.4's expanded default DID report here and that the
+# selection above does not enforce, tracked as deliberate follow-up work (one
+# category per PR, gate green after each):
+#   DTZ005  x6  naive datetime.now()            - validate_contracts.py
+#   BLE001  x6  blind `except Exception`        - 3 in shipped
+#                                                 adaptix_contracts/supply_integrations.py
+#   B008    x7  function call in default arg    - adaptix_contracts/auth/rbac_dependencies.py
+#                                                 (FastAPI Depends() idiom; likely false positive)
+#   PLW1510 x1  subprocess.run without check=
+#   S112    x1  try/except/continue
+#   B017    x2  assert-raises-Exception in tests
+#   RUF012  x5  mutable class default
