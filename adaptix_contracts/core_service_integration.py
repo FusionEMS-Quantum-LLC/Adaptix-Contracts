@@ -138,7 +138,7 @@ class CoreServiceClient:
 
         headers = self._build_headers()
         try:
-            resp = await self._client.post(url, json=req.dict(), headers=headers)
+            resp = await self._client.post(url, json=req.model_dump(), headers=headers)
             resp.raise_for_status()
             result = TenantLookupResponse(**resp.json())
             self._set_cached(cache_key, result)
@@ -184,7 +184,7 @@ class CoreServiceClient:
 
         headers = self._build_headers()
         try:
-            resp = await self._client.post(url, json=req.dict(), headers=headers)
+            resp = await self._client.post(url, json=req.model_dump(), headers=headers)
             resp.raise_for_status()
             result = RBACVerifyResponse(**resp.json())
             self._set_cached(cache_key, result)
@@ -224,7 +224,7 @@ class CoreServiceClient:
 
         headers = self._build_headers()
         try:
-            resp = await self._client.post(url, json=req.dict(), headers=headers)
+            resp = await self._client.post(url, json=req.model_dump(), headers=headers)
             resp.raise_for_status()
             result = EntitlementCheckResponse(**resp.json())
             self._set_cached(cache_key, result)
