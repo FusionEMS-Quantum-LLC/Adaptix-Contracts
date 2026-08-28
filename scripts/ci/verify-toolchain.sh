@@ -16,6 +16,15 @@ if [[ -f package-lock.json ]]; then
 fi
 
 if [[ -f pyproject.toml && -f uv.lock ]]; then
+  # Fail closed when uv.lock no longer matches pyproject.toml. `uv sync
+  # --frozen` does NOT catch this: with pyproject.toml at 4.3.0 and uv.lock
+  # still recording 4.2.0 (the state #254 left on main), it exits 0 and
+  # leaves the stale lock in place, so this gate reported green while the
+  # two files disagreed. `uv lock --check` is the explicit assertion that
+  # the lock is current for the manifest, and it is what the fleet
+  # dependency law requires: a lock file moves in the same commit as the
+  # manifest it derives from, never later.
+  uv lock --check
   uv sync --frozen --all-extras
   uv run ruff format --check .
   uv run ruff check .
