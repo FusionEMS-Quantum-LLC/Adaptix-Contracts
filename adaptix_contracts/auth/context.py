@@ -101,6 +101,29 @@ class AdaptixTenantContext(BaseModel):
         return module in self.modules_enabled
 
 
+def _token_string_list(value: object) -> list[str]:
+    """Return string items from a token claim, treating null as empty.
+
+    An explicit JSON ``null`` must not iterate. Non-string entries are
+    dropped rather than coerced, so a poisoned claim cannot invent roles.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, (list, tuple, set, frozenset)):
+        items: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                continue
+            text = entry.strip()
+            if text:
+                items.append(text)
+        return items
+    return []
+
+
 class AdaptixAuthContext(BaseModel):
     """
     Complete verified auth context for an authenticated request.
@@ -153,13 +176,13 @@ class AdaptixAuthContext(BaseModel):
             )
 
         roles = [
-            AdaptixRole(r)
-            for r in payload.get("roles", [])
-            if r in AdaptixRole._value2member_map_
+            AdaptixRole(role)
+            for role in _token_string_list(payload.get("roles"))
+            if role in AdaptixRole._value2member_map_
         ]
-        permissions = payload.get("permissions", [])
-        entitlements = payload.get("entitlements", [])
-        modules = payload.get("modules_enabled", [])
+        permissions = _token_string_list(payload.get("permissions"))
+        entitlements = _token_string_list(payload.get("entitlements"))
+        modules = _token_string_list(payload.get("modules_enabled"))
 
         return cls(
             user_id=user_id,
