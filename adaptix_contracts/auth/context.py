@@ -101,6 +101,28 @@ class AdaptixTenantContext(BaseModel):
         return module in self.modules_enabled
 
 
+def _known_adaptix_role(role: str) -> AdaptixRole | None:
+    """Return the enum member for a recognized role string, else None."""
+    try:
+        return AdaptixRole(role)
+    except ValueError:
+        return None
+
+
+def _token_string_items(value: object) -> list[str]:
+    """Collect non-empty strings from a sequence claim."""
+    if not isinstance(value, (list, tuple, set, frozenset)):
+        return []
+    items: list[str] = []
+    for entry in value:
+        if not isinstance(entry, str):
+            continue
+        text = entry.strip()
+        if text:
+            items.append(text)
+    return items
+
+
 def _token_string_list(value: object) -> list[str]:
     """Return string items from a token claim, treating null as empty.
 
@@ -112,16 +134,7 @@ def _token_string_list(value: object) -> list[str]:
     if isinstance(value, str):
         text = value.strip()
         return [text] if text else []
-    if isinstance(value, (list, tuple, set, frozenset)):
-        items: list[str] = []
-        for entry in value:
-            if not isinstance(entry, str):
-                continue
-            text = entry.strip()
-            if text:
-                items.append(text)
-        return items
-    return []
+    return _token_string_items(value)
 
 
 class AdaptixAuthContext(BaseModel):
@@ -176,9 +189,9 @@ class AdaptixAuthContext(BaseModel):
             )
 
         roles = [
-            AdaptixRole(role)
+            parsed
             for role in _token_string_list(payload.get("roles"))
-            if role in AdaptixRole._value2member_map_
+            if (parsed := _known_adaptix_role(role)) is not None
         ]
         permissions = _token_string_list(payload.get("permissions"))
         entitlements = _token_string_list(payload.get("entitlements"))
