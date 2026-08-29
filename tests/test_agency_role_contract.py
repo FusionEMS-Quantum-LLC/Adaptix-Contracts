@@ -109,3 +109,36 @@ def test_qa_permission_ids_are_stable() -> None:
     assert WORKSPACE_ADMIN_ACCESS == "workspace:admin:access"
     assert PermissionId.QA_REVIEW.value == QA_REVIEW
     assert PermissionId.CORE_USERS_MANAGE.value == CORE_USERS_MANAGE
+
+
+def test_mailroom_permission_ids_are_stable() -> None:
+    from adaptix_contracts.auth.permissions import (
+        MAILROOM_ADMIN,
+        MAILROOM_CANCEL,
+        MAILROOM_CERTIFIED_SEND,
+        MAILROOM_PERMISSIONS,
+        MAILROOM_READ,
+        MAILROOM_SEND,
+        MAILROOM_WRITE_PERMISSIONS,
+        PermissionId,
+    )
+
+    assert MAILROOM_READ == "mailroom:read"
+    assert MAILROOM_SEND == "mailroom:send"
+    assert MAILROOM_CANCEL == "mailroom:cancel"
+    assert MAILROOM_CERTIFIED_SEND == "mailroom:certified:send"
+    assert MAILROOM_ADMIN == "mailroom:admin"
+    assert MAILROOM_PERMISSIONS == {
+        MAILROOM_READ,
+        MAILROOM_SEND,
+        MAILROOM_CANCEL,
+        MAILROOM_CERTIFIED_SEND,
+        MAILROOM_ADMIN,
+    }
+    assert MAILROOM_WRITE_PERMISSIONS == {
+        MAILROOM_SEND,
+        MAILROOM_CANCEL,
+        MAILROOM_CERTIFIED_SEND,
+        MAILROOM_ADMIN,
+    }
+    assert PermissionId.MAILROOM_SEND.value == MAILROOM_SEND

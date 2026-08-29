@@ -33,6 +33,16 @@ from adaptix_contracts.auth.interoperability import (
     INTEROPERABILITY_PAYLOAD_READ_SCOPE,
     INTEROPERABILITY_SCOPES,
 )
+from adaptix_contracts.auth.mailroom_permissions import (
+    MAILROOM_ADMIN,
+    MAILROOM_CANCEL,
+    MAILROOM_CERTIFIED_SEND,
+    MAILROOM_PERMISSIONS,
+    MAILROOM_READ,
+    MAILROOM_SEND,
+    MAILROOM_WRITE_PERMISSIONS,
+    mailroom_permissions_for_roles,
+)
 from adaptix_contracts.auth.module_entitlement_gate import (
     require_module_entitlement,
 )
@@ -80,6 +90,14 @@ __all__ = [
     "AdaptixServiceContext",
     "AdaptixSignedInternalContext",
     "require_module_entitlement",
+    "MAILROOM_ADMIN",
+    "MAILROOM_CANCEL",
+    "MAILROOM_CERTIFIED_SEND",
+    "MAILROOM_PERMISSIONS",
+    "MAILROOM_READ",
+    "MAILROOM_SEND",
+    "MAILROOM_WRITE_PERMISSIONS",
+    "mailroom_permissions_for_roles",
     # Canonical interoperability S2S scopes.
     "INTEROPERABILITY_PAYLOAD_READ_SCOPE",
     "INTEROPERABILITY_IDENTITY_READ_SCOPE",
