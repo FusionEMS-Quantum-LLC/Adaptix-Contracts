@@ -18,25 +18,44 @@ import uuid
 
 
 class AdaptixRole(str, Enum):
-    """Canonical role set for Adaptix platform."""
+    """Recognized identity-role strings for verified token parsing.
+
+    Agency-assignable values must match ``AgencyRole`` in
+    ``adaptix_contracts.auth.agency_roles``. Platform-only values must match
+    ``PlatformOnlyRole``. Occupation titles below are recognized on the wire
+    so a legacy claim is not silently dropped; they are not a second agency
+    assignment catalog.
+    """
 
     FOUNDER = "founder"
+    SUPER_ADMIN = "super_admin"
+    PLATFORM_ADMIN = "platform_admin"
+    TENANT_ADMIN = "tenant_admin"
     AGENCY_ADMIN = "agency_admin"
+    ADMIN = "admin"
+    SUPERVISOR = "supervisor"
+    CAD_SUPERVISOR = "cad_supervisor"
     DISPATCHER = "dispatcher"
+    CREW_MEMBER = "crew_member"
+    BILLING_ADMIN = "billing_admin"
+    BILLING_OPERATOR = "billing_operator"
+    OPERATOR = "operator"
+    FIELD_USER = "field_user"
+    MEDICAL_DIRECTOR = "medical_director"
+    ASSISTANT_MEDICAL_DIRECTOR = "assistant_medical_director"
+    QA_REVIEWER = "qa_reviewer"
+    VIEWER = "viewer"
+    SERVICE_ACCOUNT = "service_account"
+    # Occupation / domain titles — parseable, not agency-assignable.
     PARAMEDIC = "paramedic"
     EMT = "emt"
-    MEDICAL_DIRECTOR = "medical_director"
     FIREFIGHTER = "firefighter"
     PILOT = "pilot"
-    CREW_MEMBER = "crew_member"
     BILLING_SPECIALIST = "billing_specialist"
-    BILLING_ADMIN = "billing_admin"
-    SUPERVISOR = "supervisor"
     WORKFORCE_MANAGER = "workforce_manager"
     INVENTORY_MANAGER = "inventory_manager"
     NARCOTICS_OFFICER = "narcotics_officer"
     READ_ONLY = "read_only"
-    SERVICE_ACCOUNT = "service_account"
 
 
 class AdaptixRoleSet(BaseModel):
@@ -80,6 +99,29 @@ class AdaptixTenantContext(BaseModel):
 
     def has_module(self, module: str) -> bool:
         return module in self.modules_enabled
+
+
+def _token_string_list(value: object) -> list[str]:
+    """Return string items from a token claim, treating null as empty.
+
+    An explicit JSON ``null`` must not iterate. Non-string entries are
+    dropped rather than coerced, so a poisoned claim cannot invent roles.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, (list, tuple, set, frozenset)):
+        items: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                continue
+            text = entry.strip()
+            if text:
+                items.append(text)
+        return items
+    return []
 
 
 class AdaptixAuthContext(BaseModel):
@@ -134,13 +176,13 @@ class AdaptixAuthContext(BaseModel):
             )
 
         roles = [
-            AdaptixRole(r)
-            for r in payload.get("roles", [])
-            if r in AdaptixRole._value2member_map_
+            AdaptixRole(role)
+            for role in _token_string_list(payload.get("roles"))
+            if role in AdaptixRole._value2member_map_
         ]
-        permissions = payload.get("permissions", [])
-        entitlements = payload.get("entitlements", [])
-        modules = payload.get("modules_enabled", [])
+        permissions = _token_string_list(payload.get("permissions"))
+        entitlements = _token_string_list(payload.get("entitlements"))
+        modules = _token_string_list(payload.get("modules_enabled"))
 
         return cls(
             user_id=user_id,
