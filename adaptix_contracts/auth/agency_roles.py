@@ -45,7 +45,9 @@ class PlatformOnlyRole(str, Enum):
 
 
 AGENCY_ROLE_VALUES: Final[frozenset[str]] = frozenset(role.value for role in AgencyRole)
-PLATFORM_ONLY_ROLES: Final[frozenset[str]] = frozenset(role.value for role in PlatformOnlyRole)
+PLATFORM_ONLY_ROLES: Final[frozenset[str]] = frozenset(
+    role.value for role in PlatformOnlyRole
+)
 
 
 def normalize_role(role: str | None) -> str | None:

@@ -52,7 +52,9 @@ def test_platform_roles_are_recognized_but_not_agency_roles(role: str) -> None:
         ("agency_admin", "agency_admin"),
     ],
 )
-def test_normalize_role_is_case_and_whitespace_tolerant(raw: str, expected: str) -> None:
+def test_normalize_role_is_case_and_whitespace_tolerant(
+    raw: str, expected: str
+) -> None:
     assert normalize_role(raw) == expected
     assert is_agency_role(raw) is True
 
