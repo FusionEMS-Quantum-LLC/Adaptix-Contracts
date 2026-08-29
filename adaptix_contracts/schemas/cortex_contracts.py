@@ -23,12 +23,14 @@ class RecommendationRequest(BaseModel):
 class RecommendationResponse(BaseModel):
     """Cortex recommendation response returned to the calling module."""
 
-    recommendation: str | None = Field(None, description="Recommended action, if any")
+    recommendation: str | None = Field(
+        default=None, description="Recommended action, if any"
+    )
     reasoning: str | None = Field(
-        None, description="Explanation supporting the recommendation"
+        default=None, description="Explanation supporting the recommendation"
     )
     confidence: float | None = Field(
-        None, description="Model confidence for the recommendation"
+        default=None, description="Model confidence for the recommendation"
     )
     data_used: list[str] = Field(
         default_factory=list,
@@ -39,7 +41,7 @@ class RecommendationResponse(BaseModel):
         description="Data elements that were missing or insufficient",
     )
     next_action: str | None = Field(
-        None, description="Suggested next action for the caller"
+        default=None, description="Suggested next action for the caller"
     )
     human_review_required: bool = Field(
         ..., description="Whether a human must review before acting"

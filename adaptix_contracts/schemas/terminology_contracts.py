@@ -220,7 +220,7 @@ class TerminologySource(_Base):
     license_required: bool = False
     license_status: LicenseStatus = LicenseStatus.UNKNOWN
     status: str = "active"
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 class SourceRelease(_Base):
@@ -235,14 +235,15 @@ class SourceRelease(_Base):
     content_location: Optional[str] = None
     activated_at: Optional[datetime] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 class Concept(_Base):
     concept_id: UUID
     authority: str
     authority_identifier: Optional[str] = Field(
-        None, description="External authority id, e.g. a UMLS CUI. Never the PK."
+        default=None,
+        description="External authority id, e.g. a UMLS CUI. Never the PK.",
     )
     preferred_name: str
     normalized_name: str
@@ -253,9 +254,10 @@ class Concept(_Base):
     is_clinically_sensitive: bool = False
     review_status: ReviewStatus = ReviewStatus.UNREVIEWED
     tenant_id: Optional[UUID] = Field(
-        None, description="Set for tenant-local concepts; null/nil = global authority."
+        default=None,
+        description="Set for tenant-local concepts; null/nil = global authority.",
     )
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 class ConceptTerm(_Base):
@@ -371,7 +373,7 @@ class ConceptResolutionRequest(_Base):
     tenant_id: Optional[UUID] = None
     language: str = "en"
     target_systems: list[str] = Field(default_factory=list)
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 class ConceptResolutionResponse(_Base):
@@ -380,7 +382,7 @@ class ConceptResolutionResponse(_Base):
     source_releases: dict[str, str] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     requires_review: bool = False
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 # ---------------------------------------------------------------------------
@@ -412,7 +414,7 @@ class AutocodeConcept(_Base):
 class AutocodeOutput(_Base):
     document_id: str
     concepts: list[AutocodeConcept] = Field(default_factory=list)
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 # ---------------------------------------------------------------------------
@@ -447,7 +449,7 @@ class GraphRelationship(_Base):
     confidence: Optional[float] = None
     provenance: GraphRelationshipProvenance
     status: str = "active"
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 class GraphRelationshipExplanation(_Base):
@@ -464,7 +466,7 @@ class GraphRelationshipExplanation(_Base):
     created_by: Optional[UUID] = None
     change_history: list[dict[str, Any]] = Field(default_factory=list)
     rule_id: Optional[str] = None
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +477,7 @@ class GraphRelationshipExplanation(_Base):
 class TerminologyEventEnvelope(_Base):
     event_id: UUID
     event_type: TerminologyEventType
-    schema_version: str = Field(_SCHEMA_VERSION, max_length=16)
+    schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
     occurred_at: datetime
     producer: str = "terminology"
     concept_id: Optional[UUID] = None

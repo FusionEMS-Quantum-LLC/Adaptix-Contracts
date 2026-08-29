@@ -62,10 +62,10 @@ class DeviceRegistration(BaseModel):
     )
     platform: DevicePlatform
     status: DeviceStatus = DeviceStatus.PENDING
-    name: Optional[str] = Field(None, max_length=200)
-    os_version: Optional[str] = Field(None, max_length=64)
-    app_version: Optional[str] = Field(None, max_length=64)
-    push_token: Optional[str] = Field(None, max_length=512)
+    name: Optional[str] = Field(default=None, max_length=200)
+    os_version: Optional[str] = Field(default=None, max_length=64)
+    app_version: Optional[str] = Field(default=None, max_length=64)
+    push_token: Optional[str] = Field(default=None, max_length=512)
     mdm_managed: bool = False
     last_seen_at: Optional[datetime] = None
     registered_at: datetime

@@ -67,18 +67,18 @@ class FinancialSummaryCreateRequest(BaseModel):
     """Request schema for creating a FinancialSummary."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=4000)
-    status: str = Field("active", min_length=1, max_length=50)
-    metadata_json: Optional[dict] = Field(None)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    status: str = Field(default="active", min_length=1, max_length=50)
+    metadata_json: Optional[dict] = Field(default=None)
 
 
 class FinancialSummaryUpdateRequest(BaseModel):
     """Request schema for updating a FinancialSummary."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=4000)
-    status: Optional[str] = Field(None, min_length=1, max_length=50)
-    metadata_json: Optional[dict] = Field(None)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    status: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    metadata_json: Optional[dict] = Field(default=None)
 
 
 class FinancialSummaryResponse(BaseModel):
@@ -115,11 +115,11 @@ class RevenueRecordCreateRequest(BaseModel):
     """Request schema for creating a RevenueRecord."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=4000)
-    status: str = Field("active", min_length=1, max_length=50)
-    metadata_json: Optional[dict] = Field(None)
-    amount: Optional[Decimal] = Field(None)
-    currency: str = Field("USD", max_length=3)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    status: str = Field(default="active", min_length=1, max_length=50)
+    metadata_json: Optional[dict] = Field(default=None)
+    amount: Optional[Decimal] = Field(default=None)
+    currency: str = Field(default="USD", max_length=3)
     recorded_at: Optional[datetime] = None
 
 
@@ -165,7 +165,7 @@ class LedgerAccountCreateRequest(BaseModel):
 class LedgerAccountUpdateRequest(BaseModel):
     """Partial update for a ledger account."""
 
-    name: Optional[str] = Field(None, max_length=160)
+    name: Optional[str] = Field(default=None, max_length=160)
     type: Optional[AccountType] = None
     parent_id: Optional[UUID] = None
     is_active: Optional[bool] = None
@@ -204,9 +204,9 @@ class JournalLineRequest(BaseModel):
     """Single debit/credit line in a journal entry."""
 
     account_id: UUID
-    debit_cents: int = Field(0, ge=0)
-    credit_cents: int = Field(0, ge=0)
-    memo: Optional[str] = Field(None, max_length=500)
+    debit_cents: int = Field(default=0, ge=0)
+    credit_cents: int = Field(default=0, ge=0)
+    memo: Optional[str] = Field(default=None, max_length=500)
 
     @field_validator("debit_cents", "credit_cents")
     @classmethod
@@ -222,7 +222,7 @@ class JournalEntryCreateRequest(BaseModel):
     entry_date: date
     memo: str = Field(..., min_length=1, max_length=500)
     source: TransactionSource = TransactionSource.MANUAL
-    reference_id: Optional[str] = Field(None, max_length=255)
+    reference_id: Optional[str] = Field(default=None, max_length=255)
     lines: list[JournalLineRequest] = Field(..., min_length=2)
 
 

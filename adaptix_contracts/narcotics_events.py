@@ -73,21 +73,27 @@ class NarcoticsVialEvent(BaseModel):
     total_cost: Decimal = Field(..., description="Total vial cost")
 
     # For transfers
-    from_unit_id: Optional[str] = Field(None, description="Source unit")
-    to_unit_id: Optional[str] = Field(None, description="Destination unit")
+    from_unit_id: Optional[str] = Field(default=None, description="Source unit")
+    to_unit_id: Optional[str] = Field(default=None, description="Destination unit")
 
     # For usage
-    patient_id: Optional[str] = Field(None, description="Patient (if applicable)")
-    used_by: Optional[str] = Field(None, description="Clinician who used substance")
+    patient_id: Optional[str] = Field(
+        default=None, description="Patient (if applicable)"
+    )
+    used_by: Optional[str] = Field(
+        default=None, description="Clinician who used substance"
+    )
 
     # For waste
-    waste_reason: Optional[str] = Field(None, description="Reason for waste")
-    witness: Optional[str] = Field(None, description="Witness to waste")
+    waste_reason: Optional[str] = Field(default=None, description="Reason for waste")
+    witness: Optional[str] = Field(default=None, description="Witness to waste")
 
-    actor_user_id: Optional[str] = Field(None, description="User performing action")
+    actor_user_id: Optional[str] = Field(
+        default=None, description="User performing action"
+    )
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(None)
-    trace_id: Optional[str] = Field(None)
+    correlation_id: Optional[str] = Field(default=None)
+    trace_id: Optional[str] = Field(default=None)
 
 
 class NarcoticsChainOfCustodyEntry(BaseModel):
@@ -126,24 +132,28 @@ class NarcoticsChainOfCustodyEntry(BaseModel):
         ..., description="User ID responsible for this entry"
     )
     witness_party: Optional[str] = Field(
-        None, description="Witness user ID (if required)"
+        default=None, description="Witness user ID (if required)"
     )
 
     # Location tracking
-    from_location: Optional[str] = Field(None, description="Source location")
-    to_location: Optional[str] = Field(None, description="Destination location")
+    from_location: Optional[str] = Field(default=None, description="Source location")
+    to_location: Optional[str] = Field(default=None, description="Destination location")
 
     # Seal status
-    seal_intact_before: Optional[bool] = Field(None, description="Seal status before")
-    seal_intact_after: Optional[bool] = Field(None, description="Seal status after")
+    seal_intact_before: Optional[bool] = Field(
+        default=None, description="Seal status before"
+    )
+    seal_intact_after: Optional[bool] = Field(
+        default=None, description="Seal status after"
+    )
 
     # Immutable metadata
     entry_id: str = Field(..., description="Unique entry ID (UUID)")
     created_at: datetime = Field(..., description="When entry was created (immutable)")
     created_by: str = Field(..., description="User who created entry (immutable)")
 
-    correlation_id: Optional[str] = Field(None)
-    trace_id: Optional[str] = Field(None)
+    correlation_id: Optional[str] = Field(default=None)
+    trace_id: Optional[str] = Field(default=None)
 
 
 class NarcoticsDiscrepancyAlert(BaseModel):
@@ -167,20 +177,20 @@ class NarcoticsDiscrepancyAlert(BaseModel):
 
     opened_at: datetime = Field(...)
     time_since_last_count: Optional[int] = Field(
-        None, description="Hours since last count"
+        default=None, description="Hours since last count"
     )
 
     # Escalation
     escalation_flag: bool = Field(..., description="True if unresolved > 24h")
     notify_role: str = Field(default="narcotics_officer", description="Role to notify")
     escalate_to_role: Optional[str] = Field(
-        None, description="Secondary escalation role"
+        default=None, description="Secondary escalation role"
     )
     severity: str = Field(..., description="Severity: low/medium/high/critical")
 
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(None)
-    trace_id: Optional[str] = Field(None)
+    correlation_id: Optional[str] = Field(default=None)
+    trace_id: Optional[str] = Field(default=None)
 
 
 class NarcoticsCountEvent(BaseModel):
@@ -205,8 +215,8 @@ class NarcoticsCountEvent(BaseModel):
     critical_discrepancies: int = Field(..., description="Number > 24h old")
 
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(None)
-    trace_id: Optional[str] = Field(None)
+    correlation_id: Optional[str] = Field(default=None)
+    trace_id: Optional[str] = Field(default=None)
 
 
 class NarcoticsAnalyticsEvent(BaseModel):
@@ -220,18 +230,20 @@ class NarcoticsAnalyticsEvent(BaseModel):
     category: str = Field(..., description="Event category")
 
     # Generic metrics
-    quantity: Optional[int] = Field(None)
-    cost: Optional[Decimal] = Field(None)
+    quantity: Optional[int] = Field(default=None)
+    cost: Optional[Decimal] = Field(default=None)
 
     # Risk indicators
-    risk_score: Optional[float] = Field(None, description="Diversion risk 0-100")
-    risk_level: Optional[str] = Field(None, description="green/yellow/red")
+    risk_score: Optional[float] = Field(
+        default=None, description="Diversion risk 0-100"
+    )
+    risk_level: Optional[str] = Field(default=None, description="green/yellow/red")
 
     # Custom metadata
-    metadata: Optional[dict[str, Any]] = Field(None)
+    metadata: Optional[dict[str, Any]] = Field(default=None)
 
-    correlation_id: Optional[str] = Field(None)
-    trace_id: Optional[str] = Field(None)
+    correlation_id: Optional[str] = Field(default=None)
+    trace_id: Optional[str] = Field(default=None)
 
 
 __all__ = [
