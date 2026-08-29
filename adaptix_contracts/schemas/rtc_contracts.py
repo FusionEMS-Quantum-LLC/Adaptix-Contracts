@@ -44,9 +44,9 @@ class RTCSession(BaseModel):
     status: RTCRoomStatus = RTCRoomStatus.PENDING
     correlation_id: Optional[str] = None
     created_by: Optional[UUID] = None
-    max_participants: Optional[int] = Field(None, ge=1)
-    reference_type: Optional[str] = Field(None, max_length=120)
-    reference_id: Optional[str] = Field(None, max_length=255)
+    max_participants: Optional[int] = Field(default=None, ge=1)
+    reference_type: Optional[str] = Field(default=None, max_length=120)
+    reference_id: Optional[str] = Field(default=None, max_length=255)
     created_at: datetime
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
@@ -59,9 +59,9 @@ class RTCParticipantToken(BaseModel):
     session_id: UUID
     room_name: str = Field(..., min_length=1, max_length=200)
     participant_identity: str = Field(..., min_length=1, max_length=200)
-    participant_name: Optional[str] = Field(None, max_length=200)
+    participant_name: Optional[str] = Field(default=None, max_length=200)
     token: str = Field(..., min_length=1)
-    url: Optional[str] = Field(None, max_length=2000)
+    url: Optional[str] = Field(default=None, max_length=2000)
     can_publish: bool = True
     can_subscribe: bool = True
     expires_at: Optional[datetime] = None

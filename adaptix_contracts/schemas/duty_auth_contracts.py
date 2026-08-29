@@ -32,7 +32,7 @@ class FieldLoginRequest(BaseModel):
         description="Raw encoded credential payload (NFC UID, QR content, etc.).",
     )
     unit_id: Optional[str] = Field(
-        None,
+        default=None,
         description="Optional unit/vehicle ID to pre-assign on session creation.",
     )
 
@@ -45,15 +45,15 @@ class FieldLoginResolved(BaseModel):
         description="Resolution outcome: ok | denied | challenge_required.",
     )
     responder_id: Optional[str] = Field(
-        None,
+        default=None,
         description="UUID of the resolved responder (present when result is ok).",
     )
     display_name: Optional[str] = Field(
-        None,
+        default=None,
         description="Display name of the resolved responder.",
     )
     role: Optional[str] = Field(
-        None,
+        default=None,
         description="Resolved role for the responder.",
     )
     requires_second_factor: bool = Field(
@@ -61,7 +61,7 @@ class FieldLoginResolved(BaseModel):
         description="True when a second authentication factor is still required.",
     )
     denial_reason: Optional[str] = Field(
-        None,
+        default=None,
         description="Human-readable denial reason (present when result is denied).",
     )
 
@@ -87,7 +87,7 @@ class CreateDutySessionRequest(BaseModel):
         description="Whether to assign the responder to a unit on session start.",
     )
     unit_id: Optional[str] = Field(
-        None,
+        default=None,
         description="Unit UUID to assign when assign_unit is True.",
     )
     assign_station: bool = Field(
@@ -95,7 +95,7 @@ class CreateDutySessionRequest(BaseModel):
         description="Whether to assign the responder to a station on session start.",
     )
     station_id: Optional[str] = Field(
-        None,
+        default=None,
         description="Station UUID to assign when assign_station is True.",
     )
     start_shift: bool = Field(
@@ -122,7 +122,7 @@ class EndDutySessionRequest(BaseModel):
     tenant_id: str = Field(..., description="UUID of the tenant.")
     device_id: str = Field(..., description="Registered device identifier.")
     logout_reason: Optional[str] = Field(
-        None,
+        default=None,
         description="Optional human-readable reason for ending the session.",
     )
 
@@ -134,7 +134,9 @@ class EndDutySessionResponse(BaseModel):
     ended_at: datetime = Field(
         ..., description="UTC timestamp when the session was ended."
     )
-    reason: Optional[str] = Field(None, description="Reason for session termination.")
+    reason: Optional[str] = Field(
+        default=None, description="Reason for session termination."
+    )
 
 
 class RevokeBadgeRequest(BaseModel):
@@ -172,12 +174,16 @@ class AuthAuditEvent(BaseModel):
 
     tenant_id: str = Field(..., description="UUID of the tenant.")
     actor_user_id: Optional[str] = Field(
-        None,
+        default=None,
         description="UUID of the acting user or None for system events.",
     )
-    device_id: Optional[str] = Field(None, description="Device involved in the event.")
-    app: Optional[str] = Field(None, description="App context for the event.")
+    device_id: Optional[str] = Field(
+        default=None, description="Device involved in the event."
+    )
+    app: Optional[str] = Field(default=None, description="App context for the event.")
     action: str = Field(..., description="Audit action identifier.")
     outcome: str = Field(..., description="Outcome: success | failure | denied.")
-    detail: Optional[str] = Field(None, description="Optional human-readable detail.")
+    detail: Optional[str] = Field(
+        default=None, description="Optional human-readable detail."
+    )
     occurred_at: datetime = Field(..., description="UTC timestamp of the event.")

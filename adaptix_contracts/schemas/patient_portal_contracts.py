@@ -41,9 +41,11 @@ class PatientVerifyRequest(BaseModel):
     verification_method: PatientVerificationMethod
     patient_name: str = Field(..., max_length=255)
     date_of_birth: str = Field(..., description="ISO 8601 date: YYYY-MM-DD")
-    account_last4: Optional[str] = Field(None, min_length=4, max_length=4)
-    ssn_last4: Optional[str] = Field(None, min_length=4, max_length=4)
-    access_token: Optional[str] = Field(None, description="Used with token_link method")
+    account_last4: Optional[str] = Field(default=None, min_length=4, max_length=4)
+    ssn_last4: Optional[str] = Field(default=None, min_length=4, max_length=4)
+    access_token: Optional[str] = Field(
+        default=None, description="Used with token_link method"
+    )
 
 
 class PatientVerifyResponse(BaseModel):
@@ -125,7 +127,8 @@ class PaymentSubmitRequest(BaseModel):
         ..., description="Stripe token or ACH authorization token"
     )
     apply_to_oldest: bool = Field(
-        True, description="Auto-apply to oldest balance if no statement specified"
+        default=True,
+        description="Auto-apply to oldest balance if no statement specified",
     )
 
 
@@ -164,7 +167,7 @@ class DisputeSubmitRequest(BaseModel):
     statement_id: Optional[str] = None
     reason: DisputeReason
     description: str = Field(..., min_length=10, max_length=2000)
-    supporting_info: Optional[str] = Field(None, max_length=2000)
+    supporting_info: Optional[str] = Field(default=None, max_length=2000)
 
 
 class DisputeSubmitResponse(BaseModel):
@@ -201,7 +204,9 @@ class AiExplanationRequest(BaseModel):
     account_id: str
     statement_id: Optional[str] = None
     question: Optional[str] = Field(
-        None, max_length=500, description="Optional specific question from patient"
+        default=None,
+        max_length=500,
+        description="Optional specific question from patient",
     )
 
 

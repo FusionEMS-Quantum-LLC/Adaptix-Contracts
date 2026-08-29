@@ -23,13 +23,15 @@ class SignaturePackageResponse(BaseModel):
     """TrustSign signature package response."""
 
     package_id: str | None = Field(
-        None, description="Created package identifier, if any"
+        default=None, description="Created package identifier, if any"
     )
     status: str = Field(..., description="Current package status")
     signed: bool = Field(..., description="Whether the package is fully signed")
     available: bool = Field(
         ..., description="Whether the TrustSign service was available"
     )
-    reason: str | None = Field(None, description="Reason for the current state, if any")
+    reason: str | None = Field(
+        default=None, description="Reason for the current state, if any"
+    )
     tenant_id: str = Field(..., description="Tenant ID")
     correlation_id: str = Field(..., description="Request correlation identifier")

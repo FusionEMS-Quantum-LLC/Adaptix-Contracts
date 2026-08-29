@@ -98,7 +98,8 @@ class AdaptixPlatformEvent(BaseModel):
     event_type: AdaptixEventType
     event_id: str = Field(..., description="UUID; unique per event emission")
     tenant_id: Optional[str] = Field(
-        None, description="None only for platform-wide events (e.g. agency.activated)"
+        default=None,
+        description="None only for platform-wide events (e.g. agency.activated)",
     )
     payload: dict[str, Any] = Field(
         ..., description="Serialized domain event payload. No raw PHI."
@@ -111,7 +112,7 @@ class AdaptixPlatformEvent(BaseModel):
         ),
     )
     schema_version: str = Field(
-        "1.0",
+        default="1.0",
         description="Schema version of the payload dict for forward-compatibility.",
     )
 

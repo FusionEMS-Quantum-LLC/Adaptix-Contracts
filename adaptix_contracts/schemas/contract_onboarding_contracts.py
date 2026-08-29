@@ -84,7 +84,7 @@ class ContractIntakeRequest(BaseModel):
     pricing_terms: ContractPricingTerms
     billing_rules: ContractBillingRules = Field(default_factory=ContractBillingRules)
     module_terms: ContractModuleTerms = Field(default_factory=ContractModuleTerms)
-    notes: str | None = Field(None, max_length=4000)
+    notes: str | None = Field(default=None, max_length=4000)
 
 
 class ContractRecord(BaseModel):

@@ -51,7 +51,7 @@ class SignalCoreEvent(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
     correlation_id: Optional[str] = None
     idempotency_key: Optional[str] = None
-    schema_version: str = Field("1.0", max_length=16)
+    schema_version: str = Field(default="1.0", max_length=16)
     occurred_at: datetime
 
 
@@ -68,14 +68,14 @@ class SignalCoreTrigger(BaseModel):
     id: UUID
     tenant_id: UUID
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
+    description: Optional[str] = Field(default=None, max_length=1000)
     event_type_pattern: str = Field(
         ...,
         min_length=1,
         max_length=200,
         description="Exact or glob pattern matched against event_type.",
     )
-    source_service: Optional[str] = Field(None, max_length=64)
+    source_service: Optional[str] = Field(default=None, max_length=64)
     target_service: str = Field(..., min_length=1, max_length=64)
     target_action: str = Field(..., min_length=1, max_length=160)
     is_active: bool = True

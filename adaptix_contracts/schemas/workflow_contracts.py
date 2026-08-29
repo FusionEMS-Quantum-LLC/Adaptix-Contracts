@@ -39,7 +39,7 @@ class WorkflowStep(BaseModel):
     service_name: str
 
     status: WorkflowStepStatus
-    retry_count: int = Field(0, ge=0)
+    retry_count: int = Field(default=0, ge=0)
 
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

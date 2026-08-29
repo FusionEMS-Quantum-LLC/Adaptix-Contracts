@@ -37,10 +37,10 @@ class GeocodeRequest(BaseModel):
     tenant_id: UUID
     correlation_id: Optional[str] = None
     address: str = Field(..., min_length=1, max_length=500)
-    city: Optional[str] = Field(None, max_length=120)
-    state: Optional[str] = Field(None, min_length=2, max_length=2)
-    postal_code: Optional[str] = Field(None, max_length=16)
-    country: str = Field("US", min_length=2, max_length=2)
+    city: Optional[str] = Field(default=None, max_length=120)
+    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
+    postal_code: Optional[str] = Field(default=None, max_length=16)
+    country: str = Field(default="US", min_length=2, max_length=2)
 
 
 class GeocodeResult(BaseModel):
@@ -49,7 +49,7 @@ class GeocodeResult(BaseModel):
     coordinate: GeoCoordinate
     formatted_address: str
     matched: bool
-    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     place_id: Optional[str] = None
     provider: Optional[str] = None
 
@@ -79,7 +79,7 @@ class RouteEstimate(BaseModel):
     duration_seconds: float = Field(..., ge=0.0)
     duration_minutes: float = Field(..., ge=0.0)
     polyline: Optional[str] = Field(
-        None, description="Encoded route geometry, if provided."
+        default=None, description="Encoded route geometry, if provided."
     )
     provider: Optional[str] = None
     estimated_at: datetime
@@ -98,10 +98,10 @@ class ServiceArea(BaseModel):
     id: UUID
     tenant_id: UUID
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
+    description: Optional[str] = Field(default=None, max_length=1000)
     polygon: list[GeoCoordinate] = Field(default_factory=list)
     center: Optional[GeoCoordinate] = None
-    radius_miles: Optional[float] = Field(None, ge=0.0)
+    radius_miles: Optional[float] = Field(default=None, ge=0.0)
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
@@ -126,8 +126,8 @@ class AutocompleteRequest(BaseModel):
     tenant_id: UUID
     correlation_id: Optional[str] = None
     query: str = Field(..., min_length=1, max_length=500)
-    country: str = Field("US", min_length=2, max_length=2)
-    limit: int = Field(5, ge=1, le=25)
+    country: str = Field(default="US", min_length=2, max_length=2)
+    limit: int = Field(default=5, ge=1, le=25)
 
 
 class AddressSuggestion(BaseModel):

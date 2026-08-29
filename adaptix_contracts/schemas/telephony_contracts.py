@@ -134,7 +134,7 @@ class Call(BaseModel):
     to_number: str = Field(..., min_length=1, max_length=64)
     destination_type: Optional[DestinationType] = None
     destination_id: Optional[str] = Field(
-        None,
+        default=None,
         max_length=255,
         description="UUID (user/team/queue/…) or non-UUID (external number) target.",
     )
@@ -142,12 +142,12 @@ class Call(BaseModel):
     started_at: Optional[datetime] = None
     answered_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
-    duration_seconds: Optional[int] = Field(None, ge=0)
-    recording_status: Optional[str] = Field(None, max_length=32)
-    transcription_status: Optional[str] = Field(None, max_length=32)
+    duration_seconds: Optional[int] = Field(default=None, ge=0)
+    recording_status: Optional[str] = Field(default=None, max_length=32)
+    transcription_status: Optional[str] = Field(default=None, max_length=32)
     assigned_user_id: Optional[UUID] = None
     assigned_queue_id: Optional[UUID] = None
-    failure_code: Optional[str] = Field(None, max_length=64)
+    failure_code: Optional[str] = Field(default=None, max_length=64)
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
@@ -161,20 +161,22 @@ class Voicemail(BaseModel):
     voicemail_id: UUID
     tenant_id: UUID
     call_id: Optional[UUID] = Field(
-        None,
+        default=None,
         description="Originating call, when the voicemail derives from a call leg.",
     )
     voicemail_box_id: UUID
     caller_number: str = Field(..., min_length=1, max_length=64)
     caller_contact_id: Optional[UUID] = None
     audio_object_key: Optional[str] = Field(
-        None, max_length=1024, description="Object-storage key of the recorded audio."
+        default=None,
+        max_length=1024,
+        description="Object-storage key of the recorded audio.",
     )
-    duration_seconds: Optional[int] = Field(None, ge=0)
+    duration_seconds: Optional[int] = Field(default=None, ge=0)
     transcript: Optional[str] = None
     summary: Optional[str] = None
-    intent: Optional[str] = Field(None, max_length=255)
-    urgency: Optional[str] = Field(None, max_length=32)
+    intent: Optional[str] = Field(default=None, max_length=255)
+    urgency: Optional[str] = Field(default=None, max_length=32)
     status: VoicemailStatus
     assigned_user_id: Optional[UUID] = None
     callback_required: bool = False

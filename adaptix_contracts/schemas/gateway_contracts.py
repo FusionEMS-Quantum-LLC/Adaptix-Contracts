@@ -27,7 +27,7 @@ class ForwardedRequestContext(BaseModel):
 
     tenant_id: str = Field(..., description="Tenant ID")
     user_id: str | None = Field(
-        None, description="Authenticated user identifier, if any"
+        default=None, description="Authenticated user identifier, if any"
     )
     correlation_id: str = Field(..., description="Request correlation identifier")
     is_founder: bool = Field(..., description="Whether the caller is a founder")
