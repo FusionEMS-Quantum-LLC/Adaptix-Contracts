@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "adaptix-contracts"
-version = "4.3.0"
+version = "5.0.0"
 description = "Shared cross-domain schemas and contracts for the Adaptix platform"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
@@ -26,10 +26,20 @@ dependencies = [
     "email-validator>=2.0.0",
     "PyJWT>=2.8.0",
     "cryptography>=50.0.0",
-    "PyYAML",
     "SQLAlchemy",
-    "boto3",
 ]
+
+# NOT base dependencies:
+#   boto3 / botocore / PyYAML are used ONLY by tools/bedrock_ops.py, which
+#   `[tool.setuptools.packages.find].exclude` drops from the wheel - so nothing
+#   this package SHIPS can import them (0 references under adaptix_contracts/).
+#   Declaring them here forced every consumer to install boto3, which pulls
+#   botocore and s3transfer, for code it cannot reach. They moved to the `dev`
+#   extra because tests/test_bedrock_ops_command_safety.py does exercise that
+#   tool, so the repo's own gate still needs them - `uv sync --all-extras`
+#   installs them. requirements-bedrock-ci.txt remains their pinned home for
+#   the Bedrock CI path.
+#   temporalio - see the `temporal` extra below.
 
 [project.urls]
 Homepage = "https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts"
@@ -46,6 +56,12 @@ dev = [
     "temporalio>=1.7.0,<2.0.0",
     "ruff==0.16.4",
     "mypy==2.3.1",
+    # Needed by tests/test_bedrock_ops_command_safety.py, which loads
+    # tools/bedrock_ops.py. That tool is excluded from the wheel, so these stay
+    # out of the base dependency set - see the note above `dependencies`.
+    "boto3>=1.43.71",
+    "botocore>=1.43.36",
+    "PyYAML>=6.0.3",
 ]
 # Temporal payload codec (adaptix_contracts.temporal). An EXTRA, not a base
 # dependency: every Adaptix service imports adaptix_contracts, but only the ones
