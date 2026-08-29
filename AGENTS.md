@@ -58,3 +58,16 @@ production runtime verified.
 Local rules may be stricter than global rules.
 
 Local rules may never weaken global rules.
+
+## Shared contract and merge-bar alignment
+
+This repository is the shared schema truth owner. Adaptix-Governance owns
+written policy. The two must match, and live GitHub must enforce the same bar.
+
+- Required GitHub Actions job name on pull requests to `main`: `validate`
+- GitHub must require that exact job name. Do not invent a fleet-wide check name.
+- CodeBuild is release authority for this non-deployable library only when a
+  release is cut. It is not the pull-request merge gate.
+- Shared schemas live in `adaptix_contracts/`. Downstream services import the
+  published package. Divergent copies are forbidden.
+- Backup, wip, temp, archive, recovery, and similar leftover branches are forbidden.
