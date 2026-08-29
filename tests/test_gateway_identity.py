@@ -135,9 +135,7 @@ def test_legacy_non_integer_timestamp_is_rejected() -> None:
 
 def test_legacy_empty_secret_fails_closed() -> None:
     with pytest.raises(GatewayIdentitySecretMissing):
-        sign_legacy_identity(
-            user_id="u", tenant_id="t", email="e", shared_secret=""
-        )
+        sign_legacy_identity(user_id="u", tenant_id="t", email="e", shared_secret="")
 
 
 def test_modern_sign_verify_still_roundtrips_through_this_package() -> None:
