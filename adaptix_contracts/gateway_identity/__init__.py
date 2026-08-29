@@ -115,6 +115,33 @@ def canonical_legacy_payload(
     return f"{timestamp}.{user_id}.{tenant_id}.{email}".encode("utf-8")
 
 
+def _legacy_hmac_hex(secret: str, payload: bytes) -> str:
+    return hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+
+
+def _require_legacy_headers(timestamp: str, signature: str) -> None:
+    if not timestamp or not signature:
+        raise GatewayIdentityMissing("request did not come through the Adaptix gateway")
+
+
+def _parse_legacy_timestamp(timestamp: str) -> int:
+    try:
+        return int(timestamp)
+    except (TypeError, ValueError) as exc:
+        raise GatewayIdentityInvalidTimestamp("timestamp is not an integer") from exc
+
+
+def _assert_legacy_fresh(issued_at: int, clock_skew_seconds: int) -> None:
+    if abs(time.time() - issued_at) > clock_skew_seconds:
+        raise GatewayIdentityExpired("timestamp outside tolerance")
+
+
+def _assert_legacy_hmac(secret: str, payload: bytes, signature: str) -> None:
+    expected = _legacy_hmac_hex(secret, payload)
+    if not hmac.compare_digest(expected, signature):
+        raise GatewayIdentityMismatch("signature mismatch")
+
+
 def sign_legacy_identity(
     *,
     user_id: str,
@@ -139,8 +166,7 @@ def sign_legacy_identity(
         tenant_id=tenant_id,
         email=email,
     )
-    signature = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-    return timestamp, signature
+    return timestamp, _legacy_hmac_hex(secret, payload)
 
 
 def verify_legacy_identity(
@@ -163,26 +189,18 @@ def verify_legacy_identity(
         GatewayIdentitySecretMissing: secret is blank.
     """
     secret = _require_secret(shared_secret)
-    if not timestamp or not signature:
-        raise GatewayIdentityMissing("request did not come through the Adaptix gateway")
-
-    try:
-        issued_at = int(timestamp)
-    except (TypeError, ValueError) as exc:
-        raise GatewayIdentityInvalidTimestamp("timestamp is not an integer") from exc
-
-    if abs(time.time() - issued_at) > clock_skew_seconds:
-        raise GatewayIdentityExpired("timestamp outside tolerance")
-
-    payload = canonical_legacy_payload(
-        timestamp=timestamp,
-        user_id=user_id,
-        tenant_id=tenant_id,
-        email=email,
+    _require_legacy_headers(timestamp, signature)
+    _assert_legacy_fresh(_parse_legacy_timestamp(timestamp), clock_skew_seconds)
+    _assert_legacy_hmac(
+        secret,
+        canonical_legacy_payload(
+            timestamp=timestamp,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            email=email,
+        ),
+        signature,
     )
-    expected = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, signature):
-        raise GatewayIdentityMismatch("signature mismatch")
 
 
 # Back-compat aliases the correction named: sign() / verify() for the modern

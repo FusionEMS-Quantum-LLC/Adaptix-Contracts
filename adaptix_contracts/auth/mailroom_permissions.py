@@ -24,6 +24,18 @@ _ADMIN_ROLES: frozenset[str] = frozenset(
 )
 _BILLING_ROLES: frozenset[str] = frozenset({"billing_admin", "billing_operator"})
 _READ_ROLES: frozenset[str] = frozenset({"supervisor", "cad_supervisor"})
+_BILLING_SCOPES: frozenset[str] = frozenset(
+    {MAILROOM_READ, MAILROOM_SEND, MAILROOM_CANCEL, MAILROOM_CERTIFIED_SEND}
+)
+_ROLE_GRANTS: tuple[tuple[frozenset[str], frozenset[str]], ...] = (
+    (_ADMIN_ROLES, MAILROOM_PERMISSIONS),
+    (_BILLING_ROLES, _BILLING_SCOPES),
+    (_READ_ROLES, frozenset({MAILROOM_READ})),
+)
+
+
+def _normalized_roles(roles: Iterable[str]) -> set[str]:
+    return {str(role).strip().lower() for role in roles if str(role).strip()}
 
 
 def mailroom_permissions_for_roles(
@@ -37,18 +49,13 @@ def mailroom_permissions_for_roles(
     may send statements and certified mail. Supervisors may read delivery
     state. Viewer / field / crew receive nothing.
     """
-    normalized = {str(role).strip().lower() for role in roles if str(role).strip()}
+    normalized = _normalized_roles(roles)
     if is_founder or "founder" in normalized:
         return sorted(MAILROOM_PERMISSIONS)
     granted: set[str] = set()
-    if normalized & _ADMIN_ROLES:
-        granted.update(MAILROOM_PERMISSIONS)
-    if normalized & _BILLING_ROLES:
-        granted.update(
-            {MAILROOM_READ, MAILROOM_SEND, MAILROOM_CANCEL, MAILROOM_CERTIFIED_SEND}
-        )
-    if normalized & _READ_ROLES:
-        granted.add(MAILROOM_READ)
+    for role_set, scopes in _ROLE_GRANTS:
+        if normalized & role_set:
+            granted.update(scopes)
     return sorted(granted)
 
 
