@@ -1,0 +1,50 @@
+name: PR Validation
+
+# Runs the repository's declared repo-native validation command
+# (repo.yaml -> validation.command) on every pull request AND on every push to
+# main. Validation only: no build, package, or deployment step — CodeBuild
+# remains the sole deploy authority.
+#
+# Why the push trigger exists (added 2026-08-29). With `pull_request` alone,
+# main was never validated. A defect could land, sit red on main unnoticed, and
+# then surface on the next unrelated pull request, which inherited the blame.
+# Measured case: Adaptix-EPCR-Service PR #438 failed on a broken Alembic
+# migration chain that landed on main on 2026-08-19 and had nothing to do with
+# that PR's change. Running on push to main attributes breakage to the commit
+# that caused it, at the moment it lands.
+#
+# The concurrency group is keyed by ref so a PR's runs supersede each other,
+# while main's runs are never cancelled by PR activity.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: pr-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: repo-native validation (verify-toolchain)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        id: install
+        run: python3 -m pip install uv
+
+      - name: Run declared repo-native validation
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bash scripts/ci/verify-toolchain.sh
