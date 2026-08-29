@@ -16,10 +16,13 @@ fleet-wide (corrected in PR #273). Nothing in the repository's gate could see
 it, because the gate only ever looked through the plugin.
 
 This test closes that hole at the DECLARATION site, which is where the defect
-is actually introduced. It is deliberately independent of mypy: the
-complementary plugin-less mypy run (``mypy-consumer-view.ini``) reports the
-same defect class only where a model is also CONSTRUCTED inside this package,
-which most of these contract modules never do.
+is actually introduced. Its independence from mypy is load-bearing rather than
+defensive: the complementary plugin-less mypy run (``mypy-consumer-view.ini``)
+reports this defect class as ``call-arg`` at a CONSTRUCTION site, and a
+contract library mostly declares models rather than constructing them. On the
+demonstration run for PR #274 a positional default reintroduced in
+``adaptix_contracts/epcr/caregraph_contracts.py`` was invisible to BOTH mypy
+runs and was caught only here.
 """
 
 from __future__ import annotations
@@ -29,21 +32,45 @@ from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "adaptix_contracts"
 
+#: Modules that export the Pydantic field specifier this guard tracks.
+_PYDANTIC_MODULES = frozenset({"pydantic", "pydantic.fields"})
 
-def _called_name(func: ast.expr) -> str | None:
-    """Return the trailing callable name for ``Field(...)`` or ``x.Field(...)``."""
-    if isinstance(func, ast.Name):
-        return func.id
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    return None
+
+def _local_field_names(tree: ast.AST) -> set[str]:
+    """Return the local names bound to Pydantic's ``Field`` in one module.
+
+    ``from pydantic import Field`` is the convention throughout this package,
+    but ``from pydantic import Field as F`` binds the same callable to another
+    name, and a guard matching only the literal string ``Field`` would be
+    silently bypassed by it. Attribute calls such as ``pydantic.Field(...)``
+    are matched separately, on the attribute name.
+    """
+    names = {"Field"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        if (node.module or "") not in _PYDANTIC_MODULES:
+            continue
+        names.update(
+            alias.asname or alias.name for alias in node.names if alias.name == "Field"
+        )
+    return names
+
+
+def _is_field_call(node: ast.Call, local_names: set[str]) -> bool:
+    if isinstance(node.func, ast.Name):
+        return node.func.id in local_names
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr == "Field"
+    return False
 
 
 def _positional_field_defaults(tree: ast.AST) -> list[tuple[int, str]]:
     """Return ``(lineno, rendered_argument)`` for every offending ``Field()`` call."""
+    local_names = _local_field_names(tree)
     offenders: list[tuple[int, str]] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or _called_name(node.func) != "Field":
+        if not isinstance(node, ast.Call) or not _is_field_call(node, local_names):
             continue
         for arg in node.args:
             # `Field(...)` - a bare Ellipsis - is Pydantic's explicit "this field
@@ -54,6 +81,53 @@ def _positional_field_defaults(tree: ast.AST) -> list[tuple[int, str]]:
                 continue
             offenders.append((node.lineno, ast.unparse(arg)))
     return offenders
+
+
+def _findings(source: str) -> list[tuple[int, str]]:
+    return _positional_field_defaults(ast.parse(source))
+
+
+def test_detector_flags_a_positional_default() -> None:
+    """Positive control. A guard that cannot fail proves nothing."""
+    source = (
+        "from pydantic import BaseModel, Field\n"
+        "class M(BaseModel):\n"
+        "    quantity: int = Field(1, ge=1)\n"
+    )
+    assert _findings(source) == [(3, "1")]
+
+
+def test_detector_accepts_the_keyword_and_required_forms() -> None:
+    """Negative control. The forms PEP 681 and Pydantic agree on must pass."""
+    source = (
+        "from pydantic import BaseModel, Field\n"
+        "class M(BaseModel):\n"
+        "    quantity: int = Field(default=1, ge=1)\n"
+        "    tags: list[str] = Field(default_factory=list)\n"
+        "    name: str = Field(..., description='required')\n"
+    )
+    assert _findings(source) == []
+
+
+def test_detector_follows_an_aliased_field_import() -> None:
+    """An alias binds the same callable and must not slip past the guard."""
+    source = (
+        "from pydantic import BaseModel\n"
+        "from pydantic import Field as F\n"
+        "class M(BaseModel):\n"
+        "    quantity: int = F(1, ge=1)\n"
+    )
+    assert _findings(source) == [(4, "1")]
+
+
+def test_detector_follows_a_qualified_field_call() -> None:
+    """``pydantic.Field(...)`` is the same specifier under another spelling."""
+    source = (
+        "import pydantic\n"
+        "class M(pydantic.BaseModel):\n"
+        "    quantity: int = pydantic.Field(1, ge=1)\n"
+    )
+    assert _findings(source) == [(3, "1")]
 
 
 def test_no_positional_field_defaults_in_shipped_package() -> None:
