@@ -64,10 +64,12 @@ def normalize_role(role: str | None) -> str | None:
 
 
 def is_platform_only(role: str | None) -> bool:
+    """Return True when ``role`` is founder, super_admin, or platform_admin."""
     canonical = normalize_role(role)
     return canonical is not None and canonical in PLATFORM_ONLY_ROLES
 
 
 def is_agency_role(role: str | None) -> bool:
+    """Return True when ``role`` is in the agency assignment vocabulary."""
     canonical = normalize_role(role)
     return canonical is not None and canonical in AGENCY_ROLE_VALUES

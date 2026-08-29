@@ -17,6 +17,7 @@ from adaptix_contracts.auth.permissions import (
     QA_REVIEW,
     QA_SUPERVISE,
     WORKSPACE_ADMIN_ACCESS,
+    PermissionId,
 )
 from adaptix_contracts.auth.context import (
     AdaptixRole,
@@ -64,6 +65,7 @@ __all__ = [
     "normalize_role",
     "is_agency_role",
     "is_platform_only",
+    "PermissionId",
     "WORKSPACE_ADMIN_ACCESS",
     "CORE_USERS_MANAGE",
     "CORE_ROLES_MANAGE",

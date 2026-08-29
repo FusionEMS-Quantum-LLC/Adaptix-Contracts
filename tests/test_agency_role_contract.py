@@ -98,6 +98,7 @@ def test_qa_permission_ids_are_stable() -> None:
         QA_SUPERVISE,
         CORE_USERS_MANAGE,
         WORKSPACE_ADMIN_ACCESS,
+        PermissionId,
     )
 
     assert QA_REVIEW == "qa:review"
@@ -106,3 +107,5 @@ def test_qa_permission_ids_are_stable() -> None:
     assert QA_PERMISSIONS == {QA_REVIEW, QA_SUPERVISE, QA_PROTOCOL_MANAGE}
     assert CORE_USERS_MANAGE == "core:users:manage"
     assert WORKSPACE_ADMIN_ACCESS == "workspace:admin:access"
+    assert PermissionId.QA_REVIEW.value == QA_REVIEW
+    assert PermissionId.CORE_USERS_MANAGE.value == CORE_USERS_MANAGE
