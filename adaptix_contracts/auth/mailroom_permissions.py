@@ -9,30 +9,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-MAILROOM_READ = "mailroom:read"
-MAILROOM_SEND = "mailroom:send"
-MAILROOM_CANCEL = "mailroom:cancel"
-MAILROOM_CERTIFIED_SEND = "mailroom:certified:send"
-MAILROOM_ADMIN = "mailroom:admin"
-
-MAILROOM_PERMISSIONS: frozenset[str] = frozenset(
-    {
-        MAILROOM_READ,
-        MAILROOM_SEND,
-        MAILROOM_CANCEL,
-        MAILROOM_CERTIFIED_SEND,
-        MAILROOM_ADMIN,
-    }
-)
-
-# Paid-mail initiation. Viewer / field / crew must never receive these.
-MAILROOM_WRITE_PERMISSIONS: frozenset[str] = frozenset(
-    {
-        MAILROOM_SEND,
-        MAILROOM_CANCEL,
-        MAILROOM_CERTIFIED_SEND,
-        MAILROOM_ADMIN,
-    }
+from adaptix_contracts.auth.permissions import (
+    MAILROOM_ADMIN,
+    MAILROOM_CANCEL,
+    MAILROOM_CERTIFIED_SEND,
+    MAILROOM_PERMISSIONS,
+    MAILROOM_READ,
+    MAILROOM_SEND,
+    MAILROOM_WRITE_PERMISSIONS,
 )
 
 _ADMIN_ROLES: frozenset[str] = frozenset(

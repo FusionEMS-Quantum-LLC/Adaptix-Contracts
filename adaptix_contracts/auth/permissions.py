@@ -20,6 +20,11 @@ class PermissionId(str, Enum):
     QA_REVIEW = "qa:review"
     QA_SUPERVISE = "qa:supervise"
     QA_PROTOCOL_MANAGE = "qa:protocol:manage"
+    MAILROOM_READ = "mailroom:read"
+    MAILROOM_SEND = "mailroom:send"
+    MAILROOM_CANCEL = "mailroom:cancel"
+    MAILROOM_CERTIFIED_SEND = "mailroom:certified:send"
+    MAILROOM_ADMIN = "mailroom:admin"
 
 
 WORKSPACE_ADMIN_ACCESS: Final[str] = PermissionId.WORKSPACE_ADMIN_ACCESS.value
@@ -35,5 +40,30 @@ QA_PERMISSIONS: Final[frozenset[str]] = frozenset(
         PermissionId.QA_REVIEW.value,
         PermissionId.QA_SUPERVISE.value,
         PermissionId.QA_PROTOCOL_MANAGE.value,
+    }
+)
+
+MAILROOM_READ: Final[str] = PermissionId.MAILROOM_READ.value
+MAILROOM_SEND: Final[str] = PermissionId.MAILROOM_SEND.value
+MAILROOM_CANCEL: Final[str] = PermissionId.MAILROOM_CANCEL.value
+MAILROOM_CERTIFIED_SEND: Final[str] = PermissionId.MAILROOM_CERTIFIED_SEND.value
+MAILROOM_ADMIN: Final[str] = PermissionId.MAILROOM_ADMIN.value
+
+MAILROOM_PERMISSIONS: Final[frozenset[str]] = frozenset(
+    {
+        PermissionId.MAILROOM_READ.value,
+        PermissionId.MAILROOM_SEND.value,
+        PermissionId.MAILROOM_CANCEL.value,
+        PermissionId.MAILROOM_CERTIFIED_SEND.value,
+        PermissionId.MAILROOM_ADMIN.value,
+    }
+)
+
+MAILROOM_WRITE_PERMISSIONS: Final[frozenset[str]] = frozenset(
+    {
+        PermissionId.MAILROOM_SEND.value,
+        PermissionId.MAILROOM_CANCEL.value,
+        PermissionId.MAILROOM_CERTIFIED_SEND.value,
+        PermissionId.MAILROOM_ADMIN.value,
     }
 )
