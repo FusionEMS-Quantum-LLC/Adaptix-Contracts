@@ -80,3 +80,5 @@ pip-wheel-metadata/
 # under reports/ is still visible to git (repository-shape.yml requires narrow
 # rules and prohibits broad patterns that could hide legitimate source).
 /reports/toolchain-inventory.json
+Thumbs.db
+*.log
