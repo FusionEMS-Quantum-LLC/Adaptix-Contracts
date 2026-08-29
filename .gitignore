@@ -53,6 +53,9 @@ coverage.xml
 
 # Type checking
 .mypy_cache/
+# Cache for the plugin-less consumer-view run (mypy-consumer-view.ini).
+# Deliberately separate: mypy keys cache entries to the active option set.
+.mypy_cache_consumer_view/
 .dmypy.json
 dmypy.json
 .pytype/
