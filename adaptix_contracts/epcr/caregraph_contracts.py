@@ -121,7 +121,7 @@ class OPQRSTSymptomDTO(BaseModel):
     radiation_present: Optional[bool] = None
     radiation_locations: Optional[list[str]] = None
     region_primary: Optional[str] = None
-    severity_scale: Optional[int] = Field(default=None, ge=0, le=10)
+    severity_scale: Optional[int] = Field(None, ge=0, le=10)
     time_duration_minutes: Optional[int] = None
     time_progression: Optional[str] = None
     associated_symptoms: Optional[list[str]] = None
