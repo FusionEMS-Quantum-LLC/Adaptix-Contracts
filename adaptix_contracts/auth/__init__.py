@@ -1,5 +1,23 @@
 """Adaptix auth context contracts."""
 
+from adaptix_contracts.auth.agency_roles import (
+    AGENCY_ROLE_VALUES,
+    PLATFORM_ONLY_ROLES,
+    AgencyRole,
+    PlatformOnlyRole,
+    is_agency_role,
+    is_platform_only,
+    normalize_role,
+)
+from adaptix_contracts.auth.permissions import (
+    CORE_ROLES_MANAGE,
+    CORE_USERS_MANAGE,
+    QA_PERMISSIONS,
+    QA_PROTOCOL_MANAGE,
+    QA_REVIEW,
+    QA_SUPERVISE,
+    WORKSPACE_ADMIN_ACCESS,
+)
 from adaptix_contracts.auth.context import (
     AdaptixRole,
     AdaptixRoleSet,
@@ -39,6 +57,20 @@ from adaptix_contracts.auth.service_token import (
 )
 
 __all__ = [
+    "AgencyRole",
+    "PlatformOnlyRole",
+    "AGENCY_ROLE_VALUES",
+    "PLATFORM_ONLY_ROLES",
+    "normalize_role",
+    "is_agency_role",
+    "is_platform_only",
+    "WORKSPACE_ADMIN_ACCESS",
+    "CORE_USERS_MANAGE",
+    "CORE_ROLES_MANAGE",
+    "QA_REVIEW",
+    "QA_SUPERVISE",
+    "QA_PROTOCOL_MANAGE",
+    "QA_PERMISSIONS",
     "AdaptixRole",
     "AdaptixRoleSet",
     "AdaptixTenantContext",

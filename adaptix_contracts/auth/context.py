@@ -18,25 +18,44 @@ import uuid
 
 
 class AdaptixRole(str, Enum):
-    """Canonical role set for Adaptix platform."""
+    """Recognized identity-role strings for verified token parsing.
+
+    Agency-assignable values must match ``AgencyRole`` in
+    ``adaptix_contracts.auth.agency_roles``. Platform-only values must match
+    ``PlatformOnlyRole``. Occupation titles below are recognized on the wire
+    so a legacy claim is not silently dropped; they are not a second agency
+    assignment catalog.
+    """
 
     FOUNDER = "founder"
+    SUPER_ADMIN = "super_admin"
+    PLATFORM_ADMIN = "platform_admin"
+    TENANT_ADMIN = "tenant_admin"
     AGENCY_ADMIN = "agency_admin"
+    ADMIN = "admin"
+    SUPERVISOR = "supervisor"
+    CAD_SUPERVISOR = "cad_supervisor"
     DISPATCHER = "dispatcher"
+    CREW_MEMBER = "crew_member"
+    BILLING_ADMIN = "billing_admin"
+    BILLING_OPERATOR = "billing_operator"
+    OPERATOR = "operator"
+    FIELD_USER = "field_user"
+    MEDICAL_DIRECTOR = "medical_director"
+    ASSISTANT_MEDICAL_DIRECTOR = "assistant_medical_director"
+    QA_REVIEWER = "qa_reviewer"
+    VIEWER = "viewer"
+    SERVICE_ACCOUNT = "service_account"
+    # Occupation / domain titles — parseable, not agency-assignable.
     PARAMEDIC = "paramedic"
     EMT = "emt"
-    MEDICAL_DIRECTOR = "medical_director"
     FIREFIGHTER = "firefighter"
     PILOT = "pilot"
-    CREW_MEMBER = "crew_member"
     BILLING_SPECIALIST = "billing_specialist"
-    BILLING_ADMIN = "billing_admin"
-    SUPERVISOR = "supervisor"
     WORKFORCE_MANAGER = "workforce_manager"
     INVENTORY_MANAGER = "inventory_manager"
     NARCOTICS_OFFICER = "narcotics_officer"
     READ_ONLY = "read_only"
-    SERVICE_ACCOUNT = "service_account"
 
 
 class AdaptixRoleSet(BaseModel):
