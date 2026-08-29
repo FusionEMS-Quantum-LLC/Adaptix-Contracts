@@ -61,9 +61,10 @@ class FormValidationRule(BaseModel):
         description="e.g. required, min_length, max_length, regex, min, max.",
     )
     value: Optional[str] = Field(
-        None, description="Rule parameter serialized as a string, when applicable."
+        default=None,
+        description="Rule parameter serialized as a string, when applicable.",
     )
-    message: Optional[str] = Field(None, max_length=500)
+    message: Optional[str] = Field(default=None, max_length=500)
 
 
 class FormFieldDefinition(BaseModel):
@@ -73,14 +74,14 @@ class FormFieldDefinition(BaseModel):
     label: str = Field(..., min_length=1, max_length=255)
     field_type: FormFieldType
     required: bool = False
-    placeholder: Optional[str] = Field(None, max_length=255)
-    help_text: Optional[str] = Field(None, max_length=1000)
+    placeholder: Optional[str] = Field(default=None, max_length=255)
+    help_text: Optional[str] = Field(default=None, max_length=1000)
     options: list[str] = Field(
         default_factory=list, description="Choices for select/radio/multiselect."
     )
     default_value: Optional[str] = None
     validation_rules: list[FormValidationRule] = Field(default_factory=list)
-    order: int = Field(0, ge=0)
+    order: int = Field(default=0, ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -91,8 +92,8 @@ class FormFieldDefinition(BaseModel):
 class FormSchema(BaseModel):
     """An ordered set of field definitions describing a form."""
 
-    title: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = Field(None, max_length=2000)
+    title: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
     fields: list[FormFieldDefinition] = Field(default_factory=list)
 
 
@@ -120,9 +121,9 @@ class FormTemplate(BaseModel):
     tenant_id: UUID
     key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=2000)
+    description: Optional[str] = Field(default=None, max_length=2000)
     status: FormStatus = FormStatus.DRAFT
-    current_version: int = Field(1, ge=1)
+    current_version: int = Field(default=1, ge=1)
     latest_version: Optional[FormVersion] = None
     created_at: datetime
     updated_at: datetime
@@ -138,7 +139,7 @@ class FormValidationError(BaseModel):
 
     field_key: str = Field(..., min_length=1, max_length=160)
     message: str = Field(..., min_length=1, max_length=500)
-    rule_type: Optional[str] = Field(None, max_length=64)
+    rule_type: Optional[str] = Field(default=None, max_length=64)
 
 
 class FormSubmission(BaseModel):
@@ -168,15 +169,15 @@ class FormTemplateCreateRequest(BaseModel):
 
     key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=2000)
+    description: Optional[str] = Field(default=None, max_length=2000)
     form_schema: FormSchema
 
 
 class FormTemplateUpdateRequest(BaseModel):
     """Partial update of a form template's metadata / lifecycle status."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=2000)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
     status: Optional[FormStatus] = None
 
 
@@ -192,7 +193,7 @@ class FormSubmissionCreateRequest(BaseModel):
 
     values: dict[str, Any] = Field(default_factory=dict)
     submitted_by: Optional[UUID] = None
-    idempotency_key: Optional[str] = Field(None, max_length=255)
+    idempotency_key: Optional[str] = Field(default=None, max_length=255)
 
 
 # ---------------------------------------------------------------------------
@@ -204,18 +205,18 @@ class FormTemplateListResponse(BaseModel):
     """Paginated set of form templates."""
 
     templates: list[FormTemplate] = Field(default_factory=list)
-    total: int = Field(0, ge=0)
-    limit: int = Field(50, ge=1, le=500)
-    offset: int = Field(0, ge=0)
+    total: int = Field(default=0, ge=0)
+    limit: int = Field(default=50, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
 
 
 class FormSubmissionListResponse(BaseModel):
     """Paginated set of form submissions."""
 
     submissions: list[FormSubmission] = Field(default_factory=list)
-    total: int = Field(0, ge=0)
-    limit: int = Field(50, ge=1, le=500)
-    offset: int = Field(0, ge=0)
+    total: int = Field(default=0, ge=0)
+    limit: int = Field(default=50, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
 
 
 # ---------------------------------------------------------------------------

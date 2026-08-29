@@ -61,18 +61,20 @@ class InventoryItemEvent(BaseModel):
 
     # Before/after for updates
     before_state: Optional[dict[str, Any]] = Field(
-        None, description="State before mutation"
+        default=None, description="State before mutation"
     )
     after_state: Optional[dict[str, Any]] = Field(
-        None, description="State after mutation"
+        default=None, description="State after mutation"
     )
 
-    actor_user_id: Optional[str] = Field(None, description="User performing action")
+    actor_user_id: Optional[str] = Field(
+        default=None, description="User performing action"
+    )
     timestamp: datetime = Field(..., description="Event timestamp")
     correlation_id: Optional[str] = Field(
-        None, description="Correlation ID for tracing"
+        default=None, description="Correlation ID for tracing"
     )
-    trace_id: Optional[str] = Field(None, description="Distributed trace ID")
+    trace_id: Optional[str] = Field(default=None, description="Distributed trace ID")
 
 
 class InventoryStockAdjustmentEvent(BaseModel):
@@ -80,7 +82,7 @@ class InventoryStockAdjustmentEvent(BaseModel):
 
     event_type: InventoryEventType = Field(default=InventoryEventType.STOCK_ADJUSTED)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(None, description="Unit/station ID")
+    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
     item_id: str = Field(..., description="Inventory item UUID")
     item_name: str = Field(..., description="Item name")
     category: str = Field(..., description="Item category")
@@ -95,10 +97,12 @@ class InventoryStockAdjustmentEvent(BaseModel):
     cost_per_unit: Decimal = Field(..., description="Cost per unit")
     adjustment_cost: Decimal = Field(..., description="Cost impact of adjustment")
 
-    actor_user_id: Optional[str] = Field(None, description="User performing action")
+    actor_user_id: Optional[str] = Field(
+        default=None, description="User performing action"
+    )
     timestamp: datetime = Field(..., description="Event timestamp")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    trace_id: Optional[str] = Field(None, description="Distributed trace ID")
+    correlation_id: Optional[str] = Field(default=None, description="Correlation ID")
+    trace_id: Optional[str] = Field(default=None, description="Distributed trace ID")
 
 
 class InventoryLowStockAlert(BaseModel):
@@ -106,7 +110,7 @@ class InventoryLowStockAlert(BaseModel):
 
     event_type: InventoryEventType = Field(default=InventoryEventType.LOW_STOCK_ALERT)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(None, description="Unit/station ID")
+    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
 
     item_id: str = Field(..., description="Inventory item UUID")
     item_name: str = Field(..., description="Item name")
@@ -131,8 +135,8 @@ class InventoryLowStockAlert(BaseModel):
     )
 
     timestamp: datetime = Field(..., description="Event timestamp")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    trace_id: Optional[str] = Field(None, description="Distributed trace ID")
+    correlation_id: Optional[str] = Field(default=None, description="Correlation ID")
+    trace_id: Optional[str] = Field(default=None, description="Distributed trace ID")
 
 
 class InventoryExpirationAlert(BaseModel):
@@ -140,7 +144,7 @@ class InventoryExpirationAlert(BaseModel):
 
     event_type: InventoryEventType = Field(default=InventoryEventType.EXPIRATION_ALERT)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(None, description="Unit/station ID")
+    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
 
     item_id: str = Field(..., description="Inventory item UUID")
     item_name: str = Field(..., description="Item name")
@@ -159,8 +163,8 @@ class InventoryExpirationAlert(BaseModel):
     )
 
     timestamp: datetime = Field(..., description="Event timestamp")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    trace_id: Optional[str] = Field(None, description="Distributed trace ID")
+    correlation_id: Optional[str] = Field(default=None, description="Correlation ID")
+    trace_id: Optional[str] = Field(default=None, description="Distributed trace ID")
 
 
 class InventoryReadinessScoreEvent(BaseModel):
@@ -186,8 +190,8 @@ class InventoryReadinessScoreEvent(BaseModel):
     )
 
     timestamp: datetime = Field(..., description="Event timestamp")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    trace_id: Optional[str] = Field(None, description="Distributed trace ID")
+    correlation_id: Optional[str] = Field(default=None, description="Correlation ID")
+    trace_id: Optional[str] = Field(default=None, description="Distributed trace ID")
 
 
 class InventoryAnalyticsEvent(BaseModel):
@@ -195,22 +199,22 @@ class InventoryAnalyticsEvent(BaseModel):
 
     event_type: InventoryEventType = Field(...)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(None, description="Unit/station ID")
+    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
 
     timestamp: datetime = Field(..., description="Event timestamp")
     category: str = Field(..., description="Item category or event category")
 
     # Generic metrics
-    quantity: Optional[int] = Field(None, description="Quantity involved")
-    cost: Optional[Decimal] = Field(None, description="Cost impact")
+    quantity: Optional[int] = Field(default=None, description="Quantity involved")
+    cost: Optional[Decimal] = Field(default=None, description="Cost impact")
 
     # Custom fields for different event types
     metadata: Optional[dict[str, Any]] = Field(
-        None, description="Event-specific metadata"
+        default=None, description="Event-specific metadata"
     )
 
-    correlation_id: Optional[str] = Field(None, description="Correlation ID")
-    trace_id: Optional[str] = Field(None, description="Distributed trace ID")
+    correlation_id: Optional[str] = Field(default=None, description="Correlation ID")
+    trace_id: Optional[str] = Field(default=None, description="Distributed trace ID")
 
 
 __all__ = [

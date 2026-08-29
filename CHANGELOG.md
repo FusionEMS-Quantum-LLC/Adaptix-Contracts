@@ -7,7 +7,7 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `4.3.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
@@ -72,6 +72,65 @@ re-pin. Verified: the public surface diff between `v4.1.0` and `v4.3.0` is
   it landed on `main` in #255, after the tag was cut — so no released
   artifact is affected. Nothing in this repository or the fleet reads the
   file by path; the only reference was the 4.3.0 entry below.
+
+## [5.0.0] - 2026-08-28
+
+Major release. One wire-format change to a controlled-substance field and one
+dependency-set change, both of which can affect a consumer, so this is a major
+version per `DEPRECATION_POLICY.md` rather than a minor.
+
+### Fixed
+
+- **`ResourceExecutionContract.quantity` was `float`.** That model is, in its
+  own words, the "Canonical resource, medication, and narcotic execution
+  event", so a controlled-substance quantity was carried in binary floating
+  point, where `0.1 + 0.2 != 0.3`. It is now
+  `Decimal | None = Field(default=None, ge=Decimal("0"))`, matching the exact
+  pattern `schemas/narcotic.py` already uses for every narcotic quantity.
+  **Wire-format change:** the field now serialises as a JSON string, the same
+  as every other exact quantity in this package since 2.37.0. A consumer that
+  parses it as a JSON number must be updated.
+- **The precision guard could not see the defect.** `CONVERTED_MODULES` in
+  `tests/test_money_and_quantity_precision.py` did not list `fire_contracts`,
+  so the repository's own `MUST_BE_EXACT` check never scanned the module that
+  held the only real offender. `fire_contracts` is now covered. Proven in both
+  directions: with the float restored the guard fails with
+  `assert not ['ResourceExecutionContract.quantity: float | None']`; with the
+  fix it passes.
+- A package-wide sweep of all 1396 models found exactly three `float` fields
+  matching the money/quantity vocabulary. The other two,
+  `cct.models.InfusionRun.concentration_amount` and `.rate_amount`, are left
+  as `float` deliberately: one is a rate and the other the numerator of a
+  concentration ratio, both covered by this changelog's existing rule that
+  rates, percentages, scores and durations stay float on purpose.
+
+### Changed
+
+- **`boto3` and `PyYAML` are no longer base dependencies.** Nothing this
+  package ships imports either (0 references under `adaptix_contracts/`);
+  their only consumer is `tools/bedrock_ops.py`, which
+  `[tool.setuptools.packages.find].exclude` keeps out of the wheel. Every
+  consumer was installing boto3 — and botocore, s3transfer, jmespath, six —
+  for code it could not reach. They moved to the `dev` extra, which the repo's
+  own gate needs because `tests/test_bedrock_ops_command_safety.py` loads that
+  tool. A consumer that imported boto3 while relying on this package to supply
+  it must now declare it directly; 48 fleet repos already do.
+- All 28 pydantic v1-style `class Config:` blocks became
+  `model_config = ConfigDict(...)`, across `epcr/clinical_contracts.py` (21),
+  `epcr/caregraph_contracts.py` (4), `auth/cognito.py` (2) and
+  `cad/nemsis_handoff.py` (1). Every setting is preserved exactly; the two
+  forms are equivalent in pydantic v2. This removes the last API pydantic
+  schedules for removal in v3 — `PydanticDeprecatedSince20` warnings during
+  the suite are now zero, down from two.
+- `RBAC_MIGRATION_TEMPLATE.md` told services to `cp` `rbac_contracts.py`,
+  `core_service_integration.py` and `auth/` into their own tree. That is the
+  "Divergent contract copies in sibling repositories" that this repository's
+  own `DEPRECATION_POLICY.md` lists under **Forbidden changes**, and it is the
+  documented reason permission values are hand-duplicated downstream rather
+  than imported. It now shows the import, and pins by commit instead of the
+  stale `adaptix_contracts>=0.1.0` floor it previously suggested. The
+  `python-jose` line was dropped from the example dependency list: this
+  package uses PyJWT.
 
 ## [4.3.0] - 2026-08-28
 

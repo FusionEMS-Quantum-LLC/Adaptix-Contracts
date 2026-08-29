@@ -101,7 +101,7 @@ class ChartLockBlockedEvent(BaseModel):
     )
     mac_region: MacRegion
     attempted_by_user_id: Optional[str] = Field(
-        None, description="ePCR user who attempted the lock"
+        default=None, description="ePCR user who attempted the lock"
     )
     occurred_at: datetime
 

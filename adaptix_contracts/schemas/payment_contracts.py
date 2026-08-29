@@ -73,8 +73,8 @@ class StripeCustomerRef(BaseModel):
 
     tenant_id: UUID
     stripe_customer_id: str = Field(..., min_length=1, max_length=64)
-    email: Optional[str] = Field(None, max_length=320)
-    default_payment_method_id: Optional[str] = Field(None, max_length=64)
+    email: Optional[str] = Field(default=None, max_length=320)
+    default_payment_method_id: Optional[str] = Field(default=None, max_length=64)
     created_at: Optional[datetime] = None
 
 
@@ -85,9 +85,9 @@ class SubscriptionRef(BaseModel):
     stripe_subscription_id: str = Field(..., min_length=1, max_length=64)
     stripe_customer_id: str = Field(..., min_length=1, max_length=64)
     status: SubscriptionStatus
-    price_id: Optional[str] = Field(None, max_length=64)
-    product_id: Optional[str] = Field(None, max_length=64)
-    quantity: int = Field(1, ge=0)
+    price_id: Optional[str] = Field(default=None, max_length=64)
+    product_id: Optional[str] = Field(default=None, max_length=64)
+    quantity: int = Field(default=1, ge=0)
     current_period_start: Optional[datetime] = None
     current_period_end: Optional[datetime] = None
     cancel_at_period_end: bool = False
@@ -100,11 +100,11 @@ class InvoiceRef(BaseModel):
     tenant_id: UUID
     stripe_invoice_id: str = Field(..., min_length=1, max_length=64)
     stripe_customer_id: str = Field(..., min_length=1, max_length=64)
-    stripe_subscription_id: Optional[str] = Field(None, max_length=64)
+    stripe_subscription_id: Optional[str] = Field(default=None, max_length=64)
     status: InvoiceStatus
     amount_due: Decimal = Field(..., ge=Decimal("0"))
-    amount_paid: Decimal = Field(Decimal("0"), ge=Decimal("0"))
-    currency: str = Field("usd", min_length=3, max_length=3)
+    amount_paid: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    currency: str = Field(default="usd", min_length=3, max_length=3)
     hosted_invoice_url: Optional[str] = None
     invoice_pdf_url: Optional[str] = None
     period_start: Optional[datetime] = None
@@ -123,12 +123,12 @@ class CheckoutSessionRequest(BaseModel):
     tenant_id: UUID
     correlation_id: Optional[str] = None
     price_id: str = Field(..., min_length=1, max_length=64)
-    quantity: int = Field(1, ge=1)
+    quantity: int = Field(default=1, ge=1)
     success_url: str = Field(..., min_length=1, max_length=2000)
     cancel_url: str = Field(..., min_length=1, max_length=2000)
-    mode: str = Field("subscription", max_length=32)
-    customer_email: Optional[str] = Field(None, max_length=320)
-    stripe_customer_id: Optional[str] = Field(None, max_length=64)
+    mode: str = Field(default="subscription", max_length=32)
+    customer_email: Optional[str] = Field(default=None, max_length=320)
+    stripe_customer_id: Optional[str] = Field(default=None, max_length=64)
     metadata: dict[str, str] = Field(default_factory=dict)
 
 
@@ -171,12 +171,12 @@ class PaymentEvent(BaseModel):
     event_id: Optional[UUID] = None
     tenant_id: UUID
     event_type: PaymentEventType
-    stripe_event_id: Optional[str] = Field(None, max_length=64)
-    stripe_customer_id: Optional[str] = Field(None, max_length=64)
-    stripe_subscription_id: Optional[str] = Field(None, max_length=64)
-    stripe_invoice_id: Optional[str] = Field(None, max_length=64)
-    amount: Optional[Decimal] = Field(None, ge=Decimal("0"))
-    currency: str = Field("usd", min_length=3, max_length=3)
+    stripe_event_id: Optional[str] = Field(default=None, max_length=64)
+    stripe_customer_id: Optional[str] = Field(default=None, max_length=64)
+    stripe_subscription_id: Optional[str] = Field(default=None, max_length=64)
+    stripe_invoice_id: Optional[str] = Field(default=None, max_length=64)
+    amount: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+    currency: str = Field(default="usd", min_length=3, max_length=3)
     correlation_id: Optional[str] = None
     idempotency_key: Optional[str] = None
     payload: dict[str, Any] = Field(default_factory=dict)

@@ -63,7 +63,7 @@ class NotificationDeliveryStatus(BaseModel):
     status: NotificationStatus
     correlation_id: Optional[str] = None
     template_key: Optional[str] = None
-    attempts: int = Field(0, ge=0)
+    attempts: int = Field(default=0, ge=0)
     provider_message_id: Optional[str] = None
     error_reason: Optional[str] = None
     queued_at: Optional[datetime] = None
@@ -107,10 +107,10 @@ class NotificationTemplate(BaseModel):
     tenant_id: UUID
     key: str = Field(..., min_length=1, max_length=160)
     channel: NotificationChannel
-    subject_template: Optional[str] = Field(None, max_length=500)
+    subject_template: Optional[str] = Field(default=None, max_length=500)
     body_template: str = Field(..., min_length=1)
-    locale: str = Field("en-US", max_length=16)
-    description: Optional[str] = Field(None, max_length=1000)
+    locale: str = Field(default="en-US", max_length=16)
+    description: Optional[str] = Field(default=None, max_length=1000)
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
@@ -136,17 +136,17 @@ class NotificationSendRequest(BaseModel):
     recipient_id: UUID
     channel: NotificationChannel
     category: str = Field(..., min_length=1, max_length=100)
-    subject: Optional[str] = Field(None, max_length=500)
+    subject: Optional[str] = Field(default=None, max_length=500)
     body: str = Field(..., min_length=1)
-    template_key: Optional[str] = Field(None, max_length=160)
+    template_key: Optional[str] = Field(default=None, max_length=160)
     correlation_id: Optional[str] = None
     idempotency_key: Optional[str] = Field(
-        None,
+        default=None,
         max_length=255,
         description="Dedup key; a retry with the same key must not double-send.",
     )
-    reference_type: Optional[str] = Field(None, max_length=64)
-    reference_id: Optional[str] = Field(None, max_length=255)
+    reference_type: Optional[str] = Field(default=None, max_length=64)
+    reference_id: Optional[str] = Field(default=None, max_length=255)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -174,12 +174,12 @@ class NotificationPreferenceSet(BaseModel):
     in_app_enabled: bool = True
     push_enabled: bool = False
     quiet_hours_start: Optional[str] = Field(
-        None, max_length=5, description="Local start time HH:MM, 24-hour."
+        default=None, max_length=5, description="Local start time HH:MM, 24-hour."
     )
     quiet_hours_end: Optional[str] = Field(
-        None, max_length=5, description="Local end time HH:MM, 24-hour."
+        default=None, max_length=5, description="Local end time HH:MM, 24-hour."
     )
-    timezone: str = Field("UTC", max_length=64)
+    timezone: str = Field(default="UTC", max_length=64)
     updated_at: datetime
 
 

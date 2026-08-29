@@ -166,8 +166,8 @@ class ClaimContract(BaseModel):
     status: ClaimStatus
 
     total_charge_cents: int = Field(..., ge=0)
-    total_paid_cents: int = Field(0, ge=0)
-    total_adjustment_cents: int = Field(0, ge=0)
+    total_paid_cents: int = Field(default=0, ge=0)
+    total_adjustment_cents: int = Field(default=0, ge=0)
     balance_cents: int = Field(..., ge=0)
 
     line_items: list[ClaimLineItem] = Field(default_factory=list)

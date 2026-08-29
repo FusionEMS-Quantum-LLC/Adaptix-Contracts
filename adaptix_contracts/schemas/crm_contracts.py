@@ -86,13 +86,17 @@ class RelationshipCreateRequest(BaseModel):
     )
     contact_person: str = Field(..., description="Primary contact person.")
     contact_email: str = Field(..., description="Primary contact email.")
-    contact_phone: str | None = Field(None, description="Primary contact phone.")
+    contact_phone: str | None = Field(
+        default=None, description="Primary contact phone."
+    )
     stage: RelationshipStage = Field(
         default=RelationshipStage.PROSPECT,
         description="Initial stage.",
     )
-    estimated_value: int | None = Field(None, description="Estimated value in USD.")
-    notes: str | None = Field(None, description="Free-text notes.")
+    estimated_value: int | None = Field(
+        default=None, description="Estimated value in USD."
+    )
+    notes: str | None = Field(default=None, description="Free-text notes.")
 
 
 class RelationshipResponse(BaseModel):
@@ -126,7 +130,9 @@ class RelationshipStageTransitionRequest(BaseModel):
         ...,
         description="Target stage.",
     )
-    notes: str | None = Field(None, description="Optional notes for the transition.")
+    notes: str | None = Field(
+        default=None, description="Optional notes for the transition."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -142,9 +148,13 @@ class InvestorCreateRequest(BaseModel):
         ...,
         description="Investor type.",
     )
-    contact_person: str | None = Field(None, description="Primary contact person.")
-    contact_email: str | None = Field(None, description="Primary contact email.")
-    notes: str | None = Field(None, description="Free-text notes.")
+    contact_person: str | None = Field(
+        default=None, description="Primary contact person."
+    )
+    contact_email: str | None = Field(
+        default=None, description="Primary contact email."
+    )
+    notes: str | None = Field(default=None, description="Free-text notes.")
     metadata_json: dict = Field(default_factory=dict)
 
 
@@ -172,12 +182,12 @@ class InvestorRoundCreateRequest(BaseModel):
     target_amount: Decimal = Field(
         ..., gt=Decimal("0"), description="Target raise amount in USD."
     )
-    close_date: date | None = Field(None, description="Expected close date.")
+    close_date: date | None = Field(default=None, description="Expected close date.")
     status: str = Field(
         default="open",
         description="Round status: open | closed | cancelled.",
     )
-    notes: str | None = Field(None, description="Free-text notes.")
+    notes: str | None = Field(default=None, description="Free-text notes.")
 
 
 class InvestorRoundResponse(BaseModel):
@@ -206,7 +216,7 @@ class InvestorCommitmentCreateRequest(BaseModel):
         default=CommitmentStatus.PLEDGED,
         description="Commitment status.",
     )
-    notes: str | None = Field(None, description="Free-text notes.")
+    notes: str | None = Field(default=None, description="Free-text notes.")
 
 
 class InvestorCommitmentResponse(BaseModel):
@@ -250,9 +260,13 @@ class PartnerCreateRequest(BaseModel):
         default=PartnerStatus.ACTIVE,
         description="Partner status.",
     )
-    contact_person: str | None = Field(None, description="Primary contact person.")
-    contact_email: str | None = Field(None, description="Primary contact email.")
-    notes: str | None = Field(None, description="Free-text notes.")
+    contact_person: str | None = Field(
+        default=None, description="Primary contact person."
+    )
+    contact_email: str | None = Field(
+        default=None, description="Primary contact email."
+    )
+    notes: str | None = Field(default=None, description="Free-text notes.")
     metadata_json: dict = Field(default_factory=dict)
 
 
@@ -280,8 +294,8 @@ class PartnerAgreementCreateRequest(BaseModel):
         ..., description="Agreement type: nda | msa | referral | reseller."
     )
     effective_date: date = Field(..., description="Agreement effective date.")
-    expiry_date: date | None = Field(None, description="Agreement expiry date.")
-    notes: str | None = Field(None, description="Free-text notes.")
+    expiry_date: date | None = Field(default=None, description="Agreement expiry date.")
+    notes: str | None = Field(default=None, description="Free-text notes.")
 
 
 class PartnerAgreementResponse(BaseModel):
@@ -416,31 +430,34 @@ class FounderOpportunityCreateRequest(BaseModel):
         ...,
         description="Type: partnership | investment | acquisition | strategic | other.",
     )
-    description: str | None = Field(None, description="Opportunity description.")
+    description: str | None = Field(
+        default=None, description="Opportunity description."
+    )
     status: OpportunityStatus = Field(
         default=OpportunityStatus.DISCOVERED,
         description="Initial status.",
     )
     estimated_value: int | None = Field(
-        None, ge=0, description="Estimated value in USD."
+        default=None, ge=0, description="Estimated value in USD."
     )
     likelihood_percentage: float | None = Field(
-        None, ge=0.0, le=100.0, description="Win probability 0-100."
+        default=None, ge=0.0, le=100.0, description="Win probability 0-100."
     )
-    target_date: date | None = Field(None, description="Target close date.")
-    notes: str | None = Field(None, description="Free-text notes.")
+    target_date: date | None = Field(default=None, description="Target close date.")
+    notes: str | None = Field(default=None, description="Free-text notes.")
 
 
 class FounderOpportunityUpdateRequest(BaseModel):
     """Update a founder opportunity."""
 
-    title: str | None = Field(None, min_length=1)
+    title: str | None = Field(default=None, min_length=1)
     status: OpportunityStatus | None = Field(
-        None, description="discovered | evaluating | pursuing | won | lost | stalled."
+        default=None,
+        description="discovered | evaluating | pursuing | won | lost | stalled.",
     )
     description: str | None = None
-    estimated_value: int | None = Field(None, ge=0)
-    likelihood_percentage: float | None = Field(None, ge=0.0, le=100.0)
+    estimated_value: int | None = Field(default=None, ge=0)
+    likelihood_percentage: float | None = Field(default=None, ge=0.0, le=100.0)
     target_date: date | None = None
     notes: str | None = None
 

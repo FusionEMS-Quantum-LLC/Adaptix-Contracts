@@ -29,7 +29,7 @@ class ServiceHealthStatus(str, Enum):
 class QueueMetric(BaseModel):
     queue_name: str
     depth: int = Field(..., ge=0)
-    oldest_age_seconds: Optional[int] = Field(None, ge=0)
+    oldest_age_seconds: Optional[int] = Field(default=None, ge=0)
     measured_at: datetime
 
 
@@ -61,7 +61,7 @@ class ServiceHealthSummary(BaseModel):
     status: ServiceHealthStatus
     severity: MetricSeverity = MetricSeverity.NORMAL
 
-    uptime_seconds: Optional[int] = Field(None, ge=0)
+    uptime_seconds: Optional[int] = Field(default=None, ge=0)
     version: Optional[str] = None
     message: Optional[str] = None
 

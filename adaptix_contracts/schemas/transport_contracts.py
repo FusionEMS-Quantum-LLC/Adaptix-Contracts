@@ -40,8 +40,8 @@ class RecurrencePatternContract(str, Enum):
 
 class TransportRequestCreate(BaseModel):
     patient_name: str = Field(..., max_length=255)
-    patient_dob: Optional[str] = Field(None, description="ISO 8601 date string")
-    patient_mrn: Optional[str] = Field(None, max_length=100)
+    patient_dob: Optional[str] = Field(default=None, description="ISO 8601 date string")
+    patient_mrn: Optional[str] = Field(default=None, max_length=100)
     pickup_facility_id: str
     destination_facility_id: str
     transport_type: TransportRequestTypeContract
@@ -50,12 +50,12 @@ class TransportRequestCreate(BaseModel):
     appointment_at: Optional[datetime] = None
     pcs_required: bool = False
     authorization_required: bool = False
-    payer_name: Optional[str] = Field(None, max_length=255)
-    payer_id: Optional[str] = Field(None, max_length=100)
+    payer_name: Optional[str] = Field(default=None, max_length=255)
+    payer_id: Optional[str] = Field(default=None, max_length=100)
     is_recurring: bool = False
     recurrence_pattern: Optional[RecurrencePatternContract] = None
     recurrence_end_date: Optional[datetime] = None
-    notes: Optional[str] = Field(None, max_length=2000)
+    notes: Optional[str] = Field(default=None, max_length=2000)
 
 
 class TransportRequestResponse(BaseModel):
@@ -93,7 +93,7 @@ class TripScheduleRequest(BaseModel):
     scheduled_dropoff_at: Optional[datetime] = None
     unit_id: Optional[str] = None
     crew_ids: list[str] = Field(default_factory=list)
-    notes: Optional[str] = Field(None, max_length=2000)
+    notes: Optional[str] = Field(default=None, max_length=2000)
 
 
 class TripResponse(BaseModel):
@@ -116,7 +116,7 @@ class RecurringSeriesCreate(BaseModel):
     series_start_date: datetime
     series_end_date: Optional[datetime] = None
     preferred_pickup_time: str = Field(..., description="HH:MM in 24-hour format")
-    max_occurrences: Optional[int] = Field(None, ge=1, le=365)
+    max_occurrences: Optional[int] = Field(default=None, ge=1, le=365)
 
 
 class RecurringSeriesResponse(BaseModel):
@@ -154,7 +154,7 @@ class CalendarEventResponse(BaseModel):
 class SlotSuggestionRequest(BaseModel):
     transport_request_id: str
     preferred_date: datetime
-    window_hours: int = Field(4, ge=1, le=24)
+    window_hours: int = Field(default=4, ge=1, le=24)
     avoid_unit_ids: list[str] = Field(default_factory=list)
 
 
@@ -235,7 +235,7 @@ class FacilityResponse(BaseModel):
 class CadPushRequest(BaseModel):
     trip_id: str
     force: bool = False
-    operator_note: Optional[str] = Field(None, max_length=500)
+    operator_note: Optional[str] = Field(default=None, max_length=500)
 
 
 class CadPushResponse(BaseModel):

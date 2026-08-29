@@ -45,6 +45,7 @@ from adaptix_contracts import (
 )
 from adaptix_contracts.schemas import (
     crm_contracts,
+    fire_contracts,
     founder_contracts,
     inventory_contracts,
     narcotic,
@@ -52,6 +53,7 @@ from adaptix_contracts.schemas import (
 
 CONVERTED_MODULES = (
     narcotic,
+    fire_contracts,
     inventory_contracts,
     founder_contracts,
     crm_contracts,

@@ -41,11 +41,11 @@ class AppAccessPolicy(BaseModel):
     tenant_id: UUID
     app_key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=1000)
+    description: Optional[str] = Field(default=None, max_length=1000)
     required_roles: list[str] = Field(default_factory=list)
     required_module_entitlements: list[str] = Field(default_factory=list)
     allowed_platforms: list[str] = Field(default_factory=list)
-    min_app_version: Optional[str] = Field(None, max_length=64)
+    min_app_version: Optional[str] = Field(default=None, max_length=64)
     mfa_required: bool = False
     is_active: bool = True
     created_at: datetime

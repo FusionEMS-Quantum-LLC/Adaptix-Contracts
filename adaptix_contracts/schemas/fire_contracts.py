@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -162,7 +163,7 @@ class ResourceExecutionContract(BaseModel):
     category: str
     action: str
     item_reference: str
-    quantity: float | None = None
+    quantity: Decimal | None = Field(default=None, ge=Decimal("0"))
     unit_of_measure: str | None = None
     narcotic_chain_id: str | None = None
     occurred_at: datetime

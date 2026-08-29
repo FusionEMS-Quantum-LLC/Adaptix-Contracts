@@ -1,0 +1,3 @@
+# Ownership for review routing. Code-owner review is not a required merge gate
+# (solo founder; GitHub requires the real validate check instead).
+* @FusionEMS-Quantum-LLC/adaptix-platform
