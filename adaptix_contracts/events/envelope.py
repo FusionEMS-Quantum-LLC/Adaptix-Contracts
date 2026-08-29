@@ -34,7 +34,7 @@ class AdaptixEventEnvelope(BaseModel):
         ..., description="Tenant scope — required for all tenant events"
     )
     actor_id: str | None = Field(
-        None, description="User or service that caused this event"
+        default=None, description="User or service that caused this event"
     )
     source_service: str = Field(..., description="Service that published this event")
     correlation_id: str = Field(
@@ -42,7 +42,7 @@ class AdaptixEventEnvelope(BaseModel):
         description="Correlation ID for tracing across services",
     )
     causation_id: str | None = Field(
-        None, description="ID of the event or request that caused this event"
+        default=None, description="ID of the event or request that caused this event"
     )
     idempotency_key: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
@@ -59,7 +59,8 @@ class AdaptixEventEnvelope(BaseModel):
         default_factory=dict, description="Event-specific payload data"
     )
     metadata: Optional[dict[str, Any]] = Field(
-        None, description="Optional additional metadata (routing hints, flags, etc.)"
+        default=None,
+        description="Optional additional metadata (routing hints, flags, etc.)",
     )
 
     @classmethod

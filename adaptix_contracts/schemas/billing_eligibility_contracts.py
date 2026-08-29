@@ -61,9 +61,9 @@ class EligibilityBenefitSummary(BaseModel):
     member_id: Optional[str] = None
     group_number: Optional[str] = None
 
-    copay_cents: Optional[int] = Field(None, ge=0)
-    deductible_remaining_cents: Optional[int] = Field(None, ge=0)
-    out_of_pocket_remaining_cents: Optional[int] = Field(None, ge=0)
+    copay_cents: Optional[int] = Field(default=None, ge=0)
+    deductible_remaining_cents: Optional[int] = Field(default=None, ge=0)
+    out_of_pocket_remaining_cents: Optional[int] = Field(default=None, ge=0)
 
 
 class EligibilityResponse(BaseModel):

@@ -12,7 +12,7 @@ Rules:
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 from pydantic import BaseModel, Field
 import uuid
 
@@ -182,6 +182,26 @@ class AdaptixAuthContext(BaseModel):
             raise ValueError(
                 "Missing required token payload fields: " + ", ".join(missing_fields)
             )
+
+        # The guard above has already rejected a payload where any of these three
+        # is absent or empty, so each is a present, non-empty claim by the time
+        # execution reaches here. A type checker cannot follow that narrowing -
+        # it happens through a list comprehension over tuples, deliberately, so
+        # that ONE error names every missing field instead of failing on the
+        # first. `typing.cast` states the invariant the guard already enforces
+        # and is a documented no-op at runtime: it returns its second argument
+        # unchanged, so behaviour, validation and error messages are identical.
+        #
+        # This is not cosmetic. `payload.get(...)` on a `dict[str, Any]` is typed
+        # `Any | None`, and `user_id`/`tenant_id`/`session_id` are declared `str`,
+        # so the constructor call below is a genuine type error - one a consumer
+        # sees and this repository did not, because the pydantic mypy plugin's
+        # `init_typed` defaults to False and therefore types every synthesised
+        # `__init__` argument as `Any`. mypy-consumer-view.ini is what surfaced
+        # it. Do not re-hide it by widening that config.
+        user_id = cast(str, user_id)
+        tenant_id = cast(str, tenant_id)
+        session_id = cast(str, session_id)
 
         if trusted_tenant_id is not None and tenant_id != trusted_tenant_id:
             raise ValueError(

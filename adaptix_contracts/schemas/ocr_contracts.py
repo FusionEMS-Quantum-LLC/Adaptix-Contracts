@@ -119,7 +119,7 @@ class OcrFieldApproval(BaseModel):
     field_candidate_id: str
     approved: bool
     corrected_value: Optional[str] = None
-    reviewer_note: Optional[str] = Field(None, max_length=500)
+    reviewer_note: Optional[str] = Field(default=None, max_length=500)
 
 
 class OcrApprovalRequest(BaseModel):
