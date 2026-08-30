@@ -1,0 +1,61 @@
+name: repo-validation
+
+# THE ONLY VALIDATION WORKFLOW A REPOSITORY MAY CARRY.
+#
+# This file is generated from validation/carrier-workflow.yml in
+# FusionEMS-Quantum-LLC/adaptix-ops and is identical in every repository. It
+# holds no validation logic, no runtime version, no policy, and no repository
+# specifics. Everything that decides what must run, whether a phase was
+# skipped, and whether the result is green lives in the engine it calls.
+#
+# What it replaces, per repository:
+#   .github/workflows/pr-validation.yml   (copied, with a hardcoded runtime)
+#   scripts/ci/verify-toolchain.sh        (copied)
+#   scripts/verify_toolchain.py           (copied)
+#   scripts/generate_tool_inventory.py    (copied)
+#   governance/approved-tools.json        (copied, and drifted into 3 versions)
+#
+# Those files are DELETED when this lands. Leaving them in place would mean two
+# ways to validate one repository, which is the defect being removed rather
+# than a safety net.
+#
+# The push trigger is deliberate. With `pull_request` alone, main was never
+# validated: a defect could land, sit red on main unnoticed, and surface on the
+# next unrelated pull request, which inherited the blame. Measured case —
+# Adaptix-EPCR-Service PR #438 failed on a broken Alembic migration chain that
+# landed on main on 2026-08-19 and had nothing to do with that PR's change.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: repo-validation-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # The job name IS the required status check name. Branch protection requires
+  # the literal string `adaptix/repo-validation` in every enforced repository,
+  # so this name is a contract: renaming the job silently detaches the gate,
+  # and a required check whose name never appears blocks every pull request
+  # forever as "Expected". Do not rename it.
+  repo-validation:
+    name: adaptix/repo-validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository under validation
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      # Pinned to an immutable engine tag. Bumping the fleet is one tag move in
+      # adaptix-ops plus this line, not an edit to ~100 copied scripts.
+      - name: Validate
+        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@v1
+        with:
+          repository: ${{ github.repository }}
+          target-path: repo
