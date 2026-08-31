@@ -197,7 +197,7 @@ def _m(
 # names it. Do not add an alias that is not observed in a shipping vocabulary.
 
 _DEFINITIONS: tuple[ModuleDefinition, ...] = (
-    # â”€â”€ Platform base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Platform base ────────────────────────────────────────────────────
     _m(
         "core",
         "Core Platform",
@@ -205,7 +205,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-core",
         source="Web-App MODULES; Core MODULE_CATALOG; Core _MODULE_TO_AUDIENCE",
     ),
-    # â”€â”€ Clinical / documentation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Clinical / documentation ─────────────────────────────────────────
     _m(
         "epcr",
         "ePCR & NEMSIS",
@@ -214,7 +214,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-epcr",
         source="Web-App MODULES; Core signup_pricing; Billing _PRODUCT_MODULE_MAP",
     ),
-    # â”€â”€ Dispatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Dispatch ─────────────────────────────────────────────────────────
     _m(
         "cad",
         "CAD / Dispatch",
@@ -222,7 +222,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-cad",
         source="Web-App MODULES; Core signup_pricing; Billing _PRODUCT_MODULE_MAP",
     ),
-    # â”€â”€ Revenue cycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Revenue cycle ────────────────────────────────────────────────────
     # `billing_automation` is the Stripe product "Adaptix Billing Command
     # Automation" (Core signup_pricing.py:83,111; Billing seed_v2_stripe_prices
     # .py:56). It is the SAME module Adaptix-Billing-Service gates on as
@@ -267,7 +267,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "(enabled_modules: wisconsin_trip_pack + billing_automation)"
         ),
     ),
-    # â”€â”€ Fire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Fire ─────────────────────────────────────────────────────────────
     # Three spellings of one product: Web-App sells `fire_rms`, Core pricing
     # sells `fire_response`, Adaptix-Fire-Service gates on `fire`.
     _m(
@@ -287,7 +287,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         implies=("fire",),
         source="adaptix-crr",
     ),
-    # â”€â”€ Air medical â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Air medical ──────────────────────────────────────────────────────
     _m(
         "air",
         "Air Medical",
@@ -329,7 +329,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         purchasable=True,
         source="Billing _PRODUCT_MODULE_MAP prod_UEOHmIlaVBQJMX enabled_modules",
     ),
-    # â”€â”€ Field / mobile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Field / mobile ───────────────────────────────────────────────────
     # The crew-facing tablet/phone application. Web-App sells `mobile_field`,
     # Core pricing includes it as `field_app`, Core's admin catalog spells it
     # `field`, and Adaptix-CAD-Service gates the write-back surface on `mdt`.
@@ -370,7 +370,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "Gateway ROUTE_TABLE /api/v1/crewlink -> cad_service_url audience=adaptix-cad"
         ),
     ),
-    # â”€â”€ Workforce / scheduling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Workforce / scheduling ───────────────────────────────────────────
     # Mirrors Core auth.py::_MODULE_ENTITLEMENT_ALIASES â€” `workforce` is the id
     # Core historically persists, but the scheduling engine is served by
     # Labor-Service behind the `labor` / `scheduling` entitlements.
@@ -431,7 +431,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-crew",
         source="Core signup_pricing command_v1; Core MODULE_CATALOG",
     ),
-    # â”€â”€ Communications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Communications ───────────────────────────────────────────────────
     _m(
         "communications",
         "Communications Command",
@@ -447,7 +447,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-telephony",
         source="Web-App MODULES; Core MODULE_CATALOG; Core _MODULE_TO_AUDIENCE",
     ),
-    # â”€â”€ Controlled substances / supply â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Controlled substances / supply ───────────────────────────────────
     # alias ``narcotic`` (singular): the gateway ROUTE_TABLE carries BOTH
     # prefix="/api/v1/narcotic" (routes.py:2287) and prefix="/api/v1/narcotics"
     # as separate entries, and ``_extract_module_id`` takes the first path
@@ -531,7 +531,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "Gateway ROUTE_TABLE /api/v1/assetops -> assetops_service_url audience=adaptix-assetops"
         ),
     ),
-    # â”€â”€ Interoperability exports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Interoperability exports ─────────────────────────────────────────
     # Web-App sells one combined "NEMSIS / NERIS" SKU; Core carries two
     # separate audiences. The bundle implies both.
     _m(
@@ -553,7 +553,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-neris",
         source="Core _MODULE_TO_AUDIENCE",
     ),
-    # â”€â”€ Transport â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Transport ────────────────────────────────────────────────────────
     # Mirrors Core auth.py::_MODULE_ENTITLEMENT_ALIASES: TransportLink is the
     # user-facing route tree, `transport` is the persisted id, and both carry
     # their own gateway audience.
@@ -571,7 +571,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-transportlink",
         source="Core _MODULE_TO_AUDIENCE; Core _MODULE_ENTITLEMENT_ALIASES",
     ),
-    # â”€â”€ Onboarding / services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Onboarding / services ────────────────────────────────────────────
     # audience: the onboarding surface is served by Core itself â€” the gateway
     # routes /api/v1/onboarding to auth_service_url with audience
     # ``adaptix-core``. Stating it explicitly (rather than leaving None and
@@ -587,7 +587,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "Gateway ROUTE_TABLE /api/v1/onboarding -> auth_service_url audience=adaptix-core"
         ),
     ),
-    # â”€â”€ Platform modules (entitlement-bearing, not individually sold) â”€â”€â”€â”€â”€
+    # ── Platform modules (entitlement-bearing, not individually sold) ─────
     _m(
         "calendar",
         "Calendar",
@@ -837,7 +837,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-training",
         source="Gateway ROUTE_TABLE /api/v1/training; Web-App app/workspace/training",
     ),
-    # â”€â”€ Forms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Forms ────────────────────────────────────────────────────────────
     # Adaptix-Forms-Service is a live upstream with its own gateway route and
     # audience, but the module had NO row here â€” so audience_map() lacked a
     # ``forms`` key, Core's _MODULE_TO_AUDIENCE never mapped it, and
@@ -857,7 +857,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-forms; Core MODULE_CATALOG"
         ),
     ),
-    # â”€â”€ HR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── HR ───────────────────────────────────────────────────────────────
     # Identical defect to ``forms`` above, runtime-proven in production on
     # 2026-08-13: Adaptix-HR-Service is deployed and healthy
     # (adaptix-production-hr), the gateway routes /api/v1/hr to it behind
@@ -883,7 +883,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-hr; ECS adaptix-production-hr"
         ),
     ),
-    # â”€â”€ Office â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Office ───────────────────────────────────────────────────────────
     # Same defect and same runtime proof as ``hr`` above: Adaptix-Office-Service
     # runs as adaptix-production-office and the gateway routes /api/v1/office to
     # it behind audience ``adaptix-office``, with no module row here.
@@ -903,7 +903,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-office; ECS adaptix-production-office"
         ),
     ),
-    # â”€â”€ Facilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Facilities ───────────────────────────────────────────────────────
     # Same defect and same runtime proof as ``hr`` and ``office`` above:
     # Adaptix-Facility-Registry-Service runs as adaptix-production-facilities
     # and the gateway routes /api/v1/facilities to it behind audience
