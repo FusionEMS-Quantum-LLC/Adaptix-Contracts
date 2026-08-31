@@ -466,6 +466,25 @@ def test_field_app_and_crewlink_reach_cad_service() -> None:
     assert "cad" not in expand_entitlements(["crewlink"])
 
 
+def test_ai_reaches_the_cortex_ai_runtime() -> None:
+    """Pinned regression for the 2026-08-31 production failure.
+
+    Gateway ``RouteEntry(prefix="/api/v1/ai", audience="adaptix-ai")`` and its
+    entitlement middleware derives module id ``ai`` from that path, but no
+    module declared the ``adaptix-ai`` audience — so ``audience_map()`` never
+    emitted it and Core could not mint it for any non-founder token: every
+    /api/v1/ai request (including the workspace shell's
+    GET /api/v1/ai/cortex/health, measured with a Cortex Live demo session)
+    answered 403 jwt_audience_mismatch.
+    """
+    assert module_audiences("ai") == {"adaptix-ai"}
+    assert audience_map()["ai"] == "adaptix-ai"
+    # Holding ``ai`` confers reach to the AI runtime only — no other module,
+    # and no other module silently confers ``ai``.
+    assert expand_entitlements(["ai"]) == {"ai"}
+    assert "ai" not in expand_entitlements(["cortex", "bedrock", "intelligence"])
+
+
 def test_assetops_reaches_its_own_service() -> None:
     """Live $29/vehicle/month SKU; gateway routes /api/v1/assetops to it."""
     assert module_audiences("assetops") == {"adaptix-assetops"}

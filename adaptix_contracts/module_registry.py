@@ -777,6 +777,25 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-core",
         source="Gateway ROUTE_TABLE /api/v1/ai-infrastructure; Web-App app/ai-infrastructure",
     ),
+    # The Cortex AI runtime surface. The gateway routes /api/v1/ai/* to
+    # ai_service_url with audience "adaptix-ai" and its entitlement middleware
+    # derives module id "ai" from that path — but no module declared the
+    # "adaptix-ai" audience, so audience_map() never emitted it, Core's
+    # _MODULE_TO_AUDIENCE had no row, and _session_audiences could not mint
+    # "adaptix-ai" for ANY non-founder token. Every /api/v1/ai request (e.g.
+    # GET /api/v1/ai/cortex/health from the workspace shell) answered
+    # 403 jwt_audience_mismatch for every non-founder tenant — measured in
+    # production 2026-08-31 with a Cortex Live demo session token. Same
+    # routed-but-audience-less shape and same fix as ``forms`` below.
+    # purchasable=False: granting is an explicit provisioning/admin action
+    # (the Cortex Live demo pool is the first grantee), not a signup SKU, so
+    # no existing tenant's token or entitlement changes.
+    _m(
+        "ai",
+        "Cortex AI Runtime",
+        audience="adaptix-ai",
+        source="Gateway ROUTE_TABLE /api/v1/ai -> ai_service_url audience=adaptix-ai",
+    ),
     _m(
         "command-intelligence",
         "Command Intelligence",
