@@ -92,7 +92,8 @@ to any existing one), per `DEPRECATION_POLICY.md`'s semantic-versioning rule
   `_MODULE_TO_AUDIENCE` never mapped it and no tenant's session could ever
   carry the `adaptix-rtc` audience. Every `/api/v1/rtc` request 403'd
   `jwt_audience_mismatch` for every tenant, including Cortex Live's demo
-  pool, whose live voice session opens a room via `POST /api/v1/rtc/rooms`.
+  pool, whose live voice session opens a room via `POST /api/v1/rtc/rooms`
+  (#278).
 
 ## [5.0.0] - 2026-08-28
 
