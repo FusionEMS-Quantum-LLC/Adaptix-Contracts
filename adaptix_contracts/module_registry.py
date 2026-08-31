@@ -923,7 +923,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "ECS adaptix-production-facilities"
         ),
     ),
-    # -- Realtime -------------------------------------------------------------
+    # ── Realtime ─────────────────────────────────────────────────────────────
     # Adaptix-Gateway routes.py declares this RouteEntry with the comment "RTC
     # -- real-time comms (WebRTC/SFU signalling) shared service" (prefix
     # "/api/v1/rtc", upstream_url=settings.rtc_service_url,
