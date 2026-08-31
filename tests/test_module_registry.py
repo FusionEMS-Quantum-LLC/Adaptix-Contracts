@@ -544,7 +544,6 @@ def test_facilities_reaches_its_own_service() -> None:
     assert module_audiences("facility_registry") == {"adaptix-facilities"}
 
 
-
 def test_rtc_reaches_its_own_service() -> None:
     """The realtime room control plane gateway route is behind adaptix-rtc.
 

@@ -950,8 +950,8 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-rtc",
         source=(
             "Gateway ROUTE_TABLE /api/v1/rtc -> rtc_service_url "
-            "audience=adaptix-rtc (\"RTC -- real-time comms (WebRTC/SFU "
-            "signalling) shared service\"); service_audiences."
+            'audience=adaptix-rtc ("RTC -- real-time comms (WebRTC/SFU '
+            'signalling) shared service"); service_audiences.'
             "KNOWN_SERVICE_AUDIENCES"
         ),
     ),
