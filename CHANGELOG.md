@@ -12,7 +12,20 @@ from the installed package metadata).
 
 ## [Unreleased]
 
-Housekeeping only. No contract, model, field, enum or public import path
+### Added
+
+- `module_registry`: registered the `ai` module (audience `adaptix-ai`,
+  purchasable=False, no aliases, no implies). The gateway already routed
+  `/api/v1/ai/*` with audience `adaptix-ai` and gated it on module id `ai`,
+  but no module declared that audience, so `audience_map()` never emitted it
+  and Core could not mint `adaptix-ai` for any non-founder token — every
+  `/api/v1/ai` request answered 403 `jwt_audience_mismatch` (measured in
+  production 2026-08-31 with a Cortex Live demo session). Strictly additive:
+  no existing tenant holds `ai`, no alias or `implies` reaches it, so no
+  existing token, entitlement or gate changes. Consumers that need the new
+  row (Core, to entitle the Cortex Live demo pool) re-pin deliberately.
+
+Everything below this line is housekeeping only. No contract, model, field, enum or public import path
 changed in any of the entries below, so nothing here requires a consumer to
 re-pin. Verified: the public surface diff between `v4.1.0` and `v4.3.0` is
 47 additions and 0 removals, and no commit below touches
