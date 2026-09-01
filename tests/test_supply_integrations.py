@@ -16,9 +16,11 @@ you the URL, `headers=`, and `json=` actually sent. Compare them against the
 receiving service's route, its auth dependency, and its request model.
 """
 
+import json
 import pytest
 import httpx
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import uuid4
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -30,6 +32,48 @@ def _mock_success_response(payload: dict | None = None) -> Mock:
     response.raise_for_status = Mock()
     response.json = Mock(return_value=payload or {})
     return response
+
+
+# Captured at import time, before any test patches `httpx.AsyncClient` --
+# `_capturing_async_client` below must build the real client through THIS
+# name, never through `httpx.AsyncClient` directly. While a test's
+# `patch("httpx.AsyncClient", ...)` is active, `httpx.AsyncClient` resolves
+# to that patch, so a factory that calls `httpx.AsyncClient(...)` on itself
+# calls right back into its own patch and recurses without end.
+_RealAsyncClient = httpx.AsyncClient
+
+
+def _capturing_async_client(captured: dict):
+    """A patch target for `httpx.AsyncClient` that is a REAL AsyncClient bound
+    to an `httpx.MockTransport`, not a Mock.
+
+    `patch("httpx.AsyncClient")` + a fully-mocked `.post()` (the pattern the
+    rest of this file uses) replaces `client.post(...)` itself, so the real
+    request is never built and httpx's JSON encoder never runs. That is
+    exactly how this suite passed `cost=25.00` / `waste_forecast=50.00` --
+    plain floats, not the `Decimal` the functions are typed to require --
+    while `AnalyticsClient.publish_waste_event` and
+    `NotificationClient.send_expiration_alert` had been silently dropping
+    every call made with a real `Decimal` (`TypeError: Object of type
+    Decimal is not JSON serializable`, swallowed by `_post_event` /
+    `_post_notification`'s broad `except Exception`).
+
+    Routing through `httpx.MockTransport` instead keeps the real
+    `AsyncClient.post` -> request-encoding path intact -- including the JSON
+    serialisation that a Mock skips -- while still never touching the
+    network. `captured` receives the exact bytes that would have gone over
+    the wire.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.content
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json={})
+
+    def factory(*_args, **_kwargs):
+        return _RealAsyncClient(transport=httpx.MockTransport(handler))
+
+    return factory
 
 
 @pytest.mark.asyncio
@@ -62,29 +106,39 @@ async def test_notification_client_low_stock_alert():
 
 @pytest.mark.asyncio
 async def test_notification_client_expiration_alert():
-    """Test sending expiration alert notification."""
+    """Test sending expiration alert notification.
+
+    Regression coverage for a real bug: `waste_forecast` is typed `Decimal`,
+    and the payload used to carry that Decimal straight into `json=`, which
+    httpx cannot serialise. That raised inside `_post_notification`, was
+    swallowed by its broad `except Exception`, and this call silently
+    returned False -- while every prior version of this test passed a float
+    and never exercised real JSON encoding, so it stayed green throughout.
+    Passing a real `Decimal` through a real transport catches both defects.
+    """
     from adaptix_contracts.supply_integrations import NotificationClient
 
     tenant_id = uuid4()
     expiration_date = datetime.now(timezone.utc)
+    captured: dict = {}
 
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_response = _mock_success_response()
-
-        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value = mock_client
-
+    with patch("httpx.AsyncClient", side_effect=_capturing_async_client(captured)):
         result = await NotificationClient.send_expiration_alert(
             tenant_id=tenant_id,
             recipient_user_id="user-123",
             item_name="Saline 0.9%",
             expiration_date=expiration_date,
             current_stock=10,
-            waste_forecast=50.00,
+            waste_forecast=Decimal("50.00"),
         )
 
         assert result is True
+        body = json.loads(captured["body"])
+        assert body["waste_forecast"] == "50.00", (
+            "an exact quantity must serialise as a JSON string, matching this "
+            "package's wire convention since 2.37.0 -- not a JSON number, which "
+            "cannot represent Decimal exactly"
+        )
 
 
 @pytest.mark.asyncio
@@ -167,27 +221,38 @@ async def test_analytics_client_publish_usage_event():
 
 @pytest.mark.asyncio
 async def test_analytics_client_publish_waste_event():
-    """Test publishing waste event to analytics."""
+    """Test publishing waste event to analytics.
+
+    Regression coverage for a real bug: `cost` is typed `Decimal`, and the
+    payload used to carry that Decimal straight into `json=`, which httpx
+    cannot serialise. That raised inside `_post_event`, was swallowed by its
+    broad `except Exception`, and this call silently returned False -- a
+    controlled-substance waste event dropped, not published -- while every
+    prior version of this test passed a float and never exercised real JSON
+    encoding, so it stayed green throughout. Passing a real `Decimal` through
+    a real transport catches both defects.
+    """
     from adaptix_contracts.supply_integrations import AnalyticsClient
 
     tenant_id = uuid4()
+    captured: dict = {}
 
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_response = _mock_success_response()
-
-        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value = mock_client
-
+    with patch("httpx.AsyncClient", side_effect=_capturing_async_client(captured)):
         result = await AnalyticsClient.publish_waste_event(
             tenant_id=tenant_id,
             unit_id="unit-123",
             waste_reason="expired",
             quantity=5,
-            cost=25.00,
+            cost=Decimal("25.00"),
         )
 
         assert result is True
+        body = json.loads(captured["body"])
+        assert body["cost"] == "25.00", (
+            "an exact quantity must serialise as a JSON string, matching this "
+            "package's wire convention since 2.37.0 -- not a JSON number, which "
+            "cannot represent Decimal exactly"
+        )
 
 
 @pytest.mark.asyncio
