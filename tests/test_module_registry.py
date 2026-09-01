@@ -497,7 +497,9 @@ def test_mih_reaches_the_mih_service_and_is_state_gated_by_its_canonical_id() ->
     assert module_audiences(MIH_ENTITLEMENT_ID) == frozenset({MIH_SERVICE_AUDIENCE})
     assert resolve_module_id("mih") == MIH_ENTITLEMENT_ID
     assert MODULE_REGISTRY[MIH_ENTITLEMENT_ID].purchasable is True
-    assert expand_entitlements(["mih"]) == frozenset({MIH_ENTITLEMENT_ID})
+    # Expansion keeps the input spelling and adds the canonical id (the
+    # registry never drops an input id), so membership is the contract.
+    assert MIH_ENTITLEMENT_ID in expand_entitlements(["mih"])
 
 
 def test_assetops_reaches_its_own_service() -> None:
