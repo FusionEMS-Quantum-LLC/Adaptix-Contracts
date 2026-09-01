@@ -4,7 +4,10 @@ Canonical entitlement id: `mih_community_paramedicine`
 
 Canonical service audience: `adaptix-mih`
 
-`adaptix-mih` is registered in `service_audiences.py`. Core, Gateway, and Adaptix-MIH-Service must consume these identifiers from the shared Contracts package or pin equivalent values in tests until the module registry entry is fully consolidated.
+`adaptix-mih` is registered in `service_audiences.py`, and
+`mih_community_paramedicine` is registered in `module_registry.py`
+(alias `mih`, audience `adaptix-mih`, purchasable) so Core's module catalog
+can grant it and per-state restriction keeps matching the same string. Core, Gateway, and Adaptix-MIH-Service must consume these identifiers from the shared Contracts package or pin equivalent values in tests until the module registry entry is fully consolidated.
 
 ## Service surface covered by `adaptix_contracts.mih`
 

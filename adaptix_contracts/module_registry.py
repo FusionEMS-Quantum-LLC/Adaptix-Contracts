@@ -974,6 +974,25 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "KNOWN_SERVICE_AUDIENCES"
         ),
     ),
+    _m(
+        "mih_community_paramedicine",
+        "Mobile Integrated Healthcare / Community Paramedicine",
+        # ``mih`` is the Gateway route slug (/api/v1/mih) and the spelling the
+        # web workspace gate first used; it resolves here, never the reverse.
+        aliases=("mih",),
+        # Sold: Community Paramedicine is a priced application in
+        # adaptix_contracts.commercial (starting price only, bands TBD).
+        purchasable=True,
+        audience="adaptix-mih",
+        source=(
+            "adaptix_contracts.mih.MIH_ENTITLEMENT_ID (the id Core's "
+            "state_rules.py restricts per state); Gateway ROUTE_TABLE "
+            "/api/v1/mih -> mih.adaptix.internal:8000 audience=adaptix-mih "
+            "(backend/app/config/mih_route.py); service_audiences."
+            "KNOWN_SERVICE_AUDIENCES; commercial CommercialApplicationKey."
+            "COMMUNITY_PARAMEDICINE"
+        ),
+    ),
 )
 
 
