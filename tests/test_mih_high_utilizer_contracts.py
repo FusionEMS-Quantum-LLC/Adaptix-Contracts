@@ -231,7 +231,9 @@ def test_signal_spec_example_two_of_three_dimensions() -> None:
     signal = _signal()
     assert signal.trigger_score == 2
     assert signal.trigger_admission is None  # disabled dimension: not evaluated
-    assert signal.recommended_action is HighUtilizerRecommendedAction.CONSIDER_ENROLLMENT
+    assert (
+        signal.recommended_action is HighUtilizerRecommendedAction.CONSIDER_ENROLLMENT
+    )
 
 
 def test_signal_score_must_equal_satisfied_dimensions() -> None:
@@ -295,7 +297,9 @@ def test_recommendation_dismissed_requires_reason() -> None:
     with pytest.raises(ValidationError, match="dismissal_reason"):
         _recommendation(status=EnrollmentRecommendationStatus.DISMISSED)
     with pytest.raises(ValidationError, match="dismissal_reason"):
-        _recommendation(status=EnrollmentRecommendationStatus.DISMISSED, dismissal_reason="  ")
+        _recommendation(
+            status=EnrollmentRecommendationStatus.DISMISSED, dismissal_reason="  "
+        )
     ok = _recommendation(
         status=EnrollmentRecommendationStatus.DISMISSED,
         dismissal_reason="declined outreach",
@@ -402,9 +406,13 @@ def test_new_event_names_are_registered() -> None:
         MIH_HIGH_UTILIZER_EVALUATED,
         MIH_ENROLLMENT_RECOMMENDATION_CHANGED,
     } <= MIH_EVENTS
-    assert MIH_UTILIZATION_OBSERVATION_RECORDED == "mih.utilization.observation_recorded"
+    assert (
+        MIH_UTILIZATION_OBSERVATION_RECORDED == "mih.utilization.observation_recorded"
+    )
     assert MIH_HIGH_UTILIZER_EVALUATED == "mih.high_utilizer.evaluated"
-    assert MIH_ENROLLMENT_RECOMMENDATION_CHANGED == "mih.enrollment_recommendation.changed"
+    assert (
+        MIH_ENROLLMENT_RECOMMENDATION_CHANGED == "mih.enrollment_recommendation.changed"
+    )
 
 
 def test_observation_recorded_event_is_idempotent_on_observation_id() -> None:
@@ -461,7 +469,9 @@ def test_recommendation_changed_event_keys_on_transition() -> None:
             latest_evaluation_id=eval_id,
         )
 
-    created = build_mih_enrollment_recommendation_changed_event(payload("created", EnrollmentRecommendationStatus.OPEN))
+    created = build_mih_enrollment_recommendation_changed_event(
+        payload("created", EnrollmentRecommendationStatus.OPEN)
+    )
     created_again = build_mih_enrollment_recommendation_changed_event(
         payload("created", EnrollmentRecommendationStatus.OPEN)
     )
@@ -486,8 +496,12 @@ def test_new_error_codes_map_to_platform_codes() -> None:
         MihErrorCode.UTILIZATION_EVALUATION_CONFLICT: AdaptixErrorCode.CONFLICT,
         MihErrorCode.UTILIZATION_INVALID_EVENT_TYPE: AdaptixErrorCode.INVALID_VALUE,
         MihErrorCode.RECOMMENDATION_NOT_FOUND: AdaptixErrorCode.NOT_FOUND,
-        MihErrorCode.RECOMMENDATION_ALREADY_DISMISSED: (AdaptixErrorCode.INVALID_STATE_TRANSITION),
-        MihErrorCode.RECOMMENDATION_ENROLLMENT_NOT_ACTIVE: (AdaptixErrorCode.WORKFLOW_BLOCKED),
+        MihErrorCode.RECOMMENDATION_ALREADY_DISMISSED: (
+            AdaptixErrorCode.INVALID_STATE_TRANSITION
+        ),
+        MihErrorCode.RECOMMENDATION_ENROLLMENT_NOT_ACTIVE: (
+            AdaptixErrorCode.WORKFLOW_BLOCKED
+        ),
         MihErrorCode.READING_INVALID_METRIC: AdaptixErrorCode.INVALID_VALUE,
     }
     for mih_code, platform_code in expected.items():

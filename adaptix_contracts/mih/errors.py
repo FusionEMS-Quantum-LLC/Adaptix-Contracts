@@ -83,7 +83,9 @@ class MihErrorCode(str, Enum):
     RECOMMENDATION_ALREADY_DISMISSED = "mih.recommendation_already_dismissed"
     RECOMMENDATION_ALREADY_ENROLLED = "mih.recommendation_already_enrolled"
     RECOMMENDATION_INVALID_TRANSITION = "mih.recommendation_invalid_transition"
-    RECOMMENDATION_PATIENT_IDENTITY_MISMATCH = "mih.recommendation_patient_identity_mismatch"
+    RECOMMENDATION_PATIENT_IDENTITY_MISMATCH = (
+        "mih.recommendation_patient_identity_mismatch"
+    )
     RECOMMENDATION_ENROLLMENT_NOT_ACTIVE = "mih.recommendation_enrollment_not_active"
 
 
@@ -119,10 +121,18 @@ _MIH_TO_PLATFORM: dict[MihErrorCode, AdaptixErrorCode] = {
     MihErrorCode.UTILIZATION_SOURCE_EVENT_CONFLICT: AdaptixErrorCode.CONFLICT,
     MihErrorCode.UTILIZATION_EVALUATION_CONFLICT: AdaptixErrorCode.CONFLICT,
     MihErrorCode.RECOMMENDATION_NOT_FOUND: AdaptixErrorCode.NOT_FOUND,
-    MihErrorCode.RECOMMENDATION_ALREADY_DISMISSED: (AdaptixErrorCode.INVALID_STATE_TRANSITION),
-    MihErrorCode.RECOMMENDATION_ALREADY_ENROLLED: (AdaptixErrorCode.INVALID_STATE_TRANSITION),
-    MihErrorCode.RECOMMENDATION_INVALID_TRANSITION: (AdaptixErrorCode.INVALID_STATE_TRANSITION),
-    MihErrorCode.RECOMMENDATION_PATIENT_IDENTITY_MISMATCH: (AdaptixErrorCode.CONSTRAINT_VIOLATION),
+    MihErrorCode.RECOMMENDATION_ALREADY_DISMISSED: (
+        AdaptixErrorCode.INVALID_STATE_TRANSITION
+    ),
+    MihErrorCode.RECOMMENDATION_ALREADY_ENROLLED: (
+        AdaptixErrorCode.INVALID_STATE_TRANSITION
+    ),
+    MihErrorCode.RECOMMENDATION_INVALID_TRANSITION: (
+        AdaptixErrorCode.INVALID_STATE_TRANSITION
+    ),
+    MihErrorCode.RECOMMENDATION_PATIENT_IDENTITY_MISMATCH: (
+        AdaptixErrorCode.CONSTRAINT_VIOLATION
+    ),
     MihErrorCode.RECOMMENDATION_ENROLLMENT_NOT_ACTIVE: AdaptixErrorCode.WORKFLOW_BLOCKED,
 }
 
@@ -228,7 +238,9 @@ def enrollment_consent_required(
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.ENROLLMENT_CONSENT_REQUIRED,
-        message=(f"MIH enrollment {enrollment_id} cannot proceed: patient consent has not been recorded"),
+        message=(
+            f"MIH enrollment {enrollment_id} cannot proceed: patient consent has not been recorded"
+        ),
         trace=trace,
     )
 
@@ -241,7 +253,9 @@ def visit_invalid_state_transition(
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.VISIT_INVALID_STATE_TRANSITION,
-        message=(f"MIH visit {visit_id} cannot transition from {from_status} to {to_status}"),
+        message=(
+            f"MIH visit {visit_id} cannot transition from {from_status} to {to_status}"
+        ),
         trace=trace,
     )
 
@@ -263,7 +277,9 @@ def utilization_policy_not_configured(
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.UTILIZATION_POLICY_NOT_CONFIGURED,
-        message=("This tenant has not configured a high-utilizer policy; no default thresholds are assumed"),
+        message=(
+            "This tenant has not configured a high-utilizer policy; no default thresholds are assumed"
+        ),
         trace=trace,
     )
 
@@ -287,7 +303,9 @@ def recommendation_invalid_transition(
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.RECOMMENDATION_INVALID_TRANSITION,
-        message=(f"MIH enrollment recommendation {recommendation_id} cannot {action} from status {current_status}"),
+        message=(
+            f"MIH enrollment recommendation {recommendation_id} cannot {action} from status {current_status}"
+        ),
         trace=trace,
     )
 

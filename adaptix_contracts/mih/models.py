@@ -140,7 +140,9 @@ class MihEnrollment(_MihBase):
     payer: MihPayer
     payer_member_id: str | None = Field(
         default=None,
-        description=("Payer-issued member ID. Treated as PHI; do not log outside billing/enrollment services."),
+        description=(
+            "Payer-issued member ID. Treated as PHI; do not log outside billing/enrollment services."
+        ),
     )
 
     referral_source: MihReferralSource | None = None
@@ -280,7 +282,9 @@ class MihVisitVitalSigns(BaseModel):
     heart_rate: int | None = Field(default=None, ge=0, le=300)
     respiratory_rate: int | None = Field(default=None, ge=0, le=80)
     spo2: int | None = Field(default=None, ge=0, le=100)
-    temperature_c: Decimal | None = Field(default=None, ge=Decimal("20"), le=Decimal("45"))
+    temperature_c: Decimal | None = Field(
+        default=None, ge=Decimal("20"), le=Decimal("45")
+    )
     blood_glucose_mg_dl: int | None = Field(default=None, ge=0, le=1000)
     pain_scale_0_10: int | None = Field(default=None, ge=0, le=10)
 
@@ -408,7 +412,11 @@ class MihMonitoringThreshold(_MihBase):
     def _bounds(self) -> "MihMonitoringThreshold":
         if self.min_value is None and self.max_value is None:
             raise ValueError("at least one of min_value / max_value is required")
-        if self.min_value is not None and self.max_value is not None and self.min_value >= self.max_value:
+        if (
+            self.min_value is not None
+            and self.max_value is not None
+            and self.min_value >= self.max_value
+        ):
             raise ValueError("min_value must be below max_value")
         return self
 
@@ -434,7 +442,9 @@ class MihRemoteReading(_MihBase):
     """
 
     id: UUID
-    patient_id: UUID = Field(..., description="The MIH enrollment record id (``mih_patients.id``).")
+    patient_id: UUID = Field(
+        ..., description="The MIH enrollment record id (``mih_patients.id``)."
+    )
     client_reference_id: str = Field(..., min_length=1, max_length=128)
     device_id: str | None = Field(default=None, max_length=128)
     metric: RemoteReadingMetric
@@ -490,7 +500,9 @@ class MihUtilizationPolicy(_MihBase):
     id: UUID
     version: int = Field(..., ge=1)
     status: UtilizationPolicyStatus
-    lookback_days: int = Field(..., ge=UTILIZATION_LOOKBACK_MIN_DAYS, le=UTILIZATION_LOOKBACK_MAX_DAYS)
+    lookback_days: int = Field(
+        ..., ge=UTILIZATION_LOOKBACK_MIN_DAYS, le=UTILIZATION_LOOKBACK_MAX_DAYS
+    )
     min_911_calls: int | None = Field(default=None, ge=1)
     min_ed_visits: int | None = Field(default=None, ge=1)
     min_admissions: int | None = Field(default=None, ge=1)
@@ -502,7 +514,11 @@ class MihUtilizationPolicy(_MihBase):
 
     @property
     def enabled_dimensions(self) -> int:
-        return sum(1 for t in (self.min_911_calls, self.min_ed_visits, self.min_admissions) if t is not None)
+        return sum(
+            1
+            for t in (self.min_911_calls, self.min_ed_visits, self.min_admissions)
+            if t is not None
+        )
 
     @model_validator(mode="after")
     def _reachable(self) -> "MihUtilizationPolicy":
@@ -583,7 +599,11 @@ class HighUtilizerSignal(_MihBase):
 
     @model_validator(mode="after")
     def _consistent(self) -> "HighUtilizerSignal":
-        expected = sum(1 for t in (self.trigger_911, self.trigger_ed, self.trigger_admission) if t is True)
+        expected = sum(
+            1
+            for t in (self.trigger_911, self.trigger_ed, self.trigger_admission)
+            if t is True
+        )
         if self.trigger_score != expected:
             raise ValueError(
                 f"trigger_score {self.trigger_score} does not equal the number of satisfied dimensions ({expected})"
@@ -645,9 +665,17 @@ class MihEnrollmentRecommendation(_MihBase):
             self.dismissal_reason and self.dismissal_reason.strip()
         ):
             raise ValueError("a dismissed recommendation must carry dismissal_reason")
-        if self.status == EnrollmentRecommendationStatus.ENROLLED and self.resolved_patient_id is None:
-            raise ValueError("an enrolled recommendation must reference resolved_patient_id")
-        if self.status != EnrollmentRecommendationStatus.ENROLLED and self.resolved_patient_id is not None:
+        if (
+            self.status == EnrollmentRecommendationStatus.ENROLLED
+            and self.resolved_patient_id is None
+        ):
+            raise ValueError(
+                "an enrolled recommendation must reference resolved_patient_id"
+            )
+        if (
+            self.status != EnrollmentRecommendationStatus.ENROLLED
+            and self.resolved_patient_id is not None
+        ):
             raise ValueError("resolved_patient_id is only valid when status=enrolled")
         return self
 

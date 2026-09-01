@@ -61,9 +61,13 @@ MIH_VISIT_SCHEDULED: Final[str] = "mih.visit.scheduled"
 MIH_VISIT_COMPLETED: Final[str] = "mih.visit.completed"
 MIH_DISCHARGED: Final[str] = "mih.discharged"
 
-MIH_UTILIZATION_OBSERVATION_RECORDED: Final[str] = "mih.utilization.observation_recorded"
+MIH_UTILIZATION_OBSERVATION_RECORDED: Final[str] = (
+    "mih.utilization.observation_recorded"
+)
 MIH_HIGH_UTILIZER_EVALUATED: Final[str] = "mih.high_utilizer.evaluated"
-MIH_ENROLLMENT_RECOMMENDATION_CHANGED: Final[str] = "mih.enrollment_recommendation.changed"
+MIH_ENROLLMENT_RECOMMENDATION_CHANGED: Final[str] = (
+    "mih.enrollment_recommendation.changed"
+)
 
 MIH_EVENTS: frozenset[str] = frozenset(
     {
@@ -356,7 +360,10 @@ def build_mih_utilization_observation_recorded_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"{MIH_UTILIZATION_OBSERVATION_RECORDED}:{payload.observation_id}"),
+        idempotency_key=(
+            idempotency_key
+            or f"{MIH_UTILIZATION_OBSERVATION_RECORDED}:{payload.observation_id}"
+        ),
         source_service=source_service,
     )
 
@@ -376,7 +383,10 @@ def build_mih_high_utilizer_evaluated_event(
         payload,
         actor_id=actor_id,
         causation_id=causation_id,
-        idempotency_key=(idempotency_key or f"{MIH_HIGH_UTILIZER_EVALUATED}:{payload.signal.evaluation_id}"),
+        idempotency_key=(
+            idempotency_key
+            or f"{MIH_HIGH_UTILIZER_EVALUATED}:{payload.signal.evaluation_id}"
+        ),
         source_service=source_service,
     )
 
