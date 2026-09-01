@@ -55,7 +55,7 @@ that service a shared vocabulary to adopt instead of inventing a sixth one.
 from __future__ import annotations
 
 import enum
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -278,8 +278,19 @@ class UnitRateFormula:
 
 
 @dataclass(frozen=True)
-class ApplicationPricingCatalogEntry:
-    """One application's complete pricing shape inside one catalog version."""
+class ApplicationPricingCatalogEntry:  # pylint: disable=too-many-instance-attributes
+    """One application's complete pricing shape inside one catalog version.
+
+    Deliberately wide: a single ``PricingMechanic`` value selects which
+    subset of these fields is populated (enforced by
+    ``_validate_mechanic_shape``), so one shape covers all seven mechanics
+    instead of Billing-Service having to import seven near-identical
+    per-mechanic types. Matches this repo's existing precedent of exempting
+    a genuinely wide, exhaustively-typed data holder from pylint's
+    generic attribute-count default (see
+    ``schemas/signup_contracts.py``'s ``too-few-public-methods`` exemption
+    for the same class of reason, inverted).
+    """
 
     application: CommercialApplicationKey
     display_name: str
@@ -358,80 +369,193 @@ class CommercialPricingCatalog:
     dependencies: tuple[ApplicationDependency, ...] = ()
 
 
+def _validate_band_ordering(
+    application: CommercialApplicationKey, bands: tuple[PricingBand, ...]
+) -> list[PricingBand]:
+    ordered = sorted(bands, key=lambda band: band.min_units)
+    if list(ordered) != list(bands):
+        raise ValueError(f"{application.value}: bands are not in ascending order")
+    return ordered
+
+
+def _validate_single_open_ended_band(
+    application: CommercialApplicationKey, ordered: list[PricingBand]
+) -> None:
+    open_ended = [band for band in ordered if band.max_units is None]
+    if len(open_ended) != 1:
+        raise ValueError(
+            f"{application.value}: expected exactly one open-ended top band, "
+            f"found {len(open_ended)}"
+        )
+    if ordered[-1].max_units is not None:
+        raise ValueError(f"{application.value}: the open-ended band must be last")
+
+
+def _validate_band_bounds(
+    application: CommercialApplicationKey,
+    band: PricingBand,
+    previous_max: int | None,
+) -> None:
+    if band.min_units < 0:
+        raise ValueError(f"{application.value}: min_units must be >= 0")
+    if band.max_units is not None and band.max_units < band.min_units:
+        raise ValueError(f"{application.value}: band max_units below its own min_units")
+    if previous_max is not None and band.min_units != previous_max + 1:
+        raise ValueError(
+            f"{application.value}: bands are not contiguous around "
+            f"min_units={band.min_units}"
+        )
+
+
+def _validate_band_annual_price(
+    application: CommercialApplicationKey, band: PricingBand
+) -> None:
+    if band.monthly_price is not None and band.annual_price != _expected_annual(
+        band.monthly_price
+    ):
+        raise ValueError(
+            f"{application.value}: annual_price does not match "
+            f"monthly_price {band.monthly_price} at ANNUAL_DISCOUNT_RATE "
+            f"(expected {_expected_annual(band.monthly_price)}, got {band.annual_price})"
+        )
+    if (
+        band.monthly_price_per_unit is not None
+        and band.annual_price_per_unit != _expected_annual(band.monthly_price_per_unit)
+    ):
+        raise ValueError(
+            f"{application.value}: annual_price_per_unit does not match "
+            f"monthly_price_per_unit {band.monthly_price_per_unit} at "
+            "ANNUAL_DISCOUNT_RATE"
+        )
+
+
+def _validate_band_price(
+    application: CommercialApplicationKey, band: PricingBand
+) -> None:
+    priced = band.monthly_price is not None or band.monthly_price_per_unit is not None
+    if band.custom_quote:
+        if priced:
+            raise ValueError(
+                f"{application.value}: a custom_quote band must carry no price"
+            )
+        return
+    if not priced:
+        raise ValueError(
+            f"{application.value}: a non-custom-quote band must carry a price"
+        )
+    if band.monthly_price is not None and band.monthly_price_per_unit is not None:
+        raise ValueError(
+            f"{application.value}: a band cannot set both monthly_price and "
+            "monthly_price_per_unit"
+        )
+    _validate_band_annual_price(application, band)
+
+
 def _validate_band_sequence(
     application: CommercialApplicationKey, bands: tuple[PricingBand, ...]
 ) -> None:
     if not bands:
         return
-    ordered = sorted(bands, key=lambda band: band.min_units)
-    if list(ordered) != list(bands):
-        raise ValueError(f"{application.value}: bands are not in ascending order")
-
-    open_ended = [band for band in ordered if band.max_units is None]
-    if len(open_ended) != 1:
-        raise ValueError(
-            f"{application.value}: expected exactly one open-ended top band, found {len(open_ended)}"
-        )
-    if ordered[-1].max_units is not None:
-        raise ValueError(f"{application.value}: the open-ended band must be last")
+    ordered = _validate_band_ordering(application, bands)
+    _validate_single_open_ended_band(application, ordered)
 
     previous_max: int | None = None
     for band in ordered:
-        if band.min_units < 0:
-            raise ValueError(f"{application.value}: min_units must be >= 0")
-        if band.max_units is not None and band.max_units < band.min_units:
-            raise ValueError(
-                f"{application.value}: band max_units below its own min_units"
-            )
-        if previous_max is not None and band.min_units != previous_max + 1:
-            raise ValueError(
-                f"{application.value}: bands are not contiguous around min_units={band.min_units}"
-            )
+        _validate_band_bounds(application, band, previous_max)
         previous_max = band.max_units
+        _validate_band_price(application, band)
 
-        priced = (
-            band.monthly_price is not None or band.monthly_price_per_unit is not None
+
+def _validate_banded_mechanic_shape(
+    application: CommercialApplicationKey,
+    mechanic: PricingMechanic,
+    entry: ApplicationPricingCatalogEntry,
+) -> None:
+    if not entry.bands:
+        raise ValueError(f"{application.value}: {mechanic.value} requires bands")
+    if entry.unit_formula is not None:
+        raise ValueError(
+            f"{application.value}: {mechanic.value} must not set unit_formula"
         )
-        if band.custom_quote:
-            if priced:
-                raise ValueError(
-                    f"{application.value}: a custom_quote band must carry no price"
-                )
-            continue
-        if not priced:
-            raise ValueError(
-                f"{application.value}: a non-custom-quote band must carry a price"
-            )
-        if band.monthly_price is not None and band.monthly_price_per_unit is not None:
-            raise ValueError(
-                f"{application.value}: a band cannot set both monthly_price and monthly_price_per_unit"
-            )
-        if band.monthly_price is not None:
-            if band.annual_price != _expected_annual(band.monthly_price):
-                raise ValueError(
-                    f"{application.value}: annual_price does not match "
-                    f"monthly_price {band.monthly_price} at ANNUAL_DISCOUNT_RATE "
-                    f"(expected {_expected_annual(band.monthly_price)}, "
-                    f"got {band.annual_price})"
-                )
-        if band.monthly_price_per_unit is not None:
-            if band.annual_price_per_unit != _expected_annual(
-                band.monthly_price_per_unit
-            ):
-                raise ValueError(
-                    f"{application.value}: annual_price_per_unit does not match "
-                    f"monthly_price_per_unit {band.monthly_price_per_unit} at "
-                    "ANNUAL_DISCOUNT_RATE"
-                )
+    if entry.starting_monthly_prices:
+        raise ValueError(
+            f"{application.value}: {mechanic.value} must not set "
+            "starting_monthly_prices"
+        )
 
 
-_BANDED_MECHANICS = frozenset(
-    {
-        PricingMechanic.FLAT_VOLUME_BAND,
-        PricingMechanic.WORKFORCE_HEADCOUNT_BAND,
-        PricingMechanic.PER_UNIT_RATE_BY_BRACKET,
-    }
-)
+def _validate_unit_formula_mechanic_shape(
+    application: CommercialApplicationKey,
+    mechanic: PricingMechanic,
+    entry: ApplicationPricingCatalogEntry,
+) -> None:
+    if entry.unit_formula is None:
+        raise ValueError(f"{application.value}: {mechanic.value} requires unit_formula")
+    if entry.bands:
+        raise ValueError(f"{application.value}: {mechanic.value} must not set bands")
+
+
+def _validate_starting_price_mechanic_shape(
+    application: CommercialApplicationKey,
+    mechanic: PricingMechanic,
+    entry: ApplicationPricingCatalogEntry,
+) -> None:
+    if not entry.starting_monthly_prices:
+        raise ValueError(
+            f"{application.value}: {mechanic.value} requires starting_monthly_prices"
+        )
+    if entry.bands:
+        raise ValueError(f"{application.value}: {mechanic.value} must not set bands")
+
+
+def _validate_base_fee_mechanic_shape(
+    application: CommercialApplicationKey,
+    mechanic: PricingMechanic,
+    entry: ApplicationPricingCatalogEntry,
+) -> None:
+    if entry.base_fee_monthly is None:
+        raise ValueError(
+            f"{application.value}: {mechanic.value} requires base_fee_monthly"
+        )
+    if entry.bands:
+        raise ValueError(f"{application.value}: {mechanic.value} must not set bands")
+
+
+#: One shape-validator per mechanic. A dict dispatch, not an if/elif chain, so
+#: adding a mechanic cannot silently grow this into an unmaintainable branch
+#: ladder — see ``_MECHANIC_SHAPE_VALIDATORS`` used in ``_validate_mechanic_shape``.
+_MechanicShapeValidator = Callable[
+    [CommercialApplicationKey, PricingMechanic, ApplicationPricingCatalogEntry], None
+]
+_MECHANIC_SHAPE_VALIDATORS: Mapping[PricingMechanic, _MechanicShapeValidator] = {
+    PricingMechanic.FLAT_VOLUME_BAND: _validate_banded_mechanic_shape,
+    PricingMechanic.WORKFORCE_HEADCOUNT_BAND: _validate_banded_mechanic_shape,
+    PricingMechanic.PER_UNIT_RATE_BY_BRACKET: _validate_banded_mechanic_shape,
+    PricingMechanic.BASE_PLUS_PER_UNIT: _validate_unit_formula_mechanic_shape,
+    PricingMechanic.STARTING_PRICE_BANDS_TBD: _validate_starting_price_mechanic_shape,
+    PricingMechanic.BASE_PLUS_METERED_USAGE: _validate_base_fee_mechanic_shape,
+    PricingMechanic.SOFTWARE_FEE_PLUS_PASSTHROUGH: _validate_base_fee_mechanic_shape,
+}
+
+
+def _validate_included_units_usage(
+    application: CommercialApplicationKey,
+    mechanic: PricingMechanic,
+    entry: ApplicationPricingCatalogEntry,
+) -> None:
+    if (
+        mechanic is not PricingMechanic.PER_UNIT_RATE_BY_BRACKET
+        and entry.included_units
+    ):
+        raise ValueError(
+            f"{application.value}: included_units is only meaningful for "
+            f"{PricingMechanic.PER_UNIT_RATE_BY_BRACKET.value}"
+        )
+    if entry.included_units and entry.base_fee_monthly is None:
+        raise ValueError(
+            f"{application.value}: included_units without base_fee_monthly makes "
+            "no sense"
+        )
 
 
 def _validate_mechanic_shape(
@@ -446,62 +570,58 @@ def _validate_mechanic_shape(
     """
 
     mechanic = entry.mechanic
-    if mechanic in _BANDED_MECHANICS:
-        if not entry.bands:
-            raise ValueError(f"{application.value}: {mechanic.value} requires bands")
-        if entry.unit_formula is not None:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} must not set unit_formula"
-            )
-        if entry.starting_monthly_prices:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} must not set starting_monthly_prices"
-            )
-    elif mechanic is PricingMechanic.BASE_PLUS_PER_UNIT:
-        if entry.unit_formula is None:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} requires unit_formula"
-            )
-        if entry.bands:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} must not set bands"
-            )
-    elif mechanic is PricingMechanic.STARTING_PRICE_BANDS_TBD:
-        if not entry.starting_monthly_prices:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} requires starting_monthly_prices"
-            )
-        if entry.bands:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} must not set bands"
-            )
-    elif mechanic in (
-        PricingMechanic.BASE_PLUS_METERED_USAGE,
-        PricingMechanic.SOFTWARE_FEE_PLUS_PASSTHROUGH,
-    ):
-        if entry.base_fee_monthly is None:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} requires base_fee_monthly"
-            )
-        if entry.bands:
-            raise ValueError(
-                f"{application.value}: {mechanic.value} must not set bands"
-            )
-    else:  # pragma: no cover - exhaustiveness guard for future mechanics
-        raise ValueError(f"{application.value}: unhandled mechanic {mechanic.value}")
-
+    validator = _MECHANIC_SHAPE_VALIDATORS.get(mechanic)
     if (
-        mechanic is not PricingMechanic.PER_UNIT_RATE_BY_BRACKET
-        and entry.included_units
+        validator is None
+    ):  # pragma: no cover - exhaustiveness guard for future mechanics
+        raise ValueError(f"{application.value}: unhandled mechanic {mechanic.value}")
+    validator(application, mechanic, entry)
+    _validate_included_units_usage(application, mechanic, entry)
+
+
+def _validate_catalog_coverage(catalog: CommercialPricingCatalog) -> None:
+    missing = [key for key in CommercialApplicationKey if key not in catalog.entries]
+    if missing:
+        raise ValueError(
+            "catalog is missing entries for: "
+            + ", ".join(sorted(key.value for key in missing))
+        )
+
+
+def _validate_catalog_entry(
+    key: CommercialApplicationKey, entry: ApplicationPricingCatalogEntry
+) -> None:
+    if entry.application is not key:
+        raise ValueError(
+            f"entries[{key.value!r}].application is {entry.application.value!r}, "
+            "not the mapping key it is stored under"
+        )
+    if (
+        entry.module_canonical_id is not None
+        and entry.module_canonical_id not in MODULE_REGISTRY
     ):
         raise ValueError(
-            f"{application.value}: included_units is only meaningful for "
-            f"{PricingMechanic.PER_UNIT_RATE_BY_BRACKET.value}"
+            f"{key.value}: module_canonical_id {entry.module_canonical_id!r} "
+            "is not a canonical id in module_registry.MODULE_REGISTRY"
         )
-    if entry.included_units and entry.base_fee_monthly is None:
-        raise ValueError(
-            f"{application.value}: included_units without base_fee_monthly makes no sense"
-        )
+    _validate_band_sequence(key, entry.bands)
+    _validate_mechanic_shape(key, entry)
+
+
+def _validate_catalog_dependencies(catalog: CommercialPricingCatalog) -> None:
+    for dependency in catalog.dependencies:
+        if dependency.application in dependency.requires:
+            raise ValueError(f"{dependency.application.value}: cannot require itself")
+        unknown = [
+            required.value
+            for required in dependency.requires
+            if required not in catalog.entries
+        ]
+        if unknown:
+            raise ValueError(
+                f"{dependency.application.value}: requires unregistered "
+                "application(s): " + ", ".join(sorted(unknown))
+            )
 
 
 def validate_catalog(catalog: CommercialPricingCatalog) -> None:
@@ -513,39 +633,7 @@ def validate_catalog(catalog: CommercialPricingCatalog) -> None:
     package entirely.
     """
 
-    missing = [key for key in CommercialApplicationKey if key not in catalog.entries]
-    if missing:
-        raise ValueError(
-            "catalog is missing entries for: "
-            + ", ".join(sorted(key.value for key in missing))
-        )
-
+    _validate_catalog_coverage(catalog)
     for key, entry in catalog.entries.items():
-        if entry.application is not key:
-            raise ValueError(
-                f"entries[{key.value!r}].application is {entry.application.value!r}, "
-                "not the mapping key it is stored under"
-            )
-        if entry.module_canonical_id is not None and (
-            entry.module_canonical_id not in MODULE_REGISTRY
-        ):
-            raise ValueError(
-                f"{key.value}: module_canonical_id {entry.module_canonical_id!r} "
-                "is not a canonical id in module_registry.MODULE_REGISTRY"
-            )
-        _validate_band_sequence(key, entry.bands)
-        _validate_mechanic_shape(key, entry)
-
-    for dependency in catalog.dependencies:
-        if dependency.application in dependency.requires:
-            raise ValueError(f"{dependency.application.value}: cannot require itself")
-        unknown = [
-            required.value
-            for required in dependency.requires
-            if required not in catalog.entries
-        ]
-        if unknown:
-            raise ValueError(
-                f"{dependency.application.value}: requires unregistered application(s): "
-                + ", ".join(sorted(unknown))
-            )
+        _validate_catalog_entry(key, entry)
+    _validate_catalog_dependencies(catalog)
