@@ -14,6 +14,31 @@ from the installed package metadata).
 
 ### Added
 
+- `adaptix_contracts.commercial`: new package with the shared commercial
+  pricing/application-catalog vocabulary for the founder's modular-pricing
+  directive (Phase B) — every independently purchasable Adaptix customer
+  application priced and sold separately by real operational volume, never
+  by user seat count. Adds `CommercialApplicationKey` (21 applications,
+  cross-referenced against `module_registry.MODULE_REGISTRY` canonical ids
+  wherever one already exists — reused, never duplicated),
+  `PricingMechanic` (the seven genuinely distinct pricing shapes the
+  founder's price list actually uses: flat volume band, workforce headcount
+  band, base-plus-per-unit, per-unit-rate-by-bracket, base-plus-metered-usage,
+  starting-price-bands-TBD, software-fee-plus-passthrough),
+  `PricingBand`, `UnitRateFormula`, `ApplicationPricingCatalogEntry`,
+  `ApplicationDependency` (currently empty — zero true technical dependencies
+  confirmed among the twenty priced applications), `CatalogEntryStatus`, and
+  `CommercialPricingCatalog`. Seeds the first catalog version,
+  `wisconsin_launch_catalog.WI_LAUNCH_CATALOG`, from the founder's verified
+  Wisconsin launch price list; every seeded annual price is checked against
+  the 10%-off-monthly-times-12 discount formula at import time.
+  Carries no pricing CALCULATION logic — shapes and seed data only, per
+  `adaptix_contracts/AGENTS.md` and `BILLING_AND_PACKAGING_RULES.md`; the
+  engine that evaluates a tenant's volume against these shapes belongs in
+  Adaptix-Billing-Service, a separate later task. Strictly additive: no
+  existing file, export, or signature in `module_registry.py`,
+  `auth/capability_registry.py`, or `schemas/tenant_contracts.py` is
+  changed, renamed, or removed.
 - `module_registry`: registered the `ai` module (audience `adaptix-ai`,
   purchasable=False, no aliases, no implies). The gateway already routed
   `/api/v1/ai/*` with audience `adaptix-ai` and gated it on module id `ai`,
