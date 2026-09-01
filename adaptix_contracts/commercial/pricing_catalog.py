@@ -415,7 +415,7 @@ def _validate_band_bounds(
     _validate_band_contiguity(application, band, previous_max)
 
 
-def _validate_band_flat_annual_price(
+def _validate_flat_annual_price(
     application: CommercialApplicationKey, band: PricingBand
 ) -> None:
     if band.monthly_price is not None and band.annual_price != _expected_annual(
@@ -428,7 +428,7 @@ def _validate_band_flat_annual_price(
         )
 
 
-def _validate_band_per_unit_annual_price(
+def _validate_unit_annual_price(
     application: CommercialApplicationKey, band: PricingBand
 ) -> None:
     if (
@@ -447,12 +447,12 @@ def _validate_band_per_unit_annual_price(
 def _validate_band_annual_price(
     application: CommercialApplicationKey, band: PricingBand
 ) -> None:
-    _validate_band_flat_annual_price(application, band)
-    _validate_band_per_unit_annual_price(application, band)
+    _validate_flat_annual_price(application, band)
+    _validate_unit_annual_price(application, band)
 
 
-def _validate_custom_quote_band_price(
-    application: CommercialApplicationKey, band: PricingBand, priced: bool
+def _validate_custom_quote_band(
+    application: CommercialApplicationKey, priced: bool
 ) -> None:
     if priced:
         raise ValueError(
@@ -480,7 +480,7 @@ def _validate_band_price(
 ) -> None:
     priced = band.monthly_price is not None or band.monthly_price_per_unit is not None
     if band.custom_quote:
-        _validate_custom_quote_band_price(application, band, priced)
+        _validate_custom_quote_band(application, priced)
         return
     _validate_priced_band_shape(application, band, priced)
 
