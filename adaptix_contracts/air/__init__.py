@@ -1,0 +1,9 @@
+from adaptix_contracts.air.far_135_267 import (
+    DUTY_EXCEPTION_MAX_DUTY_HOURS,
+    REST_BEFORE_COMPLETION_HOURS,
+)
+
+__all__ = [
+    "DUTY_EXCEPTION_MAX_DUTY_HOURS",
+    "REST_BEFORE_COMPLETION_HOURS",
+]
