@@ -485,6 +485,21 @@ def test_ai_reaches_the_cortex_ai_runtime() -> None:
     assert "ai" not in expand_entitlements(["cortex", "bedrock", "intelligence"])
 
 
+def test_mih_reaches_the_mih_service_and_is_state_gated_by_its_canonical_id() -> None:
+    """The MIH entitlement id must be grantable (Core's MODULE_CATALOG derives
+    from ``canonical_module_ids()``), must reach the MIH service audience the
+    Gateway signs for /api/v1/mih, and must be exactly the string Core's
+    state_rules.py restricts per state — ``mih_community_paramedicine`` —
+    with ``mih`` (the route slug) as an alias, never the other way round."""
+    from adaptix_contracts.mih import MIH_ENTITLEMENT_ID, MIH_SERVICE_AUDIENCE
+
+    assert MIH_ENTITLEMENT_ID in canonical_module_ids()
+    assert module_audiences(MIH_ENTITLEMENT_ID) == frozenset({MIH_SERVICE_AUDIENCE})
+    assert resolve_module_id("mih") == MIH_ENTITLEMENT_ID
+    assert MODULE_REGISTRY[MIH_ENTITLEMENT_ID].purchasable is True
+    assert expand_entitlements(["mih"]) == frozenset({MIH_ENTITLEMENT_ID})
+
+
 def test_assetops_reaches_its_own_service() -> None:
     """Live $29/vehicle/month SKU; gateway routes /api/v1/assetops to it."""
     assert module_audiences("assetops") == {"adaptix-assetops"}

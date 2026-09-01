@@ -14,6 +14,18 @@ from the installed package metadata).
 
 ### Added
 
+- `module_registry`: registered `mih_community_paramedicine` (Mobile
+  Integrated Healthcare / Community Paramedicine; audience `adaptix-mih`;
+  alias `mih`, the Gateway route slug; purchasable — Community Paramedicine
+  is a priced application in `adaptix_contracts.commercial`). Until now the
+  id existed only as `adaptix_contracts.mih.MIH_ENTITLEMENT_ID` and in Core's
+  per-state `restricted_modules`, so Core's `MODULE_CATALOG` (derived from
+  `canonical_module_ids()`) could never grant it and the Web-App workspace
+  gate `mih_community_paramedicine` was dark for every non-founder tenant.
+  Strictly additive: no existing id, alias, audience or implication changes.
+  Consumers (Core, Web-App's `canonicalModuleIds.ts` mirror) re-pin /
+  regenerate deliberately.
+
 - `adaptix_contracts.mih`: shared contract surface for the remote patient
   monitoring and high-utilizer detection capabilities Adaptix-MIH-Service
   now implements (build-order steps 4 and 5; MIH PR #18). Enums
