@@ -123,11 +123,121 @@ class MihReferralSource(StrEnum):
     OTHER = "other"
 
 
+# ---------------------------------------------------------------------------
+# Remote patient monitoring (Adaptix-MIH-Service build-order step 4)
+# ---------------------------------------------------------------------------
+
+
+class RemoteReadingMetric(StrEnum):
+    """Remote-monitoring metrics the MIH service accepts.
+
+    Mirrors ``READING_METRICS`` in Adaptix-MIH-Service exactly; a metric
+    outside this set is refused by the service (422 ``invalid_metric``),
+    never coerced.
+    """
+
+    SYSTOLIC_BP = "systolic_bp"
+    DIASTOLIC_BP = "diastolic_bp"
+    HEART_RATE = "heart_rate"
+    SPO2 = "spo2"
+    WEIGHT_KG = "weight_kg"
+    GLUCOSE_MG_DL = "glucose_mg_dl"
+    HRV_MS = "hrv_ms"
+
+
+class MihEscalationState(StrEnum):
+    """Lifecycle of a threshold-breach escalation awaiting acknowledgement."""
+
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+
+
+# ---------------------------------------------------------------------------
+# High-utilizer detection (Adaptix-MIH-Service build-order step 5)
+# ---------------------------------------------------------------------------
+
+
+class UtilizationEventType(StrEnum):
+    """Normalized utilization evidence the MIH service counts.
+
+    Strict vocabulary shared with the future producers: ePCR supplies
+    ``911_call``; the QHIN hospital feed supplies ``ed_visit`` and
+    ``hospital_admission``. Anything else is refused, never fuzzy-matched.
+    """
+
+    CALL_911 = "911_call"
+    ED_VISIT = "ed_visit"
+    HOSPITAL_ADMISSION = "hospital_admission"
+
+
+class UtilizationSourceSystem(StrEnum):
+    """Which system asserted a utilization observation.
+
+    ``EPCR`` and ``QHIN`` are the authoritative automated producers (their
+    service-to-service identity is a later gateway wave); ``MANUAL_VERIFIED``
+    is supervisor-entered, validated historical/backfill evidence. There are
+    deliberately no demo, sample or test sources.
+    """
+
+    EPCR = "epcr"
+    QHIN = "qhin"
+    MANUAL_VERIFIED = "manual_verified"
+
+
+class UtilizationPolicyStatus(StrEnum):
+    """A tenant's high-utilizer policy is versioned; one version is active."""
+
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+
+
+class UtilizationEvaluationOrigin(StrEnum):
+    """Why an evaluation ran, stored on every evaluation row."""
+
+    OBSERVATION_INGEST = "observation_ingest"
+    EXPLICIT = "explicit"
+
+
+class EnrollmentRecommendationStatus(StrEnum):
+    """Lifecycle of an MIH enrollment recommendation.
+
+    ``OPEN`` → ``ACKNOWLEDGED`` → one of ``DISMISSED`` (supervisor reason
+    required), ``ENROLLED`` (resolved against an existing, consented, active
+    enrollment — the recommendation never creates one) or ``EXPIRED`` (the
+    person no longer meets the policy, or the policy version was superseded;
+    retained, never deleted). ``DISMISSED``/``EXPIRED`` may return to ``OPEN``
+    only through an explicit, audited supervisor reopen or, for ``EXPIRED``,
+    by re-qualifying under the same policy version.
+    """
+
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+    DISMISSED = "dismissed"
+    ENROLLED = "enrolled"
+    EXPIRED = "expired"
+
+
+class HighUtilizerRecommendedAction(StrEnum):
+    """What a high-utilizer signal asks a consumer to do. Never "enroll"."""
+
+    NONE = "none"
+    CONSIDER_ENROLLMENT = "consider_enrollment"
+    ALREADY_ENROLLED = "already_enrolled"
+
+
 __all__ = [
+    "EnrollmentRecommendationStatus",
     "EnrollmentStatus",
+    "HighUtilizerRecommendedAction",
+    "MihEscalationState",
     "MihOutcomeType",
     "MihPayer",
     "MihReferralSource",
     "MihServiceType",
     "MihVisitStatus",
+    "RemoteReadingMetric",
+    "UtilizationEvaluationOrigin",
+    "UtilizationEventType",
+    "UtilizationPolicyStatus",
+    "UtilizationSourceSystem",
 ]

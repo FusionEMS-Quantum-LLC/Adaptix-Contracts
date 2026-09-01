@@ -14,6 +14,52 @@ from the installed package metadata).
 
 ### Added
 
+- `module_registry`: registered `mih_community_paramedicine` (Mobile
+  Integrated Healthcare / Community Paramedicine; audience `adaptix-mih`;
+  alias `mih`, the Gateway route slug; purchasable — Community Paramedicine
+  is a priced application in `adaptix_contracts.commercial`). Until now the
+  id existed only as `adaptix_contracts.mih.MIH_ENTITLEMENT_ID` and in Core's
+  per-state `restricted_modules`, so Core's `MODULE_CATALOG` (derived from
+  `canonical_module_ids()`) could never grant it and the Web-App workspace
+  gate `mih_community_paramedicine` was dark for every non-founder tenant.
+  Strictly additive: no existing id, alias, audience or implication changes.
+  Consumers (Core, Web-App's `canonicalModuleIds.ts` mirror) re-pin /
+  regenerate deliberately.
+
+- `adaptix_contracts.mih`: shared contract surface for the remote patient
+  monitoring and high-utilizer detection capabilities Adaptix-MIH-Service
+  now implements (build-order steps 4 and 5; MIH PR #18). Enums
+  `RemoteReadingMetric`, `MihEscalationState`, `UtilizationEventType`
+  (`911_call` / `ed_visit` / `hospital_admission`), `UtilizationSourceSystem`
+  (`epcr` / `qhin` / `manual_verified`), `UtilizationPolicyStatus`,
+  `UtilizationEvaluationOrigin`, `EnrollmentRecommendationStatus`
+  (`open` / `acknowledged` / `dismissed` / `enrolled` / `expired`) and
+  `HighUtilizerRecommendedAction`; models `MihMonitoringThreshold`,
+  `MihRemoteReading` (+ `MihRemoteReadingBreach`), `MihEscalation`,
+  `MihUtilizationPolicy` (tenant-versioned, lookback 1–365 days, each enabled
+  threshold ≥ 1, `recommendation_min_score` validated as reachable — there
+  are no platform default thresholds), `MihUtilizationObservation` (opaque
+  patient identity only, timezone-aware `occurred_at`), `HighUtilizerSignal`
+  (the transparent trigger count 0–3 with tri-state per-dimension triggers,
+  validated against the score; `recommended_action` is never "enroll") and
+  `MihEnrollmentRecommendation` (status-field consistency validated: a
+  `dismissed` row carries reason, actor and time; an `enrolled` row carries
+  the pre-existing consented enrollment it was resolved against, actor and
+  time). `MihEscalation.acknowledged` and `MihUtilizationPolicy.superseded`
+  likewise require their actor/time (and successor) fields;
+  `expected_recommended_action` is the single mapping from evaluation flags
+  to the recommended action. Events `mih.utilization.observation_recorded`,
+  `mih.high_utilizer.evaluated` and `mih.enrollment_recommendation.changed`
+  with payloads and envelope factories (deterministic idempotency keys), and
+  `MihErrorCode` entries mirroring the service's `error_code` strings with
+  platform mappings, plus `MIH_SERVICE_ERROR_CODES` /
+  `from_service_error_code` translating the service's bare `error_code`
+  strings (which carry no `mih.` prefix) to the enum. Every timestamp on the
+  new models must be timezone-aware and is normalised to UTC. Strictly
+  additive: no existing MIH model, enum value, event name or error code is
+  changed. Producer wiring in the MIH service,
+  the ePCR/QHIN feeds and the Gateway route remain separate waves.
+
 - `adaptix_contracts.air.far_135_267`: new module holding the single numeric
   authority for the 14 CFR 135.267 duty/rest floors — `DUTY_EXCEPTION_MAX_DUTY_HOURS`
   (14) and `REST_BEFORE_COMPLETION_HOURS` (10). Both Adaptix-Air-Service

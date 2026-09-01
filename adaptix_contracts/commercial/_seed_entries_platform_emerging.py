@@ -123,13 +123,13 @@ ENTRIES: tuple[ApplicationPricingCatalogEntry, ...] = (
         status=CatalogEntryStatus.STARTING_PRICE_ONLY_BANDS_TBD,
         starting_monthly_prices=(Decimal("995"),),
         notes=(
-            "Single starting price only; volume bands TBD. Not registered in "
-            "module_registry.py. adaptix_contracts/mih/ exists as a schema "
-            "package for Mobile Integrated Health, the same clinical domain "
-            "as Community Paramedicine, but MIH has no canonical module id in "
-            "module_registry.py today -- cross-referenced here in "
-            "documentation only, not reused, since no registered id exists to "
-            "reuse."
+            "Single starting price only; volume bands TBD. The entitlement this "
+            "application confers is module_registry canonical id "
+            "mih_community_paramedicine (audience adaptix-mih), the same "
+            "clinical domain as adaptix_contracts/mih/. The catalog key stays "
+            "community_paramedicine: renaming a sold key is a contract change "
+            "for every consumer, so the mapping is documented here rather than "
+            "made by equality."
         ),
     ),
     ApplicationPricingCatalogEntry(
