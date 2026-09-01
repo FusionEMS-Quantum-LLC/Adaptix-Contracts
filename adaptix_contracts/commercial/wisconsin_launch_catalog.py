@@ -114,7 +114,9 @@ _ENTRIES: tuple[ApplicationPricingCatalogEntry, ...] = (
             per_unit_rate=Decimal("125"),
             minimum_fee=Decimal("750"),
         ),
-        notes=("$125/device/month, $750/month minimum: price = max(125 * devices, 750)."),
+        notes=(
+            "$125/device/month, $750/month minimum: price = max(125 * devices, 750)."
+        ),
     ),
     ApplicationPricingCatalogEntry(
         application=CommercialApplicationKey.CREWLINK,
@@ -143,7 +145,9 @@ _ENTRIES: tuple[ApplicationPricingCatalogEntry, ...] = (
             _band(7501, 15000, "2295", "24786.00"),
             _custom_quote_band(15001),
         ),
-        notes=("Does NOT auto-include EPCR, CAD, or Hospital -- no confirmed technical dependency."),
+        notes=(
+            "Does NOT auto-include EPCR, CAD, or Hospital -- no confirmed technical dependency."
+        ),
     ),
     ApplicationPricingCatalogEntry(
         application=CommercialApplicationKey.HOSPITAL,
@@ -285,7 +289,9 @@ _ENTRIES: tuple[ApplicationPricingCatalogEntry, ...] = (
         application=CommercialApplicationKey.CORTEX,
         display_name="Cortex",
         mechanic=PricingMechanic.STARTING_PRICE_BANDS_TBD,
-        volume_dimension=("not yet defined -- candidate tiers only, pending real provider-cost measurement"),
+        volume_dimension=(
+            "not yet defined -- candidate tiers only, pending real provider-cost measurement"
+        ),
         status=CatalogEntryStatus.CANDIDATE_NOT_APPROVED_FOR_LAUNCH,
         module_canonical_id="cortex",
         starting_monthly_prices=(
