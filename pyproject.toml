@@ -54,7 +54,7 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "twine>=7.0.0,<8",
     "temporalio>=1.7.0,<2.0.0",
-    "ruff==0.16.4",
+    "ruff==0.16.5",
     "mypy==2.3.1",
     # Needed by tests/test_bedrock_ops_command_safety.py, which loads
     # tools/bedrock_ops.py. That tool is excluded from the wheel, so these stay
