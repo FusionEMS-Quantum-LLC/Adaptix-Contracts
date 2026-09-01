@@ -32,7 +32,9 @@ def _minimal_catalog(
     )
 
 
-def _complete_starting_price_entries() -> dict[CommercialApplicationKey, ApplicationPricingCatalogEntry]:
+def _complete_starting_price_entries() -> dict[
+    CommercialApplicationKey, ApplicationPricingCatalogEntry
+]:
     """One valid, minimal entry per application key -- a baseline for defect tests."""
 
     return {
@@ -129,7 +131,9 @@ class TestModuleReuseNotDuplication:
             CommercialApplicationKey.THIRD_PARTY_BILLING,
         ],
     )
-    def test_genuinely_new_applications_have_no_module_id_yet(self, application: CommercialApplicationKey) -> None:
+    def test_genuinely_new_applications_have_no_module_id_yet(
+        self, application: CommercialApplicationKey
+    ) -> None:
         """These four have no existing module_registry row -- confirmed, not guessed."""
 
         entry = WI_LAUNCH_CATALOG.entries[application]
@@ -322,7 +326,9 @@ class TestValidateCatalogCatchesRealDefects:
         validate_catalog(_minimal_catalog(_complete_starting_price_entries()))
 
 
-def test_unit_rate_formula_never_fabricates_an_unspecified_custom_quote_threshold() -> None:
+def test_unit_rate_formula_never_fabricates_an_unspecified_custom_quote_threshold() -> (
+    None
+):
     """HEMS 'large multi-base = custom' named no number; none may be invented here."""
 
     hems_formula = WI_LAUNCH_CATALOG.entries[CommercialApplicationKey.HEMS].unit_formula
