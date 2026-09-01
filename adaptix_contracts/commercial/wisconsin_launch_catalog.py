@@ -26,13 +26,27 @@ from __future__ import annotations
 from datetime import date
 from types import MappingProxyType
 
-from adaptix_contracts.commercial._seed_entries_clinical_dispatch import (
+# These three imports already pull only the one name each private module
+# exports (``ENTRIES``), never the submodule object itself. Pylint's
+# no-name-in-module check still cannot resolve them: confirmed a false
+# positive against this exact source tree with a current pylint/astroid
+# (4.0.8) reporting zero issues here, and separately confirmed by this
+# repo's own passing test suite genuinely importing and exercising these
+# same three modules at collection time. The failure is scoped to Codacy's
+# older bundled Pylint mis-resolving leading-underscore submodule names — it
+# does not fire on the non-underscore ``pricing_catalog`` import two lines
+# below, which is the same import shape. Matches this repo's existing
+# precedent of a targeted, explained pylint exemption (see
+# ``pricing_catalog.ApplicationPricingCatalogEntry``'s
+# ``too-many-instance-attributes`` exemption) rather than restructuring
+# working, correct imports around a tool limitation.
+from adaptix_contracts.commercial._seed_entries_clinical_dispatch import (  # pylint: disable=no-name-in-module
     ENTRIES as _CLINICAL_DISPATCH_ENTRIES,
 )
-from adaptix_contracts.commercial._seed_entries_platform_emerging import (
+from adaptix_contracts.commercial._seed_entries_platform_emerging import (  # pylint: disable=no-name-in-module
     ENTRIES as _PLATFORM_EMERGING_ENTRIES,
 )
-from adaptix_contracts.commercial._seed_entries_revenue_workforce import (
+from adaptix_contracts.commercial._seed_entries_revenue_workforce import (  # pylint: disable=no-name-in-module
     ENTRIES as _REVENUE_WORKFORCE_ENTRIES,
 )
 from adaptix_contracts.commercial.pricing_catalog import (
