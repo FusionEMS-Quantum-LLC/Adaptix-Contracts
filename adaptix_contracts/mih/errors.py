@@ -70,8 +70,10 @@ class MihErrorCode(str, Enum):
     READING_INVALID_METRIC = "mih.reading_invalid_metric"
     ESCALATION_NOT_FOUND = "mih.escalation_not_found"
 
-    # High-utilizer detection. Codes mirror the ``error_code`` strings
-    # Adaptix-MIH-Service answers on ``/api/v1/mih/utilization/*``.
+    # High-utilizer detection. Each code corresponds to one bare
+    # ``error_code`` string Adaptix-MIH-Service answers on
+    # ``/api/v1/mih/utilization/*`` (see ``MIH_SERVICE_ERROR_CODES``); the
+    # ``mih.`` namespace follows the rest of this enum.
     UTILIZATION_POLICY_NOT_CONFIGURED = "mih.utilization_policy_not_configured"
     UTILIZATION_POLICY_VERSION_CONFLICT = "mih.utilization_policy_version_conflict"
     UTILIZATION_INVALID_EVENT_TYPE = "mih.utilization_invalid_event_type"
@@ -135,6 +137,44 @@ _MIH_TO_PLATFORM: dict[MihErrorCode, AdaptixErrorCode] = {
     ),
     MihErrorCode.RECOMMENDATION_ENROLLMENT_NOT_ACTIVE: AdaptixErrorCode.WORKFLOW_BLOCKED,
 }
+
+
+#: Translation from the bare ``error_code`` strings Adaptix-MIH-Service puts
+#: in ``HTTPException.detail`` to this enum. The service does not prefix its
+#: codes with ``mih.``; consumers that receive a raw service response use
+#: :func:`from_service_error_code` to classify it.
+MIH_SERVICE_ERROR_CODES: dict[str, MihErrorCode] = {
+    "consent_required": MihErrorCode.ENROLLMENT_CONSENT_REQUIRED,
+    "patient_not_found": MihErrorCode.ENROLLMENT_NOT_FOUND,
+    "already_enrolled": MihErrorCode.ENROLLMENT_ALREADY_EXISTS,
+    "invalid_metric": MihErrorCode.READING_INVALID_METRIC,
+    "escalation_not_found": MihErrorCode.ESCALATION_NOT_FOUND,
+    "policy_not_configured": MihErrorCode.UTILIZATION_POLICY_NOT_CONFIGURED,
+    "policy_version_conflict": MihErrorCode.UTILIZATION_POLICY_VERSION_CONFLICT,
+    "invalid_event_type": MihErrorCode.UTILIZATION_INVALID_EVENT_TYPE,
+    "invalid_source_system": MihErrorCode.UTILIZATION_INVALID_SOURCE_SYSTEM,
+    "occurred_at_in_future": MihErrorCode.UTILIZATION_OCCURRED_AT_IN_FUTURE,
+    "source_event_conflict": MihErrorCode.UTILIZATION_SOURCE_EVENT_CONFLICT,
+    "evaluation_conflict": MihErrorCode.UTILIZATION_EVALUATION_CONFLICT,
+    "recommendation_not_found": MihErrorCode.RECOMMENDATION_NOT_FOUND,
+    "recommendation_already_dismissed": MihErrorCode.RECOMMENDATION_ALREADY_DISMISSED,
+    "recommendation_already_enrolled": MihErrorCode.RECOMMENDATION_ALREADY_ENROLLED,
+    "invalid_transition": MihErrorCode.RECOMMENDATION_INVALID_TRANSITION,
+    "patient_identity_mismatch": (
+        MihErrorCode.RECOMMENDATION_PATIENT_IDENTITY_MISMATCH
+    ),
+    "enrollment_not_active": MihErrorCode.RECOMMENDATION_ENROLLMENT_NOT_ACTIVE,
+}
+
+
+def from_service_error_code(error_code: str) -> Optional[MihErrorCode]:
+    """Classify a bare Adaptix-MIH-Service ``error_code``; ``None`` if unknown.
+
+    Unknown is returned rather than guessed: a consumer must not invent a
+    meaning for a code this package does not know.
+    """
+
+    return MIH_SERVICE_ERROR_CODES.get(error_code)
 
 
 def to_adaptix_error_code(mih_code: MihErrorCode) -> AdaptixErrorCode:
@@ -239,7 +279,8 @@ def enrollment_consent_required(
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.ENROLLMENT_CONSENT_REQUIRED,
         message=(
-            f"MIH enrollment {enrollment_id} cannot proceed: patient consent has not been recorded"
+            f"MIH enrollment {enrollment_id} cannot proceed: "
+            "patient consent has not been recorded"
         ),
         trace=trace,
     )
@@ -311,11 +352,13 @@ def recommendation_invalid_transition(
 
 
 __all__ = [
+    "MIH_SERVICE_ERROR_CODES",
     "MihErrorCode",
     "MihErrorEnvelope",
     "MihServiceError",
     "enrollment_consent_required",
     "enrollment_not_found",
+    "from_service_error_code",
     "payer_not_authorized_for_program",
     "recommendation_invalid_transition",
     "recommendation_not_found",

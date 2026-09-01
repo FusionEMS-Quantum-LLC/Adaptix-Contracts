@@ -19,6 +19,7 @@ from adaptix_contracts.events.envelope import AdaptixEventEnvelope
 from adaptix_contracts.mih import (
     MIH_ENROLLMENT_RECOMMENDATION_CHANGED,
     MIH_EVENTS,
+    MIH_SERVICE_ERROR_CODES,
     MIH_HIGH_UTILIZER_EVALUATED,
     MIH_UTILIZATION_OBSERVATION_RECORDED,
     EnrollmentRecommendationStatus,
@@ -43,6 +44,7 @@ from adaptix_contracts.mih import (
     build_mih_enrollment_recommendation_changed_event,
     build_mih_high_utilizer_evaluated_event,
     build_mih_utilization_observation_recorded_event,
+    from_service_error_code,
     recommendation_invalid_transition,
     recommendation_not_found,
     to_adaptix_error_code,
@@ -509,6 +511,58 @@ def test_new_error_codes_map_to_platform_codes() -> None:
     # Every code has a mapping — a new code without one raises KeyError here.
     for code in MihErrorCode:
         to_adaptix_error_code(code)
+
+
+def test_service_error_codes_translate_and_unknown_is_none() -> None:
+    assert from_service_error_code("invalid_transition") is (
+        MihErrorCode.RECOMMENDATION_INVALID_TRANSITION
+    )
+    assert from_service_error_code("policy_not_configured") is (
+        MihErrorCode.UTILIZATION_POLICY_NOT_CONFIGURED
+    )
+    assert from_service_error_code("something_else") is None
+    # Every translated code is a real enum member with a platform mapping.
+    for code in MIH_SERVICE_ERROR_CODES.values():
+        to_adaptix_error_code(code)
+
+
+def test_every_new_timestamp_must_be_timezone_aware() -> None:
+    naive = datetime(2026, 9, 1, 12, 0)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        _policy(created_at=naive)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        _policy(superseded_at=naive)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        _observation(recorded_at=naive)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        _signal(window_start=naive)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        _signal(evaluated_at=naive)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        _recommendation(updated_at=naive)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        _recommendation(acknowledged_at=naive)
+    with pytest.raises(ValidationError, match="timezone offset"):
+        MihMonitoringThreshold(
+            tenant_id=TENANT,
+            metric=RemoteReadingMetric.SPO2,
+            min_value=90.0,
+            updated_by="admin-1",
+            updated_at=naive,
+        )
+    with pytest.raises(ValidationError, match="timezone offset"):
+        MihEscalation(
+            tenant_id=TENANT,
+            id=uuid4(),
+            patient_id=uuid4(),
+            reading_id=uuid4(),
+            reason="x",
+            created_at=NOW,
+            acknowledged_at=naive,
+        )
+    # Aware non-UTC input is normalised to UTC.
+    local = datetime(2026, 9, 1, 7, 0, tzinfo=timezone(timedelta(hours=-5)))
+    assert _recommendation(created_at=local).created_at == NOW
 
 
 def test_error_constructors_produce_mih_envelopes() -> None:

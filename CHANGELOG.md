@@ -36,8 +36,12 @@ from the installed package metadata).
   `mih.high_utilizer.evaluated` and `mih.enrollment_recommendation.changed`
   with payloads and envelope factories (deterministic idempotency keys), and
   `MihErrorCode` entries mirroring the service's `error_code` strings with
-  platform mappings. Strictly additive: no existing MIH model, enum value,
-  event name or error code is changed. Producer wiring in the MIH service,
+  platform mappings, plus `MIH_SERVICE_ERROR_CODES` /
+  `from_service_error_code` translating the service's bare `error_code`
+  strings (which carry no `mih.` prefix) to the enum. Every timestamp on the
+  new models must be timezone-aware and is normalised to UTC. Strictly
+  additive: no existing MIH model, enum value, event name or error code is
+  changed. Producer wiring in the MIH service,
   the ePCR/QHIN feeds and the Gateway route remain separate waves.
 
 - `adaptix_contracts.air.far_135_267`: new module holding the single numeric

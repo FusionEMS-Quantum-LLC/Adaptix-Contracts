@@ -141,7 +141,8 @@ class MihEnrollment(_MihBase):
     payer_member_id: str | None = Field(
         default=None,
         description=(
-            "Payer-issued member ID. Treated as PHI; do not log outside billing/enrollment services."
+            "Payer-issued member ID. Treated as PHI; do not log outside "
+            "billing/enrollment services."
         ),
     )
 
@@ -395,6 +396,10 @@ def _require_aware(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def _require_aware_optional(value: datetime | None) -> datetime | None:
+    return None if value is None else _require_aware(value)
+
+
 class MihMonitoringThreshold(_MihBase):
     """Per-tenant escalation limit for one remote-monitoring metric.
 
@@ -407,6 +412,11 @@ class MihMonitoringThreshold(_MihBase):
     max_value: float | None = Field(default=None)
     updated_by: str = Field(..., min_length=1)
     updated_at: datetime
+
+    @field_validator("updated_at")
+    @classmethod
+    def _aware(cls, value: datetime) -> datetime:
+        return _require_aware(value)
 
     @model_validator(mode="after")
     def _bounds(self) -> "MihMonitoringThreshold":
@@ -455,9 +465,9 @@ class MihRemoteReading(_MihBase):
     breach_detail: MihRemoteReadingBreach | None = Field(default=None)
     created_at: datetime
 
-    @field_validator("taken_at")
+    @field_validator("taken_at", "created_at")
     @classmethod
-    def _taken_at_aware(cls, value: datetime) -> datetime:
+    def _aware(cls, value: datetime) -> datetime:
         return _require_aware(value)
 
 
@@ -472,6 +482,16 @@ class MihEscalation(_MihBase):
     acknowledged_by: str | None = Field(default=None)
     acknowledged_at: datetime | None = Field(default=None)
     created_at: datetime
+
+    @field_validator("created_at")
+    @classmethod
+    def _aware(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+    @field_validator("acknowledged_at")
+    @classmethod
+    def _aware_optional(cls, value: datetime | None) -> datetime | None:
+        return _require_aware_optional(value)
 
 
 # ---------------------------------------------------------------------------
@@ -512,6 +532,16 @@ class MihUtilizationPolicy(_MihBase):
     superseded_at: datetime | None = Field(default=None)
     superseded_by_policy_id: UUID | None = Field(default=None)
 
+    @field_validator("created_at")
+    @classmethod
+    def _aware(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+    @field_validator("superseded_at")
+    @classmethod
+    def _aware_optional(cls, value: datetime | None) -> datetime | None:
+        return _require_aware_optional(value)
+
     @property
     def enabled_dimensions(self) -> int:
         return sum(
@@ -550,9 +580,9 @@ class MihUtilizationObservation(_MihBase):
     recorded_by: str = Field(..., min_length=1)
     recorded_at: datetime
 
-    @field_validator("occurred_at")
+    @field_validator("occurred_at", "recorded_at")
     @classmethod
-    def _occurred_at_aware(cls, value: datetime) -> datetime:
+    def _aware(cls, value: datetime) -> datetime:
         return _require_aware(value)
 
 
@@ -596,6 +626,11 @@ class HighUtilizerSignal(_MihBase):
     evaluated_at: datetime
     evaluated_by: str = Field(..., min_length=1)
     evaluation_origin: UtilizationEvaluationOrigin
+
+    @field_validator("window_start", "window_end", "evaluated_at")
+    @classmethod
+    def _aware(cls, value: datetime) -> datetime:
+        return _require_aware(value)
 
     @model_validator(mode="after")
     def _consistent(self) -> "HighUtilizerSignal":
@@ -658,6 +693,16 @@ class MihEnrollmentRecommendation(_MihBase):
     resolved_patient_id: UUID | None = Field(default=None)
     resolved_by: str | None = Field(default=None)
     resolved_at: datetime | None = Field(default=None)
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def _aware(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+    @field_validator("acknowledged_at", "dismissed_at", "reopened_at", "resolved_at")
+    @classmethod
+    def _aware_optional(cls, value: datetime | None) -> datetime | None:
+        return _require_aware_optional(value)
 
     @model_validator(mode="after")
     def _status_fields(self) -> "MihEnrollmentRecommendation":
