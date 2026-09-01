@@ -777,6 +777,25 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-core",
         source="Gateway ROUTE_TABLE /api/v1/ai-infrastructure; Web-App app/ai-infrastructure",
     ),
+    # The Cortex AI runtime surface. The gateway routes /api/v1/ai/* to
+    # ai_service_url with audience "adaptix-ai" and its entitlement middleware
+    # derives module id "ai" from that path — but no module declared the
+    # "adaptix-ai" audience, so audience_map() never emitted it, Core's
+    # _MODULE_TO_AUDIENCE had no row, and _session_audiences could not mint
+    # "adaptix-ai" for ANY non-founder token. Every /api/v1/ai request (e.g.
+    # GET /api/v1/ai/cortex/health from the workspace shell) answered
+    # 403 jwt_audience_mismatch for every non-founder tenant — measured in
+    # production 2026-08-31 with a Cortex Live demo session token. Same
+    # routed-but-audience-less shape and same fix as ``forms`` below.
+    # purchasable=False: granting is an explicit provisioning/admin action
+    # (the Cortex Live demo pool is the first grantee), not a signup SKU, so
+    # no existing tenant's token or entitlement changes.
+    _m(
+        "ai",
+        "Cortex AI Runtime",
+        audience="adaptix-ai",
+        source="Gateway ROUTE_TABLE /api/v1/ai -> ai_service_url audience=adaptix-ai",
+    ),
     _m(
         "command-intelligence",
         "Command Intelligence",
@@ -921,6 +940,57 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "Gateway ROUTE_TABLE /api/v1/facilities -> facilities_service_url "
             "audience=adaptix-facilities (routes.py:3554); "
             "ECS adaptix-production-facilities"
+        ),
+    ),
+    # ── Realtime ─────────────────────────────────────────────────────────────
+    # Adaptix-Gateway routes.py declares this RouteEntry with the comment "RTC
+    # -- real-time comms (WebRTC/SFU signalling) shared service" (prefix
+    # "/api/v1/rtc", upstream_url=settings.rtc_service_url,
+    # audience="adaptix-rtc"), and "adaptix-rtc" is already listed in
+    # ``service_audiences.KNOWN_SERVICE_AUDIENCES`` -- so the gateway and the
+    # audience registry both already agree this service exists. What was
+    # missing is this row: with no module here, ``audience_map()`` had no
+    # ``rtc`` key, so Core's ``_MODULE_TO_AUDIENCE`` never mapped it and no
+    # tenant's session ``aud`` could ever carry ``adaptix-rtc`` -- every
+    # /api/v1/rtc request 403'd ``jwt_audience_mismatch`` for every tenant,
+    # including Cortex Live's demo pool, whose live voice session opens a room
+    # via ``POST /api/v1/rtc/rooms`` and cannot reach it without this audience.
+    # Same defect class as ``forms`` / ``hr`` / ``office`` / ``facilities``
+    # above: a live routed upstream with no module-registry row.
+    #
+    # purchasable=False: rtc is a platform control plane (room signalling for
+    # a feature, not a product a tenant buys on its own), granted the same way
+    # as forms/hr/office/facilities -- through entitlement, not a signup SKU.
+    # No ``implies``: nothing else genuinely depends on holding this module,
+    # and nothing else should be silently granted by holding it.
+    _m(
+        "rtc",
+        "Realtime Room Control Plane",
+        audience="adaptix-rtc",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/rtc -> rtc_service_url "
+            'audience=adaptix-rtc ("RTC -- real-time comms (WebRTC/SFU '
+            'signalling) shared service"); service_audiences.'
+            "KNOWN_SERVICE_AUDIENCES"
+        ),
+    ),
+    _m(
+        "mih_community_paramedicine",
+        "Mobile Integrated Healthcare / Community Paramedicine",
+        # ``mih`` is the Gateway route slug (/api/v1/mih) and the spelling the
+        # web workspace gate first used; it resolves here, never the reverse.
+        aliases=("mih",),
+        # Sold: Community Paramedicine is a priced application in
+        # adaptix_contracts.commercial (starting price only, bands TBD).
+        purchasable=True,
+        audience="adaptix-mih",
+        source=(
+            "adaptix_contracts.mih.MIH_ENTITLEMENT_ID (the id Core's "
+            "state_rules.py restricts per state); Gateway ROUTE_TABLE "
+            "/api/v1/mih -> mih.adaptix.internal:8000 audience=adaptix-mih "
+            "(backend/app/config/mih_route.py); service_audiences."
+            "KNOWN_SERVICE_AUDIENCES; commercial CommercialApplicationKey."
+            "COMMUNITY_PARAMEDICINE"
         ),
     ),
 )
