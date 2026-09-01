@@ -14,7 +14,7 @@ from the installed package metadata).
 
 ### Added
 
-- `adaptix_contracts.air.far_135_267`: new package holding the single numeric
+- `adaptix_contracts.air.far_135_267`: new module holding the single numeric
   authority for the 14 CFR 135.267 duty/rest floors — `DUTY_EXCEPTION_MAX_DUTY_HOURS`
   (14) and `REST_BEFORE_COMPLETION_HOURS` (10). Both Adaptix-Air-Service
   (`air_app/far_135_267.py`) and Adaptix-Air-Service-Pilot
