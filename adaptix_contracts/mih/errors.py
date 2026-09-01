@@ -66,6 +66,26 @@ class MihErrorCode(str, Enum):
     EPCR_LINK_INVALID = "mih.epcr_link_invalid"
     CAD_LINK_INVALID = "mih.cad_link_invalid"
 
+    # Remote patient monitoring
+    READING_INVALID_METRIC = "mih.reading_invalid_metric"
+    ESCALATION_NOT_FOUND = "mih.escalation_not_found"
+
+    # High-utilizer detection. Codes mirror the ``error_code`` strings
+    # Adaptix-MIH-Service answers on ``/api/v1/mih/utilization/*``.
+    UTILIZATION_POLICY_NOT_CONFIGURED = "mih.utilization_policy_not_configured"
+    UTILIZATION_POLICY_VERSION_CONFLICT = "mih.utilization_policy_version_conflict"
+    UTILIZATION_INVALID_EVENT_TYPE = "mih.utilization_invalid_event_type"
+    UTILIZATION_INVALID_SOURCE_SYSTEM = "mih.utilization_invalid_source_system"
+    UTILIZATION_OCCURRED_AT_IN_FUTURE = "mih.utilization_occurred_at_in_future"
+    UTILIZATION_SOURCE_EVENT_CONFLICT = "mih.utilization_source_event_conflict"
+    UTILIZATION_EVALUATION_CONFLICT = "mih.utilization_evaluation_conflict"
+    RECOMMENDATION_NOT_FOUND = "mih.recommendation_not_found"
+    RECOMMENDATION_ALREADY_DISMISSED = "mih.recommendation_already_dismissed"
+    RECOMMENDATION_ALREADY_ENROLLED = "mih.recommendation_already_enrolled"
+    RECOMMENDATION_INVALID_TRANSITION = "mih.recommendation_invalid_transition"
+    RECOMMENDATION_PATIENT_IDENTITY_MISMATCH = "mih.recommendation_patient_identity_mismatch"
+    RECOMMENDATION_ENROLLMENT_NOT_ACTIVE = "mih.recommendation_enrollment_not_active"
+
 
 _MIH_TO_PLATFORM: dict[MihErrorCode, AdaptixErrorCode] = {
     MihErrorCode.PROGRAM_INACTIVE: AdaptixErrorCode.WORKFLOW_BLOCKED,
@@ -89,6 +109,21 @@ _MIH_TO_PLATFORM: dict[MihErrorCode, AdaptixErrorCode] = {
     MihErrorCode.BILLING_HANDOFF_FAILED: AdaptixErrorCode.EXPORT_FAILED,
     MihErrorCode.EPCR_LINK_INVALID: AdaptixErrorCode.INVALID_VALUE,
     MihErrorCode.CAD_LINK_INVALID: AdaptixErrorCode.INVALID_VALUE,
+    MihErrorCode.READING_INVALID_METRIC: AdaptixErrorCode.INVALID_VALUE,
+    MihErrorCode.ESCALATION_NOT_FOUND: AdaptixErrorCode.NOT_FOUND,
+    MihErrorCode.UTILIZATION_POLICY_NOT_CONFIGURED: AdaptixErrorCode.NOT_CONFIGURED,
+    MihErrorCode.UTILIZATION_POLICY_VERSION_CONFLICT: AdaptixErrorCode.CONFLICT,
+    MihErrorCode.UTILIZATION_INVALID_EVENT_TYPE: AdaptixErrorCode.INVALID_VALUE,
+    MihErrorCode.UTILIZATION_INVALID_SOURCE_SYSTEM: AdaptixErrorCode.INVALID_VALUE,
+    MihErrorCode.UTILIZATION_OCCURRED_AT_IN_FUTURE: AdaptixErrorCode.INVALID_VALUE,
+    MihErrorCode.UTILIZATION_SOURCE_EVENT_CONFLICT: AdaptixErrorCode.CONFLICT,
+    MihErrorCode.UTILIZATION_EVALUATION_CONFLICT: AdaptixErrorCode.CONFLICT,
+    MihErrorCode.RECOMMENDATION_NOT_FOUND: AdaptixErrorCode.NOT_FOUND,
+    MihErrorCode.RECOMMENDATION_ALREADY_DISMISSED: (AdaptixErrorCode.INVALID_STATE_TRANSITION),
+    MihErrorCode.RECOMMENDATION_ALREADY_ENROLLED: (AdaptixErrorCode.INVALID_STATE_TRANSITION),
+    MihErrorCode.RECOMMENDATION_INVALID_TRANSITION: (AdaptixErrorCode.INVALID_STATE_TRANSITION),
+    MihErrorCode.RECOMMENDATION_PATIENT_IDENTITY_MISMATCH: (AdaptixErrorCode.CONSTRAINT_VIOLATION),
+    MihErrorCode.RECOMMENDATION_ENROLLMENT_NOT_ACTIVE: AdaptixErrorCode.WORKFLOW_BLOCKED,
 }
 
 
@@ -193,10 +228,7 @@ def enrollment_consent_required(
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.ENROLLMENT_CONSENT_REQUIRED,
-        message=(
-            f"MIH enrollment {enrollment_id} cannot proceed: "
-            "patient consent has not been recorded"
-        ),
+        message=(f"MIH enrollment {enrollment_id} cannot proceed: patient consent has not been recorded"),
         trace=trace,
     )
 
@@ -209,9 +241,7 @@ def visit_invalid_state_transition(
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.VISIT_INVALID_STATE_TRANSITION,
-        message=(
-            f"MIH visit {visit_id} cannot transition from {from_status} to {to_status}"
-        ),
+        message=(f"MIH visit {visit_id} cannot transition from {from_status} to {to_status}"),
         trace=trace,
     )
 
@@ -228,6 +258,40 @@ def payer_not_authorized_for_program(
     )
 
 
+def utilization_policy_not_configured(
+    trace: Optional[AdaptixTraceContext] = None,
+) -> MihErrorEnvelope:
+    return MihErrorEnvelope.from_mih_code(
+        MihErrorCode.UTILIZATION_POLICY_NOT_CONFIGURED,
+        message=("This tenant has not configured a high-utilizer policy; no default thresholds are assumed"),
+        trace=trace,
+    )
+
+
+def recommendation_not_found(
+    recommendation_id: str,
+    trace: Optional[AdaptixTraceContext] = None,
+) -> MihErrorEnvelope:
+    return MihErrorEnvelope.from_mih_code(
+        MihErrorCode.RECOMMENDATION_NOT_FOUND,
+        message=f"MIH enrollment recommendation {recommendation_id} not found",
+        trace=trace,
+    )
+
+
+def recommendation_invalid_transition(
+    recommendation_id: str,
+    current_status: str,
+    action: str,
+    trace: Optional[AdaptixTraceContext] = None,
+) -> MihErrorEnvelope:
+    return MihErrorEnvelope.from_mih_code(
+        MihErrorCode.RECOMMENDATION_INVALID_TRANSITION,
+        message=(f"MIH enrollment recommendation {recommendation_id} cannot {action} from status {current_status}"),
+        trace=trace,
+    )
+
+
 __all__ = [
     "MihErrorCode",
     "MihErrorEnvelope",
@@ -235,6 +299,9 @@ __all__ = [
     "enrollment_consent_required",
     "enrollment_not_found",
     "payer_not_authorized_for_program",
+    "recommendation_invalid_transition",
+    "recommendation_not_found",
     "to_adaptix_error_code",
+    "utilization_policy_not_configured",
     "visit_invalid_state_transition",
 ]

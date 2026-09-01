@@ -14,6 +14,32 @@ from the installed package metadata).
 
 ### Added
 
+- `adaptix_contracts.mih`: shared contract surface for the remote patient
+  monitoring and high-utilizer detection capabilities Adaptix-MIH-Service
+  now implements (build-order steps 4 and 5; MIH PR #18). Enums
+  `RemoteReadingMetric`, `MihEscalationState`, `UtilizationEventType`
+  (`911_call` / `ed_visit` / `hospital_admission`), `UtilizationSourceSystem`
+  (`epcr` / `qhin` / `manual_verified`), `UtilizationPolicyStatus`,
+  `UtilizationEvaluationOrigin`, `EnrollmentRecommendationStatus`
+  (`open` / `acknowledged` / `dismissed` / `enrolled` / `expired`) and
+  `HighUtilizerRecommendedAction`; models `MihMonitoringThreshold`,
+  `MihRemoteReading` (+ `MihRemoteReadingBreach`), `MihEscalation`,
+  `MihUtilizationPolicy` (tenant-versioned, lookback 1–365 days, each enabled
+  threshold ≥ 1, `recommendation_min_score` validated as reachable — there
+  are no platform default thresholds), `MihUtilizationObservation` (opaque
+  patient identity only, timezone-aware `occurred_at`), `HighUtilizerSignal`
+  (the transparent trigger count 0–3 with tri-state per-dimension triggers,
+  validated against the score; `recommended_action` is never "enroll") and
+  `MihEnrollmentRecommendation` (status-field consistency validated; an
+  `enrolled` row must reference the pre-existing consented enrollment it was
+  resolved against). Events `mih.utilization.observation_recorded`,
+  `mih.high_utilizer.evaluated` and `mih.enrollment_recommendation.changed`
+  with payloads and envelope factories (deterministic idempotency keys), and
+  `MihErrorCode` entries mirroring the service's `error_code` strings with
+  platform mappings. Strictly additive: no existing MIH model, enum value,
+  event name or error code is changed. Producer wiring in the MIH service,
+  the ePCR/QHIN feeds and the Gateway route remain separate waves.
+
 - `adaptix_contracts.air.far_135_267`: new module holding the single numeric
   authority for the 14 CFR 135.267 duty/rest floors — `DUTY_EXCEPTION_MAX_DUTY_HOURS`
   (14) and `REST_BEFORE_COMPLETION_HOURS` (10). Both Adaptix-Air-Service

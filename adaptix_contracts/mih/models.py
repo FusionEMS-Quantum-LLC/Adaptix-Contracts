@@ -16,15 +16,23 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from adaptix_contracts.mih.enums import (
+    EnrollmentRecommendationStatus,
     EnrollmentStatus,
+    HighUtilizerRecommendedAction,
+    MihEscalationState,
     MihOutcomeType,
     MihPayer,
     MihReferralSource,
     MihServiceType,
     MihVisitStatus,
+    RemoteReadingMetric,
+    UtilizationEvaluationOrigin,
+    UtilizationEventType,
+    UtilizationPolicyStatus,
+    UtilizationSourceSystem,
 )
 
 
@@ -132,10 +140,7 @@ class MihEnrollment(_MihBase):
     payer: MihPayer
     payer_member_id: str | None = Field(
         default=None,
-        description=(
-            "Payer-issued member ID. Treated as PHI; do not log outside "
-            "billing/enrollment services."
-        ),
+        description=("Payer-issued member ID. Treated as PHI; do not log outside billing/enrollment services."),
     )
 
     referral_source: MihReferralSource | None = None
@@ -275,9 +280,7 @@ class MihVisitVitalSigns(BaseModel):
     heart_rate: int | None = Field(default=None, ge=0, le=300)
     respiratory_rate: int | None = Field(default=None, ge=0, le=80)
     spo2: int | None = Field(default=None, ge=0, le=100)
-    temperature_c: Decimal | None = Field(
-        default=None, ge=Decimal("20"), le=Decimal("45")
-    )
+    temperature_c: Decimal | None = Field(default=None, ge=Decimal("20"), le=Decimal("45"))
     blood_glucose_mg_dl: int | None = Field(default=None, ge=0, le=1000)
     pain_scale_0_10: int | None = Field(default=None, ge=0, le=10)
 
@@ -374,16 +377,303 @@ class MihOutcome(_MihBase):
     )
 
 
+# ---------------------------------------------------------------------------
+# Remote patient monitoring — reading, tenant threshold, escalation
+# (Adaptix-MIH-Service ``/api/v1/mih/patients/{id}/readings``,
+#  ``/thresholds``, ``/escalations``)
+# ---------------------------------------------------------------------------
+
+
+def _require_aware(value: datetime) -> datetime:
+    """Timestamps that cross a service boundary must carry an offset."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamp must carry a timezone offset")
+    return value.astimezone(timezone.utc)
+
+
+class MihMonitoringThreshold(_MihBase):
+    """Per-tenant escalation limit for one remote-monitoring metric.
+
+    There are no platform defaults: until a tenant sets a threshold for a
+    metric, readings for it are stored NOT EVALUATED.
+    """
+
+    metric: RemoteReadingMetric
+    min_value: float | None = Field(default=None)
+    max_value: float | None = Field(default=None)
+    updated_by: str = Field(..., min_length=1)
+    updated_at: datetime
+
+    @model_validator(mode="after")
+    def _bounds(self) -> "MihMonitoringThreshold":
+        if self.min_value is None and self.max_value is None:
+            raise ValueError("at least one of min_value / max_value is required")
+        if self.min_value is not None and self.max_value is not None and self.min_value >= self.max_value:
+            raise ValueError("min_value must be below max_value")
+        return self
+
+
+class MihRemoteReadingBreach(BaseModel):
+    """Which bound a reading crossed. Mirrors the service's ``breach_detail``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    bound: str = Field(..., pattern=r"^(min|max)$")
+    limit: float
+    observed: float
+    metric: RemoteReadingMetric
+
+
+class MihRemoteReading(_MihBase):
+    """One remote-monitoring reading for an enrolled MIH patient.
+
+    ``threshold_breached`` is tri-state on purpose: True/False means the
+    reading was evaluated against the tenant's threshold; ``None`` means the
+    tenant has no threshold for this metric and the reading was NOT
+    evaluated. Honest absence, never coerced to False.
+    """
+
+    id: UUID
+    patient_id: UUID = Field(..., description="The MIH enrollment record id (``mih_patients.id``).")
+    client_reference_id: str = Field(..., min_length=1, max_length=128)
+    device_id: str | None = Field(default=None, max_length=128)
+    metric: RemoteReadingMetric
+    value: float
+    unit: str = Field(..., min_length=1, max_length=32)
+    taken_at: datetime
+    threshold_breached: bool | None = Field(default=None)
+    breach_detail: MihRemoteReadingBreach | None = Field(default=None)
+    created_at: datetime
+
+    @field_validator("taken_at")
+    @classmethod
+    def _taken_at_aware(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+
+class MihEscalation(_MihBase):
+    """A threshold breach awaiting supervisor acknowledgement."""
+
+    id: UUID
+    patient_id: UUID
+    reading_id: UUID
+    reason: str = Field(..., min_length=1)
+    state: MihEscalationState = Field(default=MihEscalationState.OPEN)
+    acknowledged_by: str | None = Field(default=None)
+    acknowledged_at: datetime | None = Field(default=None)
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# High-utilizer detection — policy, observation, evaluation, recommendation
+# (Adaptix-MIH-Service ``/api/v1/mih/utilization/*``)
+#
+# The trigger score is a TRANSPARENT count of satisfied dimensions (0..3).
+# It is not a clinical acuity or risk score: no weighting, no inference. A
+# tenant with no active policy is ``not_configured`` — there are no default
+# thresholds anywhere on the platform.
+# ---------------------------------------------------------------------------
+
+UTILIZATION_LOOKBACK_MIN_DAYS = 1
+UTILIZATION_LOOKBACK_MAX_DAYS = 365
+UTILIZATION_TRIGGER_SCORE_MAX = 3
+
+
+class MihUtilizationPolicy(_MihBase):
+    """A tenant's versioned high-utilizer policy.
+
+    A policy change is a NEW version that supersedes the prior one; history
+    is never edited. ``None`` for a threshold means that dimension is
+    disabled; an enabled threshold is always >= 1.
+    """
+
+    id: UUID
+    version: int = Field(..., ge=1)
+    status: UtilizationPolicyStatus
+    lookback_days: int = Field(..., ge=UTILIZATION_LOOKBACK_MIN_DAYS, le=UTILIZATION_LOOKBACK_MAX_DAYS)
+    min_911_calls: int | None = Field(default=None, ge=1)
+    min_ed_visits: int | None = Field(default=None, ge=1)
+    min_admissions: int | None = Field(default=None, ge=1)
+    recommendation_min_score: int = Field(..., ge=1, le=UTILIZATION_TRIGGER_SCORE_MAX)
+    created_by: str = Field(..., min_length=1)
+    created_at: datetime
+    superseded_at: datetime | None = Field(default=None)
+    superseded_by_policy_id: UUID | None = Field(default=None)
+
+    @property
+    def enabled_dimensions(self) -> int:
+        return sum(1 for t in (self.min_911_calls, self.min_ed_visits, self.min_admissions) if t is not None)
+
+    @model_validator(mode="after")
+    def _reachable(self) -> "MihUtilizationPolicy":
+        enabled = self.enabled_dimensions
+        if enabled == 0:
+            raise ValueError("at least one utilization dimension must be enabled")
+        if self.recommendation_min_score > enabled:
+            raise ValueError(
+                f"recommendation_min_score {self.recommendation_min_score} can "
+                f"never be reached with {enabled} enabled dimension(s)"
+            )
+        return self
+
+
+class MihUtilizationObservation(_MihBase):
+    """One normalized utilization event for an opaque patient identity.
+
+    The person does NOT need an MIH enrollment. Minimum necessary only: no
+    name, date of birth, address, chart narrative or diagnosis ever rides on
+    this contract. Idempotent per (tenant, source_system, source_event_id).
+    """
+
+    id: UUID
+    patient_identity_id: str = Field(..., min_length=1, max_length=64)
+    event_type: UtilizationEventType
+    source_system: UtilizationSourceSystem
+    source_event_id: str = Field(..., min_length=1, max_length=128)
+    occurred_at: datetime
+    recorded_by: str = Field(..., min_length=1)
+    recorded_at: datetime
+
+    @field_validator("occurred_at")
+    @classmethod
+    def _occurred_at_aware(cls, value: datetime) -> datetime:
+        return _require_aware(value)
+
+
+class MihUtilizationCounts(BaseModel):
+    """Observation counts inside one rolling window."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    count_911_calls: int = Field(default=0, ge=0)
+    count_ed_visits: int = Field(default=0, ge=0)
+    count_admissions: int = Field(default=0, ge=0)
+
+
+class HighUtilizerSignal(_MihBase):
+    """The transparent result of evaluating one person under one policy.
+
+    This is the shared shape Adaptix-MIH-Service produces on every evaluation
+    (``MihUtilizationEvaluation`` rows) and the payload of
+    ``mih.high_utilizer.evaluated``. Each ``trigger_*`` is tri-state: True /
+    False when the dimension is enabled and evaluated, ``None`` when the
+    policy disables it (not evaluated). ``trigger_score`` is exactly the
+    number of ``True`` triggers.
+    """
+
+    evaluation_id: UUID
+    patient_identity_id: str = Field(..., min_length=1, max_length=64)
+    policy_id: UUID
+    policy_version: int = Field(..., ge=1)
+    window_start: datetime
+    window_end: datetime
+    count_911_calls: int = Field(..., ge=0)
+    count_ed_visits: int = Field(..., ge=0)
+    count_admissions: int = Field(..., ge=0)
+    trigger_911: bool | None = Field(default=None)
+    trigger_ed: bool | None = Field(default=None)
+    trigger_admission: bool | None = Field(default=None)
+    trigger_score: int = Field(..., ge=0, le=UTILIZATION_TRIGGER_SCORE_MAX)
+    recommendation_triggered: bool
+    already_enrolled: bool
+    recommended_action: HighUtilizerRecommendedAction
+    evaluated_at: datetime
+    evaluated_by: str = Field(..., min_length=1)
+    evaluation_origin: UtilizationEvaluationOrigin
+
+    @model_validator(mode="after")
+    def _consistent(self) -> "HighUtilizerSignal":
+        expected = sum(1 for t in (self.trigger_911, self.trigger_ed, self.trigger_admission) if t is True)
+        if self.trigger_score != expected:
+            raise ValueError(
+                f"trigger_score {self.trigger_score} does not equal the number of satisfied dimensions ({expected})"
+            )
+        if self.window_end <= self.window_start:
+            raise ValueError("window_end must be after window_start")
+        if self.already_enrolled:
+            allowed = HighUtilizerRecommendedAction.ALREADY_ENROLLED
+        elif self.recommendation_triggered:
+            allowed = HighUtilizerRecommendedAction.CONSIDER_ENROLLMENT
+        else:
+            allowed = HighUtilizerRecommendedAction.NONE
+        if self.recommended_action != allowed:
+            raise ValueError(
+                f"recommended_action must be {allowed.value!r} for "
+                f"recommendation_triggered={self.recommendation_triggered}, "
+                f"already_enrolled={self.already_enrolled}"
+            )
+        return self
+
+
+class MihEnrollmentRecommendation(_MihBase):
+    """ "Consider / contact this person for MIH enrollment" — never "enrolled".
+
+    One row per (tenant, patient identity, policy version). Further
+    qualifying evidence refreshes the snapshot; it never adds a row.
+    ``resolved_patient_id`` is set only when a supervisor resolves the
+    recommendation against an enrollment that already exists with recorded
+    consent; this contract carries no path that creates an enrollment.
+    """
+
+    id: UUID
+    patient_identity_id: str = Field(..., min_length=1, max_length=64)
+    policy_id: UUID
+    policy_version: int = Field(..., ge=1)
+    latest_evaluation_id: UUID
+    trigger_score: int = Field(..., ge=0, le=UTILIZATION_TRIGGER_SCORE_MAX)
+    count_911_calls: int = Field(..., ge=0)
+    count_ed_visits: int = Field(..., ge=0)
+    count_admissions: int = Field(..., ge=0)
+    status: EnrollmentRecommendationStatus
+    status_reason: str | None = Field(default=None)
+    created_at: datetime
+    updated_at: datetime
+    acknowledged_by: str | None = Field(default=None)
+    acknowledged_at: datetime | None = Field(default=None)
+    dismissed_by: str | None = Field(default=None)
+    dismissed_at: datetime | None = Field(default=None)
+    dismissal_reason: str | None = Field(default=None)
+    reopened_by: str | None = Field(default=None)
+    reopened_at: datetime | None = Field(default=None)
+    resolved_patient_id: UUID | None = Field(default=None)
+    resolved_by: str | None = Field(default=None)
+    resolved_at: datetime | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _status_fields(self) -> "MihEnrollmentRecommendation":
+        if self.status == EnrollmentRecommendationStatus.DISMISSED and not (
+            self.dismissal_reason and self.dismissal_reason.strip()
+        ):
+            raise ValueError("a dismissed recommendation must carry dismissal_reason")
+        if self.status == EnrollmentRecommendationStatus.ENROLLED and self.resolved_patient_id is None:
+            raise ValueError("an enrolled recommendation must reference resolved_patient_id")
+        if self.status != EnrollmentRecommendationStatus.ENROLLED and self.resolved_patient_id is not None:
+            raise ValueError("resolved_patient_id is only valid when status=enrolled")
+        return self
+
+
 __all__ = [
+    "HighUtilizerSignal",
     "MihEnrollment",
+    "MihEnrollmentRecommendation",
+    "MihEscalation",
+    "MihMonitoringThreshold",
     "MihOutcome",
     "MihOutcomeMetric",
     "MihProgram",
     "MihProgramSchedule",
+    "MihRemoteReading",
+    "MihRemoteReadingBreach",
     "MihServicePlan",
     "MihServicePlanGoal",
     "MihServicePlanIntervention",
+    "MihUtilizationCounts",
+    "MihUtilizationObservation",
+    "MihUtilizationPolicy",
     "MihVisit",
     "MihVisitLocation",
     "MihVisitVitalSigns",
+    "UTILIZATION_LOOKBACK_MAX_DAYS",
+    "UTILIZATION_LOOKBACK_MIN_DAYS",
+    "UTILIZATION_TRIGGER_SCORE_MAX",
 ]
