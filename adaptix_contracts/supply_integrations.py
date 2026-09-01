@@ -158,7 +158,11 @@ class NotificationClient:
             "item_name": item_name,
             "expiration_date": expiration_date.isoformat(),
             "current_stock": current_stock,
-            "waste_forecast": waste_forecast,
+            # str(), not the Decimal itself -- see the identical comment on
+            # AnalyticsClient.publish_waste_event's `cost` field below in this
+            # module for why an unconverted Decimal here silently drops the
+            # alert instead of raising.
+            "waste_forecast": str(waste_forecast),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         return await cls._post_notification(payload)
@@ -292,7 +296,16 @@ class AnalyticsClient:
             "event_type": "waste_recorded",
             "waste_reason": waste_reason,
             "quantity": quantity,
-            "cost": cost,
+            # str(), not the Decimal itself: this dict goes straight to
+            # httpx's `json=`, which uses the stdlib json encoder and cannot
+            # serialise Decimal (`TypeError: Object of type Decimal is not
+            # JSON serializable`). `_post_event` catches that in a broad
+            # `except Exception` and returns False, so an unconverted Decimal
+            # here silently drops the waste event instead of raising. This
+            # matches the wire convention every other exact quantity in this
+            # package has used since 2.37.0: an exact value serialises as a
+            # JSON string, not a JSON number.
+            "cost": str(cost),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         return await cls._post_event(payload)

@@ -12,7 +12,100 @@ from the installed package metadata).
 
 ## [Unreleased]
 
-Housekeeping only. No contract, model, field, enum or public import path
+### Added
+
+- `module_registry`: registered `mih_community_paramedicine` (Mobile
+  Integrated Healthcare / Community Paramedicine; audience `adaptix-mih`;
+  alias `mih`, the Gateway route slug; purchasable — Community Paramedicine
+  is a priced application in `adaptix_contracts.commercial`). Until now the
+  id existed only as `adaptix_contracts.mih.MIH_ENTITLEMENT_ID` and in Core's
+  per-state `restricted_modules`, so Core's `MODULE_CATALOG` (derived from
+  `canonical_module_ids()`) could never grant it and the Web-App workspace
+  gate `mih_community_paramedicine` was dark for every non-founder tenant.
+  Strictly additive: no existing id, alias, audience or implication changes.
+  Consumers (Core, Web-App's `canonicalModuleIds.ts` mirror) re-pin /
+  regenerate deliberately.
+
+- `adaptix_contracts.mih`: shared contract surface for the remote patient
+  monitoring and high-utilizer detection capabilities Adaptix-MIH-Service
+  now implements (build-order steps 4 and 5; MIH PR #18). Enums
+  `RemoteReadingMetric`, `MihEscalationState`, `UtilizationEventType`
+  (`911_call` / `ed_visit` / `hospital_admission`), `UtilizationSourceSystem`
+  (`epcr` / `qhin` / `manual_verified`), `UtilizationPolicyStatus`,
+  `UtilizationEvaluationOrigin`, `EnrollmentRecommendationStatus`
+  (`open` / `acknowledged` / `dismissed` / `enrolled` / `expired`) and
+  `HighUtilizerRecommendedAction`; models `MihMonitoringThreshold`,
+  `MihRemoteReading` (+ `MihRemoteReadingBreach`), `MihEscalation`,
+  `MihUtilizationPolicy` (tenant-versioned, lookback 1–365 days, each enabled
+  threshold ≥ 1, `recommendation_min_score` validated as reachable — there
+  are no platform default thresholds), `MihUtilizationObservation` (opaque
+  patient identity only, timezone-aware `occurred_at`), `HighUtilizerSignal`
+  (the transparent trigger count 0–3 with tri-state per-dimension triggers,
+  validated against the score; `recommended_action` is never "enroll") and
+  `MihEnrollmentRecommendation` (status-field consistency validated: a
+  `dismissed` row carries reason, actor and time; an `enrolled` row carries
+  the pre-existing consented enrollment it was resolved against, actor and
+  time). `MihEscalation.acknowledged` and `MihUtilizationPolicy.superseded`
+  likewise require their actor/time (and successor) fields;
+  `expected_recommended_action` is the single mapping from evaluation flags
+  to the recommended action. Events `mih.utilization.observation_recorded`,
+  `mih.high_utilizer.evaluated` and `mih.enrollment_recommendation.changed`
+  with payloads and envelope factories (deterministic idempotency keys), and
+  `MihErrorCode` entries mirroring the service's `error_code` strings with
+  platform mappings, plus `MIH_SERVICE_ERROR_CODES` /
+  `from_service_error_code` translating the service's bare `error_code`
+  strings (which carry no `mih.` prefix) to the enum. Every timestamp on the
+  new models must be timezone-aware and is normalised to UTC. Strictly
+  additive: no existing MIH model, enum value, event name or error code is
+  changed. Producer wiring in the MIH service,
+  the ePCR/QHIN feeds and the Gateway route remain separate waves.
+
+- `adaptix_contracts.air.far_135_267`: new module holding the single numeric
+  authority for the 14 CFR 135.267 duty/rest floors — `DUTY_EXCEPTION_MAX_DUTY_HOURS`
+  (14) and `REST_BEFORE_COMPLETION_HOURS` (10). Both Adaptix-Air-Service
+  (`air_app/far_135_267.py`) and Adaptix-Air-Service-Pilot
+  (`air_pilot_app/far_135_267.py`) had independently declared these same two
+  federal numbers with no shared source of truth; each now imports from here
+  and derives whatever unit (hours or minutes) its own domain needs locally.
+  Deduplication only — the values are unchanged (14 hours duty, 10 hours
+  rest), transcribed from CFR-2016-title14-vol3-sec135-267.
+- `adaptix_contracts.commercial`: new package with the shared commercial
+  pricing/application-catalog vocabulary for the founder's modular-pricing
+  directive (Phase B) — every independently purchasable Adaptix customer
+  application priced and sold separately by real operational volume, never
+  by user seat count. Adds `CommercialApplicationKey` (21 applications,
+  cross-referenced against `module_registry.MODULE_REGISTRY` canonical ids
+  wherever one already exists — reused, never duplicated),
+  `PricingMechanic` (the seven genuinely distinct pricing shapes the
+  founder's price list actually uses: flat volume band, workforce headcount
+  band, base-plus-per-unit, per-unit-rate-by-bracket, base-plus-metered-usage,
+  starting-price-bands-TBD, software-fee-plus-passthrough),
+  `PricingBand`, `UnitRateFormula`, `ApplicationPricingCatalogEntry`,
+  `ApplicationDependency` (currently empty — zero true technical dependencies
+  confirmed among the twenty priced applications), `CatalogEntryStatus`, and
+  `CommercialPricingCatalog`. Seeds the first catalog version,
+  `wisconsin_launch_catalog.WI_LAUNCH_CATALOG`, from the founder's verified
+  Wisconsin launch price list; every seeded annual price is checked against
+  the 10%-off-monthly-times-12 discount formula at import time.
+  Carries no pricing CALCULATION logic — shapes and seed data only, per
+  `adaptix_contracts/AGENTS.md` and `BILLING_AND_PACKAGING_RULES.md`; the
+  engine that evaluates a tenant's volume against these shapes belongs in
+  Adaptix-Billing-Service, a separate later task. Strictly additive: no
+  existing file, export, or signature in `module_registry.py`,
+  `auth/capability_registry.py`, or `schemas/tenant_contracts.py` is
+  changed, renamed, or removed.
+- `module_registry`: registered the `ai` module (audience `adaptix-ai`,
+  purchasable=False, no aliases, no implies). The gateway already routed
+  `/api/v1/ai/*` with audience `adaptix-ai` and gated it on module id `ai`,
+  but no module declared that audience, so `audience_map()` never emitted it
+  and Core could not mint `adaptix-ai` for any non-founder token — every
+  `/api/v1/ai` request answered 403 `jwt_audience_mismatch` (measured in
+  production 2026-08-31 with a Cortex Live demo session). Strictly additive:
+  no existing tenant holds `ai`, no alias or `implies` reaches it, so no
+  existing token, entitlement or gate changes. Consumers that need the new
+  row (Core, to entitle the Cortex Live demo pool) re-pin deliberately.
+
+Everything below this line is housekeeping only. No contract, model, field, enum or public import path
 changed in any of the entries below, so nothing here requires a consumer to
 re-pin. Verified: the public surface diff between `v4.1.0` and `v4.3.0` is
 47 additions and 0 removals, and no commit below touches

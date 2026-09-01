@@ -40,7 +40,7 @@ workspace on 2026-08-02) enforce only these slugs::
 
     air  assetops  billing  cad  crewlink  epcr  fire  mdt  scheduling
 
-Every one of those is a ``canonical_id`` below. That is a hard invariant â€” see
+Every one of those is a ``canonical_id`` below. That is a hard invariant — see
 ``tests/test_module_registry.py::test_runtime_gate_slugs_are_canonical``.
 
 Design contract
@@ -122,7 +122,7 @@ class ModuleDefinition:
         canonical_id: The authoritative slug. This is what routes gate on and
             what SHOULD be persisted going forward. Never renamed without an
             alias covering the old spelling.
-        display_name: Human label. Presentation only â€” never an identifier.
+        display_name: Human label. Presentation only — never an identifier.
         aliases: Legacy / alternate spellings of THIS SAME module. Any of these
             resolve to ``canonical_id``.
         implies: Canonical ids that are additionally granted when this module is
@@ -131,7 +131,7 @@ class ModuleDefinition:
             surface (signup wizard, signup pricing catalog, or a Stripe product
             module map). False for platform-internal modules.
         audience: The gateway JWT ``aud`` value for the module's upstream
-            service â€” the value the ``RouteEntry`` for that module's prefix
+            service — the value the ``RouteEntry`` for that module's prefix
             declares in ``Adaptix-Gateway/backend/app/config/routes.py``. This
             is the SOURCE for Adaptix-Core ``core_app/auth.py::
             _MODULE_TO_AUDIENCE``, which is derived from this field.
@@ -150,7 +150,7 @@ class ModuleDefinition:
             and the gateway returns 403 ``jwt_audience_mismatch`` on every
             request. ``tests/test_module_registry.py::
             test_every_purchasable_module_resolves_to_an_audience`` fails on
-            exactly that condition â€” see ``SOLD_WITHOUT_SERVICE_MAPPING`` for
+            exactly that condition — see ``SOLD_WITHOUT_SERVICE_MAPPING`` for
             the only sanctioned exceptions.
         source: Where each spelling was observed. Documentation only; keeps the
             registry auditable against the repos it unifies.
@@ -197,7 +197,7 @@ def _m(
 # names it. Do not add an alias that is not observed in a shipping vocabulary.
 
 _DEFINITIONS: tuple[ModuleDefinition, ...] = (
-    # â”€â”€ Platform base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Platform base ────────────────────────────────────────────────────
     _m(
         "core",
         "Core Platform",
@@ -205,7 +205,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-core",
         source="Web-App MODULES; Core MODULE_CATALOG; Core _MODULE_TO_AUDIENCE",
     ),
-    # â”€â”€ Clinical / documentation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Clinical / documentation ─────────────────────────────────────────
     _m(
         "epcr",
         "ePCR & NEMSIS",
@@ -214,7 +214,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-epcr",
         source="Web-App MODULES; Core signup_pricing; Billing _PRODUCT_MODULE_MAP",
     ),
-    # â”€â”€ Dispatch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Dispatch ─────────────────────────────────────────────────────────
     _m(
         "cad",
         "CAD / Dispatch",
@@ -222,7 +222,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-cad",
         source="Web-App MODULES; Core signup_pricing; Billing _PRODUCT_MODULE_MAP",
     ),
-    # â”€â”€ Revenue cycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Revenue cycle ────────────────────────────────────────────────────
     # `billing_automation` is the Stripe product "Adaptix Billing Command
     # Automation" (Core signup_pricing.py:83,111; Billing seed_v2_stripe_prices
     # .py:56). It is the SAME module Adaptix-Billing-Service gates on as
@@ -255,7 +255,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # "billing_automation"]`` and carries ``requires_product_id =
     # prod_UEOH2V8H1u39rY`` (Billing Command Automation), i.e. the TRIP Pack is
     # a Wisconsin payer/claim ruleset INSIDE Billing and is never sold alone.
-    # Recording the bundle here is what the SKU already sells â€” it grants
+    # Recording the bundle here is what the SKU already sells — it grants
     # nothing the purchaser is not already charged for.
     _m(
         "wisconsin_trip_pack",
@@ -267,7 +267,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "(enabled_modules: wisconsin_trip_pack + billing_automation)"
         ),
     ),
-    # â”€â”€ Fire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Fire ─────────────────────────────────────────────────────────────
     # Three spellings of one product: Web-App sells `fire_rms`, Core pricing
     # sells `fire_response`, Adaptix-Fire-Service gates on `fire`.
     _m(
@@ -287,7 +287,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         implies=("fire",),
         source="adaptix-crr",
     ),
-    # â”€â”€ Air medical â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Air medical ──────────────────────────────────────────────────────
     _m(
         "air",
         "Air Medical",
@@ -307,7 +307,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     #     enabled_modules = [cct_transport_ops, cad, crewlink, mdt, epcr, billing_automation]
     #
     # The ``implies`` below is exactly that list, so it grants nothing the
-    # purchaser is not already charged for â€” it only makes the marker id
+    # purchaser is not already charged for — it only makes the marker id
     # self-sufficient when a plan surface (e.g. the live $999 ``enterprise``
     # tier of GET /api/v1/billing/plans) lists it.
     #
@@ -329,7 +329,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         purchasable=True,
         source="Billing _PRODUCT_MODULE_MAP prod_UEOHmIlaVBQJMX enabled_modules",
     ),
-    # â”€â”€ Field / mobile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Field / mobile ───────────────────────────────────────────────────
     # The crew-facing tablet/phone application. Web-App sells `mobile_field`,
     # Core pricing includes it as `field_app`, Core's admin catalog spells it
     # `field`, and Adaptix-CAD-Service gates the write-back surface on `mdt`.
@@ -359,7 +359,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # WITHOUT the cad gate, so a crewlink buyer reaches crewlink and nothing
     # else. Verified in prod 2026-08-04: a token holding adaptix-cad but NOT
     # the crewlink module got 403 MODULE_NOT_ENTITLED on /api/v1/crewlink/pages
-    # â€” the module gate, not the audience, is what protects this surface.
+    # — the module gate, not the audience, is what protects this surface.
     _m(
         "crewlink",
         "CrewLink",
@@ -370,8 +370,8 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "Gateway ROUTE_TABLE /api/v1/crewlink -> cad_service_url audience=adaptix-cad"
         ),
     ),
-    # â”€â”€ Workforce / scheduling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Mirrors Core auth.py::_MODULE_ENTITLEMENT_ALIASES â€” `workforce` is the id
+    # ── Workforce / scheduling ───────────────────────────────────────────
+    # Mirrors Core auth.py::_MODULE_ENTITLEMENT_ALIASES — `workforce` is the id
     # Core historically persists, but the scheduling engine is served by
     # Labor-Service behind the `labor` / `scheduling` entitlements.
     _m(
@@ -402,7 +402,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # The 200 control proves the token was valid and the tenant reachable; the
     # missing audience was the whole defect.
     #
-    # Granting the audience grants NO additional module entitlement â€” the
+    # Granting the audience grants NO additional module entitlement — the
     # `labor` module (sold separately in command_v1) stays unheld, so this is
     # not a widening of the entitlement set, only of transport reachability to
     # the service that serves the product the agency already bought.
@@ -431,7 +431,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-crew",
         source="Core signup_pricing command_v1; Core MODULE_CATALOG",
     ),
-    # â”€â”€ Communications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Communications ───────────────────────────────────────────────────
     _m(
         "communications",
         "Communications Command",
@@ -447,11 +447,11 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-telephony",
         source="Web-App MODULES; Core MODULE_CATALOG; Core _MODULE_TO_AUDIENCE",
     ),
-    # â”€â”€ Controlled substances / supply â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Controlled substances / supply ───────────────────────────────────
     # alias ``narcotic`` (singular): the gateway ROUTE_TABLE carries BOTH
     # prefix="/api/v1/narcotic" (routes.py:2287) and prefix="/api/v1/narcotics"
     # as separate entries, and ``_extract_module_id`` takes the first path
-    # segment verbatim â€” so the singular route produced module_id "narcotic",
+    # segment verbatim — so the singular route produced module_id "narcotic",
     # which matched no registered module and was not in the tenant's
     # entitlements (Core persists the plural ``narcotics``) -> 403
     # MODULE_NOT_ENTITLED on a controlled-substances surface for a tenant that
@@ -479,7 +479,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # KNOWN_SERVICE_AUDIENCES and gateway ROUTE_TABLE entries, but were missing
     # module-registry rows. Provisioning could persist ``social`` / ``vision``
     # entitlements while Core's token mint skipped those audiences
-    # (``_MODULE_TO_AUDIENCE.get`` miss) â†’ live 403 jwt_audience_mismatch on
+    # (``_MODULE_TO_AUDIENCE.get`` miss) → live 403 jwt_audience_mismatch on
     # /api/v1/social and Vision requests missing gateway identity headers.
     # Observed 2026-08-24 with a provisioned session that listed both modules
     # in module_entitlements but not in JWT aud.
@@ -513,7 +513,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     ),
     # AssetOps is a live metered SKU ($29/vehicle/month, Stripe lookup_key
     # ``assetops_per_vehicle``) and is already grantable through Core's admin
-    # MODULE_CATALOG â€” but with no audience row a granted tenant's token could
+    # MODULE_CATALOG — but with no audience row a granted tenant's token could
     # never reach the service, so the SKU was billable and dark. The gateway
     # routes /api/v1/assetops to assetops_service_url with audience
     # ``adaptix-assetops`` (present in KNOWN_SERVICE_AUDIENCES) and
@@ -531,7 +531,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "Gateway ROUTE_TABLE /api/v1/assetops -> assetops_service_url audience=adaptix-assetops"
         ),
     ),
-    # â”€â”€ Interoperability exports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Interoperability exports ─────────────────────────────────────────
     # Web-App sells one combined "NEMSIS / NERIS" SKU; Core carries two
     # separate audiences. The bundle implies both.
     _m(
@@ -553,7 +553,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-neris",
         source="Core _MODULE_TO_AUDIENCE",
     ),
-    # â”€â”€ Transport â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Transport ────────────────────────────────────────────────────────
     # Mirrors Core auth.py::_MODULE_ENTITLEMENT_ALIASES: TransportLink is the
     # user-facing route tree, `transport` is the persisted id, and both carry
     # their own gateway audience.
@@ -571,8 +571,8 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-transportlink",
         source="Core _MODULE_TO_AUDIENCE; Core _MODULE_ENTITLEMENT_ALIASES",
     ),
-    # â”€â”€ Onboarding / services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # audience: the onboarding surface is served by Core itself â€” the gateway
+    # ── Onboarding / services ────────────────────────────────────────────
+    # audience: the onboarding surface is served by Core itself — the gateway
     # routes /api/v1/onboarding to auth_service_url with audience
     # ``adaptix-core``. Stating it explicitly (rather than leaving None and
     # relying on adaptix-core always being present in a session aud) keeps the
@@ -587,7 +587,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "Gateway ROUTE_TABLE /api/v1/onboarding -> auth_service_url audience=adaptix-core"
         ),
     ),
-    # â”€â”€ Platform modules (entitlement-bearing, not individually sold) â”€â”€â”€â”€â”€
+    # ── Platform modules (entitlement-bearing, not individually sold) ─────
     _m(
         "calendar",
         "Calendar",
@@ -644,7 +644,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # alias ``devices`` (plural): the gateway derives module_id from the FIRST
     # path segment verbatim (Adaptix-Gateway backend/app/middleware/entitlements.py
     # ``_extract_module_id``), and ROUTE_TABLE carries BOTH spellings as separate
-    # entries â€” prefix="/api/v1/devices" (routes.py:2771) alongside
+    # entries — prefix="/api/v1/devices" (routes.py:2771) alongside
     # prefix="/api/v1/device" (routes.py:2777). The canonical module id Core
     # persists and mints is the singular ``device``, so a request to
     # /api/v1/devices/* produced module_id "devices", which resolved to nothing
@@ -662,9 +662,9 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # alias ``patient-identity`` (hyphen): the canonical module id Core persists
     # and mints is ``patient_identity`` (underscore, from Core
     # _MODULE_TO_AUDIENCE), but the SERVICE that owns the surface is slugged
-    # ``patient-identity`` â€” ``adaptix_contracts.schemas.service_registry
+    # ``patient-identity`` — ``adaptix_contracts.schemas.service_registry
     # .PATIENT_IDENTITY_SERVICE`` (slug="patient-identity",
-    # route_prefix="/api/v1/patient-identity") â€” and the gateway RouteEntry for
+    # route_prefix="/api/v1/patient-identity") — and the gateway RouteEntry for
     # /api/v1/patient-identity carries audience ``adaptix-patient-identity``.
     # A route/service guard declared with the hyphen spelling
     # (require_module_entitlement("patient-identity")) therefore did NOT resolve
@@ -673,7 +673,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # the identity surface even though the ``adaptix-patient-identity`` audience
     # was minted. Registering the hyphen spelling as an alias of the SAME module
     # makes both sides resolve to one canonical id. Non-widening: an alias is a
-    # synonym for the same product (collision-checked at import â€” it can never
+    # synonym for the same product (collision-checked at import — it can never
     # shadow a canonical id or map to two canonicals), so this grants no
     # additional module; it only unifies two spellings of one.
     _m(
@@ -723,7 +723,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         source="Core _MODULE_TO_AUDIENCE",
     ),
     # audience: /api/v1/workspace routes to auth_service_url (Core) with
-    # audience "adaptix-core" â€” the workspace lock/state surface is Core's own.
+    # audience "adaptix-core" — the workspace lock/state surface is Core's own.
     _m(
         "workspace",
         "Workspace",
@@ -746,8 +746,8 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     # because useModuleEntitlements returns True unconditionally for a
     # founder, so no amount of founder click-through could surface it.
     #
-    # Registered from the gateway ROUTE_TABLE â€” the routing source of
-    # truth â€” rather than from the web spelling, and deliberately NOT as
+    # Registered from the gateway ROUTE_TABLE — the routing source of
+    # truth — rather than from the web spelling, and deliberately NOT as
     # aliases of an existing module: aliasing would hand these routes to
     # every tenant already holding the aliased module, granting access
     # under an entitlement they may never have bought. As separate
@@ -777,6 +777,25 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-core",
         source="Gateway ROUTE_TABLE /api/v1/ai-infrastructure; Web-App app/ai-infrastructure",
     ),
+    # The Cortex AI runtime surface. The gateway routes /api/v1/ai/* to
+    # ai_service_url with audience "adaptix-ai" and its entitlement middleware
+    # derives module id "ai" from that path — but no module declared the
+    # "adaptix-ai" audience, so audience_map() never emitted it, Core's
+    # _MODULE_TO_AUDIENCE had no row, and _session_audiences could not mint
+    # "adaptix-ai" for ANY non-founder token. Every /api/v1/ai request (e.g.
+    # GET /api/v1/ai/cortex/health from the workspace shell) answered
+    # 403 jwt_audience_mismatch for every non-founder tenant — measured in
+    # production 2026-08-31 with a Cortex Live demo session token. Same
+    # routed-but-audience-less shape and same fix as ``forms`` below.
+    # purchasable=False: granting is an explicit provisioning/admin action
+    # (the Cortex Live demo pool is the first grantee), not a signup SKU, so
+    # no existing tenant's token or entitlement changes.
+    _m(
+        "ai",
+        "Cortex AI Runtime",
+        audience="adaptix-ai",
+        source="Gateway ROUTE_TABLE /api/v1/ai -> ai_service_url audience=adaptix-ai",
+    ),
     _m(
         "command-intelligence",
         "Command Intelligence",
@@ -791,9 +810,9 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     ),
     # alias ``integrations`` (plural): the canonical module id Core persists and
     # mints is ``integration`` (singular, matching Core MODULE_CATALOG), but the
-    # SERVICE is slugged ``integrations`` â€” ``adaptix_contracts.schemas
+    # SERVICE is slugged ``integrations`` — ``adaptix_contracts.schemas
     # .service_registry.INTEGRATIONS_SERVICE`` (slug="integrations",
-    # route_prefix="/api/v1/integrations") â€” and the gateway RouteEntry for
+    # route_prefix="/api/v1/integrations") — and the gateway RouteEntry for
     # /api/v1/integrations carries audience ``adaptix-integrations``. A
     # route/service guard declared with the plural spelling
     # (require_module_entitlement("integrations")) did NOT resolve against a
@@ -818,16 +837,16 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         audience="adaptix-training",
         source="Gateway ROUTE_TABLE /api/v1/training; Web-App app/workspace/training",
     ),
-    # â”€â”€ Forms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Forms ────────────────────────────────────────────────────────────
     # Adaptix-Forms-Service is a live upstream with its own gateway route and
-    # audience, but the module had NO row here â€” so audience_map() lacked a
+    # audience, but the module had NO row here — so audience_map() lacked a
     # ``forms`` key, Core's _MODULE_TO_AUDIENCE never mapped it, and
     # _session_audiences could not add ``adaptix-forms`` to any non-founder
     # tenant's token. The gateway's AudienceEnforcementMiddleware then 403'd
     # (jwt_audience_mismatch) EVERY /api/v1/forms request for every tenant.
     # Adding the mapping makes the module reachable for entitled tenants on
     # Core's next deploy. purchasable=False: forms is granted through the admin
-    # module toggle (Core MODULE_CATALOG), not a signup-pricing SKU â€” same
+    # module toggle (Core MODULE_CATALOG), not a signup-pricing SKU — same
     # shape as ``integration`` / ``training`` above.
     _m(
         "forms",
@@ -838,11 +857,11 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-forms; Core MODULE_CATALOG"
         ),
     ),
-    # â”€â”€ HR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── HR ───────────────────────────────────────────────────────────────
     # Identical defect to ``forms`` above, runtime-proven in production on
     # 2026-08-13: Adaptix-HR-Service is deployed and healthy
     # (adaptix-production-hr), the gateway routes /api/v1/hr to it behind
-    # audience ``adaptix-hr`` â€” but no module row existed here, so
+    # audience ``adaptix-hr`` — but no module row existed here, so
     # audience_map() had no ``hr`` key, Core's _MODULE_TO_AUDIENCE never mapped
     # it, and _session_audiences could not put ``adaptix-hr`` in ANY tenant's
     # token. Probed with a real agency_admin session carrying all 55 entitled
@@ -854,7 +873,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     #
     # i.e. the whole HR service was unreachable for every tenant, always.
     # purchasable=False: HR is granted through the admin module toggle (Core
-    # MODULE_CATALOG), not a signup-pricing SKU â€” same shape as ``forms``.
+    # MODULE_CATALOG), not a signup-pricing SKU — same shape as ``forms``.
     _m(
         "hr",
         "HR",
@@ -864,7 +883,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-hr; ECS adaptix-production-hr"
         ),
     ),
-    # â”€â”€ Office â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Office ───────────────────────────────────────────────────────────
     # Same defect and same runtime proof as ``hr`` above: Adaptix-Office-Service
     # runs as adaptix-production-office and the gateway routes /api/v1/office to
     # it behind audience ``adaptix-office``, with no module row here.
@@ -874,7 +893,7 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
     #
     # NOTE: ``officeally`` is a DIFFERENT service (the Office Ally clearinghouse
     # upstream, audience ``adaptix-officeally``) and is deliberately not added
-    # here â€” provider policy pins Office Ally to MIGRATION_ONLY.
+    # here — provider policy pins Office Ally to MIGRATION_ONLY.
     _m(
         "office",
         "Office",
@@ -884,12 +903,12 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             "audience=adaptix-office; ECS adaptix-production-office"
         ),
     ),
-    # â”€â”€ Facilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Facilities ───────────────────────────────────────────────────────
     # Same defect and same runtime proof as ``hr`` and ``office`` above:
     # Adaptix-Facility-Registry-Service runs as adaptix-production-facilities
     # and the gateway routes /api/v1/facilities to it behind audience
     # ``adaptix-facilities`` (Gateway routes.py:3554), but there was no module
-    # row here â€” so a tenant could carry ``facilities`` in
+    # row here — so a tenant could carry ``facilities`` in
     # ``metadata_json["module_entitlements"]``, and Core's ``_session_audiences``
     # would mint NO ``adaptix-facilities`` audience for it, leaving every
     # facilities request 403 ``jwt_audience_mismatch``.
@@ -953,6 +972,25 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
             'audience=adaptix-rtc ("RTC -- real-time comms (WebRTC/SFU '
             'signalling) shared service"); service_audiences.'
             "KNOWN_SERVICE_AUDIENCES"
+        ),
+    ),
+    _m(
+        "mih_community_paramedicine",
+        "Mobile Integrated Healthcare / Community Paramedicine",
+        # ``mih`` is the Gateway route slug (/api/v1/mih) and the spelling the
+        # web workspace gate first used; it resolves here, never the reverse.
+        aliases=("mih",),
+        # Sold: Community Paramedicine is a priced application in
+        # adaptix_contracts.commercial (starting price only, bands TBD).
+        purchasable=True,
+        audience="adaptix-mih",
+        source=(
+            "adaptix_contracts.mih.MIH_ENTITLEMENT_ID (the id Core's "
+            "state_rules.py restricts per state); Gateway ROUTE_TABLE "
+            "/api/v1/mih -> mih.adaptix.internal:8000 audience=adaptix-mih "
+            "(backend/app/config/mih_route.py); service_audiences."
+            "KNOWN_SERVICE_AUDIENCES; commercial CommercialApplicationKey."
+            "COMMUNITY_PARAMEDICINE"
         ),
     ),
 )
@@ -1027,8 +1065,8 @@ RUNTIME_GATE_SLUGS: frozenset[str] = frozenset(
 #: SKU a customer can be charged for that grants nothing.
 #:
 #: It exists as a named, documented landing place so that a future change which
-#: genuinely cannot map a SKU to a service has to declare that fact in source â€”
-#: with the founder/product decision written down â€” instead of silently
+#: genuinely cannot map a SKU to a service has to declare that fact in source —
+#: with the founder/product decision written down — instead of silently
 #: shipping a billable-but-dark module. Adding an id here should be rare and
 #: temporary; ``test_quarantined_modules_are_real_purchasable_ids_with_no_audience``
 #: forces the id back out again the moment it gains an audience.
@@ -1067,7 +1105,7 @@ class UnknownModuleError(KeyError):
 def normalize_module_id(value: object) -> str:
     """Return the canonical *string form* of a module id (no alias resolution).
 
-    Lower-cased and stripped â€” identical to the normalization the runtime
+    Lower-cased and stripped — identical to the normalization the runtime
     entitlement gates already apply, so this never changes matching behaviour on
     its own.
     """
@@ -1102,7 +1140,7 @@ def require_module_id(value: object) -> str:
     """Like :func:`resolve_module_id` but raises for an unregistered id.
 
     Use in provisioning/admin write paths that should reject typos. Never use on
-    a read/authorization path â€” authorization must fail closed by *denying*, not
+    a read/authorization path — authorization must fail closed by *denying*, not
     by raising an unhandled error.
     """
     resolved = resolve_module_id(value)
@@ -1120,7 +1158,7 @@ def expand_entitlements(values: Iterable[object] | None) -> frozenset[str]:
     The result contains, for every input value:
 
     1. the normalized input id itself (so nothing that matches today stops
-       matching â€” this function is strictly additive),
+       matching — this function is strictly additive),
     2. its canonical id, when the id is a registered alias,
     3. every id transitively reachable through ``implies``.
 
@@ -1210,7 +1248,7 @@ def module_audiences(value: object) -> frozenset[str]:
     an unregistered id and for a module that reaches no upstream service.
 
     This is the function that answers "can a tenant holding exactly this
-    module reach the product it paid for?" â€” an empty result for a
+    module reach the product it paid for?" — an empty result for a
     ``purchasable`` module means the SKU is billable but dark.
 
     >>> sorted(module_audiences("billing_automation"))
@@ -1240,7 +1278,7 @@ def audience_map() -> Mapping[str, str]:
     added WITHOUT one is caught by the purchasable-module test.
 
     Only modules with their own ``audience`` appear. ``implies`` relationships
-    are intentionally NOT flattened here â€” Core walks ``implies`` itself while
+    are intentionally NOT flattened here — Core walks ``implies`` itself while
     expanding entitlements, so flattening would double-apply it.
     """
     return MappingProxyType(

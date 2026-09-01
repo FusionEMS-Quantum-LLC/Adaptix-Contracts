@@ -466,6 +466,42 @@ def test_field_app_and_crewlink_reach_cad_service() -> None:
     assert "cad" not in expand_entitlements(["crewlink"])
 
 
+def test_ai_reaches_the_cortex_ai_runtime() -> None:
+    """Pinned regression for the 2026-08-31 production failure.
+
+    Gateway ``RouteEntry(prefix="/api/v1/ai", audience="adaptix-ai")`` and its
+    entitlement middleware derives module id ``ai`` from that path, but no
+    module declared the ``adaptix-ai`` audience — so ``audience_map()`` never
+    emitted it and Core could not mint it for any non-founder token: every
+    /api/v1/ai request (including the workspace shell's
+    GET /api/v1/ai/cortex/health, measured with a Cortex Live demo session)
+    answered 403 jwt_audience_mismatch.
+    """
+    assert module_audiences("ai") == {"adaptix-ai"}
+    assert audience_map()["ai"] == "adaptix-ai"
+    # Holding ``ai`` confers reach to the AI runtime only — no other module,
+    # and no other module silently confers ``ai``.
+    assert expand_entitlements(["ai"]) == {"ai"}
+    assert "ai" not in expand_entitlements(["cortex", "bedrock", "intelligence"])
+
+
+def test_mih_reaches_the_mih_service_and_is_state_gated_by_its_canonical_id() -> None:
+    """The MIH entitlement id must be grantable (Core's MODULE_CATALOG derives
+    from ``canonical_module_ids()``), must reach the MIH service audience the
+    Gateway signs for /api/v1/mih, and must be exactly the string Core's
+    state_rules.py restricts per state — ``mih_community_paramedicine`` —
+    with ``mih`` (the route slug) as an alias, never the other way round."""
+    from adaptix_contracts.mih import MIH_ENTITLEMENT_ID, MIH_SERVICE_AUDIENCE
+
+    assert MIH_ENTITLEMENT_ID in canonical_module_ids()
+    assert module_audiences(MIH_ENTITLEMENT_ID) == frozenset({MIH_SERVICE_AUDIENCE})
+    assert resolve_module_id("mih") == MIH_ENTITLEMENT_ID
+    assert MODULE_REGISTRY[MIH_ENTITLEMENT_ID].purchasable is True
+    # Expansion keeps the input spelling and adds the canonical id (the
+    # registry never drops an input id), so membership is the contract.
+    assert MIH_ENTITLEMENT_ID in expand_entitlements(["mih"])
+
+
 def test_assetops_reaches_its_own_service() -> None:
     """Live $29/vehicle/month SKU; gateway routes /api/v1/assetops to it."""
     assert module_audiences("assetops") == {"adaptix-assetops"}
