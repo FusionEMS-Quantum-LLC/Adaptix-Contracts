@@ -70,8 +70,11 @@ def _capturing_async_client(captured: dict):
         captured["url"] = str(request.url)
         return httpx.Response(200, json={})
 
-    def factory(*_args, **_kwargs):
-        return _RealAsyncClient(transport=httpx.MockTransport(handler))
+    def factory(*args, **kwargs):
+        # Forward the caller's own constructor arguments (e.g. `timeout=`) so
+        # this stays a faithful stand-in rather than silently dropping
+        # configuration the real call site passed.
+        return _RealAsyncClient(*args, **kwargs, transport=httpx.MockTransport(handler))
 
     return factory
 
