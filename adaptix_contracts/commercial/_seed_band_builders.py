@@ -47,4 +47,6 @@ def per_unit_band(
 
 
 def custom_quote_band(min_units: int) -> PricingBand:
+    """One custom-quote band: no fixed price, sales quotes above ``min_units``."""
+
     return PricingBand(min_units=min_units, max_units=None, custom_quote=True)
