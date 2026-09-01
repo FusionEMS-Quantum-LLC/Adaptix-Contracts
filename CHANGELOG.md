@@ -30,9 +30,13 @@ from the installed package metadata).
   patient identity only, timezone-aware `occurred_at`), `HighUtilizerSignal`
   (the transparent trigger count 0–3 with tri-state per-dimension triggers,
   validated against the score; `recommended_action` is never "enroll") and
-  `MihEnrollmentRecommendation` (status-field consistency validated; an
-  `enrolled` row must reference the pre-existing consented enrollment it was
-  resolved against). Events `mih.utilization.observation_recorded`,
+  `MihEnrollmentRecommendation` (status-field consistency validated: a
+  `dismissed` row carries reason, actor and time; an `enrolled` row carries
+  the pre-existing consented enrollment it was resolved against, actor and
+  time). `MihEscalation.acknowledged` and `MihUtilizationPolicy.superseded`
+  likewise require their actor/time (and successor) fields;
+  `expected_recommended_action` is the single mapping from evaluation flags
+  to the recommended action. Events `mih.utilization.observation_recorded`,
   `mih.high_utilizer.evaluated` and `mih.enrollment_recommendation.changed`
   with payloads and envelope factories (deterministic idempotency keys), and
   `MihErrorCode` entries mirroring the service's `error_code` strings with

@@ -44,6 +44,7 @@ from adaptix_contracts.mih import (
     build_mih_enrollment_recommendation_changed_event,
     build_mih_high_utilizer_evaluated_event,
     build_mih_utilization_observation_recorded_event,
+    expected_recommended_action,
     from_service_error_code,
     recommendation_invalid_transition,
     recommendation_not_found,
@@ -146,6 +147,21 @@ def test_policy_rejects_out_of_range_values(overrides) -> None:
         _policy(**overrides)
 
 
+def test_policy_superseded_requires_both_supersession_fields() -> None:
+    with pytest.raises(ValidationError, match="superseded_at and"):
+        _policy(status=UtilizationPolicyStatus.SUPERSEDED)
+    with pytest.raises(ValidationError, match="superseded_at and"):
+        _policy(status=UtilizationPolicyStatus.SUPERSEDED, superseded_at=NOW)
+    with pytest.raises(ValidationError, match="only valid when status=superseded"):
+        _policy(superseded_at=NOW)
+    ok = _policy(
+        status=UtilizationPolicyStatus.SUPERSEDED,
+        superseded_at=NOW,
+        superseded_by_policy_id=uuid4(),
+    )
+    assert ok.status is UtilizationPolicyStatus.SUPERSEDED
+
+
 def test_policy_rejects_no_enabled_dimension() -> None:
     with pytest.raises(ValidationError, match="at least one utilization dimension"):
         _policy(min_911_calls=None)
@@ -245,6 +261,28 @@ def test_signal_score_must_equal_satisfied_dimensions() -> None:
         _signal(trigger_911=False, trigger_score=2)
 
 
+def test_expected_recommended_action_never_means_enroll() -> None:
+    assert (
+        expected_recommended_action(
+            recommendation_triggered=True, already_enrolled=True
+        )
+        is HighUtilizerRecommendedAction.ALREADY_ENROLLED
+    )
+    assert (
+        expected_recommended_action(
+            recommendation_triggered=True, already_enrolled=False
+        )
+        is HighUtilizerRecommendedAction.CONSIDER_ENROLLMENT
+    )
+    assert (
+        expected_recommended_action(
+            recommendation_triggered=False, already_enrolled=False
+        )
+        is HighUtilizerRecommendedAction.NONE
+    )
+    assert "enroll" not in {a.value for a in HighUtilizerRecommendedAction}
+
+
 def test_signal_recommended_action_follows_flags() -> None:
     with pytest.raises(ValidationError, match="recommended_action"):
         _signal(recommended_action=HighUtilizerRecommendedAction.NONE)
@@ -302,6 +340,11 @@ def test_recommendation_dismissed_requires_reason() -> None:
         _recommendation(
             status=EnrollmentRecommendationStatus.DISMISSED, dismissal_reason="  "
         )
+    with pytest.raises(ValidationError, match="dismissed_by and dismissed_at"):
+        _recommendation(
+            status=EnrollmentRecommendationStatus.DISMISSED,
+            dismissal_reason="declined outreach",
+        )
     ok = _recommendation(
         status=EnrollmentRecommendationStatus.DISMISSED,
         dismissal_reason="declined outreach",
@@ -314,6 +357,11 @@ def test_recommendation_dismissed_requires_reason() -> None:
 def test_recommendation_enrolled_must_reference_existing_patient() -> None:
     with pytest.raises(ValidationError, match="resolved_patient_id"):
         _recommendation(status=EnrollmentRecommendationStatus.ENROLLED)
+    with pytest.raises(ValidationError, match="resolved_by and resolved_at"):
+        _recommendation(
+            status=EnrollmentRecommendationStatus.ENROLLED,
+            resolved_patient_id=uuid4(),
+        )
     with pytest.raises(ValidationError, match="only valid when status=enrolled"):
         _recommendation(resolved_patient_id=uuid4())
     ok = _recommendation(
@@ -384,17 +432,31 @@ def test_reading_threshold_breached_is_tri_state_and_breach_is_typed() -> None:
         MihRemoteReading(**{**base, "metric": "banana_ripeness"})
 
 
-def test_escalation_defaults_open() -> None:
-    esc = MihEscalation(
-        tenant_id=TENANT,
-        id=uuid4(),
-        patient_id=uuid4(),
-        reading_id=uuid4(),
-        reason="heart_rate 145.0 bpm breached the max threshold 120.0",
-        created_at=NOW,
-    )
+def test_escalation_defaults_open_and_acknowledged_needs_actor_and_time() -> None:
+    base = {
+        "tenant_id": TENANT,
+        "id": uuid4(),
+        "patient_id": uuid4(),
+        "reading_id": uuid4(),
+        "reason": "heart_rate 145.0 bpm breached the max threshold 120.0",
+        "created_at": NOW,
+    }
+    esc = MihEscalation(**base)
     assert esc.state is MihEscalationState.OPEN
     assert esc.acknowledged_by is None
+    with pytest.raises(ValidationError, match="acknowledged_by and acknowledged_at"):
+        MihEscalation(**base, state=MihEscalationState.ACKNOWLEDGED)
+    with pytest.raises(ValidationError, match="acknowledged_by and acknowledged_at"):
+        MihEscalation(
+            **base, state=MihEscalationState.ACKNOWLEDGED, acknowledged_by="sup-1"
+        )
+    ok = MihEscalation(
+        **base,
+        state=MihEscalationState.ACKNOWLEDGED,
+        acknowledged_by="sup-1",
+        acknowledged_at=NOW,
+    )
+    assert ok.acknowledged_at == NOW
 
 
 # ---------------------------------------------------------------------------

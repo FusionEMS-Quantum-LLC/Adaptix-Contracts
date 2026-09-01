@@ -493,6 +493,17 @@ class MihEscalation(_MihBase):
     def _aware_optional(cls, value: datetime | None) -> datetime | None:
         return _require_aware_optional(value)
 
+    @model_validator(mode="after")
+    def _acknowledgement_recorded(self) -> "MihEscalation":
+        if self.state == MihEscalationState.ACKNOWLEDGED and not (
+            self.acknowledged_by and self.acknowledged_at
+        ):
+            raise ValueError(
+                "an acknowledged escalation must carry acknowledged_by and "
+                "acknowledged_at"
+            )
+        return self
+
 
 # ---------------------------------------------------------------------------
 # High-utilizer detection — policy, observation, evaluation, recommendation
@@ -553,12 +564,31 @@ class MihUtilizationPolicy(_MihBase):
     @model_validator(mode="after")
     def _reachable(self) -> "MihUtilizationPolicy":
         enabled = self.enabled_dimensions
-        if enabled == 0:
+        if not enabled:
             raise ValueError("at least one utilization dimension must be enabled")
         if self.recommendation_min_score > enabled:
             raise ValueError(
                 f"recommendation_min_score {self.recommendation_min_score} can "
                 f"never be reached with {enabled} enabled dimension(s)"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _supersession_recorded(self) -> "MihUtilizationPolicy":
+        superseded = self.status == UtilizationPolicyStatus.SUPERSEDED
+        recorded = self.superseded_at is not None and (
+            self.superseded_by_policy_id is not None
+        )
+        if superseded and not recorded:
+            raise ValueError(
+                "a superseded policy must carry superseded_at and "
+                "superseded_by_policy_id"
+            )
+        if not superseded and (
+            self.superseded_at is not None or self.superseded_by_policy_id is not None
+        ):
+            raise ValueError(
+                "supersession fields are only valid when status=superseded"
             )
         return self
 
@@ -594,6 +624,22 @@ class MihUtilizationCounts(BaseModel):
     count_911_calls: int = Field(default=0, ge=0)
     count_ed_visits: int = Field(default=0, ge=0)
     count_admissions: int = Field(default=0, ge=0)
+
+
+def expected_recommended_action(
+    *, recommendation_triggered: bool, already_enrolled: bool
+) -> HighUtilizerRecommendedAction:
+    """The only action a signal may carry for its flags.
+
+    An already-enrolled person is never re-recommended; a triggered person is
+    asked to be CONSIDERED for enrollment; otherwise nothing. There is no
+    value that means "enroll".
+    """
+    if already_enrolled:
+        return HighUtilizerRecommendedAction.ALREADY_ENROLLED
+    if recommendation_triggered:
+        return HighUtilizerRecommendedAction.CONSIDER_ENROLLMENT
+    return HighUtilizerRecommendedAction.NONE
 
 
 class HighUtilizerSignal(_MihBase):
@@ -632,25 +678,35 @@ class HighUtilizerSignal(_MihBase):
     def _aware(cls, value: datetime) -> datetime:
         return _require_aware(value)
 
-    @model_validator(mode="after")
-    def _consistent(self) -> "HighUtilizerSignal":
-        expected = sum(
+    @property
+    def satisfied_dimensions(self) -> int:
+        return sum(
             1
             for t in (self.trigger_911, self.trigger_ed, self.trigger_admission)
             if t is True
         )
-        if self.trigger_score != expected:
+
+    @model_validator(mode="after")
+    def _score_is_the_count(self) -> "HighUtilizerSignal":
+        if self.trigger_score != self.satisfied_dimensions:
             raise ValueError(
-                f"trigger_score {self.trigger_score} does not equal the number of satisfied dimensions ({expected})"
+                f"trigger_score {self.trigger_score} does not equal the number of "
+                f"satisfied dimensions ({self.satisfied_dimensions})"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _window_ordered(self) -> "HighUtilizerSignal":
         if self.window_end <= self.window_start:
             raise ValueError("window_end must be after window_start")
-        if self.already_enrolled:
-            allowed = HighUtilizerRecommendedAction.ALREADY_ENROLLED
-        elif self.recommendation_triggered:
-            allowed = HighUtilizerRecommendedAction.CONSIDER_ENROLLMENT
-        else:
-            allowed = HighUtilizerRecommendedAction.NONE
+        return self
+
+    @model_validator(mode="after")
+    def _action_follows_flags(self) -> "HighUtilizerSignal":
+        allowed = expected_recommended_action(
+            recommendation_triggered=self.recommendation_triggered,
+            already_enrolled=self.already_enrolled,
+        )
         if self.recommended_action != allowed:
             raise ValueError(
                 f"recommended_action must be {allowed.value!r} for "
@@ -705,28 +761,38 @@ class MihEnrollmentRecommendation(_MihBase):
         return _require_aware_optional(value)
 
     @model_validator(mode="after")
-    def _status_fields(self) -> "MihEnrollmentRecommendation":
-        if self.status == EnrollmentRecommendationStatus.DISMISSED and not (
-            self.dismissal_reason and self.dismissal_reason.strip()
-        ):
-            raise ValueError("a dismissed recommendation must carry dismissal_reason")
-        if (
-            self.status == EnrollmentRecommendationStatus.ENROLLED
-            and self.resolved_patient_id is None
-        ):
+    def _dismissal_recorded(self) -> "MihEnrollmentRecommendation":
+        if self.status != EnrollmentRecommendationStatus.DISMISSED:
+            return self
+        has_reason = bool(self.dismissal_reason and self.dismissal_reason.strip())
+        if not (has_reason and self.dismissed_by and self.dismissed_at):
             raise ValueError(
-                "an enrolled recommendation must reference resolved_patient_id"
+                "a dismissed recommendation must carry dismissal_reason, "
+                "dismissed_by and dismissed_at"
             )
-        if (
-            self.status != EnrollmentRecommendationStatus.ENROLLED
-            and self.resolved_patient_id is not None
-        ):
+        return self
+
+    @model_validator(mode="after")
+    def _resolution_recorded(self) -> "MihEnrollmentRecommendation":
+        enrolled = self.status == EnrollmentRecommendationStatus.ENROLLED
+        resolved = (
+            self.resolved_patient_id is not None
+            and bool(self.resolved_by)
+            and self.resolved_at is not None
+        )
+        if enrolled and not resolved:
+            raise ValueError(
+                "an enrolled recommendation must carry resolved_patient_id, "
+                "resolved_by and resolved_at"
+            )
+        if not enrolled and self.resolved_patient_id is not None:
             raise ValueError("resolved_patient_id is only valid when status=enrolled")
         return self
 
 
 __all__ = [
     "HighUtilizerSignal",
+    "expected_recommended_action",
     "MihEnrollment",
     "MihEnrollmentRecommendation",
     "MihEscalation",
