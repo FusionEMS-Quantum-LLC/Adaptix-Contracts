@@ -14,6 +14,15 @@ from the installed package metadata).
 
 ### Added
 
+- `adaptix_contracts.air.far_135_267`: new module holding the single numeric
+  authority for the 14 CFR 135.267 duty/rest floors — `DUTY_EXCEPTION_MAX_DUTY_HOURS`
+  (14) and `REST_BEFORE_COMPLETION_HOURS` (10). Both Adaptix-Air-Service
+  (`air_app/far_135_267.py`) and Adaptix-Air-Service-Pilot
+  (`air_pilot_app/far_135_267.py`) had independently declared these same two
+  federal numbers with no shared source of truth; each now imports from here
+  and derives whatever unit (hours or minutes) its own domain needs locally.
+  Deduplication only — the values are unchanged (14 hours duty, 10 hours
+  rest), transcribed from CFR-2016-title14-vol3-sec135-267.
 - `adaptix_contracts.commercial`: new package with the shared commercial
   pricing/application-catalog vocabulary for the founder's modular-pricing
   directive (Phase B) — every independently purchasable Adaptix customer
