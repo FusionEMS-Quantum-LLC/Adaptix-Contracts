@@ -339,7 +339,7 @@ class ApplicationDependency:
     exists so a genuine technical dependency (one application's runtime
     cannot function without another's) can be recorded when one is
     confirmed. As of this catalog version, zero true dependencies are
-    confirmed among the twenty applications it prices — see
+    confirmed among the twenty-one applications it prices — see
     ``CommercialPricingCatalog.dependencies``.
     """
 
@@ -425,7 +425,9 @@ def _validate_band_annual_price(
         raise ValueError(
             f"{application.value}: annual_price_per_unit does not match "
             f"monthly_price_per_unit {band.monthly_price_per_unit} at "
-            "ANNUAL_DISCOUNT_RATE"
+            f"ANNUAL_DISCOUNT_RATE (expected "
+            f"{_expected_annual(band.monthly_price_per_unit)}, "
+            f"got {band.annual_price_per_unit})"
         )
 
 
