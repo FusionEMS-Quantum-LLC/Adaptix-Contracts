@@ -331,18 +331,18 @@ class AuditEvent(BaseModel):
     actor_type: AuditActorType = AuditActorType.USER
     action: str = Field(..., min_length=1, max_length=160)
     resource_type: str = Field(..., min_length=1, max_length=120)
-    resource_id: Optional[str] = Field(None, max_length=255)
+    resource_id: Optional[str] = Field(default=None, max_length=255)
     correlation_id: Optional[str] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime
 
     # --- Core parity fields (added 3.2.0, all optional; see AuditIngestRequest) ---
     outcome: Optional[AuditOutcome] = None
-    ip_address: Optional[str] = Field(None, max_length=45)
-    user_agent: Optional[str] = Field(None, max_length=500)
-    error_message: Optional[str] = Field(None, max_length=500)
+    ip_address: Optional[str] = Field(default=None, max_length=45)
+    user_agent: Optional[str] = Field(default=None, max_length=500)
+    error_message: Optional[str] = Field(default=None, max_length=500)
     changes: Optional[dict[str, Any]] = None
-    payload_schema_version: Optional[str] = Field(None, max_length=16)
+    payload_schema_version: Optional[str] = Field(default=None, max_length=16)
 
 
 class AuditSearchQuery(BaseModel):
@@ -350,14 +350,14 @@ class AuditSearchQuery(BaseModel):
 
     tenant_id: UUID
     actor_user_id: Optional[UUID] = None
-    action: Optional[str] = Field(None, max_length=160)
-    resource_type: Optional[str] = Field(None, max_length=120)
-    resource_id: Optional[str] = Field(None, max_length=255)
+    action: Optional[str] = Field(default=None, max_length=160)
+    resource_type: Optional[str] = Field(default=None, max_length=120)
+    resource_id: Optional[str] = Field(default=None, max_length=255)
     correlation_id: Optional[str] = None
     occurred_after: Optional[datetime] = None
     occurred_before: Optional[datetime] = None
-    limit: int = Field(50, ge=1, le=1000)
-    offset: int = Field(0, ge=0)
+    limit: int = Field(default=50, ge=1, le=1000)
+    offset: int = Field(default=0, ge=0)
 
 
 class AuditExportRequest(BaseModel):
@@ -394,12 +394,12 @@ class AuditIngestRequest(BaseModel):
     actor_user_id: Optional[UUID] = None
     actor_type: AuditActorType = AuditActorType.USER
     action: str = Field(..., min_length=1, max_length=160)
-    resource_type: Optional[str] = Field(None, max_length=120)
-    resource_id: Optional[str] = Field(None, max_length=255)
+    resource_type: Optional[str] = Field(default=None, max_length=120)
+    resource_id: Optional[str] = Field(default=None, max_length=255)
     severity: AuditSeverity = AuditSeverity.LOW
     success: bool = True
     correlation_id: Optional[str] = None
-    idempotency_key: Optional[str] = Field(None, max_length=255)
+    idempotency_key: Optional[str] = Field(default=None, max_length=255)
     metadata: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime
 
@@ -409,19 +409,19 @@ class AuditIngestRequest(BaseModel):
     # forces the producer to either drop the value or invent one; both are
     # defects on an immutable legal record.
     outcome: Optional[AuditOutcome] = None
-    ip_address: Optional[str] = Field(None, max_length=45)
-    user_agent: Optional[str] = Field(None, max_length=500)
-    error_message: Optional[str] = Field(None, max_length=500)
+    ip_address: Optional[str] = Field(default=None, max_length=45)
+    user_agent: Optional[str] = Field(default=None, max_length=500)
+    error_message: Optional[str] = Field(default=None, max_length=500)
     changes: Optional[dict[str, Any]] = Field(
-        None,
+        default=None,
         description=(
             "Before/after state for update operations (Core ``changes_json``). "
             "Distinct from ``metadata``: ``changes`` is the structured diff, "
             "``metadata`` is arbitrary producer context. Do not conflate them."
         ),
     )
-    payload_schema_version: Optional[str] = Field(None, max_length=16)
-    source_service: Optional[str] = Field(None, max_length=120)
+    payload_schema_version: Optional[str] = Field(default=None, max_length=16)
+    source_service: Optional[str] = Field(default=None, max_length=120)
 
     @model_validator(mode="before")
     @classmethod
@@ -472,7 +472,7 @@ class AuditIngestResponse(BaseModel):
     event_id: UUID
     accepted: bool = True
     duplicate: bool = Field(
-        False, description="True when idempotency matched an existing event."
+        default=False, description="True when idempotency matched an existing event."
     )
     occurred_at: datetime
 
@@ -481,9 +481,9 @@ class AuditSearchResponse(BaseModel):
     """Paginated result set for an :class:`AuditSearchQuery`."""
 
     events: list[AuditEvent] = Field(default_factory=list)
-    total: int = Field(0, ge=0)
-    limit: int = Field(50, ge=1, le=1000)
-    offset: int = Field(0, ge=0)
+    total: int = Field(default=0, ge=0)
+    limit: int = Field(default=50, ge=1, le=1000)
+    offset: int = Field(default=0, ge=0)
 
 
 class AuditExportStatus(str, Enum):
@@ -502,9 +502,9 @@ class AuditExportResponse(BaseModel):
     tenant_id: UUID
     export_format: AuditExportFormat
     status: AuditExportStatus = AuditExportStatus.PENDING
-    record_count: Optional[int] = Field(None, ge=0)
+    record_count: Optional[int] = Field(default=None, ge=0)
     location: Optional[str] = Field(
-        None,
+        default=None,
         max_length=1024,
         description="Object-store URI (e.g. s3://...) of the exported evidence set.",
     )

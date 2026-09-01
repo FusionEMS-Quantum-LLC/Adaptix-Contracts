@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CadCrewMemberContext(BaseModel):
@@ -262,8 +262,8 @@ class CadNemsisHandoffPayload(BaseModel):
     handoff_source: str = "adaptix-cad"
     handoff_version: str = "1.0"
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "handoff_id": "hndff-001",
                 "cad_dispatch_id": "disp-001",
@@ -283,6 +283,7 @@ class CadNemsisHandoffPayload(BaseModel):
                 "handoff_created_at": "2026-05-03T12:00:00Z",
             }
         }
+    )
 
 
 class CadNemsisHandoffCreatedEvent(BaseModel):

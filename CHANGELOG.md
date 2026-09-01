@@ -7,22 +7,245 @@ The format follows Keep a Changelog principles and uses semantic versioning.
 Entries for 1.1.0 through 1.3.0 were reconstructed from merged pull requests
 after the changelog fell behind the `__version__` / `pyproject.toml` version.
 Each item below is attributed to the PR that introduced it. The current
-package version is `4.3.0` (see `pyproject.toml`; `__version__` resolves it
+package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- `module_registry`: registered `mih_community_paramedicine` (Mobile
+  Integrated Healthcare / Community Paramedicine; audience `adaptix-mih`;
+  alias `mih`, the Gateway route slug; purchasable — Community Paramedicine
+  is a priced application in `adaptix_contracts.commercial`). Until now the
+  id existed only as `adaptix_contracts.mih.MIH_ENTITLEMENT_ID` and in Core's
+  per-state `restricted_modules`, so Core's `MODULE_CATALOG` (derived from
+  `canonical_module_ids()`) could never grant it and the Web-App workspace
+  gate `mih_community_paramedicine` was dark for every non-founder tenant.
+  Strictly additive: no existing id, alias, audience or implication changes.
+  Consumers (Core, Web-App's `canonicalModuleIds.ts` mirror) re-pin /
+  regenerate deliberately.
+
+- `adaptix_contracts.mih`: shared contract surface for the remote patient
+  monitoring and high-utilizer detection capabilities Adaptix-MIH-Service
+  now implements (build-order steps 4 and 5; MIH PR #18). Enums
+  `RemoteReadingMetric`, `MihEscalationState`, `UtilizationEventType`
+  (`911_call` / `ed_visit` / `hospital_admission`), `UtilizationSourceSystem`
+  (`epcr` / `qhin` / `manual_verified`), `UtilizationPolicyStatus`,
+  `UtilizationEvaluationOrigin`, `EnrollmentRecommendationStatus`
+  (`open` / `acknowledged` / `dismissed` / `enrolled` / `expired`) and
+  `HighUtilizerRecommendedAction`; models `MihMonitoringThreshold`,
+  `MihRemoteReading` (+ `MihRemoteReadingBreach`), `MihEscalation`,
+  `MihUtilizationPolicy` (tenant-versioned, lookback 1–365 days, each enabled
+  threshold ≥ 1, `recommendation_min_score` validated as reachable — there
+  are no platform default thresholds), `MihUtilizationObservation` (opaque
+  patient identity only, timezone-aware `occurred_at`), `HighUtilizerSignal`
+  (the transparent trigger count 0–3 with tri-state per-dimension triggers,
+  validated against the score; `recommended_action` is never "enroll") and
+  `MihEnrollmentRecommendation` (status-field consistency validated: a
+  `dismissed` row carries reason, actor and time; an `enrolled` row carries
+  the pre-existing consented enrollment it was resolved against, actor and
+  time). `MihEscalation.acknowledged` and `MihUtilizationPolicy.superseded`
+  likewise require their actor/time (and successor) fields;
+  `expected_recommended_action` is the single mapping from evaluation flags
+  to the recommended action. Events `mih.utilization.observation_recorded`,
+  `mih.high_utilizer.evaluated` and `mih.enrollment_recommendation.changed`
+  with payloads and envelope factories (deterministic idempotency keys), and
+  `MihErrorCode` entries mirroring the service's `error_code` strings with
+  platform mappings, plus `MIH_SERVICE_ERROR_CODES` /
+  `from_service_error_code` translating the service's bare `error_code`
+  strings (which carry no `mih.` prefix) to the enum. Every timestamp on the
+  new models must be timezone-aware and is normalised to UTC. Strictly
+  additive: no existing MIH model, enum value, event name or error code is
+  changed. Producer wiring in the MIH service,
+  the ePCR/QHIN feeds and the Gateway route remain separate waves.
+
+- `adaptix_contracts.air.far_135_267`: new module holding the single numeric
+  authority for the 14 CFR 135.267 duty/rest floors — `DUTY_EXCEPTION_MAX_DUTY_HOURS`
+  (14) and `REST_BEFORE_COMPLETION_HOURS` (10). Both Adaptix-Air-Service
+  (`air_app/far_135_267.py`) and Adaptix-Air-Service-Pilot
+  (`air_pilot_app/far_135_267.py`) had independently declared these same two
+  federal numbers with no shared source of truth; each now imports from here
+  and derives whatever unit (hours or minutes) its own domain needs locally.
+  Deduplication only — the values are unchanged (14 hours duty, 10 hours
+  rest), transcribed from CFR-2016-title14-vol3-sec135-267.
+- `adaptix_contracts.commercial`: new package with the shared commercial
+  pricing/application-catalog vocabulary for the founder's modular-pricing
+  directive (Phase B) — every independently purchasable Adaptix customer
+  application priced and sold separately by real operational volume, never
+  by user seat count. Adds `CommercialApplicationKey` (21 applications,
+  cross-referenced against `module_registry.MODULE_REGISTRY` canonical ids
+  wherever one already exists — reused, never duplicated),
+  `PricingMechanic` (the seven genuinely distinct pricing shapes the
+  founder's price list actually uses: flat volume band, workforce headcount
+  band, base-plus-per-unit, per-unit-rate-by-bracket, base-plus-metered-usage,
+  starting-price-bands-TBD, software-fee-plus-passthrough),
+  `PricingBand`, `UnitRateFormula`, `ApplicationPricingCatalogEntry`,
+  `ApplicationDependency` (currently empty — zero true technical dependencies
+  confirmed among the twenty priced applications), `CatalogEntryStatus`, and
+  `CommercialPricingCatalog`. Seeds the first catalog version,
+  `wisconsin_launch_catalog.WI_LAUNCH_CATALOG`, from the founder's verified
+  Wisconsin launch price list; every seeded annual price is checked against
+  the 10%-off-monthly-times-12 discount formula at import time.
+  Carries no pricing CALCULATION logic — shapes and seed data only, per
+  `adaptix_contracts/AGENTS.md` and `BILLING_AND_PACKAGING_RULES.md`; the
+  engine that evaluates a tenant's volume against these shapes belongs in
+  Adaptix-Billing-Service, a separate later task. Strictly additive: no
+  existing file, export, or signature in `module_registry.py`,
+  `auth/capability_registry.py`, or `schemas/tenant_contracts.py` is
+  changed, renamed, or removed.
+- `module_registry`: registered the `ai` module (audience `adaptix-ai`,
+  purchasable=False, no aliases, no implies). The gateway already routed
+  `/api/v1/ai/*` with audience `adaptix-ai` and gated it on module id `ai`,
+  but no module declared that audience, so `audience_map()` never emitted it
+  and Core could not mint `adaptix-ai` for any non-founder token — every
+  `/api/v1/ai` request answered 403 `jwt_audience_mismatch` (measured in
+  production 2026-08-31 with a Cortex Live demo session). Strictly additive:
+  no existing tenant holds `ai`, no alias or `implies` reaches it, so no
+  existing token, entitlement or gate changes. Consumers that need the new
+  row (Core, to entitle the Cortex Live demo pool) re-pin deliberately.
+
+Everything below this line is housekeeping only. No contract, model, field, enum or public import path
+changed in any of the entries below, so nothing here requires a consumer to
+re-pin. Verified: the public surface diff between `v4.1.0` and `v4.3.0` is
+47 additions and 0 removals, and no commit below touches
+`adaptix_contracts/**/*.py` except the import guard in #264.
+
+### Fixed
+
+- `uv.lock` recorded `adaptix-contracts` 4.2.0 while `pyproject.toml`
+  declared 4.3.0; #254 bumped the manifest without regenerating the lock, and
+  `uv lock --check` failed on that tree. The lock is regenerated â€” one line,
+  the project's own version entry; 76 packages resolved, none moved (#257).
+- Importing `adaptix_contracts.security.temporal_payload_codec` without the
+  `temporal` extra failed with `No module named 'google'` â€” protobuf's
+  namespace package, naming neither the real requirement nor the remedy. It
+  now names the extra: `pip install 'adaptix-contracts[temporal]'`. The
+  exception type stays `ModuleNotFoundError`, `name`/`path` are forwarded and
+  the original error is kept as `__cause__`, so existing handlers are
+  unaffected (#264).
+- `README.md` linked to `MARKET_READY_LEDGER.md`, deleted in #249 â€” the only
+  broken relative link in the repository. `README.md` and `RUNBOOK.md` both
+  documented a personal absolute path in a public repository (#260).
+- `audit_contracts.py` justified its retention by naming Adaptix-Fire-Service
+  `fire_app/audit_service.py` as a live consumer. That path returns 404, and
+  the real file never imports this module. The remaining consumer,
+  Adaptix-CAD-Service, is genuine and unchanged (#262).
+- `test_trustsign_client_mirror_drift.py` named the repos to notify on a
+  public-surface change as Core/Transport/Integrations/Founder. None of the
+  three checkable ones import the client; the real importers are EPCR,
+  Device, TrustSign and Billing (#263).
+- `pyproject.toml` lines 1-98 had every newline doubled (92 of 225 lines
+  blank). Repaired with the exact inverse; `tomllib` parses the old and new
+  forms to equal dicts (#259).
+
 ### Changed
+
+- The declared validation authority (`scripts/ci/verify-toolchain.sh`) now
+  fails closed on two classes it previously passed. `uv lock --check` catches
+  lock/manifest drift, which `uv sync --frozen` exits 0 on (#257). And
+  `python validate_contracts.py` â€” listed under "Required release evidence"
+  in `DEPRECATION_POLICY.md` and instructed in `CONTRIBUTING.md`,
+  `README.md` and `RUNBOOK.md`, but invoked by no automated path â€” now
+  actually runs (#265).
+- `.gitignore` covers `reports/toolchain-inventory.json`, which the declared
+  gate generates on every run and previously left untracked (#258).
+- `.gitleaks.toml` records four verified false positives: three git blob
+  SHA-1 hashes in the release manifest (all 81 recomputed with
+  `git rev-parse` and matched) and one deterministic golden-vector test key.
+  Detection is unchanged â€” a planted AWS key and secret in ordinary source is
+  still reported (#261).
 
 - `RELEASE_MANIFEST_v4.3.0.json` moved from the repository root to
   `docs/archive/`. `repos/repository-shape.yml` in Adaptix-Governance is the
   fleet authority for repository root shape, and its
   `stale-session-artifact` rule forbids `*MANIFEST*.json` at a root while
   naming `docs/archive/` (`archive_location`) as the canonical destination.
-  The file's content is unchanged and the `v4.3.0` tag never contained it —
-  it landed on `main` in #255, after the tag was cut — so no released
+  The file's content is unchanged and the `v4.3.0` tag never contained it â€”
+  it landed on `main` in #255, after the tag was cut â€” so no released
   artifact is affected. Nothing in this repository or the fleet reads the
   file by path; the only reference was the 4.3.0 entry below.
+
+## [5.1.0] - 2026-08-31
+
+Minor release: one additive module-registry entry (a new contract, no change
+to any existing one), per `DEPRECATION_POLICY.md`'s semantic-versioning rule
+("Minor - New contracts or backward-compatible additions").
+
+### Added
+
+- `adaptix_contracts.module_registry` gained an `rtc` module row
+  (`canonical_id="rtc"`, `audience="adaptix-rtc"`, `purchasable=False`).
+  Adaptix-Gateway's `routes.py` already routes `/api/v1/rtc` to its own
+  upstream under that exact audience (its own comment there reads "RTC --
+  real-time comms (WebRTC/SFU signalling) shared service"), and
+  `adaptix-rtc` was already listed in
+  `service_audiences.KNOWN_SERVICE_AUDIENCES` -- but with no
+  module-registry row, `audience_map()` had no `rtc` key, so Adaptix-Core's
+  `_MODULE_TO_AUDIENCE` never mapped it and no tenant's session could ever
+  carry the `adaptix-rtc` audience. Every `/api/v1/rtc` request 403'd
+  `jwt_audience_mismatch` for every tenant, including Cortex Live's demo
+  pool, whose live voice session opens a room via `POST /api/v1/rtc/rooms`
+  (#278).
+
+## [5.0.0] - 2026-08-28
+
+Major release. One wire-format change to a controlled-substance field and one
+dependency-set change, both of which can affect a consumer, so this is a major
+version per `DEPRECATION_POLICY.md` rather than a minor.
+
+### Fixed
+
+- **`ResourceExecutionContract.quantity` was `float`.** That model is, in its
+  own words, the "Canonical resource, medication, and narcotic execution
+  event", so a controlled-substance quantity was carried in binary floating
+  point, where `0.1 + 0.2 != 0.3`. It is now
+  `Decimal | None = Field(default=None, ge=Decimal("0"))`, matching the exact
+  pattern `schemas/narcotic.py` already uses for every narcotic quantity.
+  **Wire-format change:** the field now serialises as a JSON string, the same
+  as every other exact quantity in this package since 2.37.0. A consumer that
+  parses it as a JSON number must be updated.
+- **The precision guard could not see the defect.** `CONVERTED_MODULES` in
+  `tests/test_money_and_quantity_precision.py` did not list `fire_contracts`,
+  so the repository's own `MUST_BE_EXACT` check never scanned the module that
+  held the only real offender. `fire_contracts` is now covered. Proven in both
+  directions: with the float restored the guard fails with
+  `assert not ['ResourceExecutionContract.quantity: float | None']`; with the
+  fix it passes.
+- A package-wide sweep of all 1396 models found exactly three `float` fields
+  matching the money/quantity vocabulary. The other two,
+  `cct.models.InfusionRun.concentration_amount` and `.rate_amount`, are left
+  as `float` deliberately: one is a rate and the other the numerator of a
+  concentration ratio, both covered by this changelog's existing rule that
+  rates, percentages, scores and durations stay float on purpose.
+
+### Changed
+
+- **`boto3` and `PyYAML` are no longer base dependencies.** Nothing this
+  package ships imports either (0 references under `adaptix_contracts/`);
+  their only consumer is `tools/bedrock_ops.py`, which
+  `[tool.setuptools.packages.find].exclude` keeps out of the wheel. Every
+  consumer was installing boto3 â€” and botocore, s3transfer, jmespath, six â€”
+  for code it could not reach. They moved to the `dev` extra, which the repo's
+  own gate needs because `tests/test_bedrock_ops_command_safety.py` loads that
+  tool. A consumer that imported boto3 while relying on this package to supply
+  it must now declare it directly; 48 fleet repos already do.
+- All 28 pydantic v1-style `class Config:` blocks became
+  `model_config = ConfigDict(...)`, across `epcr/clinical_contracts.py` (21),
+  `epcr/caregraph_contracts.py` (4), `auth/cognito.py` (2) and
+  `cad/nemsis_handoff.py` (1). Every setting is preserved exactly; the two
+  forms are equivalent in pydantic v2. This removes the last API pydantic
+  schedules for removal in v3 â€” `PydanticDeprecatedSince20` warnings during
+  the suite are now zero, down from two.
+- `RBAC_MIGRATION_TEMPLATE.md` told services to `cp` `rbac_contracts.py`,
+  `core_service_integration.py` and `auth/` into their own tree. That is the
+  "Divergent contract copies in sibling repositories" that this repository's
+  own `DEPRECATION_POLICY.md` lists under **Forbidden changes**, and it is the
+  documented reason permission values are hand-duplicated downstream rather
+  than imported. It now shows the import, and pins by commit instead of the
+  stale `adaptix_contracts>=0.1.0` floor it previously suggested. The
+  `python-jose` line was dropped from the example dependency list: this
+  package uses PyJWT.
 
 ## [4.3.0] - 2026-08-28
 
@@ -31,7 +254,7 @@ the `pyproject.toml` version string but never tagged, and commit
 `889be634` is already pinned by 10 fleet consumers while claiming to be
 4.2.0 informally. Reusing 4.2.0 for the official tag would create the exact
 "multiple SHAs claiming one SemVer" condition this release process exists
-to prevent, so this cut is 4.3.0 instead — the first version number with an
+to prevent, so this cut is 4.3.0 instead â€” the first version number with an
 unambiguous single commit and an actual `v4.3.0` git tag behind it.
 
 ### Added
@@ -49,7 +272,7 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
 ### Removed
 
 - `FINALIZATION_SUMMARY.md`, `MARKET_READY_LEDGER.md`, `TEST_EVIDENCE.md`
-  — superseded snapshot documents, forbidden at the repository root by the
+  â€” superseded snapshot documents, forbidden at the repository root by the
   live `repository-shape.yml` policy in Adaptix-Governance (#248).
 
 ### Fixed
@@ -57,7 +280,7 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
 - `ARCHITECTURE_TRUTH.md` named `scripts/agent_governance_runtime.py` as
   the governance hook's runtime target; `.github/hooks/agent-governance.json`
   actually invokes `.github/scripts/agent_governance_runtime.py`. Both
-  scripts are real and both stay — this only corrects which one the doc
+  scripts are real and both stay â€” this only corrects which one the doc
   says the hook runs (#253).
 
 ## [4.2.0] - 2026-08-28
@@ -117,13 +340,13 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
 
 ### Fixed
 
-- **BEHAVIOR CHANGE — `verify_service_token` now requires `jti` at decode
+- **BEHAVIOR CHANGE â€” `verify_service_token` now requires `jti` at decode
   time.** `adaptix_contracts.auth.service_token.verify_service_token` listed
   `["exp", "iat", "aud", "iss", "sub"]` as required decode claims but omitted
   `jti`, even though `ServiceTokenClaims.jti` is a required field. A validly
   signed token missing `jti` therefore passed every explicit check and failed
   only at the closing `ServiceTokenClaims(**raw)`, raising
-  `pydantic.ValidationError` — which is outside this module's documented
+  `pydantic.ValidationError` â€” which is outside this module's documented
   contract (`ServiceTokenError` -> 401, `ServiceTokenAuthzError` -> 403). A
   caller correctly catching only those two saw an unhandled 500 instead of a
   clean 401. Such a token now raises `ServiceTokenError`.
@@ -132,7 +355,7 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
   per this repo's conventions, and was authorized by the repo owner. It is
   safe for live traffic: `issue_service_token` always sets
   `jti` (`uuid.uuid4().hex`), so every legitimately issued token already
-  carries the claim — only malformed or hand-crafted tokens change outcome.
+  carries the claim â€” only malformed or hand-crafted tokens change outcome.
   The production paths on this module (Operations->CAD/Air, MCP->EPCR) are
   unaffected. `scope` was deliberately NOT added to the required list: a
   missing scope must remain an authorization failure (403) via the existing
@@ -142,11 +365,11 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
 
 ### Added
 
-- **`SmsDeliveryStatus.SUPPRESSED`** — Family-Bridge's `_send_for_stage`
+- **`SmsDeliveryStatus.SUPPRESSED`** â€” Family-Bridge's `_send_for_stage`
   (Adaptix-Communications-Service) did not consult the platform-wide consent
   ledger (STOP replies / do-not-contact) before sending a stage SMS, unlike
   every other outbound SMS/email path in Communications-Service. There was
-  also no way to represent "blocked by consent, never sent" on the wire —
+  also no way to represent "blocked by consent, never sent" on the wire â€”
   `SmsDeliveryStatus` only had `QUEUED` / `SENT` / `DELIVERED` / `FAILED` /
   `UNDELIVERED`, none of which is honest for a send that never reached the
   provider gateway. `SUPPRESSED` is additive: existing consumers that switch
@@ -155,21 +378,21 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
   and `adaptix_contracts.family_bridge.events.BridgeSmsSentPayload` for the
   updated docstring guidance to consumers (never render as a failure).
 
-- **Tenant-less platform S2S token** (#231) —
+- **Tenant-less platform S2S token** (#231) â€”
   `adaptix_contracts.auth.platform_token` (`issue_platform_service_token`,
   `verify_platform_service_token`, `verify_platform_service_token_with_keyset`,
   `PlatformServiceTokenClaims`, `PlatformServiceTokenError`,
   `PlatformServiceTokenAuthzError`; also re-exported from
   `adaptix_contracts.auth`). A SEPARATE, additive primitive alongside
   `adaptix_contracts.auth.service_token` for S2S calls that are genuinely
-  tenant-less by nature — e.g. Core-Service sending a pre-signup marketing
+  tenant-less by nature â€” e.g. Core-Service sending a pre-signup marketing
   email through Calendar-Service's internal mail endpoint, before any
   agency/tenant exists. Today that endpoint authenticates callers with a
   bare fleet-wide shared secret held by dozens of services, which proves
   only "holder of a widely-distributed secret", not caller identity.
   Reuses `service_token`'s RS256/kid/keyset signing and verification
   machinery (the key-selection algorithm was extracted into a new internal
-  `adaptix_contracts.auth._s2s_keyset` module that both now call — no new
+  `adaptix_contracts.auth._s2s_keyset` module that both now call â€” no new
   crypto was introduced).
 
   `ServiceTokenClaims.tenant_id` was deliberately NOT made optional to cover
@@ -179,8 +402,8 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
   staggered pin range on this package means such a semantic change would
   reach consumers as a rolling, partially-applied change nobody reviews
   together as a security change. Instead `PlatformServiceTokenClaims` has
-  NO `tenant_id` field at all — structurally absent, not
-  present-but-optional — and carries a required `token_use = "platform-s2s"`
+  NO `tenant_id` field at all â€” structurally absent, not
+  present-but-optional â€” and carries a required `token_use = "platform-s2s"`
   discriminator claim. A tenant-scoped verifier therefore rejects a platform
   token, and the new platform verifier rejects a tenant token, by
   construction. Both directions are pinned by real end-to-end tests (not
@@ -192,12 +415,12 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
   exp/nbf + a short TTL. An optional `reject_replayed_jti` hook lets a call
   site opt into rejecting a replay within the TTL window via an
   ATOMIC check-and-record callback against a durable store (e.g. Redis
-  `SET NX EX`) — documented and tested, including a test that pins the
+  `SET NX EX`) â€” documented and tested, including a test that pins the
   exact race a non-atomic callback fails to close.
 
   `service_token.py`'s public behavior is unchanged; its existing tests
   pass untouched. Its internal keyset key-selection logic was moved,
-  verbatim in behavior, into the new shared `_s2s_keyset` module — each
+  verbatim in behavior, into the new shared `_s2s_keyset` module â€” each
   caller module keeps its own error-code prefix (`SERVICE_TOKEN_*` vs
   `PLATFORM_TOKEN_*`) so the two verifiers' failure codes can never be
   mistaken for each other in logs, alerts, or dashboards.
@@ -217,7 +440,7 @@ unambiguous single commit and an actual `v4.3.0` git tag behind it.
   accepted is now rejected, so no accepted value was narrowed. `adaptix_contracts.auth.service_token`'s public behavior is
   unchanged; only its internal keyset key-selection logic moved to a shared
   internal helper (`adaptix_contracts.auth._s2s_keyset`, not part of the
-  public API — nothing outside `adaptix_contracts.auth` should import it).
+  public API â€” nothing outside `adaptix_contracts.auth` should import it).
   No consumer is forced to change anything to move onto a commit or release
   containing this change.
 
@@ -230,11 +453,11 @@ by moving from 4.0.0 to 4.1.0.
 
 ### Added
 
-- **`adaptix-signal-bus` service audience** in `service_audiences.py` (A012 —
+- **`adaptix-signal-bus` service audience** in `service_audiences.py` (A012 â€”
   SSRF/identity hardening for Adaptix-SignalCore-Service). The cross-service event
-  bus serves `/api/v1/signal-bus` — deliberately distinct from Core's separate
+  bus serves `/api/v1/signal-bus` â€” deliberately distinct from Core's separate
   `/api/v1/signalcore` Founder investor-signal stream (routed to Core with
-  `audience="adaptix-core"`) — so it requires its own audience. Registering it here
+  `audience="adaptix-core"`) â€” so it requires its own audience. Registering it here
   is step 1 of the module's "Adding a new service" procedure: without it the gateway
   refuses to route the prefix (`entry.audience not in KNOWN_AUDIENCES`), the same
   "audience absent from the registry" failure that previously made `adaptix-audit`
@@ -252,7 +475,7 @@ by moving from 4.0.0 to 4.1.0.
   receiver with no Cognito-JWT route). This entry was backfilled at release
   time: #227 merged without a changelog entry.
 
-- **Canonical Temporal payload codec** —
+- **Canonical Temporal payload codec** â€”
   `adaptix_contracts.security.temporal_payload_codec` plus a new optional
   `temporal` extra carrying the SDK (#225). The AES-256-GCM encrypting
   `PayloadCodec` previously private to Adaptix-Temporal-Service is promoted
@@ -264,7 +487,7 @@ by moving from 4.0.0 to 4.1.0.
   `TEMPORAL_PAYLOAD_CODEC_PLAINTEXT_LOCAL`, `ENVIRONMENT`), guarded by 46
   ported tests plus 4 golden vectors of frozen production ciphertext.
   Nothing attaches the converter in this release; enablement is per-service
-  work. `adaptix_contracts.security` still imports without `temporalio` —
+  work. `adaptix_contracts.security` still imports without `temporalio` â€”
   only this module requires the extra. This entry was backfilled at release
   time: #225 merged without a changelog entry, deliberately deferring the
   release convention to the Contracts release owner.
@@ -281,7 +504,7 @@ by moving from 4.0.0 to 4.1.0.
 
 - **`TrustSignClient.resend_request` removed** (A005 follow-up to #220).
   The standalone Adaptix-TrustSign-Service has never implemented
-  `POST /api/v1/trustsign/requests/{request_id}/resend` — the client method
+  `POST /api/v1/trustsign/requests/{request_id}/resend` â€” the client method
   has been advertising a route that returns 404 in production since the
   2026-07-15 cutover away from Billing-Service's legacy TrustSign router.
   Removing the method is preferred over implementing the missing server
@@ -305,7 +528,7 @@ by moving from 4.0.0 to 4.1.0.
   `AuditIngestRequest.resource_type` in 3.2.0 and Core's nullable
   `core_audit_logs.resource_type`. 3.2.0 relaxed the ingest field but not the
   event published in response to it, so appending a Core row with no resource
-  type raised a `ValidationError` at publish time — after the row was already
+  type raised a `ValidationError` at publish time â€” after the row was already
   durably stored. The Audit service is the only producer and consumer of this
   event.
 
@@ -313,7 +536,7 @@ by moving from 4.0.0 to 4.1.0.
 
 ### Added
 
-- `AuditOutcome` (`success` | `failure` | `denied`) — the three-value outcome
+- `AuditOutcome` (`success` | `failure` | `denied`) â€” the three-value outcome
   Core's canonical `core_audit_logs.status` column has always carried. The
   pre-existing `success: bool` on `AuditIngestRequest` is a two-value
   projection that cannot represent a deliberate authorization denial, so any
@@ -364,7 +587,7 @@ by moving from 4.0.0 to 4.1.0.
 
 - `uv.lock` declared `2.37.0` while `pyproject.toml` declared `3.0.0`. The
   `3.0.0` bump moved the project version and left the lock's own entry
-  behind — the same drift `test_lockfile_self_version_matches_pyproject_metadata`
+  behind â€” the same drift `test_lockfile_self_version_matches_pyproject_metadata`
   was written to catch after `2.37.0`. Both now read `3.1.0`.
 
 ## [3.0.0]
@@ -383,7 +606,7 @@ by moving from 4.0.0 to 4.1.0.
 
 ### Added
 
-- **CCT (`adaptix_contracts.cct`) — blood-product chain-of-custody and infusion-run
+- **CCT (`adaptix_contracts.cct`) â€” blood-product chain-of-custody and infusion-run
   contracts required by the CCT service (Play P05).** The existing CCT surface
   already covered mission, equipment loadout, extended vitals (which absorb
   ventilator/IABP/ECMO in-transit parameters), CAMTS checklist and physician
@@ -391,22 +614,22 @@ by moving from 4.0.0 to 4.1.0.
   in the CCT play spec are now shared here rather than re-invented per
   consumer:
 
-  - `BloodProduct` — a single unit carried on a mission with unit id / ISBT
+  - `BloodProduct` â€” a single unit carried on a mission with unit id / ISBT
     128 code / product code, ABO group + Rh, expiration, issuing facility,
-    lifecycle `BloodProductStatus` (`issued` → `accepted` → `infused` /
+    lifecycle `BloodProductStatus` (`issued` â†’ `accepted` â†’ `infused` /
     `returned` / `wasted`), and two append-only sub-records: `ColdChainReading`
     (temperature log, one entry per reading, with an evaluated
     `within_tolerance` flag) and `CustodyEvent` (transfer of custody with
-    releasing party, accepting party, witness — matching the two-person
+    releasing party, accepting party, witness â€” matching the two-person
     verification AABB standards require at issue and infusion). Waste requires
     a `waste_reason`; expiration is required (a unit with no expiration cannot
     legitimately be transported).
-  - `InfusionRun` — a single running infusion with drug (+ optional RxNorm
+  - `InfusionRun` â€” a single running infusion with drug (+ optional RxNorm
     RXCUI), concentration as numerator (`concentration_amount` /
     `concentration_amount_unit`) over denominator (`concentration_volume_ml`),
     programmed rate (`rate_amount` / `rate_amount_unit`), optional VTBI and
     weight-normalized dosing weight, line/pump identity, `InfusionRunStatus`
-    lifecycle (`ordered` → `running` → `paused` / `completed` /
+    lifecycle (`ordered` â†’ `running` â†’ `paused` / `completed` /
     `discontinued`), and the two-clinician witness field for high-alert
     infusions.
 
@@ -415,7 +638,7 @@ by moving from 4.0.0 to 4.1.0.
 
   The CCT addition itself is additive only: no existing CCT symbol is renamed,
   moved, or has its shape changed. **But 2.37.0 as a whole is not a safe
-  drop-in** — it also carries the money/controlled-substance `Decimal`
+  drop-in** â€” it also carries the money/controlled-substance `Decimal`
   migration below, which changes the JSON wire type on read. Consumers moving
   to 2.37.0 must handle that change.
 
@@ -466,27 +689,27 @@ by moving from 4.0.0 to 4.1.0.
 
   The gateway-v1 shared HMAC secret is held by every service that verifies
   gateway-v1 contexts, so any one of them could mint itself a forever-valid
-  identity — including `is_founder` and arbitrary roles/entitlements — that
+  identity â€” including `is_founder` and arbitrary roles/entitlements â€” that
   every consumer running `TRUST_MODE_HMAC` or `TRUST_MODE_DUAL` accepted.
   Revocation could not reach it: the freshness window was the only bound on a
   signed context and that window was unbounded by construction.
 
   `_verify_replay_window` now rejects, before consulting the clock at all:
 
-  - `exp < iat` — a malformed or hostile window; and
-  - `exp - iat > _MAX_CONTEXT_LIFETIME_SECONDS` (300s) — an over-long lifetime.
+  - `exp < iat` â€” a malformed or hostile window; and
+  - `exp - iat > _MAX_CONTEXT_LIFETIME_SECONDS` (300s) â€” an over-long lifetime.
 
   Both checks are clock-independent, so an over-long context is refused
   regardless of when it is presented. 300s matches Core's own verifier constant
   (`core_app.auth.gateway_context._MAX_CONTEXT_LIFETIME_SECONDS`).
 
-  Landed in #208, which did not carry a version bump — the fixed and unfixed
+  Landed in #208, which did not carry a version bump â€” the fixed and unfixed
   trees therefore both reported `2.35.0` and a consumer could not tell from the
   version which one it had resolved. **2.36.0 exists to make that distinguishable
   and is the first version string that guarantees the cap is present.** Pin
   `>= 2.36.0` (or the 2.36.0 commit) to depend on it.
 
-  **Compatibility:** every Adaptix producer already mints well inside the cap —
+  **Compatibility:** every Adaptix producer already mints well inside the cap â€”
   `Adaptix-Gateway` `app/services/auth_context.py` `CONTEXT_TTL_SECONDS = 60`
   with no call site overriding it. A consumer moving to 2.36.0 rejects only
   contexts whose issued lifetime exceeds 300s, which no legitimate producer
@@ -508,27 +731,27 @@ by moving from 4.0.0 to 4.1.0.
 
   `OverflowError` is not a `ValueError`, so the guard around that cast did not
   catch it. It escaped `verify_gateway_signature`, passed every caller's
-  `except GatewaySignatureError`, and surfaced as a **500 instead of a 401** —
+  `except GatewaySignatureError`, and surfaced as a **500 instead of a 401** â€”
   the same failure class as 2.34.0, reached by a different route.
 
   `NaN` was NOT part of that crash: `int(float("nan"))` raises `ValueError`,
   which the existing guard already caught correctly. It is rejected here anyway
   because `NaN` in any claim OTHER than `exp`/`iat` decodes cleanly and then
-  makes every comparison against it silently return `False` — including
+  makes every comparison against it silently return `False` â€” including
   equality with itself. That is the general reason the fix belongs at the
   decode boundary rather than at one cast.
 
   Rejected at the decode boundary via `json.loads(parse_constant=...)`, so
   these values cannot reach *any* claim rather than being defended against one
-  cast at a time — the next consumer to cast a claim should not have to
+  cast at a time â€” the next consumer to cast a claim should not have to
   rediscover this. `OverflowError` is also added to the caught tuple at the
   cast itself, which is now unreachable but is the load-bearing conversion.
 
   **Found by migrating Core-Service onto this verifier**, specifically by
   writing a regression test to answer a static-analysis claim that delegation
-  had dropped Core's `user_id`/`tenant_id` checks. It had not —
+  had dropped Core's `user_id`/`tenant_id` checks. It had not â€”
   `_verify_identity_claims` enforces both unconditionally on the gateway-v1 and
-  gateway-v2 paths alike — but proving it empirically surfaced this. Covered by
+  gateway-v2 paths alike â€” but proving it empirically surfaced this. Covered by
   `tests/test_gateway_verifier_malformed_input.py` (PR #206).
 
   No behaviour change for legitimate traffic: every rejection added here was
@@ -543,24 +766,24 @@ by moving from 4.0.0 to 4.1.0.
   header carries a byte above `0x7F`. Two places in the verifier crashed on
   that rather than rejecting it:
 
-  - `hmac.compare_digest` raises `TypeError` — not a verification failure —
+  - `hmac.compare_digest` raises `TypeError` â€” not a verification failure â€”
     when either argument is a `str` containing a non-ASCII character;
   - both schemes encode the context as ASCII, raising `UnicodeEncodeError`.
 
   Neither is a `GatewaySignatureError`, so both escaped the contract every
   caller relies on. A caller that catches `GatewaySignatureError` and answers
   401 instead saw a bare exception propagate, which FastAPI turns into a **500
-  — on every gateway-authenticated route, from an unauthenticated request**.
+  â€” on every gateway-authenticated route, from an unauthenticated request**.
 
   The context is now validated as ASCII once, before scheme dispatch (covering
   gateway-v1 and gateway-v2 alike), and the HMAC path validates that the
   signature is a hex digest before `compare_digest` is reached. Both produce
-  the ordinary `GatewaySignatureError` → 401.
+  the ordinary `GatewaySignatureError` â†’ 401.
 
   **Found by migrating Core-Service onto this verifier.** Core had already hit
   this defect in its own verifier copy and fixed it there; the canonical
   verifier never had, so adopting it fleet-wide would have reintroduced the
-  crash everywhere Core had closed it — including in services that had already
+  crash everywhere Core had closed it â€” including in services that had already
   adopted it. Covered by `tests/test_gateway_verifier_malformed_input.py`.
 
   No legitimate traffic is affected: a valid hex digest still verifies in
@@ -581,8 +804,8 @@ by moving from 4.0.0 to 4.1.0.
     so a **gateway-v2 context could not select a public key** and was pinned to
     the legacy HMAC path;
   - it gated verification on `ADAPTIX_GATEWAY_SHARED_SECRET` alone, so a
-    service holding only the public keyset — the state rollout step 3 creates
-    by withdrawing the shared secret — answered **503 on every gated route**.
+    service holding only the public keyset â€” the state rollout step 3 creates
+    by withdrawing the shared secret â€” answered **503 on every gated route**.
 
   Together these made the gate the component that would have broken the fleet
   by following the migration's own instructions. It now forwards the key id and
@@ -600,7 +823,7 @@ by moving from 4.0.0 to 4.1.0.
 - **`GatewayClaims` no longer claims to be the only context producer.** Its
   docstring said it "is the only way to mint a context under either scheme".
   The gateway has always built its own payload and always emits the full claim
-  set — including `is_founder: false`, `session_jti` and `module_entitlements`,
+  set â€” including `is_founder: false`, `session_jti` and `module_entitlements`,
   which `GatewayClaims` either omits when falsy or does not model at all. The
   two payload shapes are **not** interchangeable and a context minted by one is
   not byte-compatible with the other; only the signing SCHEME is shared.
@@ -617,7 +840,7 @@ by moving from 4.0.0 to 4.1.0.
   `AdaptixErrorEnvelope` could receive a domain code it cannot handle. `mypy`
   reported this on `main` for both files.
 
-  Fixed by extracting `AdaptixErrorEnvelopeBase` — every field except
+  Fixed by extracting `AdaptixErrorEnvelopeBase` â€” every field except
   `error_code`, plus the factory helpers and `to_http_response`. Each concrete
   envelope now declares its own `error_code`, making the domain envelopes
   SIBLINGS of `AdaptixErrorEnvelope` rather than subclasses. `mypy` is clean
@@ -625,16 +848,16 @@ by moving from 4.0.0 to 4.1.0.
 
   The two obvious alternatives were rejected deliberately. Widening
   `AdaptixErrorEnvelope.error_code` would silence the checker but make **every**
-  service's envelope accept Edge and QA codes at runtime — Pydantic validates
-  from the annotation — which weakens validation platform-wide and inverts the
+  service's envelope accept Edge and QA codes at runtime â€” Pydantic validates
+  from the annotation â€” which weakens validation platform-wide and inverts the
   import direction. Converting Edge and QA to the separate-field pattern the
-  other seven subclasses use (`hydrant_error_code`, `mih_error_code`, …) would
+  other seven subclasses use (`hydrant_error_code`, `mih_error_code`, â€¦) would
   change the serialized `error_code` value on a published wire contract.
 
   **Behavior preserved, and verified rather than asserted.** The observable
   shape of all three classes was dumped before and after and diffed. Field set,
-  required/optional state, annotations, values, factory helpers, and — the one
-  that matters — which code families each class ACCEPTS and REJECTS are all
+  required/optional state, annotations, values, factory helpers, and â€” the one
+  that matters â€” which code families each class ACCEPTS and REJECTS are all
   identical. The platform envelope still refuses Edge and QA codes, which is the
   assertion that distinguishes this fix from the widening alternative.
 
@@ -652,13 +875,13 @@ by moving from 4.0.0 to 4.1.0.
 
 - **Issuer-bound asymmetric gateway trust (D-053).** The gateway's symmetric
   HMAC signing key was distributed to every verifying service, so a signature
-  proved only possession of a fleet-wide secret — never gateway identity.
+  proved only possession of a fleet-wide secret â€” never gateway identity.
   Compromise of any single service yielded the ability to mint arbitrary
   contexts, including `is_founder=true`, accepted by every other service.
   Trust now rests on Ed25519: the gateway alone holds the private key
   (`ADAPTIX_GATEWAY_SIGNING_PRIVATE_KEY` + `_SIGNING_KEY_ID`); services hold
   only a public JWKS (`ADAPTIX_GATEWAY_PUBLIC_KEYS`) selected by `kid`, with
-  active+previous rotation. `ADAPTIX_GATEWAY_TRUST_MODE` (`hmac` → `dual` →
+  active+previous rotation. `ADAPTIX_GATEWAY_TRUST_MODE` (`hmac` â†’ `dual` â†’
   `asymmetric`) gates scheme selection; a v2 context is never verified by HMAC
   and no request header can downgrade a verifier.
 - **Mandatory production audience pin (D-034).** Exact audience enforcement was
@@ -676,12 +899,12 @@ by moving from 4.0.0 to 4.1.0.
   Cortex Live demo claims added in 2.30.0. Because gateway-v2 is the only
   producer path in asymmetric mode, those claims became unmintable at
   migration: `is_founder`/`mfa_verified` degrade closed, but `is_demo` degrades
-  **open** — a Cortex Live demo session would silently become an ordinary
+  **open** â€” a Cortex Live demo session would silently become an ordinary
   session, losing the demo side-effect policy that keeps it inside its leased
   tenant. Each claim is emitted only when set, so a context that does not use
   them is byte-identical to one minted before this change. `validated()` now
-  mirrors the verifier's demo rules exactly (founder — by flag *or* by a
-  `founder` role — rejected alongside demo; session/lease must be UUIDs;
+  mirrors the verifier's demo rules exactly (founder â€” by flag *or* by a
+  `founder` role â€” rejected alongside demo; session/lease must be UUIDs;
   persona non-empty; demo detail without `is_demo` rejected) so a producer
   mistake fails at signing instead of becoming an opaque 401 storm downstream.
 - **`get_auth_context` could not verify a gateway-v2 context at all.** The
@@ -695,10 +918,10 @@ by moving from 4.0.0 to 4.1.0.
   inside `verify_gateway_signature`. Production with a signature and no
   verification material still fails closed with 503.
 
-### Changed — one deliberate behavior change, stated plainly
+### Changed â€” one deliberate behavior change, stated plainly
 
 `get_auth_context` now reads and forwards `X-Adaptix-Auth-Key-Id`. This is
-required — without it no gateway-v2 context can be verified at all — but it has
+required â€” without it no gateway-v2 context can be verified at all â€” but it has
 one observable consequence that is NOT a no-op, so it is recorded here rather
 than left to be discovered:
 
@@ -709,20 +932,20 @@ key-id header is therefore now **rejected** (401) on an `hmac`-mode service,
 where before it verified and passed.
 
 This is deliberate and in the safe direction. Claiming v2 can only ever force
-*stricter* verification, never weaker — that is the property that guarantees no
+*stricter* verification, never weaker â€” that is the property that guarantees no
 header downgrades a verifier. Verified against a real request: a v1 context with
 `auth_path=gateway-v1` or `None` and no key-id still passes unchanged; only the
-stray-header case changes. Nothing emits that header today — no service holds
-public keys and the gateway does not sign v2 yet — so no live traffic is
+stray-header case changes. Nothing emits that header today â€” no service holds
+public keys and the gateway does not sign v2 yet â€” so no live traffic is
 affected at the time of release.
 
 ### Rollout
 
-Ordered, and the order matters — step 3 is safe only from 2.31.0 onward:
+Ordered, and the order matters â€” step 3 is safe only from 2.31.0 onward:
 
 1. Generate the keypair; private key into Secrets Manager, referenced by the
    **gateway task definition only**; publish the public JWKS fleet-wide.
-2. Services move `hmac` → `dual` automatically on receiving the keyset (unset
+2. Services move `hmac` â†’ `dual` automatically on receiving the keyset (unset
    `ADAPTIX_GATEWAY_TRUST_MODE` resolves to `dual` when public keys are
    present, `hmac` when they are not). The gateway begins signing v2.
 3. Flip services to `asymmetric`, then remove `ADAPTIX_GATEWAY_SHARED_SECRET`
@@ -731,7 +954,7 @@ Ordered, and the order matters — step 3 is safe only from 2.31.0 onward:
 **Adoption prerequisite:** every service must carry
 `ADAPTIX_GATEWAY_EXPECTED_AUDIENCE` naming its own audience *before* it
 upgrades to 2.31.0. The pin is mandatory in production and fails closed, and it
-resolves from that environment variable only — there is no fallback source.
+resolves from that environment variable only â€” there is no fallback source.
 
 ## [2.30.0]
 
@@ -743,7 +966,7 @@ resolves from that environment variable only — there is no fallback source.
   header path always yields non-demo defaults, so no raw header can grant
   demo status. A signed context with `is_demo=true` but malformed
   session/lease UUIDs, an empty persona, or founder privilege is rejected
-  with 401 — never silently downgraded to an ordinary token.
+  with 401 â€” never silently downgraded to an ordinary token.
 - **`demo_contracts.DemoSideEffectClass`** (`read` / `local_demo_write` /
   `sandbox_external` / `production_external`) plus
   `demo_side_effect_allowed(...)` implementing the platform-default demo
@@ -751,7 +974,7 @@ resolves from that environment variable only — there is no fallback source.
   their leased tenant, reach provider sandboxes only when explicitly
   configured, and never trigger production-external side effects.
 
-(Entries for 2.17.0–2.29.1 were not recorded when those versions shipped;
+(Entries for 2.17.0â€“2.29.1 were not recorded when those versions shipped;
 see git history for those releases.)
 
 ## [2.16.0]
@@ -767,16 +990,16 @@ see git history for those releases.)
   every previously-published tag, and re-aligned this changelog header
   and the "current package version" note.
 
-### Added — carried forward from the original 2.15.0 (necessity) entry
+### Added â€” carried forward from the original 2.15.0 (necessity) entry
 
 ### Added
 
-- **necessity subpackage (`adaptix_contracts.necessity`)** — canonical
+- **necessity subpackage (`adaptix_contracts.necessity`)** â€” canonical
   contracts for the **Play P02 pre-submit medical-necessity linter** that
   runs at the ePCR chart-lock boundary before a claim is dropped to the
   clearinghouse.
   - Models: `NecessityAssessment`, `NecessityFinding`, `DenialPrediction`,
-    `LcdRule`, `PayerDenialPattern` — with model-level invariants
+    `LcdRule`, `PayerDenialPattern` â€” with model-level invariants
     (`verdict` must match findings; `denial_count`/`sample_size` must equal
     `historical_denial_rate`; observation-window `end` must be on or after
     `start`; monetary amounts are USD **cents** as `int`, never floats).
@@ -803,7 +1026,7 @@ see git history for those releases.)
 
 - **docuseal_contracts:** `DocuSealPackageCreateRequest`, `DocuSealPackageResponse`
   are non-canonical and deprecated. **TrustSign is the only active AdaptixCore
-  electronic-signature authority** — this is platform law, independently
+  electronic-signature authority** â€” this is platform law, independently
   enforced in Adaptix-Governance (`registries/providers.yml` `trustsign`
   entry), Adaptix-Gateway (`README.md` "Does NOT own": *"TrustSign is the
   only AdaptixCore e-signature system. Do not treat Dropbox Sign or DocuSeal
@@ -825,13 +1048,13 @@ see git history for those releases.)
     `Adaptix-EPCR-Service`) all found **zero** imports of
     `docuseal_contracts`, `DocuSealPackageCreateRequest`, or
     `DocuSealPackageResponse`. Notably, the standalone
-    `Adaptix-DocuSeal-Service` does not consume these contracts either — it
+    `Adaptix-DocuSeal-Service` does not consume these contracts either â€” it
     defines and uses its own local `backend/app/schemas/docuseal_package.py`.
   - Per `DEPRECATION_POLICY.md`: the import path is preserved, both models
     remain fully functional and exported through `schemas.__all__` and the
-    package root (no API-surface removal — this is an announcement, not a
+    package root (no API-surface removal â€” this is an announcement, not a
     breaking change), and a `DeprecationWarning` now fires on
-    **instantiation** of either model (not on import — `docuseal_contracts`
+    **instantiation** of either model (not on import â€” `docuseal_contracts`
     is eagerly imported by `adaptix_contracts.schemas`, so a module-level
     warning would have fired for all 26 pinned consumer repos on every
     `import adaptix_contracts` regardless of whether they use DocuSeal;
@@ -848,7 +1071,7 @@ see git history for those releases.)
 
 ## [2.9.0]
 
-### Added — canonical billing-vendor migration contracts
+### Added â€” canonical billing-vendor migration contracts
 
 New module `adaptix_contracts/schemas/migration_contracts.py` (+36 public
 exports: 23 models, 6 enums, 3 constants, 3 field-type aliases, 1 pure
@@ -856,14 +1079,14 @@ function). Purely additive; no existing symbol changed, renamed, or removed.
 
 The migration subsystem in `Adaptix-Billing-Service` is real and running, but at
 `origin/main` (read 2026-08-16) it defines **zero `Enum` classes** and carries
-five mutually disjoint bare-string status vocabularies —
+five mutually disjoint bare-string status vocabularies â€”
 `BillingMigrationJob.status`
 (`backend/billing_app/services/migration/migration_service.py:31`, dict keys
 only), `MigrationIntake.status` and `ImportBatch.status`
 (`backend/billing_app/models/migration_imports.py:30, :48`),
 `CommercialInquiry` "migration" status (declared nowhere, hardcoded in
 `backend/billing_app/api/migration.py:150`), and `CortexWhispererRun.status`
-(`backend/billing_app/models/migration_whisperer.py:29`) — plus three
+(`backend/billing_app/models/migration_whisperer.py:29`) â€” plus three
 orthogonal axes (`mapping_state`, `commit_status`, `cortex_status`). None of
 those legacy vocabularies is removed or renamed here; they remain their own
 tables' persisted values. This module adds the canonical cross-service
@@ -878,7 +1101,7 @@ Added surface:
   are a contract requirement: at
   `backend/billing_app/api/migration_intelligence_routes.py:715` the live commit
   endpoint assigns `job.status = "completed"` on a job created at `"pending"`
-  (`:192`) — an illegal jump under that service's own `_VALID_TRANSITIONS`,
+  (`:192`) â€” an illegal jump under that service's own `_VALID_TRANSITIONS`,
   whose guard `update_migration_status`
   (`services/migration/migration_service.py:65`) has **zero callers**. A UI
   button must never be able to advance state. The guard fails CLOSED on any
@@ -909,17 +1132,17 @@ Added surface:
   `OpenARActivated`, `MigrationCompleted`, `MigrationRolledBack`. `tenant_id` is
   REQUIRED on every one (the Core relay refuses tenant-less events); every other
   field is optional so a producer that has not yet collected a fact emits a
-  valid event instead of raising inside a consumer's `except` — the exact defect
+  valid event instead of raising inside a consumer's `except` â€” the exact defect
   recorded for `epcr.chart.finalized` in 2.5.0 above.
 
 Money is **signed integer cents declared `strict`**, so a float is rejected
-rather than coerced — `100.0` is refused as firmly as `100.5`, because a lax
+rather than coerced â€” `100.0` is refused as firmly as `100.5`, because a lax
 `int` field accepts a zero-fraction float and that is how a rounding defect
 enters a financial migration unnoticed. This matches the persisted reality:
 every money column on the migration path is `BigInteger` cents
 (`models/migration_staging.py:80-82, 132-133, 189`;
 `models/migration_imports.py:134`) with no `Numeric` and no `Float`.
-`difference_cents` is deliberately unconstrained in sign — production below
+`difference_cents` is deliberately unconstrained in sign â€” production below
 source is the direction that loses an agency money and must be representable.
 `VendorProfileRef.vendor` reuses the existing `MigrationSourceVendor` enum
 rather than duplicating it; Stedi remains the only live clearinghouse.
@@ -950,36 +1173,36 @@ real, terminals empty, no self-edges, every state reachable from `DRAFT`,
 rollback unreachable before cutover), float rejection on all 14 money fields, and
 `tenant_id` on all 13 events.
 
-### Changed — the legacy shared-queue hard break moved to `3.0.0`
+### Changed â€” the legacy shared-queue hard break moved to `3.0.0`
 
 `EventBusPublisherClient.LEGACY_SHARED_QUEUE_REMOVAL_VERSION` said `"2.9.0"`,
 and `README.md` plus `event_consumers.py` promised the omitted-consumer hard
 break would land in that release. It did **not** land in 2.9.0, and it should
 not have been targeted there: rejecting a previously accepted call narrows
 accepted values, which `DEPRECATION_POLICY.md` reserves for a **major** release.
-The constant and both prose sites now name `3.0.0`. No behavior changed —
+The constant and both prose sites now name `3.0.0`. No behavior changed â€”
 omitting `consumer` still works and still emits `FutureWarning`.
 
 ## [2.8.0]
 
-### Added — `EpcrBillingSnapshot` transport, insurance, and certification blocks
+### Added â€” `EpcrBillingSnapshot` transport, insurance, and certification blocks
 
 `EpcrBillingSnapshot` gains three OPTIONAL sub-models (additive, minor-safe;
 legacy payloads without them still validate):
 
-- `EpcrBillingTransportBlock` (`snapshot.transport`) — origin/destination/
+- `EpcrBillingTransportBlock` (`snapshot.transport`) â€” origin/destination/
   mileage/service-type facts the EPCR producer has ALWAYS emitted under the
   snapshot's `"transport"` key (`ChartBillingReadinessExport`,
   `chart_finalization_service.py` `_collect_billing_snapshot`). The field was
   missing from the typed model, so `model_validate` silently discarded it and
-  Billing never received origin, destination, or transport distance — the
+  Billing never received origin, destination, or transport distance â€” the
   facts required to price and modifier-code a ground transport claim. Raw
   NEMSIS strings; `transport_distance_miles` is deliberately NOT coerced.
-- `EpcrBillingInsuranceBlock` (`snapshot.insurance`) — NEMSIS ePayment.09–.22
-  / .57–.60 payer + subscriber facts persisted in `epcr_chart_payment`.
+- `EpcrBillingInsuranceBlock` (`snapshot.insurance`) â€” NEMSIS ePayment.09â€“.22
+  / .57â€“.60 payer + subscriber facts persisted in `epcr_chart_payment`.
   Absence means undocumented, never "uninsured", and never verified coverage.
-- `EpcrBillingCertificationBlock` (`snapshot.certification`) — ePayment PCS /
-  medical-necessity / prior-authorization facts (ePayment.02–.07, .44–.54)
+- `EpcrBillingCertificationBlock` (`snapshot.certification`) â€” ePayment PCS /
+  medical-necessity / prior-authorization facts (ePayment.02â€“.07, .44â€“.54)
   that gate non-emergency submission under 42 CFR 410.40(e).
 
 Producers: Adaptix-EPCR-Service (emits `transport` today; `insurance` and
@@ -990,13 +1213,13 @@ compatibility and the exact producer shapes.
 
 ## [2.5.0]
 
-### Fixed — `epcr.chart.finalized` rejected every payload its producer sends
+### Fixed â€” `epcr.chart.finalized` rejected every payload its producer sends
 
 `EpcrChartFinalizedEvent` declared `is_nemsis_compliant: bool` with no default.
 The authoritative producer,
 `Adaptix-EPCR-Service/backend/epcr_app/chart_finalization_service.py:260`
 (origin/main, read 2026-08-09), writes a payload of exactly
-`chart_id, tenant_id, call_number, finalized_at, billing_case_id, record_mode` —
+`chart_id, tenant_id, call_number, finalized_at, billing_case_id, record_mode` â€”
 and the string `is_nemsis_compliant` occurs nowhere in that service.
 
 The sole consumer,
@@ -1025,7 +1248,7 @@ required-field version) and redeploy.
 
 ## [2.4.0]
 
-### Fixed — 30 more live event types were invisible to the producer audit
+### Fixed â€” 30 more live event types were invisible to the producer audit
 
 The 2.3.0 audit only resolved a **literal** `event_type=` written directly on a
 shared-envelope construction. Adaptix producers routinely do neither: they write
@@ -1036,28 +1259,28 @@ construction site, so the scanner walked straight past them and reported PASS.
 `scripts/audit_event_producer_drift.py` now also resolves module-level string
 constants, both branches of a conditional, every value a function-local can
 hold, calls through an envelope-forwarding wrapper (bare, `Class.helper(...)`
-and `self.helper(...)`), and rows written to a **declared outbox relay** — each
+and `self.helper(...)`), and rows written to a **declared outbox relay** â€” each
 relay listed with the exact `file:line` of the worker that proves it. Resolved
 production emission sites went from 38 to 74, exposing **30 unregistered event
 types** that reach cross-service consumers today:
 
-- via `ChartEventOutbox` → `Adaptix-EPCR-Service/backend/epcr_app/outbox_worker.py:99`
+- via `ChartEventOutbox` â†’ `Adaptix-EPCR-Service/backend/epcr_app/outbox_worker.py:99`
   (`source_service="epcr"`): `epcr.chart.amended`, `epcr.chart.billing_handoff`,
   `epcr.nemsis_submit.failed`, `epcr.nemsis_submit.succeeded`, the six
   `caregraph.*`, the six `cpae.*` and the seven `vas.*` events
 - via the vision-capture publish wrapper
   (`chart_vision_capture_service.py:728`, `source_service="epcr"`): the five
   `epcr.vision.*` events and `hospital.cath_lab.activate_recommended`
-- via `OutboxEvent` →
+- via `OutboxEvent` â†’
   `Adaptix-Patient-Identity-Service/.../outbox_worker.py:88`:
   `patient.identity.merged`
 
 All 30 are registered with the `source_service` their producer actually stamps
 and an in-source producing `file:line` citation, enforced by
 `INDIRECT_ENVELOPE_PRODUCERS` in `tests/test_event_producer_registry_drift.py`.
-Registry size: 85 → 115 event types.
+Registry size: 85 â†’ 115 event types.
 
-### Fixed — a live producer's `source_service` resolved to no service
+### Fixed â€” a live producer's `source_service` resolved to no service
 
 `Adaptix-Patient-Identity-Service/.../outbox_worker.py:88` stamps
 `source_service="patient_identity"` (underscore), but the service-registry slug
@@ -1068,13 +1291,13 @@ slug. It is deliberately separate from `LEGACY_SOURCE_SERVICE_ALIASES`: a legacy
 alias still reports as drift (a producer emitting a superseded string is worth
 surfacing), a live-producer alias does not.
 
-### Fixed — the test suite could validate an installed copy, not this checkout
+### Fixed â€” the test suite could validate an installed copy, not this checkout
 
 `tests/` has no `__init__.py` and `pyproject.toml` set no `pythonpath`, so
 running the repo's own gate (`scripts/local-ci.sh python pr`, which invokes the
 `pytest` console script) under an interpreter with an older `adaptix-contracts`
 in site-packages imported THAT package. The suite then measured code that is not
-in the working tree — green while the source is broken, red while it is correct.
+in the working tree â€” green while the source is broken, red while it is correct.
 `pythonpath = ["."]` now pins resolution to the checkout, and
 `tests/test_suite_tests_this_checkout.py` fails if the setting is removed.
 
@@ -1084,17 +1307,17 @@ Neither the audit nor these tests validate event PAYLOAD shape. Both shared
 envelopes carry `payload: dict[str, Any]`, so producer/consumer payload
 compatibility remains unguarded by contract. A fully dynamic re-publisher such
 as `Adaptix-Audit-Service/backend/audit_app/events/publisher.py:67` also stays
-out of scope by design — its caller chooses the event type.
+out of scope by design â€” its caller chooses the event type.
 
 ## [2.3.0]
 
-### Fixed — event registry was out of sync with its live producers
+### Fixed â€” event registry was out of sync with its live producers
 
 `events/registry.ALL_EVENTS` is the allow-list behind `is_registered()` and
 `events/operational_envelope.assert_event_type_registered()`. A workspace audit
 (`scripts/audit_event_producer_drift.py`, run 2026-08-09 across 92 sibling
 repos) found 38 production sites constructing a shared contract envelope with a
-literal `event_type`, of which **18 event types were unregistered** — so the
+literal `event_type`, of which **18 event types were unregistered** â€” so the
 allow-list returned `False` for real production traffic:
 
 - `billing.claim.created`, `billing.claim.status_changed`,
@@ -1116,7 +1339,7 @@ citation, enforced by `tests/test_event_producer_registry_drift.py`.
 has a producer. Collapsing them is a Fire-domain decision, so both remain and
 the divergence is documented in `events/registry.py`.
 
-### Changed — `source_service` is one vocabulary: the service-registry slug
+### Changed â€” `source_service` is one vocabulary: the service-registry slug
 
 64 of the 67 previously registered events stamped `source_service` values
 (`adaptix-fire`, `adaptix-neris`, `adaptix-scheduling`) that are **not**
@@ -1128,9 +1351,9 @@ could perform it. All entries now use the slug, matching both the producers and
 the `source_service` semantics `events/operational_envelope.py` already
 documented. `adaptix-fire` / `adaptix-neris` remain valid JWT audiences in
 `service_audiences` and ECS service names in `platform/ownership_manifest.json`
-— those are separate namespaces and are unchanged.
+â€” those are separate namespaces and are unchanged.
 
-### Added — shipped producer resolution and drift detection
+### Added â€” shipped producer resolution and drift detection
 
 - `events.registry.resolve_source_service(source_service)` and
   `events.registry.producer_of(event_type)` return the `ServiceDefinition` for
@@ -1139,7 +1362,7 @@ documented. `adaptix-fire` / `adaptix-neris` remain valid JWT audiences in
 - `events.registry.LEGACY_SOURCE_SERVICE_ALIASES` keeps the previously published
   `adaptix-`-prefixed strings resolvable for persisted event rows, EventBridge
   archive replays, and consumers pinned to an older `adaptix-contracts`.
-- `scripts/audit_event_producer_drift.py` — reusable polyrepo audit that AST-parses
+- `scripts/audit_event_producer_drift.py` â€” reusable polyrepo audit that AST-parses
   every shared-envelope construction and reports `UNREGISTERED`,
   `SOURCE_SERVICE_MISMATCH` and `UNRESOLVED_SOURCE_SERVICE`. Exit 0 clean, 1 on
   drift, 2 on misuse; `--json` for machine consumption.
@@ -1173,7 +1396,7 @@ producer and a consumer remains unguarded by contract.
 - Blank consumer names now raise `ValueError` instead of being treated like the
   legacy omitted-consumer path.
 
-### Added — canonical event-bus consumer registry
+### Added â€” canonical event-bus consumer registry
 
 - Added `adaptix_contracts.event_consumers` as the single import surface for the
   current audited Core fan-out consumer names:
@@ -1186,7 +1409,7 @@ producer and a consumer remains unguarded by contract.
   `adaptix-contracts` 2.9.0 will reject omitted consumer names instead of
   warning.
 
-### Added — EPCR submission event typing
+### Added â€” EPCR submission event typing
 
 - Added `EpcrNemsisSubmitSucceededEvent` for the producer-owned
   `epcr.nemsis_submit.succeeded` outbox payload emitted by
@@ -1194,7 +1417,7 @@ producer and a consumer remains unguarded by contract.
 - Exported the new typed schema from `adaptix_contracts.schemas` and added
   regression coverage that pins the exact required producer fields.
 
-### Added — canonical signup application-creation contract
+### Added â€” canonical signup application-creation contract
 
 - Added SignupApplicationCreateRequest and SignupApplicationCreateResponse for
   POST /api/v1/signup/applications.
@@ -1207,7 +1430,7 @@ producer and a consumer remains unguarded by contract.
 - Added regression coverage for schema generation, additive response fields,
   identifier equality, and idempotency-key validation.
 
-### Added — Canonical product/module identifier registry (`adaptix_contracts.module_registry`)
+### Added â€” Canonical product/module identifier registry (`adaptix_contracts.module_registry`)
 
 Single source of truth for Adaptix module ids. Five vocabularies for the same
 products had drifted while the runtime entitlement gate does exact normalized
@@ -1215,17 +1438,17 @@ string matching, so a tenant could pay for a module and still be denied it
 (e.g. Core `signup_pricing.py` sells `billing_automation`, but
 `Adaptix-Billing-Service/backend/billing_app/main.py:968` gates on `billing`).
 
-- `ModuleDefinition` — canonical id, display name, `aliases` (exact synonyms of
+- `ModuleDefinition` â€” canonical id, display name, `aliases` (exact synonyms of
   the same product), `implies` (a purchase that additionally grants a different
   module), `purchasable`, `audience`, and a `source` citation per entry.
-- `MODULE_REGISTRY` / `ALIAS_INDEX` / `RUNTIME_GATE_SLUGS` — validated at import
+- `MODULE_REGISTRY` / `ALIAS_INDEX` / `RUNTIME_GATE_SLUGS` â€” validated at import
   time (no duplicate canonical ids, no alias shadowing a canonical id, no
   dangling or self-referential `implies`, every live gate slug canonical).
 - `resolve_module_id`, `require_module_id`, `expand_entitlements`,
   `is_module_entitled`, `is_any_module_entitled`, `normalize_module_id`,
   `canonical_module_ids`, `purchasable_module_ids`.
 
-Canonical ids are the slugs the runtime already enforces — nothing
+Canonical ids are the slugs the runtime already enforces â€” nothing
 customer-visible is renamed. Resolution is strictly additive: `expand_entitlements`
 returns the caller's own normalized ids plus canonical plus implied, and passes
 unregistered ids through untouched, so anything entitled today stays entitled.
@@ -1234,7 +1457,7 @@ Covered by `tests/test_module_registry.py` (140 tests), which proves
 purchased => allowed and unpurchased => denied for every purchasable module id
 and every one of its sold spellings.
 
-### Added — Billing clearinghouse: Stedi webhook + retry-eligibility + operator-fallback (additive only)
+### Added â€” Billing clearinghouse: Stedi webhook + retry-eligibility + operator-fallback (additive only)
 
 Closes cross-repo contract drift from the merged billing/Stedi work by adding
 the request/response/enum contracts for three real endpoints in
@@ -1244,9 +1467,9 @@ paths, status codes, and value sets are cited in-line in
 
 - **`POST /api/v1/billing/webhooks/stedi`** (service source
   `backend/billing_app/api/webhooks_stedi.py`, commit `9ba5c6e2`, PR #541):
-  - `StediWebhookEventType` — KNOWN `detail-type` set
+  - `StediWebhookEventType` â€” KNOWN `detail-type` set
     (`transaction.processed.v2`, `file.delivered.v2`, `file.failed.v2`).
-  - `StediWebhookRequest` — EventBridge-shaped inbound envelope (`id` required,
+  - `StediWebhookRequest` â€” EventBridge-shaped inbound envelope (`id` required,
     `detail-type` read, extra fields persisted verbatim). Bearer auth is
     out-of-band, not a body field.
   - `StediWebhookAcceptedResponse` (202 new), `StediWebhookDuplicateResponse`
@@ -1272,12 +1495,12 @@ paths, status codes, and value sets are cited in-line in
   cross-repo error-envelope divergence for follow-up; no service behavior was
   altered by this contracts change.
 
-### Added — `SCHEDULING_SERVICE` registration (additive only)
+### Added â€” `SCHEDULING_SERVICE` registration (additive only)
 
 Phase 1 of the Workforce Scheduling directive, driven by
 `SCHEDULING_ARCHITECTURE_LOCK.md` section 3.3 (Adaptix-Governance).
 
-- **`adaptix_contracts.schemas.service_registry.SCHEDULING_SERVICE`** — new
+- **`adaptix_contracts.schemas.service_registry.SCHEDULING_SERVICE`** â€” new
   `ServiceDefinition` (name `Adaptix-Scheduling-Service`, slug `scheduling`,
   route_prefix `/api/v1/scheduling`, port `8046`), appended to `ALL_SERVICES` and
   therefore present in `SERVICE_BY_SLUG`. Closes the gap where 27 `schedule.*`
@@ -1287,11 +1510,11 @@ Phase 1 of the Workforce Scheduling directive, driven by
   (`Adaptix-Gateway/backend/app/config/routes.py:1830-1842`, audience
   `adaptix-labor`). No `Adaptix-Scheduling-Service` repository or ECS service
   exists. This entry declares contract-level ownership only.
-- **`adaptix_contracts/platform/ownership_manifest.json`** — new `scheduling`
+- **`adaptix_contracts/platform/ownership_manifest.json`** â€” new `scheduling`
   entry with `api_prefixes: ["/api/v1/scheduling"]` and all 27 `schedule.*`
   events in `owned_events`; `status: "declared_not_deployed"` with the runtime
   caveat recorded in `notes`.
-- **`adaptix_contracts.scheduling.ai.FatigueRiskScore`** — gains optional
+- **`adaptix_contracts.scheduling.ai.FatigueRiskScore`** â€” gains optional
   `risk_factors: list[str] = []`, `ai_generated: bool = False` and
   `supervisor_review_flag: bool = False`, carried over from
   `workforce.models.FatigueAssessment:49-54`. All optional with safe defaults, so
@@ -1309,26 +1532,26 @@ Phase 1 of the Workforce Scheduling directive, driven by
   `DEPRECATED_ENUM_REPLACEMENTS` (workforce_contracts, labor_contracts),
   `DEPRECATED_REPLACEMENTS` (workforce/models), and `PAYROLL_ONLY_SURFACE`
   (labor_contracts, naming the payroll surface that deliberately stays put).
-- **Tests** — `tests/test_scheduling_service_registration.py` (19 tests):
+- **Tests** â€” `tests/test_scheduling_service_registration.py` (19 tests):
   every `source_service` in `ALL_EVENTS` resolves to a registered
   `ServiceDefinition`; `service_registry` route prefixes match
   `ownership_manifest` `api_prefixes` per slug; deprecated names and their
   canonical replacements both resolve; legacy enum value sets are frozen.
 
-### Fixed — stale `narcotics` api_prefix in the ownership manifest
+### Fixed â€” stale `narcotics` api_prefix in the ownership manifest
 
 `ownership_manifest.json` listed only the singular `/api/v1/narcotic`. The
 gateway boundary-matches the **plural** `/api/v1/narcotics`
 (`Adaptix-Gateway/backend/app/config/routes.py:1849`), which is precisely why
 `Adaptix-Narcotics-Service/backend/core_app/main.py:40-62` aliases every singular
 router onto the plural namespace. `api_prefixes` is now
-`["/api/v1/narcotics", "/api/v1/narcotic"]` — plural first as the canonical
+`["/api/v1/narcotics", "/api/v1/narcotic"]` â€” plural first as the canonical
 externally routable prefix, singular retained because the service still serves
 it natively. No code change; manifest data only.
 
-### Known drift — recorded, not papered over
+### Known drift â€” recorded, not papered over
 
-- **`crew`** — `CREW_SERVICE` (slug `crew`, `/api/v1/crew`) has **no**
+- **`crew`** â€” `CREW_SERVICE` (slug `crew`, `/api/v1/crew`) has **no**
   `ownership_manifest.json` entry. The nearest entry, `crewlink`, declares
   `/api/v1/crewlink` and `canonical_repo: Adaptix-Crew-Service`, but the gateway
   routes `/api/v1/crewlink` to **CAD-Service** and comments that the
@@ -1342,7 +1565,7 @@ it natively. No code change; manifest data only.
   `telephony`, `labor`, and 29 newer domain services). Frozen in
   `_SLUGS_WITHOUT_MANIFEST_ENTRY` so the gap cannot grow silently.
 
-### BLOCKED — the model/enum consolidation itself is a major-version change
+### BLOCKED â€” the model/enum consolidation itself is a major-version change
 
 `SCHEDULING_ARCHITECTURE_LOCK.md` section 3.3 calls for deleting the duplicate
 models/enums in `schemas/workforce_contracts.py`, `schemas/labor_contracts.py`
@@ -1363,11 +1586,11 @@ downstream data migration:
 | `labor_contracts.AssignmentStatus` | `AssignmentStatus` | deletes `overridden` |
 | `labor_contracts.TradeStatus` | `SwapStatus` | deletes `proposed`, `accepted`, `completed` |
 | `WorkforceShiftContract` | `ShiftInstance` | drops `name`, `location`; adds 4 required fields |
-| `WorkforceShiftAssignmentContract` | `ShiftAssignment` | `user_id`→`person_id`; drops `role`; adds 4 required fields |
+| `WorkforceShiftAssignmentContract` | `ShiftAssignment` | `user_id`â†’`person_id`; drops `role`; adds 4 required fields |
 | `WorkforceAvailabilityContract` | `AvailabilityWindow` | recurring `day_of_week`+`time` cannot be expressed as an absolute `datetime` window |
-| `WorkforceTimeOffContract` | `TimeOffRequest` | `user_id`→`person_id`; `date`→`datetime`; adds 2 required fields |
-| `LaborShiftContract` | `ShiftInstance` | `str`→`UUID` ids; `"HH:MM"` str→`datetime` |
-| `LaborAssignmentContract` | `ShiftAssignment` | `str`→`UUID` ids; drops `slot_id`, `override_reason` |
+| `WorkforceTimeOffContract` | `TimeOffRequest` | `user_id`â†’`person_id`; `date`â†’`datetime`; adds 2 required fields |
+| `LaborShiftContract` | `ShiftInstance` | `str`â†’`UUID` ids; `"HH:MM"` strâ†’`datetime` |
+| `LaborAssignmentContract` | `ShiftAssignment` | `str`â†’`UUID` ids; drops `slot_id`, `override_reason` |
 
 `WorkforceReadinessContract` and `LaborEmployeeReadinessContract` have **no**
 canonical counterpart in `scheduling/models.py` and cannot be re-pointed at all.
@@ -1379,7 +1602,7 @@ downstream migration.
 
 ## [2.1.0] - 2026-07-14
 
-### Added — Telephony platform contracts (additive only)
+### Added â€” Telephony platform contracts (additive only)
 
 New shared module `adaptix_contracts.schemas.telephony_contracts` so
 `Adaptix-Telephony-Service`, `Adaptix-Web-App`, and `Adaptix-Founder-Service`
@@ -1405,7 +1628,7 @@ agree on the provider-agnostic telephony wire shapes and realtime event types.
 
 ## [2.0.0] - 2026-07-12
 
-### Removed — BREAKING: `TransactionSource.PLAID` enum member
+### Removed â€” BREAKING: `TransactionSource.PLAID` enum member
 
 Founder decision: Plaid is removed from the platform and replaced by SimpleFIN
 as the bank-feed ingestion provider. The `PLAID = "plaid"` member of
@@ -1420,7 +1643,7 @@ as the bank-feed ingestion provider. The `PLAID = "plaid"` member of
   `TransactionSource` is an independent hand-maintained TypeScript literal type.
   None of these are affected by this removal.)
 - **Replacement path:** A SimpleFIN-backed transaction source is the founder-
-  designated replacement. It is intentionally **not** added in this release —
+  designated replacement. It is intentionally **not** added in this release â€”
   introducing a new `SIMPLEFIN` member is a separate additive (minor) change to
   be coordinated with the Finance/SimpleFIN ingestion work.
 - **Downstream:** Consumers pinning `adaptix-contracts` must re-pin to `>=2.0.0`
@@ -1429,12 +1652,12 @@ as the bank-feed ingestion provider. The `PLAID = "plaid"` member of
 
 ## [1.6.0] - 2026-07-09
 
-### Added — ACIN (AdaptixCore Clinical Intelligence Narrative) shared contracts (additive only)
+### Added â€” ACIN (AdaptixCore Clinical Intelligence Narrative) shared contracts (additive only)
 
 New standalone subpackage `adaptix_contracts.acin` defining the canonical,
 versioned ACIN record surface consumed by EPCR, NEMSIS, Billing,
 Medical-Necessity, QA/QI, Legal, CMS-audit, AI-review, and Clinical-Decision-
-Support. Additive only — no existing field, model, or enum member was removed or
+Support. Additive only â€” no existing field, model, or enum member was removed or
 repointed, and the `schemas` surface is unchanged.
 
 - **acin.enums:** `ACINSection` (A-C-I-N-E-L-S, each with a `.letter`),
@@ -1442,19 +1665,19 @@ repointed, and the `schemas` surface is unchanged.
   `ACINReviewStatus`, `ACINReviewSeverity`.
 - **acin.provenance:** `ACINSourceRef` (grounding primitive mirroring
   `ai.capabilities.AISourceField`), `ACINProvenanceMixin`, and `ACINClaimDTO`.
-  `ACINClaimDTO` fails closed — an `ai_generated` claim with zero
+  `ACINClaimDTO` fails closed â€” an `ai_generated` claim with zero
   `source_field_refs` is invalid (no fabrication).
 - **acin.sections:** the seven section DTOs `ACINActivationDTO`,
   `ACINClinicalPictureDTO`, `ACINIntelligenceDTO`, `ACINNarrativeDTO`,
   `ACINEvidenceDTO`, `ACINLogicDTO`, `ACINSummaryDTO`, plus sub-DTOs
   `ACINTimelineEntryDTO`, `ACINWitnessStatementDTO`, `ACINContradictionFlagDTO`
   (flagged, never resolved), `ACINConditionFlagsDTO`, `ACINDifferentialDTO`.
-- **acin.scores:** `ACINScoreSetDTO` — the 10 model-attributed scores
+- **acin.scores:** `ACINScoreSetDTO` â€” the 10 model-attributed scores
   (8 bounded 0-100 + contradictions/missing-elements counts).
 - **acin.reviews:** `ACINReviewDTO` and `ACINReviewFindingDTO` for the four
   Cortex review lenses (clinical/billing/qa/legal); reviews record
   `failed_unavailable` truthfully rather than stubbing completion.
-- **acin.record:** `ACINRecordDTO` — the full aggregation (7 sections + scores +
+- **acin.record:** `ACINRecordDTO` â€” the full aggregation (7 sections + scores +
   reviews) with `overall_ai_generated`/`requires_human_review` advisory guards.
 
 Contract-enforced non-negotiables: generated claims are grounded; AI content
@@ -1463,7 +1686,7 @@ narrative/summary are never authoritative truth.
 
 ## [1.5.0] - 2026-07-08
 
-### Added — shared-service contract consolidation (additive only)
+### Added â€” shared-service contract consolidation (additive only)
 
 Makes the six shared-service contract modules the canonical, versioned surface
 the shared services import (so service builds don't re-duplicate or drift).
@@ -1487,7 +1710,7 @@ or repointed.
   `NotificationSentEvent`, `NotificationReadEvent`. The str-typed
   `communications_contracts.NotificationRequest` and its
   `communications.notification.*` delivered/failed events are left unchanged and
-  documented as the dispatcher shape — the two are versioned side by side, not
+  documented as the dispatcher shape â€” the two are versioned side by side, not
   merged.
 - **reference_data_contracts:** canonical `PayerType` (union superset),
   `ServiceLevel`, and `StateCode` enums; CRUD/query/publish DTOs
@@ -1514,17 +1737,17 @@ or repointed.
   `CmsNpiSyncResult`), and `facility.*` events (`FacilityRegisteredEvent`,
   `FacilityUpdatedEvent`, `FacilityMergedEvent`).
 
-### Field-identity divergence — versioned, not unified (requires founder call)
+### Field-identity divergence â€” versioned, not unified (requires founder call)
 
 - **PayerType** has real member divergence across domains:
   `billing_contracts.PayerType` = {MEDICARE, MEDICAID, COMMERCIAL, SELF_PAY,
   OTHER}; `intake_contracts.PayerType` = {MEDICARE, MEDICAID, TRICARE,
   COMMERCIAL, SELF_PAY, WORKERS_COMP}. The new canonical
   `reference_data_contracts.PayerType` is the union superset. The two domain
-  enums are intentionally **not** repointed to it — selecting one authoritative
+  enums are intentionally **not** repointed to it â€” selecting one authoritative
   set for billing/intake to import is a founder/billing decision.
 
-### Added — service-separation contracts (additive only, from #94)
+### Added â€” service-separation contracts (additive only, from #94)
 
 - **cortex_contracts:** `RecommendationRequest`, `RecommendationResponse` for the
   separated Cortex recommendation service.
@@ -1541,23 +1764,23 @@ or repointed.
 
 ## [1.4.0] - 2026-07-03
 
-### Security — entitlement gate fail-closed (production)
+### Security â€” entitlement gate fail-closed (production)
 
 - **module_entitlement_gate:** a gateway signature that is PRESENT but cannot be
   verified because `ADAPTIX_GATEWAY_SHARED_SECRET` is not configured now returns
   **503 `gateway_secret_not_configured`** in production instead of silently
-  falling back to the unverified-bearer legacy path — same posture as
+  falling back to the unverified-bearer legacy path â€” same posture as
   `get_auth_context` behavior 3. Non-production keeps fail-open + CRITICAL log
-  (#86). Absent-signature bearer path, verified path, and tampered→401 are
+  (#86). Absent-signature bearer path, verified path, and tamperedâ†’401 are
   unchanged.
 
 ### Deprecated (import paths preserved until 2.0.0; emit DeprecationWarning)
 
 - `adaptix_contracts.security.auth_context` (`TenantAuthContext`,
-  `RolePermissionDecision`) — parallel auth-context model with zero consumers.
+  `RolePermissionDecision`) â€” parallel auth-context model with zero consumers.
   Replacement: `auth_contracts.AuthContext` (gateway edge) or
   `auth.context.AdaptixAuthContext` (JWT-payload model) (#87).
-- `adaptix_contracts.auth.rbac_dependencies` — never adopt: its
+- `adaptix_contracts.auth.rbac_dependencies` â€” never adopt: its
   `Depends()`-on-a-pydantic-model pattern sources identity from request data;
   its `require_module_entitlement` conflicts with the real gate; its
   `rbac_decorator` enforces nothing. Replacement: `get_auth_context` +
@@ -1566,7 +1789,7 @@ or repointed.
 
 ### Governance / packaging
 
-- CODEOWNERS rewritten to this repo's real layout — the shared auth trust files
+- CODEOWNERS rewritten to this repo's real layout â€” the shared auth trust files
   are now founder-review-protected once branch protection is enabled (#82).
 - Removed the committed salvaged-branch git bundle (content verified merged) (#83).
 - `uv.lock` synced to 1.4.0; `[project.urls]` repointed to the canonical
@@ -1577,40 +1800,40 @@ or repointed.
 
 ### Verified fleet rollout status (live ECS matrix, 2026-07-03)
 
-The fail-closed default keys off `ENVIRONMENT` ∈ {`production`, `prod`}.
+The fail-closed default keys off `ENVIRONMENT` âˆˆ {`production`, `prod`}.
 Live `aws ecs describe-task-definition` sweep of the `adaptix-production`
 cluster on 2026-07-03 showed:
 
 - **Arms on next rebuild (ENVIRONMENT set):** ai, air-pilot, assetops, bedrock,
   billing, communications, core, epcr, field, fire, gateway, hl7, hospital,
   telephony, voice. All of these carry `ADAPTIX_GATEWAY_SHARED_SECRET`
-  **except air-pilot** (owner: air lane — wire the secret with the pending
-  gateway route/CloudMap work or its first ≥1.4.0 rebuild 503s signed traffic).
+  **except air-pilot** (owner: air lane â€” wire the secret with the pending
+  gateway route/CloudMap work or its first â‰¥1.4.0 rebuild 503s signed traffic).
 - **fire** already runs `ADAPTIX_GATEWAY_HMAC_ENFORCE=true` (enforcement live);
   `fire_taskdef.tf` `ignore_changes` protects it from TF reverts.
-- **investor** lacks the shared secret (inert today — ENVIRONMENT unset).
-- **~45 other production services do NOT set `ENVIRONMENT`** — this package
+- **investor** lacks the shared secret (inert today â€” ENVIRONMENT unset).
+- **~45 other production services do NOT set `ENVIRONMENT`** â€” this package
   treats them as non-production (previous fail-open behavior) until each sets
   it. Fleet-wide `ENVIRONMENT=production` is a tracked follow-up hardening
   program; flipping it arms enforcement and must be per-service verified.
 
-**Per-service rebuild checklist (run at each service's first deploy on ≥1.4.0):**
+**Per-service rebuild checklist (run at each service's first deploy on â‰¥1.4.0):**
 
-1. Real user path through the gateway → 200.
+1. Real user path through the gateway â†’ 200.
 2. Forged `X-Is-Founder`/`X-User-Id`/`X-Tenant-Id` direct to the service (no
-   signature) → 401.
+   signature) â†’ 401.
 3. Logs: no unexpected `Missing gateway auth context signature` 401s from
-   legitimate callers, and no `503 … shared secret is not configured`.
+   legitimate callers, and no `503 â€¦ shared secret is not configured`.
 4. If a legitimate unsigned intra-VPC caller surfaces: set
    `ADAPTIX_GATEWAY_HMAC_ENFORCE=false` for that service, file the caller for
    gateway-fronting, and re-verify.
 
-### Security (BREAKING default in production — coordinate fleet rollout)
+### Security (BREAKING default in production â€” coordinate fleet rollout)
 
 - **APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST:** `get_auth_context` is now
   **fail-closed by default in production** for UNSIGNED requests. Previously,
   with `ADAPTIX_GATEWAY_HMAC_ENFORCE` unset, forged `X-User-Id` / `X-Tenant-Id`
-  / `X-Is-Founder` headers on an unsigned request were trusted — live-exploitable
+  / `X-Is-Founder` headers on an unsigned request were trusted â€” live-exploitable
   on ALB-direct routes that bypass the gateway. Now, when `ENVIRONMENT` is
   `production`/`prod`, an absent gateway signature returns **401** unless
   `ADAPTIX_GATEWAY_HMAC_ENFORCE` is EXPLICITLY set to a false-y value
@@ -1627,9 +1850,9 @@ cluster on 2026-07-03 showed:
   context's `aud` must match (401 on mismatch); no-op when unset. Enforced by
   `verify_gateway_signature`.
 - **Unchanged:** the verified-signature path (present signature + configured
-  secret → HMAC verify, replay window, identity-match, signed payload
+  secret â†’ HMAC verify, replay window, identity-match, signed payload
   authoritative for roles/email/founder) and the tampered/expired/identity-
-  mismatch → 401 behaviors are untouched.
+  mismatch â†’ 401 behaviors are untouched.
 
 **Rollout warning:** this is a fleet-wide behavior change. Before the fleet
 re-pins this Contracts version, every domain service that has a legitimate

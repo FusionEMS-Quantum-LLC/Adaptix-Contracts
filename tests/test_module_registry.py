@@ -165,7 +165,7 @@ def test_registry_covers_every_shipped_vocabulary_id() -> None:
 
 
 # ---------------------------------------------------------------------------
-# STEP 3 — purchased => allowed, unpurchased => denied, for EVERY purchasable id
+# STEP 3 â€” purchased => allowed, unpurchased => denied, for EVERY purchasable id
 # ---------------------------------------------------------------------------
 
 
@@ -205,7 +205,7 @@ def test_unpurchased_module_is_denied(canonical_id: str, spelling: str) -> None:
     """A tenant that did not buy the module is denied under every spelling.
 
     The "other tenant" holds every purchasable module EXCEPT this one and
-    everything that implies it — so the denial is proven against a realistically
+    everything that implies it â€” so the denial is proven against a realistically
     large entitlement set, not against an empty list.
     """
     definition = MODULE_REGISTRY[canonical_id]
@@ -294,7 +294,7 @@ def test_implication_is_directional_not_symmetric() -> None:
 
 
 def test_expansion_never_drops_an_input_id() -> None:
-    """Resolution is strictly additive — anything entitled today stays entitled."""
+    """Resolution is strictly additive â€” anything entitled today stays entitled."""
     raw = ["billing_automation", "totally_unregistered_module", "EPCR", " cad "]
     expanded = expand_entitlements(raw)
     for value in raw:
@@ -339,7 +339,7 @@ def test_require_module_id_rejects_unknown_ids() -> None:
 # The defect class this guards against: a tenant pays for a module, Core mints
 # a JWT whose ``aud`` list does not cover that module's upstream service, and
 # the gateway answers 403 ``jwt_audience_mismatch`` on every request. The
-# module is billed and dark, and NOTHING fails — not a type check, not a unit
+# module is billed and dark, and NOTHING fails â€” not a type check, not a unit
 # test, not a health check, not a dashboard.
 #
 # RUNTIME-PROVEN in production 2026-08-04T14:18:47Z with a real agency_admin
@@ -361,7 +361,7 @@ def test_every_purchasable_module_resolves_to_at_least_one_audience() -> None:
     Failing here means someone added or changed a purchasable module without
     giving it an ``audience`` (or an ``implies`` that reaches one). Fix it by
     setting the audience the module's gateway ``RouteEntry`` declares in
-    ``Adaptix-Gateway/backend/app/config/routes.py`` — never by inventing one,
+    ``Adaptix-Gateway/backend/app/config/routes.py`` â€” never by inventing one,
     and never by adding the id to ``SOLD_WITHOUT_SERVICE_MAPPING`` to silence
     the test unless the owning service genuinely does not exist yet.
     """
@@ -371,7 +371,7 @@ def test_every_purchasable_module_resolves_to_at_least_one_audience() -> None:
         if not module_audiences(module_id)
     }
     assert dark <= SOLD_WITHOUT_SERVICE_MAPPING, (
-        "purchasable modules that resolve to ZERO service audiences — a tenant "
+        "purchasable modules that resolve to ZERO service audiences â€” a tenant "
         f"can be billed for these and reach nothing: {sorted(dark - SOLD_WITHOUT_SERVICE_MAPPING)}"
     )
 
@@ -398,25 +398,25 @@ def test_quarantined_modules_are_real_purchasable_ids_with_no_audience() -> None
     """``SOLD_WITHOUT_SERVICE_MAPPING`` must not accumulate stale entries.
 
     Once a quarantined SKU is given its audience, this fails until the id is
-    removed from the set — so the quarantine list can only shrink, never rot.
+    removed from the set â€” so the quarantine list can only shrink, never rot.
     """
     for module_id in SOLD_WITHOUT_SERVICE_MAPPING:
         assert module_id in MODULE_REGISTRY, (
             f"{module_id!r} is quarantined but is not a registered module"
         )
         assert MODULE_REGISTRY[module_id].purchasable, (
-            f"{module_id!r} is quarantined but is not purchasable — the "
+            f"{module_id!r} is quarantined but is not purchasable â€” the "
             "quarantine is only for SKUs a customer can be charged for"
         )
         assert not module_audiences(module_id), (
             f"{module_id!r} now resolves to "
-            f"{sorted(module_audiences(module_id))} — delete it from "
+            f"{sorted(module_audiences(module_id))} â€” delete it from "
             "SOLD_WITHOUT_SERVICE_MAPPING"
         )
 
 
 def test_every_declared_audience_is_a_known_live_service_audience() -> None:
-    """An audience the gateway does not know is unroutable — 403 for everyone."""
+    """An audience the gateway does not know is unroutable â€” 403 for everyone."""
     unknown = sorted(set(audience_map().values()) - KNOWN_SERVICE_AUDIENCES)
     assert not unknown, (
         f"module audiences absent from KNOWN_SERVICE_AUDIENCES: {unknown}"
@@ -428,13 +428,13 @@ def test_runtime_gated_modules_reach_the_service_that_gates_them() -> None:
 
     Otherwise the module gate can never even be evaluated: the gateway rejects
     the request on audience before the service sees it. This is precisely the
-    ``scheduling`` failure — Core gated on the module while the gateway refused
+    ``scheduling`` failure â€” Core gated on the module while the gateway refused
     the audience.
     """
     for slug in sorted(RUNTIME_GATE_SLUGS):
         assert module_audiences(slug), (
             f"{slug!r} is enforced by a live require_module_entitlement() call "
-            "but resolves to no audience — every request 403s at the gateway "
+            "but resolves to no audience â€” every request 403s at the gateway "
             "before the gate runs"
         )
 
@@ -459,11 +459,47 @@ def test_field_app_and_crewlink_reach_cad_service() -> None:
     assert module_audiences("field_app") == {"adaptix-cad"}
     assert module_audiences("mdt") == {"adaptix-cad"}
     assert module_audiences("crewlink") == {"adaptix-cad"}
-    # Reaching CAD's audience must not confer the CAD module itself — CAD
+    # Reaching CAD's audience must not confer the CAD module itself â€” CAD
     # mounts /api/v1/cad and /api/v1/mdt under
     # Depends(require_module_entitlement("cad")), which still applies.
     assert "cad" not in expand_entitlements(["mdt"])
     assert "cad" not in expand_entitlements(["crewlink"])
+
+
+def test_ai_reaches_the_cortex_ai_runtime() -> None:
+    """Pinned regression for the 2026-08-31 production failure.
+
+    Gateway ``RouteEntry(prefix="/api/v1/ai", audience="adaptix-ai")`` and its
+    entitlement middleware derives module id ``ai`` from that path, but no
+    module declared the ``adaptix-ai`` audience — so ``audience_map()`` never
+    emitted it and Core could not mint it for any non-founder token: every
+    /api/v1/ai request (including the workspace shell's
+    GET /api/v1/ai/cortex/health, measured with a Cortex Live demo session)
+    answered 403 jwt_audience_mismatch.
+    """
+    assert module_audiences("ai") == {"adaptix-ai"}
+    assert audience_map()["ai"] == "adaptix-ai"
+    # Holding ``ai`` confers reach to the AI runtime only — no other module,
+    # and no other module silently confers ``ai``.
+    assert expand_entitlements(["ai"]) == {"ai"}
+    assert "ai" not in expand_entitlements(["cortex", "bedrock", "intelligence"])
+
+
+def test_mih_reaches_the_mih_service_and_is_state_gated_by_its_canonical_id() -> None:
+    """The MIH entitlement id must be grantable (Core's MODULE_CATALOG derives
+    from ``canonical_module_ids()``), must reach the MIH service audience the
+    Gateway signs for /api/v1/mih, and must be exactly the string Core's
+    state_rules.py restricts per state — ``mih_community_paramedicine`` —
+    with ``mih`` (the route slug) as an alias, never the other way round."""
+    from adaptix_contracts.mih import MIH_ENTITLEMENT_ID, MIH_SERVICE_AUDIENCE
+
+    assert MIH_ENTITLEMENT_ID in canonical_module_ids()
+    assert module_audiences(MIH_ENTITLEMENT_ID) == frozenset({MIH_SERVICE_AUDIENCE})
+    assert resolve_module_id("mih") == MIH_ENTITLEMENT_ID
+    assert MODULE_REGISTRY[MIH_ENTITLEMENT_ID].purchasable is True
+    # Expansion keeps the input spelling and adds the canonical id (the
+    # registry never drops an input id), so membership is the contract.
+    assert MIH_ENTITLEMENT_ID in expand_entitlements(["mih"])
 
 
 def test_assetops_reaches_its_own_service() -> None:
@@ -488,7 +524,7 @@ def test_audience_map_is_consistent_with_the_registry() -> None:
 #
 # Core persists + mints the canonical module id (``patient_identity`` underscore,
 # ``integration`` singular); the owning service is slugged with the drifted
-# spelling (``patient-identity`` hyphen, ``integrations`` plural — see
+# spelling (``patient-identity`` hyphen, ``integrations`` plural â€” see
 # ``service_registry`` + the gateway ROUTE_TABLE), so a guard declared with the
 # service spelling denied an entitled tenant under exact match. These pin the
 # alias resolution so the drift cannot silently return.
@@ -523,7 +559,7 @@ def test_service_spelling_does_not_widen_entitlement(service_spelling: str) -> N
     # A tenant that holds only an unrelated module is still denied.
     assert is_module_entitled(service_spelling, ["core", "epcr"]) is False
     assert is_module_entitled(service_spelling, ["core"]) is False
-    # The drifted spelling never leaks into ``audience_map()`` keys — Core keys
+    # The drifted spelling never leaks into ``audience_map()`` keys â€” Core keys
     # ``_MODULE_TO_AUDIENCE`` by canonical id, so an alias key there would be a
     # dead audience row.
     assert service_spelling not in audience_map()
@@ -542,3 +578,18 @@ def test_facilities_reaches_its_own_service() -> None:
     # The drifted spellings a caller might send resolve to the same audience.
     assert module_audiences("facility") == {"adaptix-facilities"}
     assert module_audiences("facility_registry") == {"adaptix-facilities"}
+
+
+def test_rtc_reaches_its_own_service() -> None:
+    """The realtime room control plane gateway route is behind adaptix-rtc.
+
+    Regression pin for the gap this module row closes: the gateway already
+    routes /api/v1/rtc to its own upstream with audience ``adaptix-rtc``, and
+    ``adaptix-rtc`` was already in ``KNOWN_SERVICE_AUDIENCES`` -- but with no
+    module-registry row, ``audience_map()`` had no ``rtc`` key, so no tenant's
+    session (including a Cortex Live demo tenant) could ever carry the
+    ``adaptix-rtc`` audience, and every /api/v1/rtc request 403'd
+    jwt_audience_mismatch. Removing the ``rtc`` registry row turns this RED.
+    """
+    assert module_audiences("rtc") == {"adaptix-rtc"}
+    assert audience_map()["rtc"] == "adaptix-rtc"

@@ -317,7 +317,7 @@ class StediCreateEnrollmentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     payer_id: str = Field(..., min_length=1, max_length=80)
-    payer_name: Optional[str] = Field(None, max_length=200)
+    payer_name: Optional[str] = Field(default=None, max_length=200)
     transaction_types: list[StediEnrollmentTransactionType] = Field(..., min_length=1)
 
     @field_validator("payer_id")
@@ -367,8 +367,8 @@ class MigrationSourceClearinghouseSettingsUpdate(BaseModel):
     clearinghouse_vendor: MigrationSourceVendor = Field(
         default=MigrationSourceVendor.OFFICE_ALLY
     )
-    oa_sftp_username: Optional[str] = Field(None, max_length=200)
-    oa_tpid: Optional[str] = Field(None, max_length=50)
+    oa_sftp_username: Optional[str] = Field(default=None, max_length=200)
+    oa_tpid: Optional[str] = Field(default=None, max_length=50)
     oa_sftp_verified: bool = False
     edi_837p_enabled: bool = True
     edi_835_enabled: bool = True
@@ -419,7 +419,7 @@ class StediServiceLineOutcome(BaseModel):
     billed_cents: int = Field(..., ge=0)
     paid_cents: int = Field(..., ge=0)
     denied: bool = False
-    patient_responsibility_cents: int = Field(0, ge=0)
+    patient_responsibility_cents: int = Field(default=0, ge=0)
 
 
 class StediNormalizedArtifact(BaseModel):

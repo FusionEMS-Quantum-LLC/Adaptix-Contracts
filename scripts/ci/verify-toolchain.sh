@@ -29,6 +29,24 @@ if [[ -f pyproject.toml && -f uv.lock ]]; then
   uv run ruff format --check .
   uv run ruff check .
   uv run mypy .
+
+  # CONSUMER VIEW - the check the run above is structurally unable to perform.
+  #
+  # `uv run mypy .` loads `plugins = ["pydantic.mypy"]` from pyproject.toml.
+  # That plugin models Pydantic field specifiers correctly, including a
+  # POSITIONAL default such as `Field(1, ge=1)`, so it can never report the
+  # breakage such a default causes in the consumer repositories that do not
+  # enable the plugin - they fall back to PEP 681 dataclass_transform, which
+  # reads only `default=` / `default_factory=`, keeps the parameter REQUIRED,
+  # and fails on ordinary construction with `Missing named argument`.
+  #
+  # 503 such defaults across 42 files shipped fleet-wide (PR #273) with this
+  # gate green throughout. This second run type-checks the SHIPPED package the
+  # way a plugin-less consumer sees it. See mypy-consumer-view.ini for the
+  # full rationale and the one named exclusion it carries. Declaration sites
+  # are additionally covered by tests/test_field_defaults_are_keyword_only.py,
+  # which `uv run pytest` below executes.
+  uv run mypy --config-file mypy-consumer-view.ini adaptix_contracts
   uv run pytest
 
   # DEPRECATION_POLICY.md lists `python validate_contracts.py` under "Required

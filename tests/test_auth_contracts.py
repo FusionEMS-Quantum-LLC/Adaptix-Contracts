@@ -299,6 +299,41 @@ def test_from_token_payload_accepts_trusted_tenant_match() -> None:
     assert context.tenant_id == tenant_id
 
 
+def test_from_token_payload_treats_null_claim_lists_as_empty() -> None:
+    tenant_id = str(uuid4())
+    context = AdaptixAuthContext.from_token_payload(
+        {
+            "tenant_id": tenant_id,
+            "sub": str(uuid4()),
+            "session_id": str(uuid4()),
+            "roles": None,
+            "permissions": None,
+            "entitlements": None,
+            "modules_enabled": None,
+        }
+    )
+
+    assert context.role_set.roles == []
+    assert context.role_set.permissions == []
+    assert context.role_set.entitlements == []
+    assert context.tenant_context.modules_enabled == []
+    assert context.is_founder is False
+
+
+def test_from_token_payload_drops_null_role_entries() -> None:
+    tenant_id = str(uuid4())
+    context = AdaptixAuthContext.from_token_payload(
+        {
+            "tenant_id": tenant_id,
+            "sub": str(uuid4()),
+            "session_id": str(uuid4()),
+            "roles": ["agency_admin", None, 12, "  viewer  "],
+        }
+    )
+
+    assert [role.value for role in context.role_set.roles] == ["agency_admin", "viewer"]
+
+
 # ---------------------------------------------------------------------------
 # F-24: gateway HMAC signature verification tests.
 #

@@ -22,12 +22,18 @@ class PredictionResponse(BaseModel):
     """SageMaker prediction response."""
 
     prediction_type: str = Field(..., description="Type of prediction produced")
-    prediction_value: float | None = Field(None, description="Predicted value, if any")
-    confidence: float | None = Field(
-        None, description="Model confidence for the prediction"
+    prediction_value: float | None = Field(
+        default=None, description="Predicted value, if any"
     )
-    model_id: str | None = Field(None, description="Identifier of the model used")
-    model_version: str | None = Field(None, description="Version of the model used")
+    confidence: float | None = Field(
+        default=None, description="Model confidence for the prediction"
+    )
+    model_id: str | None = Field(
+        default=None, description="Identifier of the model used"
+    )
+    model_version: str | None = Field(
+        default=None, description="Version of the model used"
+    )
     data_used: list[str] = Field(
         default_factory=list, description="Feature elements used for the prediction"
     )

@@ -5,23 +5,39 @@ service (Inventory, Medications, or Narcotics).
 
 ## Phase 1: Contracts Integration (15 min)
 
-### 1.1 Copy RBAC Contracts
+### 1.1 Depend on the contracts package — never copy it
 
-```bash
-# In service repository root:
-cp ../Adaptix-Contracts/adaptix_contracts/rbac_contracts.py ./backend/
-cp ../Adaptix-Contracts/adaptix_contracts/core_service_integration.py ./backend/
-cp -r ../Adaptix-Contracts/adaptix_contracts/auth ./backend/auth_contracts/
+**Do not copy these files into your service.** `DEPRECATION_POLICY.md` lists
+"Divergent contract copies in sibling repositories" under **Forbidden
+changes**: a copied file stops receiving fixes the moment it is copied, and the
+two definitions then drift silently. An earlier revision of this template told
+services to `cp` `rbac_contracts.py`, `core_service_integration.py` and `auth/`
+into their own tree, and that instruction is why permission values are now
+hand-duplicated downstream instead of imported.
+
+Import them from the installed package instead:
+
+```python
+from adaptix_contracts.rbac_contracts import (
+    INVENTORY_PERMISSIONS,
+    MEDICATIONS_PERMISSIONS,
+    NARCOTICS_PERMISSIONS,
+)
 ```
 
 ### 1.2 Update service pyproject.toml
 
+Pin the contracts package to an exact commit, the way the rest of the fleet
+does. Do **not** use a bare lower bound such as `>=0.1.0` — this package makes
+breaking changes in major releases (see `DEPRECATION_POLICY.md`), so an
+unpinned floor lets an incompatible major resolve silently.
+
 ```toml
 [project]
 dependencies = [
-    "adaptix_contracts>=0.1.0",  # Add this
+    # Pin to the commit you validated against, not a floating range.
+    "adaptix-contracts @ git+https://github.com/FusionEMS-Quantum-LLC/Adaptix-Contracts.git@<commit-sha>",
     "httpx>=0.25.0",             # For Core Service client
-    "python-jose>=3.3.0",
     "fastapi>=0.104.0",
     ...
 ]

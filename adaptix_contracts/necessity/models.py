@@ -82,7 +82,7 @@ class LcdRule(BaseModel):
         description="Narrative/attestation elements the MAC requires on file",
     )
     source_url: Optional[str] = Field(
-        None, description="CMS Coverage Database URL for this LCD revision"
+        default=None, description="CMS Coverage Database URL for this LCD revision"
     )
 
     model_config = ConfigDict(from_attributes=True)
@@ -115,7 +115,8 @@ class PayerDenialPattern(BaseModel):
     cpt_code: str = Field(..., description="CPT/HCPCS code observed on the claim line")
     icd10_code: str = Field(..., description="Primary ICD-10-CM code observed")
     modifier: Optional[str] = Field(
-        None, description="Claim-line modifier if the pattern is modifier-scoped"
+        default=None,
+        description="Claim-line modifier if the pattern is modifier-scoped",
     )
     sample_size: int = Field(..., ge=1, description="Number of claims in the window")
     denial_count: int = Field(
@@ -174,7 +175,7 @@ class DenialPrediction(BaseModel):
     tenant_id: str
     chart_id: str = Field(..., description="ePCR chart the prediction is bound to")
     claim_line_id: Optional[str] = Field(
-        None,
+        default=None,
         description=(
             "Prospective claim-line identifier when the pre-submit linter "
             "runs against a drafted claim; None when running purely against "
@@ -195,7 +196,7 @@ class DenialPrediction(BaseModel):
         description="Line-level allowed amount at risk in USD cents (no floats)",
     )
     based_on_pattern_id: Optional[str] = Field(
-        None,
+        default=None,
         description=(
             "``PayerDenialPattern.pattern_id`` this prediction is grounded in. "
             "None only when the prediction comes from an LCD rule miss with "
@@ -238,20 +239,20 @@ class NecessityFinding(BaseModel):
     )
     message: str = Field(..., description="Human-readable message for the reviewer UI")
     cpt_code: Optional[str] = Field(
-        None, description="CPT/HCPCS the finding is anchored to"
+        default=None, description="CPT/HCPCS the finding is anchored to"
     )
     icd10_code: Optional[str] = Field(
-        None, description="ICD-10-CM the finding is anchored to"
+        default=None, description="ICD-10-CM the finding is anchored to"
     )
     lcd_id: Optional[str] = Field(
-        None, description="``LcdRule.lcd_id`` when the finding is LCD-grounded"
+        default=None, description="``LcdRule.lcd_id`` when the finding is LCD-grounded"
     )
     pattern_id: Optional[str] = Field(
-        None,
+        default=None,
         description="``PayerDenialPattern.pattern_id`` when pattern-grounded",
     )
     denial_prediction: Optional[DenialPrediction] = Field(
-        None,
+        default=None,
         description="Attached prediction when the finding forecasts a denial",
     )
     blocks_submission: bool = Field(
@@ -264,7 +265,7 @@ class NecessityFinding(BaseModel):
         ),
     )
     remediation_hint: Optional[str] = Field(
-        None,
+        default=None,
         description=(
             "Short reviewer-facing hint on what to fix, e.g. "
             "'Add signs/symptoms to justify BLS assessment' — plain English, "
@@ -295,7 +296,7 @@ class NecessityAssessment(BaseModel):
     tenant_id: str
     chart_id: str
     payer_id: Optional[str] = Field(
-        None,
+        default=None,
         description=(
             "Primary payer the assessment was scoped to when known at "
             "pre-submit; None during pre-billing chart lock when payer has "

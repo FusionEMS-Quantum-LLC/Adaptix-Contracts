@@ -79,30 +79,32 @@ class ContractSignatureEvent(BaseModel):
     timestamp: datetime = Field(..., description="Timestamp of the signature")
     contract_id: str = Field(..., description="ID of the contract document")
     signature_provider: str | None = Field(
-        None, description="Canonical signature provider used for this execution"
+        default=None, description="Canonical signature provider used for this execution"
     )
     signature_request_id: str | None = Field(
-        None, description="Provider request identifier for the signature packet"
+        default=None, description="Provider request identifier for the signature packet"
     )
     verification_id: str | None = Field(
-        None, description="Verification identifier for post-execution audits"
+        default=None, description="Verification identifier for post-execution audits"
     )
     contract_version: str | None = Field(
-        None, description="Executed document version identifier"
+        default=None, description="Executed document version identifier"
     )
     template_version: str | None = Field(
-        None, description="Template version used to render the signed artifact"
+        default=None, description="Template version used to render the signed artifact"
     )
     signed_document_hash: str | None = Field(
-        None, description="Stable hash of the finalized signed document"
+        default=None, description="Stable hash of the finalized signed document"
     )
     signer_ip_address: str | None = Field(
-        None, description="Signer source IP captured at execution time"
+        default=None, description="Signer source IP captured at execution time"
     )
     signer_user_agent: str | None = Field(
-        None, description="Signer user agent captured at execution time"
+        default=None, description="Signer user agent captured at execution time"
     )
-    metadata: dict[str, str] | None = Field(None, description="Additional metadata")
+    metadata: dict[str, str] | None = Field(
+        default=None, description="Additional metadata"
+    )
 
 
 class ContractAccessCheckRequest(BaseModel):
@@ -114,7 +116,7 @@ class ContractAccessCheckRequest(BaseModel):
     tenant_id: str = Field(..., description="Tenant ID")
     contract_type: ContractType = Field(..., description="Type of contract to check")
     required_status: ContractStatus = Field(
-        ContractStatus.COMPLETED,
+        default=ContractStatus.COMPLETED,
         description="Status required for access (defaults to COMPLETED)",
     )
 
@@ -129,6 +131,6 @@ class ContractAccessCheckResponse(BaseModel):
     contract_type: ContractType = Field(..., description="Type of contract checked")
     has_access: bool = Field(..., description="Whether tenant has access")
     current_status: ContractStatus | None = Field(
-        None, description="Current status of the contract"
+        default=None, description="Current status of the contract"
     )
-    reason: str | None = Field(None, description="Reason for access decision")
+    reason: str | None = Field(default=None, description="Reason for access decision")

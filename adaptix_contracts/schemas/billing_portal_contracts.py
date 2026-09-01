@@ -34,70 +34,70 @@ class UrgencyLevel(str, Enum):
 class BillingPriorityQueueSummary(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    new_intake_ready_count: Optional[int] = Field(None, ge=0)
-    blocked_claims_count: Optional[int] = Field(None, ge=0)
-    claim_defects_count: Optional[int] = Field(None, ge=0)
-    timely_filing_risk_count: Optional[int] = Field(None, ge=0)
+    new_intake_ready_count: Optional[int] = Field(default=None, ge=0)
+    blocked_claims_count: Optional[int] = Field(default=None, ge=0)
+    claim_defects_count: Optional[int] = Field(default=None, ge=0)
+    timely_filing_risk_count: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None
 
 
 class BillingBlockedClaimsSummary(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    total_blocked: Optional[int] = Field(None, ge=0)
+    total_blocked: Optional[int] = Field(default=None, ge=0)
     top_block_reasons: Optional[list[str]] = None
-    estimated_revenue_at_risk_cents: Optional[int] = Field(None, ge=0)
+    estimated_revenue_at_risk_cents: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None
 
 
 class BillingDenialQueueSummary(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    total_open_denials: Optional[int] = Field(None, ge=0)
-    high_value_denial_count: Optional[int] = Field(None, ge=0)
-    appeal_eligible_count: Optional[int] = Field(None, ge=0)
-    total_denied_revenue_cents: Optional[int] = Field(None, ge=0)
+    total_open_denials: Optional[int] = Field(default=None, ge=0)
+    high_value_denial_count: Optional[int] = Field(default=None, ge=0)
+    appeal_eligible_count: Optional[int] = Field(default=None, ge=0)
+    total_denied_revenue_cents: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None
 
 
 class BillingAgedARSummary(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    bucket_0_30_cents: Optional[int] = Field(None, ge=0)
-    bucket_31_60_cents: Optional[int] = Field(None, ge=0)
-    bucket_61_90_cents: Optional[int] = Field(None, ge=0)
-    bucket_91_120_cents: Optional[int] = Field(None, ge=0)
-    bucket_over_120_cents: Optional[int] = Field(None, ge=0)
-    total_ar_cents: Optional[int] = Field(None, ge=0)
-    recoverable_estimate_cents: Optional[int] = Field(None, ge=0)
+    bucket_0_30_cents: Optional[int] = Field(default=None, ge=0)
+    bucket_31_60_cents: Optional[int] = Field(default=None, ge=0)
+    bucket_61_90_cents: Optional[int] = Field(default=None, ge=0)
+    bucket_91_120_cents: Optional[int] = Field(default=None, ge=0)
+    bucket_over_120_cents: Optional[int] = Field(default=None, ge=0)
+    total_ar_cents: Optional[int] = Field(default=None, ge=0)
+    recoverable_estimate_cents: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None
 
 
 class BillingUnderpaymentSummary(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    total_underpayment_candidates: Optional[int] = Field(None, ge=0)
-    estimated_underpayment_cents: Optional[int] = Field(None, ge=0)
+    total_underpayment_candidates: Optional[int] = Field(default=None, ge=0)
+    estimated_underpayment_cents: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None
 
 
 class BillingPatientFinancialSummary(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    outstanding_balance_cents: Optional[int] = Field(None, ge=0)
-    payment_plans_active: Optional[int] = Field(None, ge=0)
-    disputes_open: Optional[int] = Field(None, ge=0)
-    statements_pending_delivery: Optional[int] = Field(None, ge=0)
+    outstanding_balance_cents: Optional[int] = Field(default=None, ge=0)
+    payment_plans_active: Optional[int] = Field(default=None, ge=0)
+    disputes_open: Optional[int] = Field(default=None, ge=0)
+    statements_pending_delivery: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None
 
 
 class BillingIntegrationHealthSummary(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    connectors_healthy: Optional[int] = Field(None, ge=0)
-    connectors_failing: Optional[int] = Field(None, ge=0)
-    webhook_failures_pending: Optional[int] = Field(None, ge=0)
-    credential_expiry_warnings: Optional[int] = Field(None, ge=0)
+    connectors_healthy: Optional[int] = Field(default=None, ge=0)
+    connectors_failing: Optional[int] = Field(default=None, ge=0)
+    webhook_failures_pending: Optional[int] = Field(default=None, ge=0)
+    credential_expiry_warnings: Optional[int] = Field(default=None, ge=0)
     mapping_drift_detected: Optional[bool] = None
     as_of: Optional[datetime] = None
 
@@ -107,8 +107,8 @@ class BillingOperatorSummary(BaseModel):
     unavailable_reason: Optional[str] = None
     operator_name: Optional[str] = None
     role: Optional[str] = None
-    claims_worked_today: Optional[int] = Field(None, ge=0)
-    revenue_touched_today_cents: Optional[int] = Field(None, ge=0)
+    claims_worked_today: Optional[int] = Field(default=None, ge=0)
+    revenue_touched_today_cents: Optional[int] = Field(default=None, ge=0)
     queue_pressure: Optional[str] = None
     recommended_next_action: Optional[str] = None
     as_of: Optional[datetime] = None
@@ -153,7 +153,7 @@ class ClaimReadinessSummary(BaseModel):
     is_billable: bool
     defects: list[ClaimDefect]
     urgency: UrgencyLevel
-    estimated_value_cents: Optional[int] = Field(None, ge=0)
+    estimated_value_cents: Optional[int] = Field(default=None, ge=0)
     evaluated_at: datetime
 
 
@@ -163,7 +163,7 @@ class ClaimIntakeRecord(BaseModel):
     encounter_date: Optional[str] = None
     transport_type: Optional[str] = None
     payer_name: Optional[str] = None
-    readiness_score: Optional[int] = Field(None, ge=0, le=100)
+    readiness_score: Optional[int] = Field(default=None, ge=0, le=100)
     urgency: UrgencyLevel
     status: str
     created_at: datetime
@@ -228,9 +228,9 @@ class DenialRootCauseSummary(BaseModel):
 class DenialRecoveryForecast(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    estimated_recoverable_cents: Optional[int] = Field(None, ge=0)
-    appeal_yield_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
-    high_confidence_count: Optional[int] = Field(None, ge=0)
+    estimated_recoverable_cents: Optional[int] = Field(default=None, ge=0)
+    appeal_yield_pct: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    high_confidence_count: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None
 
 
@@ -240,11 +240,11 @@ class DenialRecoveryForecast(BaseModel):
 class FounderTenantFinancialSummary(BaseModel):
     tenant_id: str
     tenant_name: str
-    total_charges_cents: Optional[int] = Field(None, ge=0)
-    total_paid_cents: Optional[int] = Field(None, ge=0)
-    outstanding_ar_cents: Optional[int] = Field(None, ge=0)
-    denial_rate_pct: Optional[float] = Field(None, ge=0.0, le=100.0)
-    recovery_opportunity_cents: Optional[int] = Field(None, ge=0)
+    total_charges_cents: Optional[int] = Field(default=None, ge=0)
+    total_paid_cents: Optional[int] = Field(default=None, ge=0)
+    outstanding_ar_cents: Optional[int] = Field(default=None, ge=0)
+    denial_rate_pct: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    recovery_opportunity_cents: Optional[int] = Field(default=None, ge=0)
     integration_health: Optional[str] = None
     as_of: Optional[datetime] = None
 
@@ -252,9 +252,9 @@ class FounderTenantFinancialSummary(BaseModel):
 class FounderBillingOverview(BaseModel):
     availability: SurfaceAvailability
     unavailable_reason: Optional[str] = None
-    total_tenants: Optional[int] = Field(None, ge=0)
-    tenants_with_ar_risk: Optional[int] = Field(None, ge=0)
-    total_recovery_opportunity_cents: Optional[int] = Field(None, ge=0)
-    total_integration_failures: Optional[int] = Field(None, ge=0)
-    migrations_in_progress: Optional[int] = Field(None, ge=0)
+    total_tenants: Optional[int] = Field(default=None, ge=0)
+    tenants_with_ar_risk: Optional[int] = Field(default=None, ge=0)
+    total_recovery_opportunity_cents: Optional[int] = Field(default=None, ge=0)
+    total_integration_failures: Optional[int] = Field(default=None, ge=0)
+    migrations_in_progress: Optional[int] = Field(default=None, ge=0)
     as_of: Optional[datetime] = None

@@ -76,8 +76,8 @@ class SearchQueryRequest(BaseModel):
         description="Key-value filters (e.g. status=denied, payer=medicare)",
     )
 
-    limit: int = Field(25, ge=1, le=100)
-    offset: int = Field(0, ge=0)
+    limit: int = Field(default=25, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
 
     sort_order: SearchSortOrder = SearchSortOrder.RELEVANCE
 

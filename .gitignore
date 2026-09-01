@@ -53,6 +53,9 @@ coverage.xml
 
 # Type checking
 .mypy_cache/
+# Cache for the plugin-less consumer-view run (mypy-consumer-view.ini).
+# Deliberately separate: mypy keys cache entries to the active option set.
+.mypy_cache_consumer_view/
 .dmypy.json
 dmypy.json
 .pytype/
@@ -80,3 +83,5 @@ pip-wheel-metadata/
 # under reports/ is still visible to git (repository-shape.yml requires narrow
 # rules and prohibits broad patterns that could hide legitimate source).
 /reports/toolchain-inventory.json
+Thumbs.db
+*.log

@@ -1,5 +1,24 @@
 """Adaptix auth context contracts."""
 
+from adaptix_contracts.auth.agency_roles import (
+    AGENCY_ROLE_VALUES,
+    PLATFORM_ONLY_ROLES,
+    AgencyRole,
+    PlatformOnlyRole,
+    is_agency_role,
+    is_platform_only,
+    normalize_role,
+)
+from adaptix_contracts.auth.permissions import (
+    CORE_ROLES_MANAGE,
+    CORE_USERS_MANAGE,
+    QA_PERMISSIONS,
+    QA_PROTOCOL_MANAGE,
+    QA_REVIEW,
+    QA_SUPERVISE,
+    WORKSPACE_ADMIN_ACCESS,
+    PermissionId,
+)
 from adaptix_contracts.auth.context import (
     AdaptixRole,
     AdaptixRoleSet,
@@ -13,6 +32,16 @@ from adaptix_contracts.auth.interoperability import (
     INTEROPERABILITY_IDENTITY_READ_SCOPE,
     INTEROPERABILITY_PAYLOAD_READ_SCOPE,
     INTEROPERABILITY_SCOPES,
+)
+from adaptix_contracts.auth.mailroom_permissions import (
+    MAILROOM_ADMIN,
+    MAILROOM_CANCEL,
+    MAILROOM_CERTIFIED_SEND,
+    MAILROOM_PERMISSIONS,
+    MAILROOM_READ,
+    MAILROOM_SEND,
+    MAILROOM_WRITE_PERMISSIONS,
+    mailroom_permissions_for_roles,
 )
 from adaptix_contracts.auth.module_entitlement_gate import (
     require_module_entitlement,
@@ -39,6 +68,21 @@ from adaptix_contracts.auth.service_token import (
 )
 
 __all__ = [
+    "AgencyRole",
+    "PlatformOnlyRole",
+    "AGENCY_ROLE_VALUES",
+    "PLATFORM_ONLY_ROLES",
+    "normalize_role",
+    "is_agency_role",
+    "is_platform_only",
+    "PermissionId",
+    "WORKSPACE_ADMIN_ACCESS",
+    "CORE_USERS_MANAGE",
+    "CORE_ROLES_MANAGE",
+    "QA_REVIEW",
+    "QA_SUPERVISE",
+    "QA_PROTOCOL_MANAGE",
+    "QA_PERMISSIONS",
     "AdaptixRole",
     "AdaptixRoleSet",
     "AdaptixTenantContext",
@@ -46,6 +90,14 @@ __all__ = [
     "AdaptixServiceContext",
     "AdaptixSignedInternalContext",
     "require_module_entitlement",
+    "MAILROOM_ADMIN",
+    "MAILROOM_CANCEL",
+    "MAILROOM_CERTIFIED_SEND",
+    "MAILROOM_PERMISSIONS",
+    "MAILROOM_READ",
+    "MAILROOM_SEND",
+    "MAILROOM_WRITE_PERMISSIONS",
+    "mailroom_permissions_for_roles",
     # Canonical interoperability S2S scopes.
     "INTEROPERABILITY_PAYLOAD_READ_SCOPE",
     "INTEROPERABILITY_IDENTITY_READ_SCOPE",

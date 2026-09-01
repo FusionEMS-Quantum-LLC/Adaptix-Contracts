@@ -116,6 +116,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-payments",
         "adaptix-policy",
         "adaptix-pricing",
+        "adaptix-qa",
         "adaptix-qhin",
         "adaptix-reference-data",
         "adaptix-rtc",
