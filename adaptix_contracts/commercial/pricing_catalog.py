@@ -452,13 +452,18 @@ def _validate_mechanic_shape(application: CommercialApplicationKey, entry: Appli
     else:  # pragma: no cover - exhaustiveness guard for future mechanics
         raise ValueError(f"{application.value}: unhandled mechanic {mechanic.value}")
 
-    if mechanic is not PricingMechanic.PER_UNIT_RATE_BY_BRACKET and entry.included_units:
+    if (
+        mechanic is not PricingMechanic.PER_UNIT_RATE_BY_BRACKET
+        and entry.included_units
+    ):
         raise ValueError(
             f"{application.value}: included_units is only meaningful for "
             f"{PricingMechanic.PER_UNIT_RATE_BY_BRACKET.value}"
         )
     if entry.included_units and entry.base_fee_monthly is None:
-        raise ValueError(f"{application.value}: included_units without base_fee_monthly makes no sense")
+        raise ValueError(
+            f"{application.value}: included_units without base_fee_monthly makes no sense"
+        )
 
 
 def validate_catalog(catalog: CommercialPricingCatalog) -> None:
@@ -472,7 +477,10 @@ def validate_catalog(catalog: CommercialPricingCatalog) -> None:
 
     missing = [key for key in CommercialApplicationKey if key not in catalog.entries]
     if missing:
-        raise ValueError("catalog is missing entries for: " + ", ".join(sorted(key.value for key in missing)))
+        raise ValueError(
+            "catalog is missing entries for: "
+            + ", ".join(sorted(key.value for key in missing))
+        )
 
     for key, entry in catalog.entries.items():
         if entry.application is not key:
@@ -480,7 +488,9 @@ def validate_catalog(catalog: CommercialPricingCatalog) -> None:
                 f"entries[{key.value!r}].application is {entry.application.value!r}, "
                 "not the mapping key it is stored under"
             )
-        if entry.module_canonical_id is not None and (entry.module_canonical_id not in MODULE_REGISTRY):
+        if entry.module_canonical_id is not None and (
+            entry.module_canonical_id not in MODULE_REGISTRY
+        ):
             raise ValueError(
                 f"{key.value}: module_canonical_id {entry.module_canonical_id!r} "
                 "is not a canonical id in module_registry.MODULE_REGISTRY"
@@ -491,8 +501,13 @@ def validate_catalog(catalog: CommercialPricingCatalog) -> None:
     for dependency in catalog.dependencies:
         if dependency.application in dependency.requires:
             raise ValueError(f"{dependency.application.value}: cannot require itself")
-        unknown = [required.value for required in dependency.requires if required not in catalog.entries]
+        unknown = [
+            required.value
+            for required in dependency.requires
+            if required not in catalog.entries
+        ]
         if unknown:
             raise ValueError(
-                f"{dependency.application.value}: requires unregistered application(s): " + ", ".join(sorted(unknown))
+                f"{dependency.application.value}: requires unregistered application(s): "
+                + ", ".join(sorted(unknown))
             )
