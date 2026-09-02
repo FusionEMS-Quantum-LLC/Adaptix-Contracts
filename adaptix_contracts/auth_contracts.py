@@ -252,12 +252,6 @@ def _parse_roles(raw: str | None) -> list[str]:
 
 
 async def get_auth_context(
-    # Injected by FastAPI from the annotation alone (the default is only for
-    # direct, non-HTTP callers such as the unit tests). It supplies the actual
-    # inbound method/path for the signed method/path binding check; a service
-    # that enables ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH fails closed when the
-    # request is unavailable.
-    request: Request = None,  # type: ignore[assignment]
     x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
     x_user_email: Annotated[str | None, Header(alias="X-User-Email")] = None,
@@ -275,6 +269,18 @@ async def get_auth_context(
     x_adaptix_auth_key_id: Annotated[
         str | None, Header(alias="X-Adaptix-Auth-Key-Id")
     ] = None,
+    # Injected by FastAPI from the annotation alone (the default is only for
+    # direct, non-HTTP callers such as the unit tests). It supplies the
+    # actual inbound method/path for the signed method/path binding check;
+    # a service that enables ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH fails
+    # closed when the request is unavailable. Placed LAST and typed
+    # ``Request | None`` (never a bare ``Request`` with a ``None`` default)
+    # so a caller invoking this dependency positionally -- e.g. in a
+    # non-HTTP unit test -- cannot accidentally bind an unrelated argument
+    # (such as a user id) to this parameter; every existing positional
+    # caller in this 50+-service library predates this parameter and passes
+    # fewer positional arguments than its new index.
+    request: Request | None = None,
 ) -> AuthContext:
     """FastAPI dependency: extract authenticated identity from API Gateway headers.
 
