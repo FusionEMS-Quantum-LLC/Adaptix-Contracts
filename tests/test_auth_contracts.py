@@ -1352,3 +1352,47 @@ def test_auth_context_demo_fields_default_for_existing_constructors() -> None:
     assert auth.demo_session_id is None
     assert auth.demo_lease_id is None
     assert auth.demo_persona is None
+
+
+def test_get_auth_context_passes_request_method_and_path_to_verifier(
+    monkeypatch,
+) -> None:
+    """The dependency hands the verifier the ACTUAL inbound method/path so the
+    signed method/path binding can be enforced (ledger item 1, gap 1)."""
+    from starlette.requests import Request as StarletteRequest
+
+    from adaptix_contracts import auth_contracts
+
+    captured: dict = {}
+
+    def fake_verify(**kwargs):
+        captured.update(kwargs)
+        return {"user_id": "u1", "tenant_id": "t1", "roles": [], "aud": "adaptix-core"}
+
+    monkeypatch.setattr(auth_contracts, "has_gateway_signature", lambda **_: True)
+    monkeypatch.setattr(auth_contracts, "gateway_shared_secret", lambda: "s3cret")
+    monkeypatch.setattr(auth_contracts, "verify_gateway_signature", fake_verify)
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/core/things",
+        "query_string": b"a=1",
+        "headers": [],
+    }
+    request = StarletteRequest(scope)
+    try:
+        asyncio.run(
+            auth_contracts.get_auth_context(
+                request=request,
+                x_user_id="u1",
+                x_tenant_id="t1",
+                x_adaptix_auth_context="ctx",
+                x_adaptix_auth_signature="sig",
+            )
+        )
+    except HTTPException:
+        # Identity/tenant post-checks may reject the stub payload; the verifier
+        # call itself is what this test pins.
+        pass
+    assert captured["request_method"] == "POST"
+    assert captured["request_path"] == "/api/v1/core/things"
