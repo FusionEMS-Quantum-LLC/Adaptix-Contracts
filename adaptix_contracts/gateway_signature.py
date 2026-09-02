@@ -687,7 +687,11 @@ def _normalize_path(path: str) -> str:
     side correct even for a caller that passes a raw ``PATH_INFO``-style
     value that has not been through that framework).
     """
-    return path.split("?", 1)[0].split("#", 1)[0]
+    bare = path.split("?", 1)[0].split("#", 1)[0]
+    # Producer and consumer frameworks may disagree on a trailing slash
+    # (redirect_slashes, mounted routers); both sides are compared after the
+    # same normalization so that difference can never fail a genuine request.
+    return bare.rstrip("/") or "/"
 
 
 def _verify_method_path_binding(
@@ -721,28 +725,37 @@ def _verify_method_path_binding(
     """
     signed_method = payload.get("method")
     signed_path = payload.get("path")
-    carries_binding = signed_method is not None or signed_path is not None
     require = _require_path_binding()
-
-    if not carries_binding:
-        if require:
-            raise GatewaySignatureError(
-                f"{GATEWAY_SIGNATURE_REQUIRE_PATH_ENV} is enabled but the "
-                "signed context carries no method/path binding; the gateway "
-                "producer must be upgraded before this service can require it"
-            )
+    if signed_method is None and signed_path is None:
+        _reject_if_binding_required(
+            require, "the signed context carries no method/path binding"
+        )
         return
-
     if request_method is None or request_path is None:
         if require:
             raise GatewayVerifierConfigurationError(
                 f"{GATEWAY_SIGNATURE_REQUIRE_PATH_ENV} is enabled but this "
-                "verify_gateway_signature() call site did not supply "
-                "request_method/request_path to check the signed binding "
-                "against; wire the caller before enabling the flag"
+                "verifier was not given request_method/request_path to check "
+                "the signed binding against; pass the inbound request's method "
+                "and path"
             )
         return
+    _compare_method_path(signed_method, signed_path, request_method, request_path)
 
+
+def _reject_if_binding_required(require: bool, reason: str) -> None:
+    """Fail closed when the require-path flag is set but no binding is present."""
+    if require:
+        raise GatewaySignatureError(
+            f"{GATEWAY_SIGNATURE_REQUIRE_PATH_ENV} is enabled but {reason}; "
+            "the gateway producer must be upgraded before this service can require it"
+        )
+
+
+def _compare_method_path(
+    signed_method: Any, signed_path: Any, request_method: str, request_path: str
+) -> None:
+    """Compare signed method/path claims against the inbound request."""
     if not isinstance(signed_method, str) or not isinstance(signed_path, str):
         raise GatewaySignatureError(
             "context method/path claims are not strings — cannot verify binding"
@@ -752,11 +765,12 @@ def _verify_method_path_binding(
             f"signed method {signed_method!r} does not match request method "
             f"{request_method!r}"
         )
-    normalized_request_path = _normalize_path(request_path)
-    if signed_path != normalized_request_path:
+    normalized_signed = _normalize_path(signed_path)
+    normalized_request = _normalize_path(request_path)
+    if normalized_signed != normalized_request:
         raise GatewaySignatureError(
             f"signed path {signed_path!r} does not match request path "
-            f"{normalized_request_path!r}"
+            f"{normalized_request!r}"
         )
 
 
@@ -767,14 +781,20 @@ def _verify_method_path_binding(
 #: legitimate caller) cannot grow this dict without bound; hitting the cap
 #: fails closed (raises) rather than silently disabling replay tracking.
 _MAX_REPLAY_CACHE_ENTRIES = 50_000
+#: Expired entries are swept at most this often (or whenever the cache is
+#: full), so the O(N) sweep is not paid on every request under a global lock.
+_REPLAY_PRUNE_INTERVAL_SECONDS = 5
 _replay_seen: dict[str, int] = {}
 _replay_lock = threading.Lock()
+_replay_last_prune_at = 0
 
 
 def reset_gateway_replay_cache_for_tests() -> None:
     """Clear the replay cache. Test-only — production code never calls this."""
+    global _replay_last_prune_at
     with _replay_lock:
         _replay_seen.clear()
+        _replay_last_prune_at = 0
 
 
 def _prune_replay_cache_locked(now: int) -> None:
@@ -785,6 +805,14 @@ def _prune_replay_cache_locked(now: int) -> None:
     expired = [jti for jti, exp in _replay_seen.items() if exp < now]
     for jti in expired:
         del _replay_seen[jti]
+
+
+def _context_expiry(payload: dict[str, Any], now: int) -> int:
+    """The context's ``exp`` as an int, or ``now`` + clock skew when absent/invalid."""
+    try:
+        return int(payload["exp"])
+    except (KeyError, TypeError, ValueError):
+        return now + GATEWAY_CLOCK_SKEW_SECONDS
 
 
 def _check_and_record_replay(payload: dict[str, Any]) -> None:
@@ -806,14 +834,16 @@ def _check_and_record_replay(payload: dict[str, Any]) -> None:
         return
 
     now = int(time.time())
-    exp_raw = payload.get("exp")
-    try:
-        exp = int(exp_raw) if exp_raw is not None else now + GATEWAY_CLOCK_SKEW_SECONDS
-    except (TypeError, ValueError):
-        exp = now + GATEWAY_CLOCK_SKEW_SECONDS
+    exp = _context_expiry(payload, now)
 
+    global _replay_last_prune_at
     with _replay_lock:
-        _prune_replay_cache_locked(now)
+        if (
+            len(_replay_seen) >= _MAX_REPLAY_CACHE_ENTRIES
+            or now - _replay_last_prune_at >= _REPLAY_PRUNE_INTERVAL_SECONDS
+        ):
+            _prune_replay_cache_locked(now)
+            _replay_last_prune_at = now
         existing = _replay_seen.get(jti)
         if existing is not None and existing >= now:
             raise GatewaySignatureError(f"context jti {jti!r} already used (replay)")
