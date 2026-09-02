@@ -111,7 +111,8 @@ A captured, still-valid signed context could be replayed verbatim within its
 60-second TTL. :func:`verify_gateway_signature` now records each verified
 context's ``jti`` in a bounded, in-process cache (keyed by ``jti``, entries
 expire with the context's own ``exp``) and rejects a repeat. This is a FIRST
-LAYER, not a claim of exactly-once or global replay protection: the cache is
+LAYER, not a claim of exactly-once or global replay protection. It does not protect
+a horizontally-scaled service across instances: the cache is
 per-process, so a context replayed against a *different* instance of a
 horizontally-scaled service is not caught here. Closing that gap needs a
 shared store (e.g. Redis/DynamoDB) keyed the same way, which is out of scope
