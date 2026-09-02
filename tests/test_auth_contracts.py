@@ -1404,3 +1404,29 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
         pass
     assert captured["request_method"] == "POST"
     assert captured["request_path"] == "/api/v1/core/things"
+
+
+def test_get_auth_context_mounts_as_fastapi_dependency() -> None:
+    """Mounting the dependency must not turn the Request parameter into a
+    query field: every downstream service registers routes with
+    ``Depends(get_auth_context)`` and would fail at startup otherwise."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from adaptix_contracts.auth_contracts import get_auth_context
+
+    app = FastAPI()
+
+    @app.get("/probe")
+    async def probe(ctx=Depends(get_auth_context)):  # noqa: B008
+        return {"user_id": str(ctx.user_id)}
+
+    with TestClient(app) as client:
+        response = client.get("/probe")
+    # No identity headers -> the dependency's own 401, which proves the route
+    # registered and the Request was injected rather than parsed as a query.
+    assert response.status_code == 401
+    assert (
+        "request" not in response.text.lower()
+        or "Missing gateway identity" in response.text
+    )
