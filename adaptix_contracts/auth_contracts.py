@@ -70,7 +70,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Annotated
+from typing import cast, Annotated
 from uuid import UUID
 
 from fastapi import Header, HTTPException, Request, status
@@ -273,14 +273,16 @@ async def get_auth_context(
     # direct, non-HTTP callers such as the unit tests). It supplies the
     # actual inbound method/path for the signed method/path binding check;
     # a service that enables ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH fails
-    # closed when the request is unavailable. Placed LAST and typed
-    # ``Request | None`` (never a bare ``Request`` with a ``None`` default)
-    # so a caller invoking this dependency positionally -- e.g. in a
-    # non-HTTP unit test -- cannot accidentally bind an unrelated argument
-    # (such as a user id) to this parameter; every existing positional
-    # caller in this 50+-service library predates this parameter and passes
-    # fewer positional arguments than its new index.
-    request: Request | None = None,
+    # closed when the request is unavailable. Placed LAST so a caller invoking
+    # this dependency positionally (a non-HTTP unit test) cannot bind an
+    # unrelated argument to it. The annotation MUST stay the bare ``Request``
+    # class: FastAPI recognises the request-injection special case only by
+    # ``issubclass`` on the annotation, so ``Request | None`` is treated as a
+    # query parameter of type Request and fails app startup in every service
+    # that mounts this dependency (proven by
+    # test_get_auth_context_mounts_as_fastapi_dependency). The ``None``
+    # default is only for direct callers.
+    request: Request = cast(Request, None),
 ) -> AuthContext:
     """FastAPI dependency: extract authenticated identity from API Gateway headers.
 
