@@ -73,8 +73,14 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(var, raising=False)
     reset_public_keyset_cache()
     gateway_signature._WARN_ONCE["audience_unpinned"] = False
+    # This file signs several contexts with the fixed jti "jti-1" across
+    # different tests (see ``_claims``). The replay cache is process-global,
+    # so without a reset a successful verify in one test would make the SAME
+    # jti look like a replay in a later, independently-valid test.
+    gateway_signature.reset_gateway_replay_cache_for_tests()
     yield
     reset_public_keyset_cache()
+    gateway_signature.reset_gateway_replay_cache_for_tests()
 
 
 @pytest.fixture()
@@ -376,7 +382,11 @@ class TestRotation:
         for pem, kid in ((old_pem, KID), (new_pem, OTHER_KID)):
             monkeypatch.setenv(GATEWAY_SIGNING_PRIVATE_KEY_ENV, pem)
             monkeypatch.setenv(GATEWAY_SIGNING_KEY_ID_ENV, kid)
-            ctx, sig, used_kid = _sign_v2()
+            # Each loop iteration is a DIFFERENT, independently-valid request
+            # (old key, then new key) — give it its own jti so the replay
+            # check (a repeated jti within its TTL) does not mistake this
+            # rotation test for a captured-and-resent context.
+            ctx, sig, used_kid = _sign_v2(jti=f"jti-rotation-{kid}")
             assert used_kid == kid
             payload = verify_gateway_signature(
                 context_b64=ctx,

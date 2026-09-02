@@ -65,16 +65,72 @@ silently lost replay protection (D-034). It is now **mandatory in production**:
 :func:`assert_gateway_verifier_ready` fails startup/readiness when it is unset,
 and verification itself fails closed rather than degrading to a warning.
 Outside production an unset pin still warns once per process.
+
+Method/path binding (ledger item 1, gap 1)
+-------------------------------------------
+The signed payload did not originally bind the HTTP method and upstream path
+the gateway forwarded the context for, so a context minted for one route
+verified identically when replayed against any other route of the same
+audience/tenant/user (e.g. a signed context for ``GET /patients/{id}`` would
+also verify against ``DELETE /patients/{id}``). The gateway producer
+(``adaptix-gateway`` ``app/services/auth_context.py::sign_context``) now signs
+``method`` (upper-cased) and ``path`` (query string stripped) into the same
+payload. This module compares those claims — WHEN THE PAYLOAD CARRIES THEM —
+against the actual request the caller is verifying for, via the optional
+``request_method``/``request_path`` arguments to
+:func:`verify_gateway_signature`.
+
+Rollout is staged because producer and verifier deploy independently:
+
+1. Ship this Contracts release; repin every downstream service onto it.
+   Nothing changes yet — a caller that does not pass
+   ``request_method``/``request_path`` gets no binding check, and a payload
+   without the claims is accepted unchanged.
+2. Ship the Gateway producer change so every NEW signed context carries
+   ``method``/``path``. Still no enforcement — old and new payload shapes both
+   verify.
+3. Update each downstream call site to pass its own request's method/path
+   into :func:`verify_gateway_signature`, so the binding is actually checked
+   once claims are present.
+4. Only once every live caller does step 3, set
+   ``ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH=true`` on that service. From then
+   on a context without ``method``/``path`` claims, or a call site that does
+   not supply the actual request to compare against, fails closed
+   (:class:`GatewaySignatureError` / :class:`GatewayVerifierConfigurationError`
+   respectively) rather than silently skipping the check.
+
+The flag is per-service, defaults to **off**, and only governs how an ABSENT
+binding is treated. A payload that DOES carry ``method``/``path`` is always
+checked against the actual request when the caller supplies one — independent
+of the flag — because verifying a claim the payload already makes never
+widens what is accepted.
+
+Replay protection (ledger item 1, gap 2)
+-----------------------------------------
+A captured, still-valid signed context could be replayed verbatim within its
+60-second TTL. :func:`verify_gateway_signature` now records each verified
+context's ``jti`` in a bounded, in-process cache (keyed by ``jti``, entries
+expire with the context's own ``exp``) and rejects a repeat. This is a FIRST
+LAYER, not a claim of exactly-once or global replay protection. It does not protect
+a horizontally-scaled service across instances: the cache is
+per-process, so a context replayed against a *different* instance of a
+horizontally-scaled service is not caught here. Closing that gap needs a
+shared store (e.g. Redis/DynamoDB) keyed the same way, which is out of scope
+for this change. A context signed without a ``jti`` (pre-jti v1 producers)
+is not replay-tracked — there is nothing to key the cache on — exactly as
+:func:`_verify_identity_claims` already only requires ``jti`` on v2.
 """
 
 from __future__ import annotations
 
 import hashlib
+import heapq
 import hmac
 import json
 import logging
 import os
 import re
+import threading
 import time
 from typing import Any
 
@@ -108,6 +164,11 @@ _GATEWAY_ENV_PREFIX = "ADAPTIX_GATEWAY_"
 GATEWAY_SHARED_SECRET_ENV = _GATEWAY_ENV_PREFIX + "SHARED_SECRET"
 GATEWAY_EXPECTED_AUDIENCE_ENV = _GATEWAY_ENV_PREFIX + "EXPECTED_AUDIENCE"
 GATEWAY_TRUST_MODE_ENV = _GATEWAY_ENV_PREFIX + "TRUST_MODE"
+#: Makes the ``method``/``path`` binding claims mandatory when set truthy
+#: (``1``/``true``/``yes``/``on``, case-insensitive). Default OFF — see the
+#: "Method/path binding" section of the module docstring for the required
+#: rollout order before a service may set this.
+GATEWAY_SIGNATURE_REQUIRE_PATH_ENV = _GATEWAY_ENV_PREFIX + "SIGNATURE_REQUIRE_PATH"
 
 #: Name of the variable that declares the deployment environment. Production is
 #: the only value that makes the audience pin mandatory, so it is read here
@@ -613,6 +674,205 @@ def _verify_identity_claims(payload: dict[str, Any], *, is_v2: bool) -> None:
         raise GatewaySignatureError("gateway-v2 context missing required claim: 'jti'")
 
 
+def _require_path_binding() -> bool:
+    """Return whether ``ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH`` is set truthy."""
+    raw = os.environ.get(GATEWAY_SIGNATURE_REQUIRE_PATH_ENV, "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _normalize_path(path: str) -> str:
+    """Strip a query string and fragment from ``path`` for signed comparison.
+
+    Matches the producer's normalization (``request.url.path`` already
+    excludes the query string in Starlette, but a defensive strip keeps this
+    side correct even for a caller that passes a raw ``PATH_INFO``-style
+    value that has not been through that framework).
+    """
+    bare = path.split("?", 1)[0].split("#", 1)[0]
+    # Producer and consumer frameworks may disagree on a trailing slash
+    # (redirect_slashes, mounted routers); both sides are compared after the
+    # same normalization so that difference can never fail a genuine request.
+    return bare.rstrip("/") or "/"
+
+
+def _verify_method_path_binding(
+    payload: dict[str, Any],
+    *,
+    request_method: str | None,
+    request_path: str | None,
+) -> None:
+    """Enforce the signed ``method``/``path`` binding, when applicable.
+
+    See the "Method/path binding" section of the module docstring for the
+    full rollout contract. Summary:
+
+    * Payload carries neither claim: accepted unless
+      :func:`_require_path_binding` is true, in which case it fails closed —
+      the producer has not been upgraded yet but this service now demands it.
+    * Payload carries the claim(s) and the caller supplies
+      ``request_method``/``request_path``: always compared, regardless of the
+      flag — a claim the payload itself makes is never left unchecked.
+    * Payload carries the claim(s) but the caller supplies neither: accepted
+      when the flag is off (nothing to compare against yet); fails closed
+      when the flag is on, because the flag is the operator's declaration
+      that every call site has been wired to supply the real request.
+
+    Raises:
+        GatewaySignatureError: the signed method or path does not match the
+            actual request.
+        GatewayVerifierConfigurationError: the flag requires the binding but
+            either the payload was signed without it, or this call site does
+            not supply the actual request to check it against.
+    """
+    signed_method = payload.get("method")
+    signed_path = payload.get("path")
+    require = _require_path_binding()
+    if signed_method is None and signed_path is None:
+        _reject_if_binding_required(
+            require, "the signed context carries no method/path binding"
+        )
+        return
+    if request_method is None or request_path is None:
+        if require:
+            raise GatewayVerifierConfigurationError(
+                f"{GATEWAY_SIGNATURE_REQUIRE_PATH_ENV} is enabled but this "
+                "verifier was not given request_method/request_path to check "
+                "the signed binding against; pass the inbound request's method "
+                "and path"
+            )
+        return
+    _compare_method_path(signed_method, signed_path, request_method, request_path)
+
+
+def _reject_if_binding_required(require: bool, reason: str) -> None:
+    """Fail closed when the require-path flag is set but no binding is present."""
+    if require:
+        raise GatewaySignatureError(
+            f"{GATEWAY_SIGNATURE_REQUIRE_PATH_ENV} is enabled but {reason}; "
+            "the gateway producer must be upgraded before this service can require it"
+        )
+
+
+def _compare_method_path(
+    signed_method: Any, signed_path: Any, request_method: str, request_path: str
+) -> None:
+    """Compare signed method/path claims against the inbound request."""
+    if not isinstance(signed_method, str) or not isinstance(signed_path, str):
+        raise GatewaySignatureError(
+            "context method/path claims are not strings — cannot verify binding"
+        )
+    if signed_method.upper() != request_method.strip().upper():
+        raise GatewaySignatureError(
+            f"signed method {signed_method!r} does not match request method "
+            f"{request_method!r}"
+        )
+    normalized_signed = _normalize_path(signed_path)
+    normalized_request = _normalize_path(request_path)
+    if normalized_signed != normalized_request:
+        raise GatewaySignatureError(
+            f"signed path {signed_path!r} does not match request path "
+            f"{normalized_request!r}"
+        )
+
+
+#: Bounded in-process replay cache: ``jti`` -> the context's own ``exp``
+#: (unix seconds), so an entry is pruned once the context it guarded would
+#: have expired anyway. A hard cap on entry count exists so an attacker who
+#: can present many distinct signed contexts (e.g. from a genuinely high-QPS
+#: legitimate caller) cannot grow this dict without bound; hitting the cap
+#: fails closed (raises) rather than silently disabling replay tracking.
+#:
+#: Pruning is a min-heap of ``(exp, jti)`` ordered by expiry, NOT a scan of
+#: the dict. Codacy flagged the prior implementation for doing an O(N) scan
+#: of up to 50,000 entries under the global lock on every verification
+#: call — real lock-contention/DoS risk across the 50+ services sharing
+#: this library. A heap lets pruning touch only entries that have ACTUALLY
+#: expired, popping the front while it is stale, so the amortized cost per
+#: entry is one push (O(log n)) and at most one pop (O(log n)), each paid
+#: exactly once over that entry's life — never a full-cache walk. The dict
+#: and heap are kept 1:1 for every live jti: an unexpired jti is rejected
+#: as a replay before any push happens (see :func:`_check_and_record_replay`),
+#: and an expired jti is always popped and deleted before a new entry for
+#: the same jti is pushed, so no stale heap tuple can ever outlive the dict
+#: entry it was superseded by.
+_MAX_REPLAY_CACHE_ENTRIES = 50_000
+_replay_seen: dict[str, int] = {}
+_replay_expiry_heap: list[tuple[int, str]] = []
+_replay_lock = threading.Lock()
+
+
+def reset_gateway_replay_cache_for_tests() -> None:
+    """Clear the replay cache. Test-only — production code never calls this."""
+    with _replay_lock:
+        _replay_seen.clear()
+        _replay_expiry_heap.clear()
+
+
+def _prune_expired_locked(now: int) -> None:
+    """Pop and drop entries whose guarded context has already expired.
+
+    Caller must hold ``_replay_lock``. Only touches entries that are
+    actually expired — it stops the instant the heap's earliest expiry is
+    still in the future — so cost is bounded by how many entries expired
+    since the last call, never by how many live entries the cache holds.
+    """
+    while _replay_expiry_heap and _replay_expiry_heap[0][0] < now:
+        exp, jti = heapq.heappop(_replay_expiry_heap)
+        # The dict is authoritative. A popped tuple only matches a real,
+        # still-current entry when its exp is unchanged; a jti reused after
+        # its prior entry already expired carries its own newer heap tuple,
+        # so this stale one is simply discarded without touching the dict.
+        if _replay_seen.get(jti) == exp:
+            del _replay_seen[jti]
+
+
+def _context_expiry(payload: dict[str, Any], now: int) -> int:
+    """The context's ``exp`` as an int, or ``now`` + clock skew when absent/invalid."""
+    try:
+        return int(payload["exp"])
+    except (KeyError, TypeError, ValueError):
+        return now + GATEWAY_CLOCK_SKEW_SECONDS
+
+
+def _check_and_record_replay(payload: dict[str, Any]) -> None:
+    """Reject a context whose ``jti`` this process has already verified.
+
+    Only a FIRST layer — see the "Replay protection" section of the module
+    docstring for why this does not protect a horizontally-scaled service
+    across instances. A payload without a ``jti`` (pre-jti v1 producers) is
+    not tracked: there is nothing to key the cache on, and
+    :func:`_verify_identity_claims` already lets v1 through without one.
+
+    Raises:
+        GatewaySignatureError: this ``jti`` was already verified and has not
+            yet expired (replay), or the cache is full and cannot safely
+            record a new entry.
+    """
+    jti = payload.get("jti")
+    if not jti or not isinstance(jti, str):
+        return
+
+    now = int(time.time())
+    exp = _context_expiry(payload, now)
+
+    with _replay_lock:
+        _prune_expired_locked(now)
+        existing = _replay_seen.get(jti)
+        if existing is not None and existing >= now:
+            raise GatewaySignatureError(f"context jti {jti!r} already used (replay)")
+        if len(_replay_seen) >= _MAX_REPLAY_CACHE_ENTRIES:
+            # Still full after pruning what has actually expired. Failing
+            # closed here is deliberate: silently skipping the record would
+            # look like normal operation while quietly disabling replay
+            # protection for every request that follows.
+            raise GatewaySignatureError(
+                "gateway signature replay cache is full; refusing to verify "
+                "without replay protection"
+            )
+        _replay_seen[jti] = exp
+        heapq.heappush(_replay_expiry_heap, (exp, jti))
+
+
 def verify_gateway_signature(
     *,
     context_b64: str,
@@ -621,6 +881,8 @@ def verify_gateway_signature(
     auth_path: str | None = None,
     key_id: str | None = None,
     clock_skew_seconds: int = GATEWAY_CLOCK_SKEW_SECONDS,
+    request_method: str | None = None,
+    request_path: str | None = None,
 ) -> dict[str, Any]:
     """Verify a signed gateway auth context. Raises on any failure.
 
@@ -637,6 +899,10 @@ def verify_gateway_signature(
     3. ``iat``/``exp`` replay window with ``clock_skew_seconds`` tolerance.
     4. ``user_id``/``tenant_id`` must be present; ``jti`` is additionally
        required on gateway-v2.
+    5. ``method``/``path`` binding, when the payload carries those claims —
+       see :func:`_verify_method_path_binding` and the module docstring.
+    6. Single-process replay: this exact ``jti`` must not have been verified
+       before — see :func:`_check_and_record_replay` and the module docstring.
 
     Args:
         context_b64: Value of ``X-Adaptix-Auth-Context``.
@@ -652,6 +918,13 @@ def verify_gateway_signature(
         key_id: Value of ``X-Adaptix-Auth-Key-Id`` — the ``kid`` of the gateway
             signing key. Required for gateway-v2.
         clock_skew_seconds: Replay-window tolerance. Default 5s.
+        request_method: The actual inbound request's HTTP method (e.g.
+            ``"GET"``), for the method/path binding check. Optional; when
+            omitted the binding check is a no-op unless
+            ``ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH`` is set, in which case
+            omitting it is a verifier configuration error.
+        request_path: The actual inbound request's path (no query string), for
+            the same check.
 
     Returns:
         The verified payload dict.
@@ -689,6 +962,10 @@ def verify_gateway_signature(
     _verify_audience(payload)
     _verify_replay_window(payload, clock_skew_seconds)
     _verify_identity_claims(payload, is_v2=is_v2)
+    _verify_method_path_binding(
+        payload, request_method=request_method, request_path=request_path
+    )
+    _check_and_record_replay(payload)
     return payload
 
 
@@ -764,6 +1041,7 @@ __all__ = [
     "GATEWAY_CLOCK_SKEW_SECONDS",
     "GATEWAY_EXPECTED_AUDIENCE_ENV",
     "GATEWAY_SHARED_SECRET_ENV",
+    "GATEWAY_SIGNATURE_REQUIRE_PATH_ENV",
     "GATEWAY_TRUST_MODE_ENV",
     "TRUST_MODE_ASYMMETRIC",
     "TRUST_MODE_DUAL",
@@ -775,5 +1053,6 @@ __all__ = [
     "gateway_trust_mode",
     "has_gateway_signature",
     "is_production",
+    "reset_gateway_replay_cache_for_tests",
     "verify_gateway_signature",
 ]

@@ -73,7 +73,7 @@ import os
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
 from pydantic import BaseModel
 
 from adaptix_contracts.gateway_keys import has_verification_keys
@@ -269,6 +269,18 @@ async def get_auth_context(
     x_adaptix_auth_key_id: Annotated[
         str | None, Header(alias="X-Adaptix-Auth-Key-Id")
     ] = None,
+    # Injected by FastAPI from the annotation alone (the default is only for
+    # direct, non-HTTP callers such as the unit tests). It supplies the
+    # actual inbound method/path for the signed method/path binding check;
+    # a service that enables ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH fails
+    # closed when the request is unavailable. Placed LAST and typed
+    # ``Request | None`` (never a bare ``Request`` with a ``None`` default)
+    # so a caller invoking this dependency positionally -- e.g. in a
+    # non-HTTP unit test -- cannot accidentally bind an unrelated argument
+    # (such as a user id) to this parameter; every existing positional
+    # caller in this 50+-service library predates this parameter and passes
+    # fewer positional arguments than its new index.
+    request: Request | None = None,
 ) -> AuthContext:
     """FastAPI dependency: extract authenticated identity from API Gateway headers.
 
@@ -383,6 +395,8 @@ async def get_auth_context(
                     shared_secret=secret,
                     auth_path=x_adaptix_auth_path,
                     key_id=x_adaptix_auth_key_id,
+                    request_method=request.method if request is not None else None,
+                    request_path=request.url.path if request is not None else None,
                 )
             except GatewaySignatureError as exc:
                 logger.warning("gateway HMAC verification failed: %s", exc)
