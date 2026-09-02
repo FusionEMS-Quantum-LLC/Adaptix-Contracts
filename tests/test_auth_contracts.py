@@ -1365,9 +1365,17 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
 
     captured: dict = {}
 
+    user_id = str(uuid4())
+    tenant_id = str(uuid4())
+
     def fake_verify(**kwargs):
         captured.update(kwargs)
-        return {"user_id": "u1", "tenant_id": "t1", "roles": [], "aud": "adaptix-core"}
+        return {
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "roles": [],
+            "aud": "adaptix-core",
+        }
 
     monkeypatch.setattr(auth_contracts, "has_gateway_signature", lambda **_: True)
     monkeypatch.setattr(auth_contracts, "gateway_shared_secret", lambda: "s3cret")
@@ -1384,8 +1392,8 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
         asyncio.run(
             auth_contracts.get_auth_context(
                 request=request,
-                x_user_id="u1",
-                x_tenant_id="t1",
+                x_user_id=user_id,
+                x_tenant_id=tenant_id,
                 x_adaptix_auth_context="ctx",
                 x_adaptix_auth_signature="sig",
             )
