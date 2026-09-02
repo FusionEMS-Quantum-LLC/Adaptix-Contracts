@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import heapq
 import hmac
 import json
 import time
@@ -141,9 +142,12 @@ class TestReplayCacheExpiry:
         )
 
         # Simulate the entry having already expired without waiting 5s real
-        # time: poke the recorded expiry directly, exactly as pruning reads
-        # it (`_replay_seen[jti] = exp`).
+        # time. Pruning now reads the heap (_replay_expiry_heap), not a scan
+        # of the dict, so both structures are rewritten together -- this
+        # mirrors exactly what real time passing would leave behind.
         gs._replay_seen[jti] = now - 1
+        gs._replay_expiry_heap[:] = [(v, k) for k, v in gs._replay_seen.items()]
+        heapq.heapify(gs._replay_expiry_heap)
 
         # A SECOND, freshly-minted context that happens to reuse the same jti
         # (e.g. a producer bug, or simply this test) is no longer a replay
@@ -194,9 +198,13 @@ class TestReplayCacheBounded:
         )
 
         # Force every currently-recorded entry to look expired, exactly as
-        # real time passing would.
+        # real time passing would. Pruning reads the heap
+        # (_replay_expiry_heap), not a scan of the dict, so both structures
+        # are rewritten together.
         for k in list(gs._replay_seen):
             gs._replay_seen[k] = now - 1
+        gs._replay_expiry_heap[:] = [(v, k) for k, v in gs._replay_seen.items()]
+        heapq.heapify(gs._replay_expiry_heap)
 
         ctx2, sig2 = _sign()
         verify_gateway_signature(
@@ -211,3 +219,100 @@ class TestHonestScopeOfProtection:
         plain in-process dict) actually provides."""
         assert "per-process" in gs.__doc__
         assert "does not protect" in gs.__doc__
+
+
+class TestReplayCacheIsAlgorithmicallyBounded:
+    """Codacy's finding: the original replay cache did an O(N) scan of a
+    dict that can grow to 50,000 entries, under the global lock, on every
+    verification call. The fix replaces the dict scan with a min-heap of
+    (exp, jti) ordered by expiry, so pruning only ever touches entries that
+    have actually expired -- never the whole cache. These tests prove that
+    property directly instead of only asserting the resulting behavior."""
+
+    def test_pruning_does_not_scan_the_full_cache(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With a large cache and nothing expired, pruning must touch zero
+        heap entries, regardless of how many live entries the cache holds.
+        A dict-scanning implementation would have inspected every one of
+        them; this counts the actual heap pops performed."""
+        now = int(time.time())
+        for i in range(5000):
+            ctx, sig = _sign(jti=f"bulk-{i}", iat=now, exp=now + 290)
+            verify_gateway_signature(
+                context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
+            )
+        assert len(gs._replay_seen) == 5000
+        assert len(gs._replay_expiry_heap) == 5000
+
+        pop_calls = {"n": 0}
+        real_heappop = heapq.heappop
+
+        def counting_heappop(heap):
+            pop_calls["n"] += 1
+            return real_heappop(heap)
+
+        monkeypatch.setattr(gs.heapq, "heappop", counting_heappop)
+
+        ctx, sig = _sign(iat=now, exp=now + 290)
+        verify_gateway_signature(
+            context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
+        )
+
+        assert pop_calls["n"] == 0
+
+    def test_pruning_only_pops_the_entries_that_actually_expired(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Seed a large cache where only a handful of entries are already
+        expired (poked directly into the cache state, since a context whose
+        own ``exp`` claim is already in the past is rejected earlier, at the
+        iat/exp freshness check, and never reaches the replay cache at all).
+        Pruning must pop exactly the expired entries -- not walk the
+        remaining live ones -- proving cost tracks expired count, not cache
+        size."""
+        now = int(time.time())
+        for i in range(4000):
+            ctx, sig = _sign(jti=f"live-{i}", iat=now, exp=now + 290)
+            verify_gateway_signature(
+                context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
+            )
+        with gs._replay_lock:
+            for i in range(7):
+                jti = f"expired-{i}"
+                exp = now - 1
+                gs._replay_seen[jti] = exp
+                heapq.heappush(gs._replay_expiry_heap, (exp, jti))
+        assert len(gs._replay_seen) == 4007
+
+        pop_calls = {"n": 0}
+        real_heappop = heapq.heappop
+
+        def counting_heappop(heap):
+            pop_calls["n"] += 1
+            return real_heappop(heap)
+
+        monkeypatch.setattr(gs.heapq, "heappop", counting_heappop)
+
+        ctx, sig = _sign(iat=now, exp=now + 290)
+        verify_gateway_signature(
+            context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
+        )
+
+        assert pop_calls["n"] == 7
+        assert len(gs._replay_seen) == 4001
+        assert all(not k.startswith("expired-") for k in gs._replay_seen)
+
+    def test_dict_and_heap_stay_the_same_size_after_many_operations(
+        self,
+    ) -> None:
+        """The dict and heap are maintained 1:1 for every live jti. If a
+        future edit reintroduced a leak (e.g. pushing without deleting, or
+        deleting without popping), this would drift."""
+        now = int(time.time())
+        for i in range(500):
+            ctx, sig = _sign(jti=f"parity-{i}", iat=now, exp=now + 290)
+            verify_gateway_signature(
+                context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
+            )
+        assert len(gs._replay_seen) == len(gs._replay_expiry_heap) == 500

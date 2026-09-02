@@ -124,6 +124,7 @@ is not replay-tracked — there is nothing to key the cache on — exactly as
 from __future__ import annotations
 
 import hashlib
+import heapq
 import hmac
 import json
 import logging
@@ -780,31 +781,49 @@ def _compare_method_path(
 #: can present many distinct signed contexts (e.g. from a genuinely high-QPS
 #: legitimate caller) cannot grow this dict without bound; hitting the cap
 #: fails closed (raises) rather than silently disabling replay tracking.
+#:
+#: Pruning is a min-heap of ``(exp, jti)`` ordered by expiry, NOT a scan of
+#: the dict. Codacy flagged the prior implementation for doing an O(N) scan
+#: of up to 50,000 entries under the global lock on every verification
+#: call — real lock-contention/DoS risk across the 50+ services sharing
+#: this library. A heap lets pruning touch only entries that have ACTUALLY
+#: expired, popping the front while it is stale, so the amortized cost per
+#: entry is one push (O(log n)) and at most one pop (O(log n)), each paid
+#: exactly once over that entry's life — never a full-cache walk. The dict
+#: and heap are kept 1:1 for every live jti: an unexpired jti is rejected
+#: as a replay before any push happens (see :func:`_check_and_record_replay`),
+#: and an expired jti is always popped and deleted before a new entry for
+#: the same jti is pushed, so no stale heap tuple can ever outlive the dict
+#: entry it was superseded by.
 _MAX_REPLAY_CACHE_ENTRIES = 50_000
-#: Expired entries are swept at most this often (or whenever the cache is
-#: full), so the O(N) sweep is not paid on every request under a global lock.
-_REPLAY_PRUNE_INTERVAL_SECONDS = 5
 _replay_seen: dict[str, int] = {}
+_replay_expiry_heap: list[tuple[int, str]] = []
 _replay_lock = threading.Lock()
-_replay_last_prune_at = 0
 
 
 def reset_gateway_replay_cache_for_tests() -> None:
     """Clear the replay cache. Test-only — production code never calls this."""
-    global _replay_last_prune_at
     with _replay_lock:
         _replay_seen.clear()
-        _replay_last_prune_at = 0
+        _replay_expiry_heap.clear()
 
 
-def _prune_replay_cache_locked(now: int) -> None:
-    """Drop entries whose guarded context has already expired.
+def _prune_expired_locked(now: int) -> None:
+    """Pop and drop entries whose guarded context has already expired.
 
-    Caller must hold ``_replay_lock``.
+    Caller must hold ``_replay_lock``. Only touches entries that are
+    actually expired — it stops the instant the heap's earliest expiry is
+    still in the future — so cost is bounded by how many entries expired
+    since the last call, never by how many live entries the cache holds.
     """
-    expired = [jti for jti, exp in _replay_seen.items() if exp < now]
-    for jti in expired:
-        del _replay_seen[jti]
+    while _replay_expiry_heap and _replay_expiry_heap[0][0] < now:
+        exp, jti = heapq.heappop(_replay_expiry_heap)
+        # The dict is authoritative. A popped tuple only matches a real,
+        # still-current entry when its exp is unchanged; a jti reused after
+        # its prior entry already expired carries its own newer heap tuple,
+        # so this stale one is simply discarded without touching the dict.
+        if _replay_seen.get(jti) == exp:
+            del _replay_seen[jti]
 
 
 def _context_expiry(payload: dict[str, Any], now: int) -> int:
@@ -836,14 +855,8 @@ def _check_and_record_replay(payload: dict[str, Any]) -> None:
     now = int(time.time())
     exp = _context_expiry(payload, now)
 
-    global _replay_last_prune_at
     with _replay_lock:
-        if (
-            len(_replay_seen) >= _MAX_REPLAY_CACHE_ENTRIES
-            or now - _replay_last_prune_at >= _REPLAY_PRUNE_INTERVAL_SECONDS
-        ):
-            _prune_replay_cache_locked(now)
-            _replay_last_prune_at = now
+        _prune_expired_locked(now)
         existing = _replay_seen.get(jti)
         if existing is not None and existing >= now:
             raise GatewaySignatureError(f"context jti {jti!r} already used (replay)")
@@ -857,6 +870,7 @@ def _check_and_record_replay(payload: dict[str, Any]) -> None:
                 "without replay protection"
             )
         _replay_seen[jti] = exp
+        heapq.heappush(_replay_expiry_heap, (exp, jti))
 
 
 def verify_gateway_signature(

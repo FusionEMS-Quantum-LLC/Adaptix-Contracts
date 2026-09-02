@@ -148,6 +148,61 @@ class TestCompatModeFlagOff:
             request_path="/api/v1/patients?limit=50&cursor=abc",
         )  # must not raise
 
+    def test_trailing_slash_on_the_request_path_is_not_a_mismatch(self) -> None:
+        """Codacy flagged the normalizer as sensitive to a trailing slash --
+        a producer and consumer that format the same logical path slightly
+        differently (redirect_slashes, mounted routers) must not
+        false-negative against each other over a cosmetic difference."""
+        ctx, sig = _sign(method="GET", path="/api/v1/patients")
+        verify_gateway_signature(
+            context_b64=ctx,
+            signature_hex=sig,
+            shared_secret=_SECRET,
+            request_method="GET",
+            request_path="/api/v1/patients/",
+        )  # must not raise
+
+    def test_trailing_slash_on_the_signed_path_is_not_a_mismatch(self) -> None:
+        """Same normalization applies symmetrically to the signed claim."""
+        ctx, sig = _sign(method="GET", path="/api/v1/patients/")
+        verify_gateway_signature(
+            context_b64=ctx,
+            signature_hex=sig,
+            shared_secret=_SECRET,
+            request_method="GET",
+            request_path="/api/v1/patients",
+        )  # must not raise
+
+    def test_root_path_normalizes_to_slash_not_empty_string(self) -> None:
+        """The rstrip-based normalizer must not turn "/" into "" -- an empty
+        normalized path would compare unequal to itself in a way that looks
+        like a mismatch, or worse, unequal paths could both collapse to "".
+        """
+        ctx, sig = _sign(method="GET", path="/")
+        verify_gateway_signature(
+            context_b64=ctx,
+            signature_hex=sig,
+            shared_secret=_SECRET,
+            request_method="GET",
+            request_path="/",
+        )  # must not raise
+
+    def test_trailing_slash_does_not_widen_acceptance_to_a_different_path(
+        self,
+    ) -> None:
+        """A materially different path must still fail even with trailing
+        slashes on either side -- normalization must never become a
+        bypass."""
+        ctx, sig = _sign(method="GET", path="/api/v1/patients/")
+        with pytest.raises(GatewaySignatureError, match="path"):
+            verify_gateway_signature(
+                context_b64=ctx,
+                signature_hex=sig,
+                shared_secret=_SECRET,
+                request_method="GET",
+                request_path="/api/v1/claims/",
+            )
+
 
 # ---------------------------------------------------------------------------
 # Enforcement mode: ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH=true
@@ -177,7 +232,7 @@ class TestRequirePathBindingEnabled:
         """Flipping the flag before wiring the local call site must not
         silently disable the check it was meant to enforce."""
         ctx, sig = _sign(method="GET", path="/api/v1/patients/123")
-        with pytest.raises(GatewayVerifierConfigurationError, match="did not supply"):
+        with pytest.raises(GatewayVerifierConfigurationError, match="not given"):
             verify_gateway_signature(
                 context_b64=ctx, signature_hex=sig, shared_secret=_SECRET
             )
