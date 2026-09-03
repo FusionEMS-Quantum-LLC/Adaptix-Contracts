@@ -14,6 +14,21 @@ from the installed package metadata).
 
 ### Added
 
+- `schemas.EpcrBillingTransportBlock`: added six optional raw-NEMSIS string
+  fields carrying the pickup and drop-off locality - `origin_city`
+  (eScene.17), `origin_state` (eScene.18), `origin_zip` (eScene.19),
+  `destination_city` (eDisposition.04), `destination_state`
+  (eDisposition.05) and `destination_zip` (eDisposition.07). The block
+  previously carried only flat street strings (`origin_address` /
+  `destination_address`), so Billing could not populate the ZIP code of the
+  point of pickup that CMS requires on every ambulance claim (CMS-1500 Item
+  23; 837P loop 2310E `N4`) or the drop-off address in loop 2310F without
+  parsing or geocoding a guess. Element numbers verified against the NEMSIS
+  3.5 data dictionary. Strictly additive and backward compatible: all six
+  default to `None`, so a producer that has not shipped them yet still
+  validates and consumers read them as absent - an absent value means the
+  crew did not document it and must never be geocoded or inferred.
+
 - `module_registry`: registered `mih_community_paramedicine` (Mobile
   Integrated Healthcare / Community Paramedicine; audience `adaptix-mih`;
   alias `mih`, the Gateway route slug; purchasable — Community Paramedicine
