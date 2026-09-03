@@ -189,14 +189,41 @@ class EpcrBillingTransportBlock(BaseModel):
     eResponse.05``, ``unit_role_code <- eResponse.07``). The producer performs no
     parsing or unit coercion — ``transport_distance_miles`` is a string, not a
     number, and consumers must treat an unparseable value as absent, never guess.
+
+    The block carried only flat street strings, so a consumer could not populate
+    the point-of-pickup ZIP that CMS requires on every ambulance claim (CMS-1500
+    Item 23; 837P loop 2310E ``N4``) nor the drop-off address in loop 2310F - it
+    had to parse or geocode ``origin_address`` / ``destination_address``. The
+    city/state/ZIP components are therefore carried explicitly, again as raw
+    NEMSIS strings the producer does not parse:
+
+    * ``origin_city`` <- eScene.17 Incident City
+    * ``origin_state`` <- eScene.18 Incident State
+    * ``origin_zip`` <- eScene.19 Incident ZIP Code
+    * ``destination_city`` <- eDisposition.04 Destination City
+    * ``destination_state`` <- eDisposition.05 Destination State
+    * ``destination_zip`` <- eDisposition.07 Destination ZIP Code
+
+    Element numbers verified against the NEMSIS 3.5 data dictionary
+    (``Combined_ElementDetails.txt``): the city elements carry a
+    ``CityGnisCode``, the state elements an ``ANSIStateCode`` (2 digits) - so
+    neither is guaranteed to be a display name - and ZIP matches ``NNNNN``,
+    ``NNNNN-NNNN`` or a Canadian postal code. Consumers must treat an
+    unparseable or absent value as absent and must never geocode a substitute.
     """
 
     origin_name: Optional[str] = None
     origin_address: Optional[str] = None
     origin_latitude: Optional[str] = None
     origin_longitude: Optional[str] = None
+    origin_city: Optional[str] = None  # eScene.17
+    origin_state: Optional[str] = None  # eScene.18
+    origin_zip: Optional[str] = None  # eScene.19
     destination_name: Optional[str] = None
     destination_address: Optional[str] = None
+    destination_city: Optional[str] = None  # eDisposition.04
+    destination_state: Optional[str] = None  # eDisposition.05
+    destination_zip: Optional[str] = None  # eDisposition.07
     transport_distance_miles: Optional[str] = None
     service_type_code: Optional[str] = None
     unit_role_code: Optional[str] = None
