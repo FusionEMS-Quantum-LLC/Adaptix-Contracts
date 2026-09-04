@@ -969,6 +969,117 @@ def verify_gateway_signature(
     return payload
 
 
+#: Attribute name under which the per-request verified-assertion cache lives on
+#: ``request.state``. Starlette creates a fresh ``state`` for every request, so
+#: this cache is inherently request-scoped: it cannot outlive, leak into, or be
+#: observed from another request. Never read or write this on any longer-lived
+#: object.
+_REQUEST_VERIFIED_ATTR = "_adaptix_gateway_verified_assertions"
+
+
+def verify_gateway_signature_for_request(
+    request: Any,
+    *,
+    context_b64: str,
+    signature_hex: str,
+    shared_secret: str | None = None,
+    auth_path: str | None = None,
+    key_id: str | None = None,
+    clock_skew_seconds: int = GATEWAY_CLOCK_SKEW_SECONDS,
+) -> dict[str, Any]:
+    """Verify the gateway auth assertion EXACTLY ONCE for one request, then reuse.
+
+    This is the request-authentication boundary. The FIRST
+    authentication-dependent check in a request (whichever of the module
+    entitlement gate or ``get_auth_context`` runs first) performs the full
+    :func:`verify_gateway_signature` -- signature, issuer, audience, replay
+    window, identity, method/path binding, AND the single-use replay recording
+    -- and binds the verified payload to ``request.state``. Every later check in
+    the SAME request that presents the SAME assertion receives that verified
+    payload without re-verifying and without re-touching the replay guard.
+
+    WHY THIS EXISTS. Contracts >= 5.2.0 records each verified assertion as
+    single-use. A legitimate request that was verified by two different
+    authentication-dependent checks (the entitlement gate, then
+    ``get_auth_context``) therefore had its second verification rejected as a
+    replay, 401-ing a legitimate request. Verification was scoped to each
+    authorization check instead of to the request. This scopes it to the
+    request, so any number of authorization / entitlement / tenancy / RBAC /
+    ABAC checks consume ONE verified principal.
+
+    REPLAY PROTECTION IS UNCHANGED ACROSS REQUESTS, AND THAT IS THE POINT.
+    ``request.state`` is created fresh by Starlette for every request, so a
+    genuinely separate request -- including one that replays an assertion --
+    has an empty cache, calls :func:`verify_gateway_signature` itself, and is
+    rejected by the single-use replay guard exactly as before. The reuse here
+    is confined to repeated cryptographic verification WITHIN one already
+    authenticated request; it can never span requests, users, tenants,
+    processes, or time.
+
+    The method/path binding is derived from ``request`` itself, so the single
+    verification always binds against the real inbound method and path -- the
+    strictest of the two former call sites, applied consistently.
+
+    ``request`` is required for the once-per-request guarantee. When it is
+    ``None`` -- a non-HTTP caller with no request scope, e.g. a worker or a unit
+    test invoking the dependency directly -- this performs the full verification
+    directly, identical to calling :func:`verify_gateway_signature`, because
+    there is no request boundary to fold a second verification into.
+    """
+    method = getattr(request, "method", None) if request is not None else None
+    path: str | None = None
+    if request is not None:
+        url = getattr(request, "url", None)
+        path = getattr(url, "path", None) if url is not None else None
+
+    # No request, or a request object without ``state`` (defensive): there is no
+    # request scope to cache in, so verify directly. This is NOT a weakening --
+    # without a request there is no second in-request verification to fold, and
+    # the full replay guard still runs.
+    state = getattr(request, "state", None) if request is not None else None
+    if state is None:
+        return verify_gateway_signature(
+            context_b64=context_b64,
+            signature_hex=signature_hex,
+            shared_secret=shared_secret,
+            auth_path=auth_path,
+            key_id=key_id,
+            clock_skew_seconds=clock_skew_seconds,
+            request_method=method,
+            request_path=path,
+        )
+
+    cache = getattr(state, _REQUEST_VERIFIED_ATTR, None)
+    if cache is None:
+        cache = {}
+        setattr(state, _REQUEST_VERIFIED_ATTR, cache)
+
+    # Key on the assertion identity. Two checks in one request present the same
+    # context+signature (and the same path/key-id), so they hit the same entry;
+    # a request that somehow carried a different assertion would verify it
+    # independently rather than borrow an unrelated principal.
+    key = (context_b64, signature_hex, auth_path, key_id)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    payload = verify_gateway_signature(
+        context_b64=context_b64,
+        signature_hex=signature_hex,
+        shared_secret=shared_secret,
+        auth_path=auth_path,
+        key_id=key_id,
+        clock_skew_seconds=clock_skew_seconds,
+        request_method=method,
+        request_path=path,
+    )
+    # Only a SUCCESSFUL verification is cached; a raised GatewaySignatureError
+    # propagates and nothing is recorded, so a later check re-attempts and is
+    # rejected identically.
+    cache[key] = payload
+    return payload
+
+
 def _check_audience_pin(signed_aud: Any, expected_aud: str) -> None:
     """Enforce the exact per-service audience pin.
 
@@ -1055,4 +1166,5 @@ __all__ = [
     "is_production",
     "reset_gateway_replay_cache_for_tests",
     "verify_gateway_signature",
+    "verify_gateway_signature_for_request",
 ]
