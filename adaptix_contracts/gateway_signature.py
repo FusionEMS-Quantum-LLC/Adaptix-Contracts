@@ -132,6 +132,7 @@ import os
 import re
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
 from adaptix_contracts.gateway_keys import (
@@ -994,6 +995,30 @@ def _request_scope(request: Any) -> tuple[str | None, str | None, Any]:
     return method, path, state
 
 
+def _verified_once_in_scope(
+    state: Any, key: tuple[Any, ...], verify: Callable[[], dict[str, Any]]
+) -> dict[str, Any]:
+    """Return the assertion verified once within this request scope.
+
+    The per-request cache lives on ``state`` (``request.state``). The first call
+    for ``key`` runs ``verify`` -- the full crypto verification, which records
+    the single-use replay entry -- and stores the payload; later calls for the
+    same key return it without re-verifying. Only a SUCCESSFUL verification is
+    cached: ``verify`` raising ``GatewaySignatureError`` propagates and records
+    nothing, so a later check re-attempts and is rejected identically.
+    """
+    cache = getattr(state, _REQUEST_VERIFIED_ATTR, None)
+    if cache is None:
+        cache = {}
+        setattr(state, _REQUEST_VERIFIED_ATTR, cache)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    payload = verify()
+    cache[key] = payload
+    return payload
+
+
 def verify_gateway_signature_for_request(
     request: Any,
     *,
@@ -1045,11 +1070,7 @@ def verify_gateway_signature_for_request(
     """
     method, path, state = _request_scope(request)
 
-    # No request, or a request object without ``state`` (defensive): there is no
-    # request scope to cache in, so verify directly. This is NOT a weakening --
-    # without a request there is no second in-request verification to fold, and
-    # the full replay guard still runs.
-    if state is None:
+    def _verify() -> dict[str, Any]:
         return verify_gateway_signature(
             context_b64=context_b64,
             signature_hex=signature_hex,
@@ -1061,35 +1082,19 @@ def verify_gateway_signature_for_request(
             request_path=path,
         )
 
-    cache = getattr(state, _REQUEST_VERIFIED_ATTR, None)
-    if cache is None:
-        cache = {}
-        setattr(state, _REQUEST_VERIFIED_ATTR, cache)
+    # No request, or a request object without ``state`` (defensive): there is no
+    # request scope to cache in, so verify directly. This is NOT a weakening --
+    # without a request there is no second in-request verification to fold, and
+    # the full replay guard still runs.
+    if state is None:
+        return _verify()
 
     # Key on the assertion identity. Two checks in one request present the same
     # context+signature (and the same path/key-id), so they hit the same entry;
-    # a request that somehow carried a different assertion would verify it
-    # independently rather than borrow an unrelated principal.
+    # a request carrying a different assertion verifies it independently rather
+    # than borrow an unrelated principal.
     key = (context_b64, signature_hex, auth_path, key_id)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
-
-    payload = verify_gateway_signature(
-        context_b64=context_b64,
-        signature_hex=signature_hex,
-        shared_secret=shared_secret,
-        auth_path=auth_path,
-        key_id=key_id,
-        clock_skew_seconds=clock_skew_seconds,
-        request_method=method,
-        request_path=path,
-    )
-    # Only a SUCCESSFUL verification is cached; a raised GatewaySignatureError
-    # propagates and nothing is recorded, so a later check re-attempts and is
-    # rejected identically.
-    cache[key] = payload
-    return payload
+    return _verified_once_in_scope(state, key, _verify)
 
 
 def _check_audience_pin(signed_aud: Any, expected_aud: str) -> None:
