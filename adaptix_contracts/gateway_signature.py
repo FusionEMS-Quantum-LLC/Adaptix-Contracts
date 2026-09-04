@@ -977,6 +977,23 @@ def verify_gateway_signature(
 _REQUEST_VERIFIED_ATTR = "_adaptix_gateway_verified_assertions"
 
 
+def _request_scope(request: Any) -> tuple[str | None, str | None, Any]:
+    """Pull ``(method, path, state)`` defensively from a request object.
+
+    Returns ``(None, None, None)`` when ``request`` is ``None`` or lacks the
+    attributes. Isolated from :func:`verify_gateway_signature_for_request` so
+    that function reads as the verify-once DECISION rather than as Starlette
+    attribute plumbing.
+    """
+    if request is None:
+        return None, None, None
+    method = getattr(request, "method", None)
+    url = getattr(request, "url", None)
+    path = getattr(url, "path", None) if url is not None else None
+    state = getattr(request, "state", None)
+    return method, path, state
+
+
 def verify_gateway_signature_for_request(
     request: Any,
     *,
@@ -1026,17 +1043,12 @@ def verify_gateway_signature_for_request(
     directly, identical to calling :func:`verify_gateway_signature`, because
     there is no request boundary to fold a second verification into.
     """
-    method = getattr(request, "method", None) if request is not None else None
-    path: str | None = None
-    if request is not None:
-        url = getattr(request, "url", None)
-        path = getattr(url, "path", None) if url is not None else None
+    method, path, state = _request_scope(request)
 
     # No request, or a request object without ``state`` (defensive): there is no
     # request scope to cache in, so verify directly. This is NOT a weakening --
     # without a request there is no second in-request verification to fold, and
     # the full replay guard still runs.
-    state = getattr(request, "state", None) if request is not None else None
     if state is None:
         return verify_gateway_signature(
             context_b64=context_b64,
