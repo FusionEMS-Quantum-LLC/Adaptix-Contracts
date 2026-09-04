@@ -58,7 +58,7 @@ jobs:
       # This remains on the current production engine until the 1.9.1 engine
       # merge is proven on main; the fleet-release commit then advances the SHA.
       - name: Validate
-        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@edc1c70e4e0da2bbb26b5d76c3bce7d349aba389
+        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@28cb33eeb5d1554eadcd322ac37487da8a1977cb
         with:
           repository: ${{ github.repository }}
           target-path: repo
