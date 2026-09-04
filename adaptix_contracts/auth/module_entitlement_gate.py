@@ -52,7 +52,7 @@ from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
     gateway_shared_secret,
     has_gateway_signature,
-    verify_gateway_signature,
+    verify_gateway_signature_for_request,
 )
 
 logger = logging.getLogger(__name__)
@@ -156,7 +156,14 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
         )
         return None
 
-    payload = verify_gateway_signature(
+    # Verify ONCE per request. This gate is a router-level dependency and
+    # usually runs FIRST, so it performs the real verification and binds the
+    # verified principal to the request; get_auth_context then reuses it. If the
+    # order is ever reversed, the reuse simply flows the other way. Either way
+    # the assertion is cryptographically verified exactly once per request and
+    # the single-use replay guard is touched exactly once -- no false replay.
+    payload = verify_gateway_signature_for_request(
+        request,
         context_b64=ctx_b64 or "",
         signature_hex=sig_hex or "",
         shared_secret=secret,

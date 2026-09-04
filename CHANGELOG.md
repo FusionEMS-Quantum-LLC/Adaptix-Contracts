@@ -12,6 +12,47 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-09-04
+
+### Fixed
+
+- **AUTH-REPLAY-VERIFY-ONCE-001: a legitimate request to an entitlement-gated
+  route was rejected as a replay.** v5.0.0's single-use replay guard records
+  each verified gateway assertion as consumed. But a request to a route guarded
+  by both `require_module_entitlement(...)` and `get_auth_context` had its ONE
+  assertion cryptographically verified twice in the same request -- once by the
+  module entitlement gate (`auth.module_entitlement_gate._gateway_context_claims`)
+  and once by `auth_contracts.get_auth_context` -- and the second verification
+  was rejected as a replay, 401-ing a legitimate request. In production this
+  would have denied every request to every entitlement-gated route across the
+  fleet. Verification was scoped to each authorization check instead of to the
+  request.
+
+### Added
+
+- **`gateway_signature.verify_gateway_signature_for_request(request, ...)`** --
+  the request-authentication boundary. The first authentication-dependent check
+  in a request performs the full `verify_gateway_signature` (signature, issuer,
+  audience, replay window, identity, method/path binding, and the single-use
+  replay recording) and binds the verified payload to `request.state`. Any later
+  check in the SAME request that presents the SAME assertion reuses that verified
+  principal without re-verifying and without re-touching the replay guard.
+  `get_auth_context` and `require_module_entitlement` now both route through it.
+
+  Replay protection is unchanged across requests, by construction: Starlette
+  creates a fresh `request.state` for every request, so a genuinely separate
+  request -- including one replaying an assertion -- has an empty cache, verifies
+  independently, and is rejected by the single-use replay guard exactly as
+  before. The reuse is confined to repeated verification within one already
+  authenticated request; it cannot span requests, users, tenants, processes, or
+  time. When `request` is `None` (a non-HTTP caller), verification is performed
+  directly, identical to `verify_gateway_signature`, so there is no scope-less
+  bypass. Covered by `tests/test_gateway_verify_once_per_request.py`:
+  verify-exactly-once on the gated path, genuine cross-request replay still
+  denied, per-request principal isolation, and the authorization negatives
+  (missing entitlement, invalid signature, expired assertion) all still deny.
+
+
 ### Added
 
 - `schemas.EpcrBillingTransportBlock`: added six optional raw-NEMSIS string
