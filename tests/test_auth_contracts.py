@@ -1361,7 +1361,7 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
     signed method/path binding can be enforced (ledger item 1, gap 1)."""
     from starlette.requests import Request as StarletteRequest
 
-    from adaptix_contracts import auth_contracts
+    from adaptix_contracts import auth_contracts, gateway_signature
 
     captured: dict = {}
 
@@ -1379,7 +1379,10 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
 
     monkeypatch.setattr(auth_contracts, "has_gateway_signature", lambda **_: True)
     monkeypatch.setattr(auth_contracts, "gateway_shared_secret", lambda: "s3cret")
-    monkeypatch.setattr(auth_contracts, "verify_gateway_signature", fake_verify)
+    # verify-once-per-request routes the crypto verify through the wrapper, which
+    # calls gateway_signature.verify_gateway_signature; patch it there so this
+    # still pins that the request's method/path reach the verifier.
+    monkeypatch.setattr(gateway_signature, "verify_gateway_signature", fake_verify)
     scope = {
         "type": "http",
         "method": "POST",

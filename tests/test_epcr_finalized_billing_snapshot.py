@@ -101,6 +101,66 @@ def test_transport_block_is_no_longer_dropped() -> None:
     assert snap.transport.transport_distance_miles == "12.4"
 
 
+def test_transport_block_carries_pickup_and_dropoff_city_state_zip() -> None:
+    """CMS needs the point-of-pickup ZIP on every ambulance claim.
+
+    CMS-1500 Item 23 / 837P loop 2310E ``N4`` cannot be populated from the
+    flat street string alone, and loop 2310F needs the drop-off locality. The
+    six components round-trip as the raw NEMSIS strings the producer emits.
+    """
+    payload = _base()
+    payload["billing_snapshot"] = {
+        "transport": {
+            "origin_address": "123 Main St",
+            "origin_city": "Madison",
+            "origin_state": "55",
+            "origin_zip": "53703",
+            "destination_address": "600 Highland Ave",
+            "destination_city": "Madison",
+            "destination_state": "55",
+            "destination_zip": "53792-0001",
+        }
+    }
+    snap = EpcrChartFinalizedEvent.model_validate(payload).billing_snapshot
+
+    # eScene.17 / .18 / .19 - point of pickup.
+    assert snap.transport.origin_city == "Madison"
+    assert snap.transport.origin_state == "55"
+    assert snap.transport.origin_zip == "53703"
+    # eDisposition.04 / .05 / .07 - drop-off.
+    assert snap.transport.destination_city == "Madison"
+    assert snap.transport.destination_state == "55"
+    # ZIP+4 is a legal NEMSIS ZIP value and must survive uncoerced.
+    assert snap.transport.destination_zip == "53792-0001"
+
+
+def test_legacy_transport_block_without_locality_still_validates() -> None:
+    """A producer that has not shipped the new fields yet must keep working.
+
+    The six additions are optional: an older payload validates and every new
+    field reads as absent, never as an empty string a consumer could mistake
+    for a documented value.
+    """
+    payload = _base()
+    payload["billing_snapshot"] = {
+        "transport": {
+            "origin_name": "Scene - Main St",
+            "origin_address": "123 Main St",
+            "destination_name": "General Hospital",
+            "destination_address": "600 Highland Ave",
+        }
+    }
+    snap = EpcrChartFinalizedEvent.model_validate(payload).billing_snapshot
+
+    assert snap.transport.origin_address == "123 Main St"
+    assert snap.transport.origin_city is None
+    assert snap.transport.origin_state is None
+    assert snap.transport.origin_zip is None
+    assert snap.transport.destination_city is None
+    assert snap.transport.destination_state is None
+    assert snap.transport.destination_zip is None
+
+
 def test_insurance_and_certification_blocks_validate() -> None:
     payload = _base()
     payload["billing_snapshot"] = {

@@ -82,7 +82,7 @@ from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
     gateway_shared_secret,
     has_gateway_signature,
-    verify_gateway_signature,
+    verify_gateway_signature_for_request,
 )
 
 logger = logging.getLogger(__name__)
@@ -391,14 +391,22 @@ async def get_auth_context(
             # is the only place audience is (or should be) checked — an unsigned
             # request has no trustworthy audience to pin.
             try:
-                verified = verify_gateway_signature(
+                # Verify ONCE per request. If the module entitlement gate (or any
+                # other authentication-dependent check) already verified this
+                # exact assertion earlier in the same request, reuse that
+                # verified principal instead of re-verifying -- which the
+                # single-use replay guard would reject as a false replay. A
+                # genuinely separate request has a fresh request scope and
+                # verifies independently, so cross-request replay protection is
+                # unchanged. The wrapper derives request_method/request_path from
+                # the request itself.
+                verified = verify_gateway_signature_for_request(
+                    request,
                     context_b64=x_adaptix_auth_context or "",
                     signature_hex=x_adaptix_auth_signature or "",
                     shared_secret=secret,
                     auth_path=x_adaptix_auth_path,
                     key_id=x_adaptix_auth_key_id,
-                    request_method=request.method if request is not None else None,
-                    request_path=request.url.path if request is not None else None,
                 )
             except GatewaySignatureError as exc:
                 logger.warning("gateway HMAC verification failed: %s", exc)
