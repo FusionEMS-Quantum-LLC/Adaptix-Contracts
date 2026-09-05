@@ -20,6 +20,15 @@ from __future__ import annotations
 
 from typing import Final
 
+from adaptix_contracts.cad.events import (
+    CAD_INCIDENT_CLOSED,
+    CAD_INCIDENT_CREATED,
+    CAD_INTAKE_CANCELLED,
+    CAD_INTAKE_CREATED,
+    CAD_INTAKE_UPDATED,
+    CAD_UNIT_DISPATCHED,
+    CAD_UNIT_STATUS_CHANGED,
+)
 from adaptix_contracts.scheduling.events import (
     ALL_SCHEDULING_EVENTS,
 )
@@ -312,6 +321,36 @@ SCHEDULING_EVENTS = ALL_SCHEDULING_EVENTS
 # Full Registry
 # ---------------------------------------------------------------------------
 ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
+    # ---------------------------------------------------------------------
+    # CAD 911/incident-dispatch and IFT-intake lanes (producer: Adaptix-CAD-Service,
+    # slug ``cad``), via the same outbox-relay pattern as the Fleet block above.
+    # Audited 2026-09-05: adaptix_contracts.cad.events documented "All CAD
+    # events must be imported from this module" while ALL_EVENTS held zero
+    # cad.* keys and the module's own constants pointed at a
+    # cad.medical_transport.* vocabulary with no producer anywhere in the
+    # fleet. These seven are the ones a real producer emits today.
+    # Producer citations, Adaptix-CAD-Service origin/main, verified 2026-09-05:
+    #   cad_app/cad_event_publisher.py:62    cad.incident.created
+    #   cad_app/cad_event_publisher.py:99    cad.unit.dispatched
+    #   cad_app/cad_event_publisher.py:134   cad.incident.closed
+    #   cad_app/cad_event_publisher.py:169   cad.unit.status_changed
+    #   cad_app/services/intake_repository.py:307  cad.intake.created
+    #   cad_app/services/intake_repository.py:463  cad.intake.updated
+    #   cad_app/services/intake_repository.py:539  cad.intake.cancelled
+    # cad_app/cad_event_publisher.py:62
+    CAD_INCIDENT_CREATED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/cad_event_publisher.py:99
+    CAD_UNIT_DISPATCHED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/cad_event_publisher.py:134
+    CAD_INCIDENT_CLOSED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/cad_event_publisher.py:169
+    CAD_UNIT_STATUS_CHANGED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/services/intake_repository.py:307
+    CAD_INTAKE_CREATED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/services/intake_repository.py:463
+    CAD_INTAKE_UPDATED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/services/intake_repository.py:539
+    CAD_INTAKE_CANCELLED: {"version": "1.0", "source_service": "cad"},
     BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_STATUS_CHANGED: {"version": "1.0", "source_service": "billing"},

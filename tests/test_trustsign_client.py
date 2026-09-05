@@ -564,3 +564,32 @@ def test_webhook_signature_rejects_short_hex() -> None:
     assert not TrustSignClient.verify_webhook_signature(
         body=b"payload", signature_header="sha256=abc", secret="secret"
     )
+
+
+def test_webhook_signature_rejects_non_ascii_digest_without_raising() -> None:
+    """A 64-char digest containing a non-hex, non-ASCII byte must reject cleanly.
+
+    Regression for a real crash: ``hmac.compare_digest`` raises ``TypeError``
+    on a ``str`` operand containing any non-ASCII character. The prior
+    implementation only checked ``len(provided) != 64``, and
+    ``len("é" * 64) == 64``, so a single crafted webhook request turned a
+    should-be-401 verification into an unhandled 500 -- no secret and no
+    timing side channel required. This must return False, not raise.
+    """
+    body = b"payload"
+    poisoned = "sha256=" + ("é" * 64)
+    assert (
+        TrustSignClient.verify_webhook_signature(
+            body=body, signature_header=poisoned, secret="secret"
+        )
+        is False
+    )
+
+
+def test_webhook_signature_rejects_non_hex_ascii_digest() -> None:
+    """64 ASCII characters that are not hex digits must also reject cleanly."""
+    body = b"payload"
+    non_hex = "sha256=" + ("g" * 64)
+    assert not TrustSignClient.verify_webhook_signature(
+        body=body, signature_header=non_hex, secret="secret"
+    )

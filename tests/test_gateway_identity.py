@@ -90,6 +90,48 @@ def test_legacy_forged_signature_is_rejected() -> None:
         )
 
 
+def test_legacy_non_ascii_signature_rejects_without_raising() -> None:
+    """A 64-char signature containing a non-hex, non-ASCII byte must reject cleanly.
+
+    Regression for a real crash: ``hmac.compare_digest`` raises ``TypeError``
+    on a ``str`` operand containing any non-ASCII character. The prior
+    implementation compared the caller-supplied ``signature`` (fully
+    attacker-controlled -- the ``X-Adaptix-Gateway-Signature`` header on an
+    ALB-direct, pre-auth request) with no shape validation at all, so a
+    single crafted request turned a should-be-``GatewayIdentityMismatch``
+    into an unhandled ``TypeError``. Must raise ``GatewayIdentityMismatch``,
+    not crash.
+    """
+    ts, _sig = sign_legacy_identity(
+        user_id="u", tenant_id="t", email="e", shared_secret=SECRET
+    )
+    with pytest.raises(GatewayIdentityMismatch):
+        verify_legacy_identity(
+            tenant_id="t",
+            user_id="u",
+            email="e",
+            timestamp=ts,
+            signature="é" * 64,
+            shared_secret=SECRET,
+        )
+
+
+def test_legacy_non_hex_ascii_signature_is_rejected() -> None:
+    """64 ASCII characters that are not hex digits must also reject cleanly."""
+    ts, _sig = sign_legacy_identity(
+        user_id="u", tenant_id="t", email="e", shared_secret=SECRET
+    )
+    with pytest.raises(GatewayIdentityMismatch):
+        verify_legacy_identity(
+            tenant_id="t",
+            user_id="u",
+            email="e",
+            timestamp=ts,
+            signature="g" * 64,
+            shared_secret=SECRET,
+        )
+
+
 def test_legacy_cross_tenant_replay_is_rejected() -> None:
     ts, sig = sign_legacy_identity(
         user_id="u", tenant_id="tenant-a", email="e", shared_secret=SECRET
