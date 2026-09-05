@@ -47,6 +47,7 @@ from fastapi import Header, HTTPException, Request, status
 
 from adaptix_contracts.auth.capability_registry import module_for_capability
 from adaptix_contracts.auth.cognito import AdaptixCognitoConfig
+from adaptix_contracts.environment import is_production as _is_production
 from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
@@ -59,13 +60,11 @@ logger = logging.getLogger(__name__)
 
 AUDIT_ACTION = "billing.module_not_entitled"
 
-# Matches auth_contracts._is_production: the production fail-closed posture is
-# keyed off the same ENVIRONMENT variable across the shared auth surface.
-_ENV_VAR = "ENVIRONMENT"
-
-
-def _is_production() -> bool:
-    return os.environ.get(_ENV_VAR, "").strip().lower() in ("production", "prod")
+# _is_production is imported above from adaptix_contracts.environment (the
+# canonical, single-source definition -- this module's own comment used to
+# say "Matches auth_contracts._is_production," which is exactly the drift
+# that module now closes) under its historical private name so every
+# existing call site in this file is unaffected.
 
 
 # Gateway-stamped signed-context headers (producer:

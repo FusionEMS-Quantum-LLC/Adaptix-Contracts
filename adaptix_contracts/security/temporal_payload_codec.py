@@ -105,6 +105,8 @@ from dataclasses import dataclass
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from adaptix_contracts.environment import ENVIRONMENT_ENV, is_production_environment
+
 # temporalio (and the protobuf runtime it pulls in) is an EXTRA, not a base
 # dependency of adaptix-contracts - see the `[project.optional-dependencies]`
 # `temporal` table in pyproject.toml. Importing this module without that extra
@@ -126,25 +128,18 @@ except ModuleNotFoundError as exc:  # pragma: no cover - import-time guard
         path=exc.path,
     ) from exc
 
-#: Environment variable names this codec reads. Declared here rather than
-#: imported from any one service, because the codec is now shared: the variable
-#: NAMES are part of the contract, exactly like the wire format below.
-ENVIRONMENT_ENV: str = "ENVIRONMENT"
+#: Environment variable names this codec reads. PAYLOAD_CODEC_KEY_ENV and
+#: PAYLOAD_CODEC_PLAINTEXT_ENV are declared here (rather than imported from
+#: any one service) because the codec is now shared: the variable NAMES are
+#: part of the contract, exactly like the wire format below.
+#:
+#: ENVIRONMENT_ENV and is_production_environment (used just below) are
+#: imported unchanged from adaptix_contracts.environment, the canonical,
+#: single-source definition -- this module used to carry its own independent
+#: copy of both (plus a PRODUCTION_ENVIRONMENTS set this file no longer needs
+#: directly), which is exactly the drift that module now closes.
 PAYLOAD_CODEC_KEY_ENV: str = "TEMPORAL_PAYLOAD_CODEC_KEY"
 PAYLOAD_CODEC_PLAINTEXT_ENV: str = "TEMPORAL_PAYLOAD_CODEC_PLAINTEXT_LOCAL"
-
-#: Values of ENVIRONMENT that mean "real customer data lives here". Matched
-#: case-insensitively. Anything in this set forbids unencrypted payloads.
-PRODUCTION_ENVIRONMENTS: frozenset[str] = frozenset({"production", "prod"})
-
-
-def is_production_environment(value: str | None) -> bool:
-    """Return True when ``value`` names a production environment.
-
-    Pure and case/whitespace tolerant so the same rule applies to a value read
-    live by the codec and to tests.
-    """
-    return (value or "").strip().lower() in PRODUCTION_ENVIRONMENTS
 
 
 def env_flag_is_true(value: str | None) -> bool:
