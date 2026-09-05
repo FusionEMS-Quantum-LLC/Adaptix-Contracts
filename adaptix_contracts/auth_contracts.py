@@ -176,6 +176,89 @@ class _DemoBlock(NamedTuple):
     agency_id: str | None
 
 
+def _reject_demo(log_message: str, detail: str) -> HTTPException:
+    """Log why a signed demo block is refused and build the 401 for it."""
+    logger.warning(log_message)
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+
+
+def _demo_uuid(raw: str, *, family: str, field: str) -> UUID:
+    """Parse a demo identifier claim, or reject the block (never downgrade).
+
+    Raises:
+        HTTPException: 401 when ``raw`` is not a UUID.
+    """
+    try:
+        return UUID(raw)
+    except (ValueError, AttributeError) as exc:
+        raise _reject_demo(
+            f"signed {family} demo context has malformed {field}; "
+            "rejecting (no silent downgrade).",
+            _DEMO_CLAIMS_MALFORMED,
+        ) from exc
+
+
+def _parse_no_lease_demo(
+    raw_session: str, raw_persona: str, raw_agency: str
+) -> _DemoBlock:
+    """No-lease family: founder Platform Demo Mode / public synthetic sessions.
+
+    No lease semantics. ``demo_session_id`` is optional but must be a UUID
+    when present; ``demo_persona`` and ``demo_agency_id`` are optional.
+    """
+    session_id = (
+        _demo_uuid(raw_session, family="no-lease", field="demo_session_id")
+        if raw_session
+        else None
+    )
+    return _DemoBlock(
+        session_id=session_id,
+        lease_id=None,
+        persona=raw_persona or None,
+        agency_id=raw_agency or None,
+    )
+
+
+def _parse_leased_demo(
+    raw_session: str,
+    raw_lease: str,
+    raw_persona: str,
+    raw_agency: str,
+    *,
+    is_founder: bool,
+) -> _DemoBlock:
+    """Cortex Live (leased) family: strict shape, never founder, never an agency.
+
+    Raises:
+        HTTPException: 401 on a mixed-family, founder, malformed or persona-less
+            block.
+    """
+    if raw_agency:
+        raise _reject_demo(
+            "signed demo context carries BOTH demo_lease_id and demo_agency_id; rejecting.",
+            "Demo auth context mixes the Cortex Live and no-lease demo families.",
+        )
+    if is_founder:
+        raise _reject_demo(
+            "signed Cortex Live demo context claims founder; rejecting "
+            "(leased demo principals are never founder).",
+            "Demo auth context may not carry founder privilege.",
+        )
+    session_id = _demo_uuid(raw_session, family="Cortex Live", field="demo_session_id")
+    lease_id = _demo_uuid(raw_lease, family="Cortex Live", field="demo_lease_id")
+    if not raw_persona:
+        raise _reject_demo(
+            "signed Cortex Live demo context has empty demo_persona; rejecting.",
+            _DEMO_CLAIMS_MALFORMED,
+        )
+    return _DemoBlock(
+        session_id=session_id,
+        lease_id=lease_id,
+        persona=raw_persona,
+        agency_id=None,
+    )
+
+
 def _parse_demo_block(payload: dict[str, Any], *, is_founder: bool) -> _DemoBlock:
     """Parse the demo block of a verified signed context, or reject it with 401.
 
@@ -188,12 +271,12 @@ def _parse_demo_block(payload: dict[str, Any], *, is_founder: bool) -> _DemoBloc
       lease MUST be UUIDs, ``demo_persona`` MUST be non-empty, the principal may
       NEVER be founder (founder lifts tenant scoping, which an isolated leased
       demo tenant must never escape), and it may not also carry
-      ``demo_agency_id``.
+      ``demo_agency_id``. See ``_parse_leased_demo``.
     * **No-lease** — founder Platform Demo Mode and the public synthetic
       ``/demo/<app>`` sessions. No lease semantics: ``demo_session_id`` is
       optional (but a UUID when present), ``demo_persona`` and
       ``demo_agency_id`` are optional, and founder is permitted because
-      Platform Demo Mode IS the founder.
+      Platform Demo Mode IS the founder. See ``_parse_no_lease_demo``.
 
     A malformed block is REJECTED, never downgraded to an ordinary context:
     every downstream demo safety gate keys off these fields, so a demo token
@@ -207,70 +290,10 @@ def _parse_demo_block(payload: dict[str, Any], *, is_founder: bool) -> _DemoBloc
     raw_lease = str(payload.get("demo_lease_id") or "").strip()
     raw_persona = str(payload.get("demo_persona") or "").strip()
     raw_agency = str(payload.get("demo_agency_id") or "").strip()
-
     if not raw_lease:
-        session_id: UUID | None = None
-        if raw_session:
-            try:
-                session_id = UUID(raw_session)
-            except (ValueError, AttributeError) as exc:
-                logger.warning(
-                    "signed no-lease demo context has malformed demo_session_id; "
-                    "rejecting (no silent downgrade)."
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=_DEMO_CLAIMS_MALFORMED,
-                ) from exc
-        return _DemoBlock(
-            session_id=session_id,
-            lease_id=None,
-            persona=raw_persona or None,
-            agency_id=raw_agency or None,
-        )
-
-    if raw_agency:
-        logger.warning(
-            "signed demo context carries BOTH demo_lease_id and demo_agency_id; rejecting."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Demo auth context mixes the Cortex Live and no-lease demo families.",
-        )
-    if is_founder:
-        logger.warning(
-            "signed Cortex Live demo context claims founder; rejecting "
-            "(leased demo principals are never founder)."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Demo auth context may not carry founder privilege.",
-        )
-    try:
-        leased_session = UUID(raw_session)
-        lease_id = UUID(raw_lease)
-    except (ValueError, AttributeError) as exc:
-        logger.warning(
-            "signed Cortex Live demo context has malformed demo_session_id/"
-            "demo_lease_id; rejecting (no silent downgrade)."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=_DEMO_CLAIMS_MALFORMED,
-        ) from exc
-    if not raw_persona:
-        logger.warning(
-            "signed Cortex Live demo context has empty demo_persona; rejecting."
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=_DEMO_CLAIMS_MALFORMED,
-        )
-    return _DemoBlock(
-        session_id=leased_session,
-        lease_id=lease_id,
-        persona=raw_persona,
-        agency_id=None,
+        return _parse_no_lease_demo(raw_session, raw_persona, raw_agency)
+    return _parse_leased_demo(
+        raw_session, raw_lease, raw_persona, raw_agency, is_founder=is_founder
     )
 
 
