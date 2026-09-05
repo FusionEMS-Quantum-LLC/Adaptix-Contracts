@@ -76,6 +76,7 @@ from uuid import UUID
 from fastapi import Header, HTTPException, Request, status
 from pydantic import BaseModel
 
+from adaptix_contracts.environment import is_production as _is_production
 from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
     GATEWAY_SHARED_SECRET_ENV,
@@ -87,10 +88,12 @@ from adaptix_contracts.gateway_signature import (
 
 logger = logging.getLogger(__name__)
 
-# Environment variable that controls whether the bearer-JWT dev fallback is
-# permitted. Set to "production" or "prod" in real deployments; the fallback
-# is then disabled so every request MUST arrive via API Gateway.
-_ENV_VAR = "ENVIRONMENT"
+# _is_production is imported above from adaptix_contracts.environment (the
+# canonical, single-source definition) under its historical private name so
+# every existing call site in this module is unaffected. It controls whether
+# the bearer-JWT dev fallback is permitted: in the real production
+# environment the fallback is disabled so every request MUST arrive via API
+# Gateway.
 
 # Forensic fix F-24 / APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST — gateway HMAC
 # verification of injected identity headers.
@@ -367,10 +370,6 @@ class AuthContext(BaseModel):
     demo_agency_id: str | None = None
 
     model_config = {"frozen": True}
-
-
-def _is_production() -> bool:
-    return os.getenv(_ENV_VAR, "").strip().lower() in ("production", "prod")
 
 
 def _parse_roles(raw: str | None) -> list[str]:

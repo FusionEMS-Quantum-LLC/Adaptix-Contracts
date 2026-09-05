@@ -12,6 +12,57 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-09-05
+
+### Added
+
+- **`adaptix_contracts.environment`** -- canonical, single-source
+  `ENVIRONMENT` detection. `is_production_environment(value)` (pure),
+  `is_production()` (reads the live process environment), and
+  `PRODUCTION_ENVIRONMENTS` replace four independent copies of the
+  identical `{"production", "prod"}`-membership predicate that had
+  accumulated inside this package: `gateway_signature.is_production`,
+  `auth_contracts._is_production`, `auth.module_entitlement_gate._is_production`
+  (whose own comment already said "Matches auth_contracts._is_production" --
+  the drift was self-documented and still not fixed), and
+  `security.temporal_payload_codec.is_production_environment`. All four call
+  sites now delegate to this module; every existing public/private name,
+  import path, and runtime behavior is unchanged (proven by the full existing
+  test suite for each of the four modules passing unmodified: 73 tests in
+  `test_auth_contracts.py`/`test_unsigned_founder_privilege_floor.py`, 103 in
+  the gateway-signature/module-entitlement/temporal-codec suites).
+  `security.temporal_payload_codec` re-exports `PRODUCTION_ENVIRONMENTS`
+  (`... import PRODUCTION_ENVIRONMENTS as PRODUCTION_ENVIRONMENTS`, the PEP 484
+  explicit-re-export idiom) even though nothing in that file uses the name
+  directly any more, so `from adaptix_contracts.security.temporal_payload_codec
+  import PRODUCTION_ENVIRONMENTS` keeps resolving for any caller that used that
+  module's historical path instead of the new canonical one.
+- **`adaptix_contracts.environment.assert_environment_configured()`** -- a
+  new, opt-in startup check services may call once at their own bootstrap
+  entrypoint. Closes a fail-open gap none of the four predicates above (nor
+  their historical duplicates) ever addressed: every one of them treats an
+  *unset* `ENVIRONMENT` variable identically to a deliberately non-production
+  deployment, which is correct for local development, this package's own
+  test suite, and one-off scripts -- but is exactly wrong for a production
+  task definition that simply forgot to set the variable, since the silent
+  result is every `is_production()`-gated protection in this package
+  (`gateway_signature._expected_audience`'s cross-service replay-protection
+  audience pin, the D-053 symmetric-mode production warning, the production
+  founder-privilege floor in `auth_contracts`, and any consumer's own
+  `is_production()`-gated logic) quietly disabling itself instead of failing
+  loudly. `assert_environment_configured()` does not change `is_production()`'s
+  runtime semantics -- an unset value still means "not production" everywhere
+  it always has, so no existing deployment's behavior changes merely by this
+  release landing. It is deliberately not wired into any call path
+  automatically; a service opts in explicitly, and it does not validate the
+  configured value against an enumerated "known good" allow-list (staging/
+  dev/test/qa/... vary by service and are not this package's policy to
+  define) -- it raises only when the variable is completely absent or blank,
+  which is the specific forgotten-task-definition-variable failure class this
+  release addresses. Filed as `Added`/minor rather than `Fixed`/patch because
+  the new function is the shippable unit; no existing caller's behavior
+  changes without that caller choosing to call it.
+
 ## [5.4.1] - 2026-09-05
 
 Lands as a patch on top of `5.4.0` (an unrelated PR -- the no-lease demo
