@@ -12,6 +12,36 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-09-05
+
+### Fixed
+
+- **CAD-DEMO-SYNTHETIC-CLAIMS-MALFORMED: the no-lease demo family was rejected
+  as malformed.** `auth_contracts.get_auth_context` required BOTH
+  `demo_session_id` and `demo_lease_id` on every `is_demo` context, so the
+  no-lease family -- founder Platform Demo Mode and the public synthetic
+  `/demo/<app>` sessions (which carry `demo_agency_id` and no lease) -- was
+  401'd with "Demo auth context claims are malformed." by every service that
+  authenticates through this package (CAD, ePCR, ...), while Core accepted the
+  same token. The two families are now told apart by `demo_lease_id` exactly
+  as `Adaptix-Core-Service` (`core_app.auth.dependencies._extract_demo_block`)
+  tells them apart:
+  - **Cortex Live (leased)** -- unchanged: session and lease MUST be UUIDs,
+    `demo_persona` MUST be non-empty, founder is refused, and a lease may not
+    be combined with `demo_agency_id` (new: 401 "mixes the ... families").
+  - **No-lease** -- accepted: `demo_session_id` optional (UUID when present),
+    `demo_persona` and `demo_agency_id` optional, founder permitted (Platform
+    Demo Mode IS the founder). A malformed session id is still 401, never
+    silently dropped.
+
+### Added
+
+- `AuthContext.demo_agency_id: str | None` -- the synthetic demo agency carried
+  by the no-lease family; always `None` for leased and non-demo contexts.
+- `GatewayClaims.demo_agency_id` on the producer, with the producer-side shape
+  checks mirroring the verifier (no-lease shape, mixed-family refusal); demo
+  claims are emitted only when present.
+
 ## [5.3.0] - 2026-09-04
 
 ### Fixed

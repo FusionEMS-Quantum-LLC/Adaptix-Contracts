@@ -236,6 +236,29 @@ class TestClaimsSurviveTheV2Path:
         assert auth.demo_persona == "agency_admin"
         assert auth.is_founder is False
 
+    def test_no_lease_demo_session_roundtrips_with_agency(self, asymmetric_only):
+        """The no-lease family (founder Platform Demo Mode / public synthetic
+        sessions) signs and verifies with the synthetic agency intact."""
+        user_id, tenant_id = uuid4(), uuid4()
+        demo_session = uuid4()
+        ctx, sig, kid = _sign(
+            user_id,
+            tenant_id,
+            roles=["dispatcher"],
+            is_demo=True,
+            demo_session_id=str(demo_session),
+            demo_persona="dispatcher",
+            demo_agency_id="demo-agency-metro",
+        )
+
+        auth = _call(user_id, tenant_id, ctx, sig, kid)
+
+        assert auth.is_demo is True
+        assert auth.demo_session_id == demo_session
+        assert auth.demo_lease_id is None
+        assert auth.demo_persona == "dispatcher"
+        assert auth.demo_agency_id == "demo-agency-metro"
+
     def test_ordinary_context_stays_non_demo(self, asymmetric_only):
         """Absence of demo claims must not be readable as a demo session."""
         user_id, tenant_id = uuid4(), uuid4()
@@ -303,6 +326,46 @@ class TestProducerRefusesWhatTheVerifierRejects:
                 demo_lease_id=str(uuid4()),
                 demo_persona="   ",
             ).validated()
+
+    def test_leased_demo_with_agency_refused(self):
+        """demo_agency_id may not accompany a lease (verifier: mixed families)."""
+        with pytest.raises(GatewaySignatureError, match="demo_agency_id"):
+            GatewayClaims(
+                user_id="u",
+                tenant_id="t",
+                aud=AUDIENCE,
+                is_demo=True,
+                demo_session_id=str(uuid4()),
+                demo_lease_id=str(uuid4()),
+                demo_persona="agency_admin",
+                demo_agency_id="demo-agency-metro",
+            ).validated()
+
+    def test_no_lease_demo_with_malformed_session_refused(self):
+        with pytest.raises(GatewaySignatureError, match="demo_session_id"):
+            GatewayClaims(
+                user_id="u",
+                tenant_id="t",
+                aud=AUDIENCE,
+                is_demo=True,
+                demo_session_id="not-a-uuid",
+                demo_persona="dispatcher",
+            ).validated()
+
+    def test_no_lease_demo_may_be_founder(self):
+        """Founder Platform Demo Mode: founder + is_demo without a lease signs."""
+        claims = GatewayClaims(
+            user_id="u",
+            tenant_id="t",
+            aud=AUDIENCE,
+            is_founder=True,
+            is_demo=True,
+            demo_persona="founder",
+        ).validated()
+        payload = claims.payload()
+        assert payload["is_demo"] is True
+        assert payload["is_founder"] is True
+        assert "demo_lease_id" not in payload
 
     def test_demo_detail_without_is_demo_refused(self):
         """Detail without the flag would silently downgrade to an ordinary session."""
