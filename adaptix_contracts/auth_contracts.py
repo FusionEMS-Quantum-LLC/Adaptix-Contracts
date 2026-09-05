@@ -213,6 +213,7 @@ class _RawDemoClaims(NamedTuple):
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> _RawDemoClaims:
+        """Read the four demo claims from a verified payload, stripped, ``""`` when absent."""
         return cls(
             session=_claim_text(payload, "demo_session_id"),
             lease=_claim_text(payload, "demo_lease_id"),
@@ -240,7 +241,7 @@ def _parse_no_lease_demo(raw: _RawDemoClaims) -> _DemoBlock:
     )
 
 
-def _reject_leased_family_violations(raw: _RawDemoClaims, *, is_founder: bool) -> None:
+def _guard_leased_demo(raw: _RawDemoClaims, *, is_founder: bool) -> None:
     """Refuse a leased block that names an agency or claims founder.
 
     Raises:
@@ -266,7 +267,7 @@ def _parse_leased_demo(raw: _RawDemoClaims, *, is_founder: bool) -> _DemoBlock:
         HTTPException: 401 on a mixed-family, founder, malformed or persona-less
             block.
     """
-    _reject_leased_family_violations(raw, is_founder=is_founder)
+    _guard_leased_demo(raw, is_founder=is_founder)
     session_id = _demo_uuid(raw.session, family="Cortex Live", field="demo_session_id")
     lease_id = _demo_uuid(raw.lease, family="Cortex Live", field="demo_lease_id")
     if not raw.persona:
