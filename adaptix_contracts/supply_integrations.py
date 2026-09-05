@@ -6,7 +6,7 @@ services. These are used by all three domain services to maintain consistency.
 There is deliberately no SearchClient here. One existed and was removed because it
 had never indexed a single row: its six call sites across the three domain services
 were all unreachable, and the client itself was wrong on three axes at once against
-Adaptix-Search-Service â€” it POSTed to /api/v1/search/index/{index} (not a route; the
+Adaptix-Search-Service — it POSTed to /api/v1/search/index/{index} (not a route; the
 real one is POST /api/v1/search/index), authenticated with `Authorization: Bearer`
 instead of the required X-Internal-Service-Key, and sent a payload carrying none of
 IndexEntityRequest's required entity_type/entity_id/title fields. `_index_document`
@@ -19,8 +19,8 @@ from a three-value deny-list ({patient, epcr_chart, billing_claim}, which return
 every OTHER entity_type to every role including `viewer` and `dispatch`) to a
 positive allow-list in search_app/permissions.py. inventory_items /
 medication_lots / narcotic_vials are now classified there with entitlements copied
-from THIS module's sibling rbac_contracts matrix â€” narcotics:read,
-medications:read, inventory:read_items respectively â€” and a Search test asserts
+from THIS module's sibling rbac_contracts matrix — narcotics:read,
+medications:read, inventory:read_items respectively — and a Search test asserts
 equality with those permission sets, so widening a read permission here widens
 search only deliberately and visibly.
 
@@ -33,7 +33,7 @@ Consequences for a future supply SearchClient:
   non-founder role. Use exactly the three registered strings above, or register
   the new one in Search first.
 * The client must still POST /api/v1/search/index with the
-  X-Internal-Service-Key header and a full IndexEntityRequest body â€” the three
+  X-Internal-Service-Key header and a full IndexEntityRequest body — the three
   defects that made the removed client a no-op are unchanged.
 
 Usage:
@@ -69,7 +69,6 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 from decimal import Decimal
@@ -96,8 +95,8 @@ logger = logging.getLogger(__name__)
 # Resolved per call, never at import. Binding a destination at module import is
 # the exact trap documented in Adaptix-Narcotics-Service
 # docs/NARCOTIC_EVENT_PUBLISHING_STATUS.md: setting the variable on a running
-# task then has no effect, and the miswiring is invisible until someone reads
-# the task definition.
+# task then has no effect, and the miswiring stays invisible until someone
+# reads the task definition.
 _AUDIT_URL_ENV = "AUDIT_SERVICE_URL"
 _AUDIT_URL_DEFAULT = "http://audit.adaptix.internal:8000"
 _AUDIT_INGEST_PATH = "/api/v1/audit/events"
@@ -406,20 +405,20 @@ class AuditClient:
       ``POST /api/v1/audit/events`` (Adaptix-Audit-Service
       ``backend/audit_app/api/audit.py``, router prefix ``/api/v1/audit``,
       responding ``201 CREATED``).
-    * **Wrong host.** It defaulted to ``http://audit:8000``. Cloud Map publishes
-      the service as ``audit.adaptix.internal`` in namespace ``adaptix.internal``
-      (verified against the live namespace, 2026-09-05); the bare label does not
-      resolve from an awsvpc task.
+    * **Wrong host.** It defaulted to ``http://audit:8000``. Cloud Map
+      publishes the service as ``audit.adaptix.internal`` in namespace
+      ``adaptix.internal`` (verified against the live namespace, 2026-09-05);
+      the bare label does not resolve from an awsvpc task.
     * **Wrong auth.** It sent ``Authorization: Bearer`` built from
-      ``AUDIT_SERVICE_TOKEN``, which is set on no consumer. The service requires
-      a *signed gateway context* and pins the audience to ``adaptix-audit``
-      (``backend/audit_app/api/gateway_auth.py``); it explicitly refuses to fall
-      back to plain headers.
+      ``AUDIT_SERVICE_TOKEN``, which is set on no consumer. The service
+      requires a *signed gateway context* and pins the audience to
+      ``adaptix-audit`` (``backend/audit_app/api/gateway_auth.py``); it
+      explicitly refuses to fall back to plain headers.
 
     ``_post_audit`` then caught the resulting exception in a bare
-    ``except Exception`` and returned ``False``, and every caller wraps the call
-    in its own ``except Exception`` as well. So the failure was swallowed twice
-    and surfaced nowhere.
+    ``except Exception`` and returned ``False``, and every caller wraps the
+    call in its own ``except Exception`` as well. So the failure was swallowed
+    twice and surfaced nowhere.
 
     Runtime evidence, captured 2026-09-05 against account 793439286972:
     ``adaptix-production-narcotics:437``, ``adaptix-production-medications:125``
@@ -497,11 +496,49 @@ class AuditClient:
         raise_on_error: bool = False,
     ) -> bool:
         """Append an immutable audit event for a domain mutation."""
+        request = cls._build_mutation_request(
+            tenant_id=tenant_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action=action,
+            actor_user_id=actor_user_id,
+            before_state=before_state,
+            after_state=after_state,
+            reason=reason,
+            severity=severity,
+            outcome=outcome,
+            correlation_id=correlation_id,
+            idempotency_key=idempotency_key,
+        )
+        return await cls._post_audit(request, raise_on_error=raise_on_error)
+
+    @classmethod
+    def _build_mutation_request(
+        cls,
+        *,
+        tenant_id: UUID,
+        entity_type: str,
+        entity_id: str,
+        action: str,
+        actor_user_id: Optional[str],
+        before_state: Optional[dict[str, Any]],
+        after_state: Optional[dict[str, Any]],
+        reason: Optional[str],
+        severity: AuditSeverity,
+        outcome: AuditOutcome,
+        correlation_id: Optional[str],
+        idempotency_key: Optional[str],
+    ) -> AuditIngestRequest:
+        """Normalise legacy mutation arguments into the typed ingest contract.
+
+        Kept separate from :meth:`log_mutation` so input normalisation and
+        request construction are not interleaved with delivery.
+        """
         actor_uuid, actor_type, extra_metadata = cls._coerce_actor(actor_user_id)
 
         # ``changes`` is the structured before/after diff; ``metadata`` is
-        # producer context. AuditIngestRequest documents that conflating them is
-        # a defect, so ``reason`` goes to metadata and the states go to changes.
+        # producer context. AuditIngestRequest documents that conflating them
+        # is a defect, so ``reason`` goes to metadata and states go to changes.
         changes: Optional[dict[str, Any]] = None
         if before_state is not None or after_state is not None:
             changes = {"before": before_state, "after": after_state}
@@ -510,7 +547,7 @@ class AuditClient:
         if reason is not None:
             metadata["reason"] = reason
 
-        request = AuditIngestRequest(
+        return AuditIngestRequest(
             tenant_id=tenant_id,
             actor_user_id=actor_uuid,
             actor_type=actor_type,
@@ -526,7 +563,6 @@ class AuditClient:
             occurred_at=datetime.now(timezone.utc),
             source_service=cls._source_service(),
         )
-        return await cls._post_audit(request, raise_on_error=raise_on_error)
 
     @classmethod
     async def log_approval(
@@ -614,6 +650,36 @@ class AuditClient:
         return headers
 
     @classmethod
+    def _classify(
+        cls, request: AuditIngestRequest, resp: httpx.Response
+    ) -> Optional[bool]:
+        """Return True on acceptance, False on producer defect, None to retry."""
+        if 200 <= resp.status_code < 300:
+            logger.info(
+                "audit.publisher: accepted action=%s resource=%s/%s tenant=%s",
+                request.action,
+                request.resource_type,
+                request.resource_id,
+                request.tenant_id,
+            )
+            return True
+        if 400 <= resp.status_code < 500 and resp.status_code != 429:
+            # A producer defect. Retrying cannot fix it and would only hide it;
+            # surface the body so the mismatch is diagnosable.
+            logger.error(
+                "audit.publisher: non-retryable http=%s body=%s action=%s "
+                "resource=%s/%s tenant=%s",
+                resp.status_code,
+                resp.text[:400],
+                request.action,
+                request.resource_type,
+                request.resource_id,
+                request.tenant_id,
+            )
+            return False
+        return None
+
+    @classmethod
     async def _post_audit(
         cls,
         request: AuditIngestRequest,
@@ -622,58 +688,39 @@ class AuditClient:
         retries: int = _AUDIT_DEFAULT_RETRIES,
     ) -> bool:
         """POST one audit event, retrying only what is actually retryable."""
-        base_url = cls._base_url()
+        url = f"{cls._base_url()}{_AUDIT_INGEST_PATH}"
         headers = cls._build_headers(request)
-        body = json.loads(request.model_dump_json())
+        body = request.model_dump(mode="json")
 
-        for attempt in range(retries + 1):
-            try:
-                async with httpx.AsyncClient(timeout=cls._timeout()) as client:
-                    resp = await client.post(
-                        f"{base_url}{_AUDIT_INGEST_PATH}",
-                        json=body,
-                        headers=headers,
-                    )
-                if 200 <= resp.status_code < 300:
-                    logger.info(
-                        "audit.publisher: accepted action=%s resource=%s/%s tenant=%s",
-                        request.action,
-                        request.resource_type,
-                        request.resource_id,
-                        request.tenant_id,
-                    )
-                    return True
-                if 400 <= resp.status_code < 500 and resp.status_code != 429:
-                    # A producer defect. Retrying cannot fix it and would only
-                    # hide it; surface the body so the mismatch is diagnosable.
-                    logger.error(
-                        "audit.publisher: non-retryable http=%s body=%s action=%s "
-                        "resource=%s/%s tenant=%s",
+        # One client for all attempts of this event: constructing an
+        # AsyncClient per attempt builds and tears down a connection pool each
+        # time round the loop.
+        async with httpx.AsyncClient(timeout=cls._timeout()) as client:
+            for attempt in range(retries + 1):
+                try:
+                    resp = await client.post(url, json=body, headers=headers)
+                    verdict = cls._classify(request, resp)
+                    if verdict is not None:
+                        if verdict:
+                            return True
+                        break
+                    logger.warning(
+                        "audit.publisher: transient http=%s attempt=%d/%d action=%s",
                         resp.status_code,
-                        resp.text[:400],
+                        attempt + 1,
+                        retries + 1,
                         request.action,
-                        request.resource_type,
-                        request.resource_id,
-                        request.tenant_id,
                     )
-                    break
-                logger.warning(
-                    "audit.publisher: transient http=%s attempt=%d/%d action=%s",
-                    resp.status_code,
-                    attempt + 1,
-                    retries + 1,
-                    request.action,
-                )
-            except (httpx.HTTPError, httpx.TimeoutException) as exc:
-                logger.warning(
-                    "audit.publisher: %s attempt=%d/%d action=%s",
-                    type(exc).__name__,
-                    attempt + 1,
-                    retries + 1,
-                    request.action,
-                )
-            if attempt < retries:
-                await asyncio.sleep(0.25 * (2**attempt))
+                except (httpx.HTTPError, httpx.TimeoutException) as exc:
+                    logger.warning(
+                        "audit.publisher: %s attempt=%d/%d action=%s",
+                        type(exc).__name__,
+                        attempt + 1,
+                        retries + 1,
+                        request.action,
+                    )
+                if attempt < retries:
+                    await asyncio.sleep(0.25 * (2**attempt))
 
         logger.error(
             "audit.publisher: GAVE UP action=%s resource=%s/%s tenant=%s -- "

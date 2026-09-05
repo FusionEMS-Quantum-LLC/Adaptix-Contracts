@@ -6,8 +6,8 @@ services.
 READ THIS BEFORE ADDING A TEST HERE. These tests patch httpx.AsyncClient, force a
 success response, and assert `result is True`. They assert nothing about the URL,
 the headers, or the request body. The deleted SearchClient tests were written the
-same way, and that is exactly why a client wrong on all three at once â€” wrong path,
-wrong auth header, wrong payload shape â€” passed this suite for its entire life
+same way, and that is exactly why a client wrong on all three at once — wrong path,
+wrong auth header, wrong payload shape — passed this suite for its entire life
 without ever indexing a row. A test that mocks the transport and asserts only the
 return value measures nothing about the contract.
 
