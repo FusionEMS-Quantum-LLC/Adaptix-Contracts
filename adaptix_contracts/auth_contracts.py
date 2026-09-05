@@ -190,7 +190,7 @@ def _demo_uuid(raw: str, *, family: str, field: str) -> UUID:
     """
     try:
         return UUID(raw)
-    except (ValueError, AttributeError) as exc:
+    except ValueError as exc:
         raise _reject_demo(
             f"signed {family} demo context has malformed {field}; "
             "rejecting (no silent downgrade).",
