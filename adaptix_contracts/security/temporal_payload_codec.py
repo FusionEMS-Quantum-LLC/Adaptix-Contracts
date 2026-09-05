@@ -107,7 +107,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from adaptix_contracts.environment import (
     ENVIRONMENT_ENV,
-    PRODUCTION_ENVIRONMENTS as PRODUCTION_ENVIRONMENTS,
+    PRODUCTION_ENVIRONMENTS as PRODUCTION_ENVIRONMENTS,  # noqa: F401
     is_production_environment,
 )
 
