@@ -188,6 +188,48 @@ LIVE_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
 #: Every one of these was unregistered until this inventory landed, so
 #: ``is_registered()`` returned False for real production traffic.
 INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
+    # --- Adaptix-CAD-Service, via CadOutboxEvent -> cad_app/outbox.py
+    # (event_type is a caller-supplied parameter, so the literal never
+    # appears at the publish_outbox() call site itself -- it appears one
+    # hop up, either as a named module-level constant or a direct string
+    # literal at the call). Audited 2026-09-05: adaptix_contracts.cad.events
+    # claimed universal CAD coverage while ALL_EVENTS held zero cad.* keys;
+    # these seven are the events a real producer emits today. ---
+    (
+        "cad.incident.created",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/cad_event_publisher.py:62",
+    ),
+    (
+        "cad.unit.dispatched",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/cad_event_publisher.py:99",
+    ),
+    (
+        "cad.incident.closed",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/cad_event_publisher.py:134",
+    ),
+    (
+        "cad.unit.status_changed",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/cad_event_publisher.py:169",
+    ),
+    (
+        "cad.intake.created",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/services/intake_repository.py:307",
+    ),
+    (
+        "cad.intake.updated",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/services/intake_repository.py:463",
+    ),
+    (
+        "cad.intake.cancelled",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/services/intake_repository.py:539",
+    ),
     # --- Adaptix-Audit-Service Evidence Graph, via the publication models in
     # audit_app/schemas/evidence.py (event_type is a field default, so the
     # string never appears at the AdaptixEventEnvelope construction site in

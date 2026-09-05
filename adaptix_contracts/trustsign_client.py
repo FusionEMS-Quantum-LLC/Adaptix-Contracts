@@ -72,6 +72,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -80,6 +81,14 @@ import httpx
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 logger = logging.getLogger(__name__)
+
+# ── Webhook signature shape guard ───────────────────────────────────────────
+# `hmac.compare_digest` raises TypeError if either operand is a `str`
+# containing a non-ASCII character, so the attacker-controlled provided digest
+# must be shape-validated before it ever reaches compare_digest. Mirrors
+# gateway_signature.py's `_HEX_DIGEST` guard, which exists for the same reason
+# on the same call.
+_SHA256_HEX_DIGEST = re.compile(r"\A[0-9a-fA-F]{64}\Z")
 
 # ── Disallowed hostnames — defence-in-depth against accidental fallback ────
 _FORBIDDEN_HOSTS = frozenset(
@@ -598,7 +607,11 @@ class TrustSignClient:
         if not signature_header.startswith("sha256="):
             return False
         provided = signature_header.removeprefix("sha256=").strip()
-        if len(provided) != 64:
+        # Shape-check before compare_digest -- see _SHA256_HEX_DIGEST above.
+        # `len(...) != 64` alone is not sufficient: a 64-character value
+        # containing one non-ASCII code point passes that check and then
+        # raises TypeError out of compare_digest below.
+        if not _SHA256_HEX_DIGEST.match(provided):
             return False
         expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
         return hmac.compare_digest(provided, expected)

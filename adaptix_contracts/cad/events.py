@@ -1,16 +1,67 @@
 """CAD domain events — canonical event type strings.
 
-All CAD events must be imported from this module.
+Two vocabularies live in this module, and they must not be conflated:
+
+* ``CAD_INCIDENT_CREATED``, ``CAD_UNIT_DISPATCHED``, ``CAD_INCIDENT_CLOSED``,
+  ``CAD_UNIT_STATUS_CHANGED`` — the 911/incident dispatch lane. VERIFIED
+  live producer: ``Adaptix-CAD-Service/backend/cad_app/cad_event_publisher.py``
+  (outbox relay to the core event bus; called from
+  ``cad_app/api/incidents_router.py`` and
+  ``cad_app/api/incident_dispatches_router.py``).
+* ``CAD_INTAKE_CREATED``, ``CAD_INTAKE_UPDATED``, ``CAD_INTAKE_CANCELLED`` —
+  the IFT intake lifecycle. VERIFIED live producer:
+  ``Adaptix-CAD-Service/backend/cad_app/services/intake_repository.py``
+  (same outbox relay; direct string literals at the ``publish_outbox`` call
+  sites). ``CAD_INTAKE_CANCELLED`` was already corrected to its live value
+  by a prior change (see the now-removed comment this docstring replaces);
+  ``CAD_INTAKE_CREATED``/``CAD_INTAKE_UPDATED`` carried the same class of
+  drift and are corrected here the same way.
+
+  All seven of the above are registered in
+  ``adaptix_contracts.events.registry.ALL_EVENTS`` and cited there and in
+  ``tests/test_event_producer_registry_drift.py::INDIRECT_ENVELOPE_PRODUCERS``.
+* Every other constant below (``cad.medical_transport.*``, ``cad.hems.*``,
+  ``cad.ai.*``, ``cad.audit.*``) is the IFT/medical-transport CAD lane.
+  Adaptix-CAD-Service hosts both the 911 lane above and this IFT lane in one
+  service; they are distinguished by their record field set, not by a shared
+  event vocabulary — do not assume a handler for one lane also covers the
+  other. Audit 2026-09-05: an org-wide search for each of these dotted strings
+  found NO producer anywhere in the fleet — ``Adaptix-CAD-Service`` mentions
+  ``cad.medical_transport.epcr_handoff.created`` and
+  ``cad.medical_transport.nemsis_handoff.generated`` only in one docstring
+  (``cad_app/epcr_handoff_service.py``), with no corresponding emission
+  code. They are therefore DELIBERATELY NOT registered in
+  ``events.registry.ALL_EVENTS`` — registering an event with no real
+  producer would require a fabricated file:line citation, which
+  ``tests/test_event_producer_registry_drift.py`` exists specifically to
+  catch (see ``adaptix_contracts.cad_connect.events`` /
+  ``adaptix_contracts.qa.events`` for the same staged-contract pattern).
+  Register each one, with its real producer's file:line, in the same pull
+  request that ships that producer.
+
+The previous revision of this docstring said "All CAD events must be
+imported from this module" — that was never true for the incident lane
+above (Adaptix-CAD-Service defines its own copy of those four constants and
+does not import this module) and gave every reader the false impression the
+medical_transport/hems/ai/audit vocabulary below was live.
 """
 
 from __future__ import annotations
 
 from typing import Final
 
-# Medical transport intake events
-CAD_INTAKE_CREATED: Final[str] = "cad.medical_transport.intake.created"
-CAD_INTAKE_UPDATED: Final[str] = "cad.medical_transport.intake.updated"
-# CAD live outbox family is cad.intake.* (Adaptix-CAD-Service).
+# --- 911/incident dispatch lane (verified live producer — see module docstring) ---
+CAD_INCIDENT_CREATED: Final[str] = "cad.incident.created"
+CAD_UNIT_DISPATCHED: Final[str] = "cad.unit.dispatched"
+CAD_INCIDENT_CLOSED: Final[str] = "cad.incident.closed"
+CAD_UNIT_STATUS_CHANGED: Final[str] = "cad.unit.status_changed"
+
+# --- IFT/medical-transport CAD lane (staged contract — see module docstring) ---
+
+# Medical transport intake events — live outbox family is cad.intake.*
+# (Adaptix-CAD-Service/backend/cad_app/services/intake_repository.py:307,463,539).
+CAD_INTAKE_CREATED: Final[str] = "cad.intake.created"
+CAD_INTAKE_UPDATED: Final[str] = "cad.intake.updated"
 CAD_INTAKE_CANCELLED: Final[str] = "cad.intake.cancelled"
 
 # Assessment events
@@ -75,6 +126,10 @@ CAD_AI_ASSESSMENT_CREATED: Final[str] = "cad.ai.assessment.created"
 CAD_AUDIT_EVENT_CREATED: Final[str] = "cad.audit.event.created"
 
 ALL_CAD_EVENTS: Final[list] = [
+    CAD_INCIDENT_CREATED,
+    CAD_UNIT_DISPATCHED,
+    CAD_INCIDENT_CLOSED,
+    CAD_UNIT_STATUS_CHANGED,
     CAD_INTAKE_CREATED,
     CAD_INTAKE_UPDATED,
     CAD_INTAKE_CANCELLED,

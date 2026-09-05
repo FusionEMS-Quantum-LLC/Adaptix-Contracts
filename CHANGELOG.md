@@ -12,6 +12,140 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.4.1] - 2026-09-05
+
+Lands as a patch on top of `5.4.0` (an unrelated PR -- the no-lease demo
+family fix below this section -- merged to `main` while this branch was
+still in review). No `5.3.1`, `5.3.2`, or `5.3.3` was ever tagged: this
+branch's four independently patch-classified fixes and one deprecation
+notice, accumulated against the `5.3.0` base it started from, are bundled
+into a single release rather than cut as separate patch versions.
+
+### Fixed
+
+- **`gateway_identity.verify_legacy_identity` could crash instead of reject.**
+  Same bug class as the `trustsign_client.verify_webhook_signature` fix
+  below: the caller-supplied `signature` (the `X-Adaptix-Gateway-Signature`
+  header — fully attacker-controlled on an ALB-direct, pre-auth request)
+  reached `hmac.compare_digest` with no shape validation at all, and
+  `compare_digest` raises `TypeError` on a `str` operand containing a
+  non-ASCII character. A single crafted request turned a
+  should-be-`GatewayIdentityMismatch` into an unhandled crash. Confirmed a
+  real, reachable production consumer:
+  `Adaptix-OfficeAlly-Service/backend/officeally_app/api/deps.py::_verify_gateway_signature`
+  catches every named `GatewayIdentityError` subtype but had no handler for
+  a bare `TypeError`. Found and reproduced during adversarial review of
+  `fix/contracts-integrity-sweep-2b` (this repo's own recent fix for the
+  identical bug class in `trustsign_client.py`) — not part of that diff, so
+  filed as its own fix in this same release. Fixed with the same compiled
+  hex-charset guard pattern
+  (`_LEGACY_SIGNATURE_SHAPE = re.compile(r"\A[0-9a-fA-F]{64}\Z")`,
+  checked before `compare_digest`); malformed shape now raises
+  `GatewayIdentityMismatch`, matching how any other wrong signature is
+  already reported, so no consumer-side change is required. Regression
+  test added and proven: the guard was reverted locally, the new test was
+  confirmed to fail with the exact `TypeError`, then the fix was restored
+  and the full suite confirmed green.
+- **`trustsign_client.verify_webhook_signature` could crash instead of
+  reject an invalid webhook.** A 64-character signature header containing
+  one non-ASCII byte passed the old `len(provided) != 64` check
+  (`len("é" * 64) == 64`) and then made `hmac.compare_digest` raise
+  `TypeError` — Python's `compare_digest` rejects any `str` operand
+  containing a non-ASCII character. A single unauthenticated request with a
+  crafted `X-TrustSign-Signature` header therefore turned a should-be-401
+  verification into an unhandled 500, with no secret and no timing side
+  channel required. Fixed with a compiled hex-charset guard
+  (`_SHA256_HEX_DIGEST = re.compile(r"\A[0-9a-fA-F]{64}\Z")`) applied before
+  `compare_digest`, mirroring the guard `gateway_signature.py` already uses
+  (`_HEX_DIGEST`) before its own `compare_digest` call. Regression test
+  added and proven: the guard was reverted locally, the new test was
+  confirmed to fail with the exact `TypeError`, then the fix was restored
+  and the suite confirmed green.
+  ⚠️ **`Adaptix-Billing-Service:backend/billing_app/trustsign/http_client.py`
+  is a deliberately-maintained byte-equivalent mirror of this file** (see
+  this file's own docstring and `tests/test_trustsign_client_mirror_drift.py`)
+  and carries the identical unfixed bug — this release does not fix that
+  copy; it needs its own PR in that repository.
+- **`adaptix_contracts.cad.events` claimed universal CAD coverage while
+  `events.registry.ALL_EVENTS` held zero `cad.*` keys and two of its own
+  constants pointed at a vocabulary no producer in the fleet emits.** The
+  module's docstring said "All CAD events must be imported from this
+  module," but an org-wide code search for every `cad.medical_transport.*`
+  / `cad.hems.*` / `cad.ai.*` / `cad.audit.*` string in this module found
+  **zero producers anywhere in the fleet** (one docstring mention in
+  `Adaptix-CAD-Service/backend/cad_app/epcr_handoff_service.py`, no
+  corresponding emission code). Meanwhile `CAD_INTAKE_CREATED` and
+  `CAD_INTAKE_UPDATED` were set to `cad.medical_transport.intake.created` /
+  `.updated` — values that string search confirms **no producer emits** —
+  while the real, live producer
+  (`Adaptix-CAD-Service/backend/cad_app/services/intake_repository.py:307,463`)
+  emits `cad.intake.created` / `cad.intake.updated` under names these
+  constants do not carry. (A third sibling, `CAD_INTAKE_CANCELLED`, had
+  already been corrected to its live value — `cad.intake.cancelled` — in a
+  prior change; this release completes that correction for its two
+  siblings using the same method.) Corrected both constants' values to
+  match their verified live producer. This changes the on-the-wire string
+  two `Final` constants resolve to; it is filed as a patch, not a major
+  version, because the search above found no fleet consumer of the old
+  values to break. The corrected registration is now guarded going
+  forward: `test_registry_cites_a_producer_file_for_each_indirect_event`
+  proves each of the newly added `INDIRECT_ENVELOPE_PRODUCERS` rows below
+  carries an in-source producer citation. Also registered the 7 events
+  Adaptix-CAD-Service actually emits today — the two corrected
+  `CAD_INTAKE_*` constants, `CAD_INTAKE_CANCELLED`, and 4 new constants for
+  the 911/incident-dispatch lane (`CAD_INCIDENT_CREATED`,
+  `CAD_UNIT_DISPATCHED`, `CAD_INCIDENT_CLOSED`, `CAD_UNIT_STATUS_CHANGED`,
+  cited to `Adaptix-CAD-Service/backend/cad_app/cad_event_publisher.py`) —
+  in `events.registry.ALL_EVENTS`, with file:line producer citations, and
+  in `tests/test_event_producer_registry_drift.py::INDIRECT_ENVELOPE_PRODUCERS`
+  so the existing drift-guard suite proves each one against the operational
+  backbone gate the same way Fleet/Billing/EPCR events already are.
+  `adaptix_contracts.interoperability.events`'s 23 constants got the
+  explicit deliberate-omission docstring `cad_connect.events` already uses
+  instead — a real producer for those was not located within this
+  correction's search budget, so no citation was fabricated for them.
+- **`AdaptixEventEnvelope.occurred_at` now normalizes to UTC instead of
+  silently accepting a naive or non-UTC-offset timestamp.** The field
+  documented "ISO 8601 UTC" but had no enforcement: a producer sending a
+  naive value (`"2026-01-01T12:00:00"`) or a non-UTC offset would have that
+  string stored and forwarded verbatim, and a consumer that parsed it as UTC
+  (the documented contract) would misread the instant. A new
+  `field_validator` normalizes naive input to UTC and converts a non-UTC
+  offset to UTC; an already-UTC string (including the `default_factory`
+  output) is returned unchanged, and an empty/unparseable value is left
+  unchanged rather than rejected, so no existing producer's malformed input
+  becomes a new validation failure (#298). Behavior differed between the
+  `v5.3.0` tag (0ee2df1a, does not have this validator) and `main` at the
+  time #298 merged (0ab5e539, has it) despite `pyproject.toml` recording
+  `5.3.0` in both — the version was not bumped when #298 landed, and it had
+  no CHANGELOG entry until this release; a consumer pinned to the `v5.3.0`
+  tag and one pinned to `main` therefore saw different behavior under the
+  same version string.
+
+  Per `DEPRECATION_POLICY.md` ("Patch releases may fix defects... without
+  changing required fields or enum semantics") and `CONTRIBUTING.md`
+  ("Patch - Bug fixes, documentation updates"), each of the four fixes
+  above is independently patch-classified.
+
+### Deprecated
+
+- **`adaptix_contracts.common.error_envelope`** (`ErrorEnvelope`,
+  `ErrorCode`, `CredentialGatedResponse`). Org-wide code search and a
+  package-wide grep both found zero consumers of either class, in the
+  fleet or inside this package. `DeprecationWarning` added on import,
+  mirroring the existing `security/auth_context.py` precedent; import path
+  preserved per `DEPRECATION_POLICY.md` until the next major version.
+  AdaptixCore has two other, genuinely live error-envelope shapes this
+  module matches neither of —
+  `adaptix_contracts.error_contracts.ErrorCode`/`make_error_response`
+  (imported directly into Billing/Core/CAD/EPCR/NEMSIS/Labor's global
+  FastAPI exception handlers) and `adaptix_contracts.errors.envelope.AdaptixErrorEnvelope`
+  (hand-replicated at the Gateway edge in `cognito_auth.py` for pre-service
+  401s, and specifically accounted for in `Adaptix-Web-App`'s error
+  parser) — this deprecation does not attempt to unify those two or
+  declare either canonical over the other; see the module's docstring for
+  the evidence behind each.
+
 ## [5.4.0] - 2026-09-05
 
 ### Fixed
