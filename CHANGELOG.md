@@ -28,9 +28,15 @@ from the installed package metadata).
   `security.temporal_payload_codec.is_production_environment`. All four call
   sites now delegate to this module; every existing public/private name,
   import path, and runtime behavior is unchanged (proven by the full existing
-  test suite for each of the four modules passing unmodified: 96 tests in
+  test suite for each of the four modules passing unmodified: 73 tests in
   `test_auth_contracts.py`/`test_unsigned_founder_privilege_floor.py`, 103 in
   the gateway-signature/module-entitlement/temporal-codec suites).
+  `security.temporal_payload_codec` re-exports `PRODUCTION_ENVIRONMENTS`
+  (`... import PRODUCTION_ENVIRONMENTS as PRODUCTION_ENVIRONMENTS`, the PEP 484
+  explicit-re-export idiom) even though nothing in that file uses the name
+  directly any more, so `from adaptix_contracts.security.temporal_payload_codec
+  import PRODUCTION_ENVIRONMENTS` keeps resolving for any caller that used that
+  module's historical path instead of the new canonical one.
 - **`adaptix_contracts.environment.assert_environment_configured()`** -- a
   new, opt-in startup check services may call once at their own bootstrap
   entrypoint. Closes a fail-open gap none of the four predicates above (nor

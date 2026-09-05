@@ -105,7 +105,11 @@ from dataclasses import dataclass
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from adaptix_contracts.environment import ENVIRONMENT_ENV, is_production_environment
+from adaptix_contracts.environment import (
+    ENVIRONMENT_ENV,
+    PRODUCTION_ENVIRONMENTS as PRODUCTION_ENVIRONMENTS,
+    is_production_environment,
+)
 
 # temporalio (and the protobuf runtime it pulls in) is an EXTRA, not a base
 # dependency of adaptix-contracts - see the `[project.optional-dependencies]`
@@ -136,8 +140,14 @@ except ModuleNotFoundError as exc:  # pragma: no cover - import-time guard
 #: ENVIRONMENT_ENV and is_production_environment (used just below) are
 #: imported unchanged from adaptix_contracts.environment, the canonical,
 #: single-source definition -- this module used to carry its own independent
-#: copy of both (plus a PRODUCTION_ENVIRONMENTS set this file no longer needs
-#: directly), which is exactly the drift that module now closes.
+#: copy of both, plus its own PRODUCTION_ENVIRONMENTS set, which is exactly
+#: the drift that module now closes. PRODUCTION_ENVIRONMENTS is re-exported
+#: here (the explicit `as PRODUCTION_ENVIRONMENTS` self-alias is the PEP 484
+#: re-export idiom -- it tells ruff/mypy this import is intentionally public,
+#: not dead) purely for import-path compatibility: this module used to define
+#: it directly, so `from adaptix_contracts.security.temporal_payload_codec
+#: import PRODUCTION_ENVIRONMENTS` must keep resolving even though nothing in
+#: this file uses the name directly any more.
 PAYLOAD_CODEC_KEY_ENV: str = "TEMPORAL_PAYLOAD_CODEC_KEY"
 PAYLOAD_CODEC_PLAINTEXT_ENV: str = "TEMPORAL_PAYLOAD_CODEC_PLAINTEXT_LOCAL"
 
