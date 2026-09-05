@@ -198,42 +198,55 @@ def _demo_uuid(raw: str, *, family: str, field: str) -> UUID:
         ) from exc
 
 
-def _parse_no_lease_demo(
-    raw_session: str, raw_persona: str, raw_agency: str
-) -> _DemoBlock:
+def _claim_text(payload: dict[str, Any], name: str) -> str:
+    """Return a claim as stripped text, with ``None``/missing as ``""``."""
+    return str(payload.get(name) or "").strip()
+
+
+class _RawDemoClaims(NamedTuple):
+    """The four demo claims as carried on the wire (text, possibly empty)."""
+
+    session: str
+    lease: str
+    persona: str
+    agency: str
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> _RawDemoClaims:
+        return cls(
+            session=_claim_text(payload, "demo_session_id"),
+            lease=_claim_text(payload, "demo_lease_id"),
+            persona=_claim_text(payload, "demo_persona"),
+            agency=_claim_text(payload, "demo_agency_id"),
+        )
+
+
+def _parse_no_lease_demo(raw: _RawDemoClaims) -> _DemoBlock:
     """No-lease family: founder Platform Demo Mode / public synthetic sessions.
 
     No lease semantics. ``demo_session_id`` is optional but must be a UUID
     when present; ``demo_persona`` and ``demo_agency_id`` are optional.
     """
     session_id = (
-        _demo_uuid(raw_session, family="no-lease", field="demo_session_id")
-        if raw_session
+        _demo_uuid(raw.session, family="no-lease", field="demo_session_id")
+        if raw.session
         else None
     )
     return _DemoBlock(
         session_id=session_id,
         lease_id=None,
-        persona=raw_persona or None,
-        agency_id=raw_agency or None,
+        persona=raw.persona or None,
+        agency_id=raw.agency or None,
     )
 
 
-def _parse_leased_demo(
-    raw_session: str,
-    raw_lease: str,
-    raw_persona: str,
-    raw_agency: str,
-    *,
-    is_founder: bool,
-) -> _DemoBlock:
-    """Cortex Live (leased) family: strict shape, never founder, never an agency.
+def _reject_leased_family_violations(raw: _RawDemoClaims, *, is_founder: bool) -> None:
+    """Refuse a leased block that names an agency or claims founder.
 
     Raises:
-        HTTPException: 401 on a mixed-family, founder, malformed or persona-less
-            block.
+        HTTPException: 401 on a mixed-family or founder leased block.
     """
-    if raw_agency:
+    if raw.agency:
         raise _reject_demo(
             "signed demo context carries BOTH demo_lease_id and demo_agency_id; rejecting.",
             "Demo auth context mixes the Cortex Live and no-lease demo families.",
@@ -244,18 +257,25 @@ def _parse_leased_demo(
             "(leased demo principals are never founder).",
             "Demo auth context may not carry founder privilege.",
         )
-    session_id = _demo_uuid(raw_session, family="Cortex Live", field="demo_session_id")
-    lease_id = _demo_uuid(raw_lease, family="Cortex Live", field="demo_lease_id")
-    if not raw_persona:
+
+
+def _parse_leased_demo(raw: _RawDemoClaims, *, is_founder: bool) -> _DemoBlock:
+    """Cortex Live (leased) family: strict shape, never founder, never an agency.
+
+    Raises:
+        HTTPException: 401 on a mixed-family, founder, malformed or persona-less
+            block.
+    """
+    _reject_leased_family_violations(raw, is_founder=is_founder)
+    session_id = _demo_uuid(raw.session, family="Cortex Live", field="demo_session_id")
+    lease_id = _demo_uuid(raw.lease, family="Cortex Live", field="demo_lease_id")
+    if not raw.persona:
         raise _reject_demo(
             "signed Cortex Live demo context has empty demo_persona; rejecting.",
             _DEMO_CLAIMS_MALFORMED,
         )
     return _DemoBlock(
-        session_id=session_id,
-        lease_id=lease_id,
-        persona=raw_persona,
-        agency_id=None,
+        session_id=session_id, lease_id=lease_id, persona=raw.persona, agency_id=None
     )
 
 
@@ -286,15 +306,10 @@ def _parse_demo_block(payload: dict[str, Any], *, is_founder: bool) -> _DemoBloc
     Raises:
         HTTPException: 401 on any malformed or mixed-family demo block.
     """
-    raw_session = str(payload.get("demo_session_id") or "").strip()
-    raw_lease = str(payload.get("demo_lease_id") or "").strip()
-    raw_persona = str(payload.get("demo_persona") or "").strip()
-    raw_agency = str(payload.get("demo_agency_id") or "").strip()
-    if not raw_lease:
-        return _parse_no_lease_demo(raw_session, raw_persona, raw_agency)
-    return _parse_leased_demo(
-        raw_session, raw_lease, raw_persona, raw_agency, is_founder=is_founder
-    )
+    raw = _RawDemoClaims.from_payload(payload)
+    if raw.lease:
+        return _parse_leased_demo(raw, is_founder=is_founder)
+    return _parse_no_lease_demo(raw)
 
 
 class AuthContext(BaseModel):
