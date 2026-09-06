@@ -83,7 +83,7 @@ jobs:
       # re-sync PRs that do not move the pin, and the sentence must stay true
       # in both.)
       - name: Validate
-        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@edc1c70e4e0da2bbb26b5d76c3bce7d349aba389
+        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@a69270b09ccb23bb73f73f1cf42417dc439dcd2f
         with:
           repository: ${{ github.repository }}
           target-path: repo
