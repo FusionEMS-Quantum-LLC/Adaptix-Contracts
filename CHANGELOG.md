@@ -12,6 +12,25 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.7.0] - 2026-09-06
+
+### Added
+
+- **`EpcrBillingInterventionsBlock`** on `EpcrBillingSnapshot` (carried by
+  `epcr.chart.finalized`) -- structured performed-procedure and
+  medication-administration facts (`EpcrBillingProcedureItem`,
+  `EpcrBillingMedicationAdministrationItem`) so Billing's ALS2/SCT
+  undercoding detection can apply CMS level-of-service policy
+  deterministically from real chart facts instead of `level_of_service_code`
+  alone. The producer lane is
+  `Adaptix-EPCR-Service/backend/epcr_app` chart finalization outbox; the
+  consumer lane is `Adaptix-Billing-Service/backend/billing_app/event_consumers`
+  undercoding detection. Purely additive: `performed_interventions` is
+  optional on `EpcrBillingSnapshot`, and every field on the new block is
+  optional. Absence means "producer predates this block", never "no
+  interventions were performed". No existing field, name, or behavior
+  changes.
+
 ## [5.6.0] - 2026-09-05
 
 ### Added
