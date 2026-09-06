@@ -138,6 +138,7 @@ class GatewayClaims:
     demo_session_id: str | None = None
     demo_lease_id: str | None = None
     demo_persona: str | None = None
+    demo_agency_id: str | None = None
 
     def validated(self) -> GatewayClaims:
         """Return ``self`` after checking required fields.
@@ -170,8 +171,36 @@ class GatewayClaims:
         if not self.is_demo:
             self._reject_unflagged_demo_detail()
             return
+        if not (self.demo_lease_id or "").strip():
+            # No-lease family (founder Platform Demo Mode / public synthetic
+            # sessions): no lease semantics, founder permitted, session and
+            # persona optional. Mirrors auth_contracts._parse_demo_block.
+            self._require_no_lease_demo_shape()
+            return
+        self._reject_mixed_demo_families()
         self._reject_demo_founder()
         self._require_demo_claim_shape()
+
+    def _require_no_lease_demo_shape(self) -> None:
+        """Require a UUID ``demo_session_id`` when one is carried without a lease.
+
+        Raises:
+            GatewaySignatureError: If the session id is present and malformed.
+        """
+        if (self.demo_session_id or "").strip():
+            self._require_uuid_claim("demo_session_id", self.demo_session_id)
+
+    def _reject_mixed_demo_families(self) -> None:
+        """Reject a leased (Cortex Live) demo context that also names an agency.
+
+        Raises:
+            GatewaySignatureError: If ``demo_agency_id`` accompanies a lease.
+        """
+        if (self.demo_agency_id or "").strip():
+            raise GatewaySignatureError(
+                "demo_agency_id belongs to the no-lease demo family and may not "
+                "accompany demo_lease_id (the verifier rejects the mix with 401)"
+            )
 
     def _reject_unflagged_demo_detail(self) -> None:
         """Reject demo detail claims emitted without ``is_demo``.
@@ -179,9 +208,14 @@ class GatewayClaims:
         Raises:
             GatewaySignatureError: If any demo detail claim is set.
         """
-        if self.demo_session_id or self.demo_lease_id or self.demo_persona:
+        if (
+            self.demo_session_id
+            or self.demo_lease_id
+            or self.demo_persona
+            or self.demo_agency_id
+        ):
             raise GatewaySignatureError(
-                "demo_session_id / demo_lease_id / demo_persona require "
+                "demo_session_id / demo_lease_id / demo_persona / demo_agency_id require "
                 "is_demo=True; the verifier reads them only on a demo "
                 "context, so emitting them alone would silently downgrade a "
                 "demo session to an ordinary one"
@@ -287,9 +321,15 @@ class GatewayClaims:
             claims["mfa_verified"] = True
         if self.is_demo:
             claims["is_demo"] = True
-            claims["demo_session_id"] = str(self.demo_session_id).strip()
-            claims["demo_lease_id"] = str(self.demo_lease_id).strip()
-            claims["demo_persona"] = str(self.demo_persona).strip()
+            for name, value in (
+                ("demo_session_id", self.demo_session_id),
+                ("demo_lease_id", self.demo_lease_id),
+                ("demo_persona", self.demo_persona),
+                ("demo_agency_id", self.demo_agency_id),
+            ):
+                text = str(value or "").strip()
+                if text:
+                    claims[name] = text
         return claims
 
     def context_b64(self) -> str:

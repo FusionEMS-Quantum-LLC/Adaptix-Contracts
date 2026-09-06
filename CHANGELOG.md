@@ -12,6 +12,247 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-09-05
+
+### Added
+
+- **`adaptix_contracts.service_audiences`** -- registered `adaptix-cct`,
+  `adaptix-edge`, `adaptix-preplan`, `adaptix-wildland`, and `adaptix-xr`.
+  These are the five AdaptixCore domain services whose backends are real on
+  `main` (FastAPI application, Alembic migrations, container image
+  definition, gateway-signature verification through
+  `adaptix_contracts.auth_contracts`) but which had no AWS footprint at all --
+  verified 2026-09-05 against account 793439286972 / us-east-1: no ECS
+  service, no target group, no RDS instance, no CodeBuild project for any of
+  the five.
+
+  This is step 1 of the three-step "Adding a new service" sequence documented
+  in `service_audiences.py` itself, and it is inert on its own. The gateway
+  refuses to start with a `RouteEntry` whose audience is absent from this
+  registry, and Core sources `_LIVE_SERVICE_AUDIENCES` from the same set, so
+  both consumers must learn the string before a route or a downstream
+  `ADAPTIX_GATEWAY_EXPECTED_AUDIENCE` can be introduced. Doing it in the other
+  order is precisely what produced the `adaptix-audit` and `adaptix-vision`
+  403 outages this module exists to prevent. An audience registered here with
+  no matching route is a structured gateway 404, not a 403.
+
+  Purely additive: no existing audience, name, or behavior changes.
+
+## [5.5.0] - 2026-09-05
+
+### Added
+
+- **`adaptix_contracts.environment`** -- canonical, single-source
+  `ENVIRONMENT` detection. `is_production_environment(value)` (pure),
+  `is_production()` (reads the live process environment), and
+  `PRODUCTION_ENVIRONMENTS` replace four independent copies of the
+  identical `{"production", "prod"}`-membership predicate that had
+  accumulated inside this package: `gateway_signature.is_production`,
+  `auth_contracts._is_production`, `auth.module_entitlement_gate._is_production`
+  (whose own comment already said "Matches auth_contracts._is_production" --
+  the drift was self-documented and still not fixed), and
+  `security.temporal_payload_codec.is_production_environment`. All four call
+  sites now delegate to this module; every existing public/private name,
+  import path, and runtime behavior is unchanged (proven by the full existing
+  test suite for each of the four modules passing unmodified: 73 tests in
+  `test_auth_contracts.py`/`test_unsigned_founder_privilege_floor.py`, 103 in
+  the gateway-signature/module-entitlement/temporal-codec suites).
+  `security.temporal_payload_codec` re-exports `PRODUCTION_ENVIRONMENTS`
+  (`... import PRODUCTION_ENVIRONMENTS as PRODUCTION_ENVIRONMENTS`, the PEP 484
+  explicit-re-export idiom) even though nothing in that file uses the name
+  directly any more, so `from adaptix_contracts.security.temporal_payload_codec
+  import PRODUCTION_ENVIRONMENTS` keeps resolving for any caller that used that
+  module's historical path instead of the new canonical one.
+- **`adaptix_contracts.environment.assert_environment_configured()`** -- a
+  new, opt-in startup check services may call once at their own bootstrap
+  entrypoint. Closes a fail-open gap none of the four predicates above (nor
+  their historical duplicates) ever addressed: every one of them treats an
+  *unset* `ENVIRONMENT` variable identically to a deliberately non-production
+  deployment, which is correct for local development, this package's own
+  test suite, and one-off scripts -- but is exactly wrong for a production
+  task definition that simply forgot to set the variable, since the silent
+  result is every `is_production()`-gated protection in this package
+  (`gateway_signature._expected_audience`'s cross-service replay-protection
+  audience pin, the D-053 symmetric-mode production warning, the production
+  founder-privilege floor in `auth_contracts`, and any consumer's own
+  `is_production()`-gated logic) quietly disabling itself instead of failing
+  loudly. `assert_environment_configured()` does not change `is_production()`'s
+  runtime semantics -- an unset value still means "not production" everywhere
+  it always has, so no existing deployment's behavior changes merely by this
+  release landing. It is deliberately not wired into any call path
+  automatically; a service opts in explicitly, and it does not validate the
+  configured value against an enumerated "known good" allow-list (staging/
+  dev/test/qa/... vary by service and are not this package's policy to
+  define) -- it raises only when the variable is completely absent or blank,
+  which is the specific forgotten-task-definition-variable failure class this
+  release addresses. Filed as `Added`/minor rather than `Fixed`/patch because
+  the new function is the shippable unit; no existing caller's behavior
+  changes without that caller choosing to call it.
+
+## [5.4.1] - 2026-09-05
+
+Lands as a patch on top of `5.4.0` (an unrelated PR -- the no-lease demo
+family fix below this section -- merged to `main` while this branch was
+still in review). No `5.3.1`, `5.3.2`, or `5.3.3` was ever tagged: this
+branch's four independently patch-classified fixes and one deprecation
+notice, accumulated against the `5.3.0` base it started from, are bundled
+into a single release rather than cut as separate patch versions.
+
+### Fixed
+
+- **`gateway_identity.verify_legacy_identity` could crash instead of reject.**
+  Same bug class as the `trustsign_client.verify_webhook_signature` fix
+  below: the caller-supplied `signature` (the `X-Adaptix-Gateway-Signature`
+  header — fully attacker-controlled on an ALB-direct, pre-auth request)
+  reached `hmac.compare_digest` with no shape validation at all, and
+  `compare_digest` raises `TypeError` on a `str` operand containing a
+  non-ASCII character. A single crafted request turned a
+  should-be-`GatewayIdentityMismatch` into an unhandled crash. Confirmed a
+  real, reachable production consumer:
+  `Adaptix-OfficeAlly-Service/backend/officeally_app/api/deps.py::_verify_gateway_signature`
+  catches every named `GatewayIdentityError` subtype but had no handler for
+  a bare `TypeError`. Found and reproduced during adversarial review of
+  `fix/contracts-integrity-sweep-2b` (this repo's own recent fix for the
+  identical bug class in `trustsign_client.py`) — not part of that diff, so
+  filed as its own fix in this same release. Fixed with the same compiled
+  hex-charset guard pattern
+  (`_LEGACY_SIGNATURE_SHAPE = re.compile(r"\A[0-9a-fA-F]{64}\Z")`,
+  checked before `compare_digest`); malformed shape now raises
+  `GatewayIdentityMismatch`, matching how any other wrong signature is
+  already reported, so no consumer-side change is required. Regression
+  test added and proven: the guard was reverted locally, the new test was
+  confirmed to fail with the exact `TypeError`, then the fix was restored
+  and the full suite confirmed green.
+- **`trustsign_client.verify_webhook_signature` could crash instead of
+  reject an invalid webhook.** A 64-character signature header containing
+  one non-ASCII byte passed the old `len(provided) != 64` check
+  (`len("é" * 64) == 64`) and then made `hmac.compare_digest` raise
+  `TypeError` — Python's `compare_digest` rejects any `str` operand
+  containing a non-ASCII character. A single unauthenticated request with a
+  crafted `X-TrustSign-Signature` header therefore turned a should-be-401
+  verification into an unhandled 500, with no secret and no timing side
+  channel required. Fixed with a compiled hex-charset guard
+  (`_SHA256_HEX_DIGEST = re.compile(r"\A[0-9a-fA-F]{64}\Z")`) applied before
+  `compare_digest`, mirroring the guard `gateway_signature.py` already uses
+  (`_HEX_DIGEST`) before its own `compare_digest` call. Regression test
+  added and proven: the guard was reverted locally, the new test was
+  confirmed to fail with the exact `TypeError`, then the fix was restored
+  and the suite confirmed green.
+  ⚠️ **`Adaptix-Billing-Service:backend/billing_app/trustsign/http_client.py`
+  is a deliberately-maintained byte-equivalent mirror of this file** (see
+  this file's own docstring and `tests/test_trustsign_client_mirror_drift.py`)
+  and carries the identical unfixed bug — this release does not fix that
+  copy; it needs its own PR in that repository.
+- **`adaptix_contracts.cad.events` claimed universal CAD coverage while
+  `events.registry.ALL_EVENTS` held zero `cad.*` keys and two of its own
+  constants pointed at a vocabulary no producer in the fleet emits.** The
+  module's docstring said "All CAD events must be imported from this
+  module," but an org-wide code search for every `cad.medical_transport.*`
+  / `cad.hems.*` / `cad.ai.*` / `cad.audit.*` string in this module found
+  **zero producers anywhere in the fleet** (one docstring mention in
+  `Adaptix-CAD-Service/backend/cad_app/epcr_handoff_service.py`, no
+  corresponding emission code). Meanwhile `CAD_INTAKE_CREATED` and
+  `CAD_INTAKE_UPDATED` were set to `cad.medical_transport.intake.created` /
+  `.updated` — values that string search confirms **no producer emits** —
+  while the real, live producer
+  (`Adaptix-CAD-Service/backend/cad_app/services/intake_repository.py:307,463`)
+  emits `cad.intake.created` / `cad.intake.updated` under names these
+  constants do not carry. (A third sibling, `CAD_INTAKE_CANCELLED`, had
+  already been corrected to its live value — `cad.intake.cancelled` — in a
+  prior change; this release completes that correction for its two
+  siblings using the same method.) Corrected both constants' values to
+  match their verified live producer. This changes the on-the-wire string
+  two `Final` constants resolve to; it is filed as a patch, not a major
+  version, because the search above found no fleet consumer of the old
+  values to break. The corrected registration is now guarded going
+  forward: `test_registry_cites_a_producer_file_for_each_indirect_event`
+  proves each of the newly added `INDIRECT_ENVELOPE_PRODUCERS` rows below
+  carries an in-source producer citation. Also registered the 7 events
+  Adaptix-CAD-Service actually emits today — the two corrected
+  `CAD_INTAKE_*` constants, `CAD_INTAKE_CANCELLED`, and 4 new constants for
+  the 911/incident-dispatch lane (`CAD_INCIDENT_CREATED`,
+  `CAD_UNIT_DISPATCHED`, `CAD_INCIDENT_CLOSED`, `CAD_UNIT_STATUS_CHANGED`,
+  cited to `Adaptix-CAD-Service/backend/cad_app/cad_event_publisher.py`) —
+  in `events.registry.ALL_EVENTS`, with file:line producer citations, and
+  in `tests/test_event_producer_registry_drift.py::INDIRECT_ENVELOPE_PRODUCERS`
+  so the existing drift-guard suite proves each one against the operational
+  backbone gate the same way Fleet/Billing/EPCR events already are.
+  `adaptix_contracts.interoperability.events`'s 23 constants got the
+  explicit deliberate-omission docstring `cad_connect.events` already uses
+  instead — a real producer for those was not located within this
+  correction's search budget, so no citation was fabricated for them.
+- **`AdaptixEventEnvelope.occurred_at` now normalizes to UTC instead of
+  silently accepting a naive or non-UTC-offset timestamp.** The field
+  documented "ISO 8601 UTC" but had no enforcement: a producer sending a
+  naive value (`"2026-01-01T12:00:00"`) or a non-UTC offset would have that
+  string stored and forwarded verbatim, and a consumer that parsed it as UTC
+  (the documented contract) would misread the instant. A new
+  `field_validator` normalizes naive input to UTC and converts a non-UTC
+  offset to UTC; an already-UTC string (including the `default_factory`
+  output) is returned unchanged, and an empty/unparseable value is left
+  unchanged rather than rejected, so no existing producer's malformed input
+  becomes a new validation failure (#298). Behavior differed between the
+  `v5.3.0` tag (0ee2df1a, does not have this validator) and `main` at the
+  time #298 merged (0ab5e539, has it) despite `pyproject.toml` recording
+  `5.3.0` in both — the version was not bumped when #298 landed, and it had
+  no CHANGELOG entry until this release; a consumer pinned to the `v5.3.0`
+  tag and one pinned to `main` therefore saw different behavior under the
+  same version string.
+
+  Per `DEPRECATION_POLICY.md` ("Patch releases may fix defects... without
+  changing required fields or enum semantics") and `CONTRIBUTING.md`
+  ("Patch - Bug fixes, documentation updates"), each of the four fixes
+  above is independently patch-classified.
+
+### Deprecated
+
+- **`adaptix_contracts.common.error_envelope`** (`ErrorEnvelope`,
+  `ErrorCode`, `CredentialGatedResponse`). Org-wide code search and a
+  package-wide grep both found zero consumers of either class, in the
+  fleet or inside this package. `DeprecationWarning` added on import,
+  mirroring the existing `security/auth_context.py` precedent; import path
+  preserved per `DEPRECATION_POLICY.md` until the next major version.
+  AdaptixCore has two other, genuinely live error-envelope shapes this
+  module matches neither of —
+  `adaptix_contracts.error_contracts.ErrorCode`/`make_error_response`
+  (imported directly into Billing/Core/CAD/EPCR/NEMSIS/Labor's global
+  FastAPI exception handlers) and `adaptix_contracts.errors.envelope.AdaptixErrorEnvelope`
+  (hand-replicated at the Gateway edge in `cognito_auth.py` for pre-service
+  401s, and specifically accounted for in `Adaptix-Web-App`'s error
+  parser) — this deprecation does not attempt to unify those two or
+  declare either canonical over the other; see the module's docstring for
+  the evidence behind each.
+
+## [5.4.0] - 2026-09-05
+
+### Fixed
+
+- **CAD-DEMO-SYNTHETIC-CLAIMS-MALFORMED: the no-lease demo family was rejected
+  as malformed.** `auth_contracts.get_auth_context` required BOTH
+  `demo_session_id` and `demo_lease_id` on every `is_demo` context, so the
+  no-lease family -- founder Platform Demo Mode and the public synthetic
+  `/demo/<app>` sessions (which carry `demo_agency_id` and no lease) -- was
+  401'd with "Demo auth context claims are malformed." by every service that
+  authenticates through this package (CAD, ePCR, ...), while Core accepted the
+  same token. The two families are now told apart by `demo_lease_id` exactly
+  as `Adaptix-Core-Service` (`core_app.auth.dependencies._extract_demo_block`)
+  tells them apart:
+  - **Cortex Live (leased)** -- unchanged: session and lease MUST be UUIDs,
+    `demo_persona` MUST be non-empty, founder is refused, and a lease may not
+    be combined with `demo_agency_id` (new: 401 "mixes the ... families").
+  - **No-lease** -- accepted: `demo_session_id` optional (UUID when present),
+    `demo_persona` and `demo_agency_id` optional, founder permitted (Platform
+    Demo Mode IS the founder). A malformed session id is still 401, never
+    silently dropped.
+
+### Added
+
+- `AuthContext.demo_agency_id: str | None` -- the synthetic demo agency carried
+  by the no-lease family; always `None` for leased and non-demo contexts.
+- `GatewayClaims.demo_agency_id` on the producer, with the producer-side shape
+  checks mirroring the verifier (no-lease shape, mixed-family refusal); demo
+  claims are emitted only when present.
+
 ## [5.3.0] - 2026-09-04
 
 ### Fixed

@@ -135,6 +135,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from adaptix_contracts.environment import ENVIRONMENT_ENV, is_production
 from adaptix_contracts.gateway_keys import (
     GATEWAY_PUBLIC_KEYS_ENV,
     GATEWAY_SIGNING_ALGORITHM,
@@ -171,10 +172,10 @@ GATEWAY_TRUST_MODE_ENV = _GATEWAY_ENV_PREFIX + "TRUST_MODE"
 #: rollout order before a service may set this.
 GATEWAY_SIGNATURE_REQUIRE_PATH_ENV = _GATEWAY_ENV_PREFIX + "SIGNATURE_REQUIRE_PATH"
 
-#: Name of the variable that declares the deployment environment. Production is
-#: the only value that makes the audience pin mandatory, so it is read here
-#: rather than inferred from anything ambient.
-ENVIRONMENT_ENV = "ENVIRONMENT"
+# ENVIRONMENT_ENV and is_production are imported above from
+# adaptix_contracts.environment (the canonical, single-source definition);
+# both names stay importable from this module unchanged for every existing
+# consumer.
 
 # Matches the producer (auth_context.py GATEWAY_ISS) and Core verifier.
 _EXPECTED_ISSUER = "adaptix-gateway"
@@ -235,11 +236,6 @@ def gateway_shared_secret() -> str | None:
     """
     secret = os.environ.get(GATEWAY_SHARED_SECRET_ENV, "").strip()
     return secret or None
-
-
-def is_production() -> bool:
-    """Return whether this process is running in the production environment."""
-    return os.environ.get(ENVIRONMENT_ENV, "").strip().lower() in {"production", "prod"}
 
 
 def gateway_trust_mode() -> str:

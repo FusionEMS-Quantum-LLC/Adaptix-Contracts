@@ -1,4 +1,26 @@
-"""Canonical event names for the AdaptixCore interoperability fabric."""
+"""Canonical event names for the AdaptixCore interoperability fabric.
+
+These 23 constants are DELIBERATELY NOT registered in
+``adaptix_contracts.events.registry.ALL_EVENTS``.
+
+Why: the event-producer drift test (``tests/test_event_producer_registry_drift.py``)
+requires every registered event to cite a REAL producer file:line, the way
+``events/registry.py``'s CAD/Fleet/Billing blocks do. Adaptix-Core-Service does
+implement a substantial interoperability fabric
+(``core_app/interoperability/{peer_auth,peer_verification,peer_ingress,
+exchange_routes,delivery_worker,tenant_signing_routes}.py``), but a 2026-09-05
+audit did not locate, within its search budget, the exact file:line where any
+of these 23 dotted strings is constructed as an ``event_type`` literal — so a
+citation here would either be fabricated or would have to point at inferred
+call sites rather than a verified construction line. Neither is acceptable
+per the drift test's own stated purpose (catching the 64-entry
+source_service-mismatch class of drift the registry's docstring records).
+
+Register each constant, with its real producer's file:line, in the same pull
+request that adds the citation — see ``adaptix_contracts.cad_connect.events``
+/ ``adaptix_contracts.qa.events`` for the same staged-contract pattern this
+module now follows.
+"""
 
 from __future__ import annotations
 

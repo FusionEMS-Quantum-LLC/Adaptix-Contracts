@@ -16,12 +16,13 @@ import hashlib
 import hmac
 import json
 import time
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import HTTPException, status
 
 from adaptix_contracts.auth_contracts import (
+    AuthContext,
     get_auth_context,
 )
 from adaptix_contracts.auth.context import AdaptixAuthContext
@@ -1123,6 +1124,7 @@ def _demo_claims(
     session_id: str | None,
     lease_id: str | None,
     persona: str | None,
+    agency_id: str | None = None,
 ) -> dict[str, object]:
     claims: dict[str, object] = {"is_demo": True}
     if session_id is not None:
@@ -1131,7 +1133,27 @@ def _demo_claims(
         claims["demo_lease_id"] = lease_id
     if persona is not None:
         claims["demo_persona"] = persona
+    if agency_id is not None:
+        claims["demo_agency_id"] = agency_id
     return claims
+
+
+def _demo_auth(
+    *,
+    user_id: UUID,
+    tenant_id: UUID,
+    ctx_b64: str,
+    sig: str,
+) -> AuthContext:
+    return asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
 
 
 def test_demo_claims_surface_from_verified_signed_context(
@@ -1199,10 +1221,111 @@ def test_demo_context_with_malformed_session_id_is_rejected_not_downgraded(
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_demo_context_with_missing_lease_id_is_rejected(
+def test_no_lease_demo_context_is_accepted_and_surfaces_agency(
     _gateway_secret: str,
 ) -> None:
-    """is_demo without demo_lease_id -> 401 (no half-formed demo identity)."""
+    """is_demo WITHOUT demo_lease_id is the no-lease family (founder Platform
+    Demo Mode / public synthetic ``/demo/<app>`` sessions): accepted, with the
+    synthetic agency surfaced and no lease -- the same discriminator Core uses."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    demo_session = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        roles=["agency_admin"],
+        extra_claims=_demo_claims(
+            session_id=str(demo_session),
+            lease_id=None,
+            persona="dispatcher",
+            agency_id="demo-agency-metro",
+        ),
+    )
+
+    auth = _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
+
+    assert auth.is_demo is True
+    assert auth.demo_session_id == demo_session
+    assert auth.demo_lease_id is None
+    assert auth.demo_persona == "dispatcher"
+    assert auth.demo_agency_id == "demo-agency-metro"
+    assert auth.is_founder is False
+
+
+def test_no_lease_demo_context_with_only_the_flag_is_accepted(
+    _gateway_secret: str,
+) -> None:
+    """Bare founder Platform Demo Mode (is_demo and nothing else) is accepted
+    with every demo identifier unset; it is never downgraded to non-demo."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims=_demo_claims(session_id=None, lease_id=None, persona=None),
+    )
+
+    auth = _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
+
+    assert auth.is_demo is True
+    assert auth.demo_session_id is None
+    assert auth.demo_lease_id is None
+    assert auth.demo_persona is None
+    assert auth.demo_agency_id is None
+
+
+def test_no_lease_demo_context_may_be_founder(
+    _gateway_secret: str,
+) -> None:
+    """Founder Platform Demo Mode IS the founder: no lease -> founder permitted.
+    (The founder prohibition is a Cortex Live / leased-tenant rule.)"""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        is_founder=True,
+        extra_claims=_demo_claims(
+            session_id=str(uuid4()),
+            lease_id=None,
+            persona="founder",
+        ),
+    )
+
+    auth = _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
+
+    assert auth.is_demo is True
+    assert auth.is_founder is True
+    assert auth.demo_lease_id is None
+
+
+def test_no_lease_demo_context_with_malformed_session_id_is_rejected(
+    _gateway_secret: str,
+) -> None:
+    """A no-lease demo block that carries a non-UUID demo_session_id -> 401,
+    never silently accepted with the id dropped."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims=_demo_claims(
+            session_id="not-a-uuid",
+            lease_id=None,
+            persona="dispatcher",
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_demo_context_mixing_lease_and_agency_is_rejected(
+    _gateway_secret: str,
+) -> None:
+    """A leased (Cortex Live) demo block that also names a synthetic agency
+    mixes the two families -> 401."""
     user_id = uuid4()
     tenant_id = uuid4()
     ctx_b64, sig = _sign_gateway_context(
@@ -1210,22 +1333,38 @@ def test_demo_context_with_missing_lease_id_is_rejected(
         tenant_id=str(tenant_id),
         extra_claims=_demo_claims(
             session_id=str(uuid4()),
-            lease_id=None,
+            lease_id=str(uuid4()),
             persona="agency_admin",
+            agency_id="demo-agency-metro",
         ),
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            get_auth_context(
-                x_user_id=str(user_id),
-                x_tenant_id=str(tenant_id),
-                x_adaptix_auth_context=ctx_b64,
-                x_adaptix_auth_signature=sig,
-                x_adaptix_auth_path="gateway-v1",
-            )
-        )
+        _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_leased_demo_context_never_surfaces_agency_id(
+    _gateway_secret: str,
+) -> None:
+    """The Cortex Live family carries no synthetic agency: demo_agency_id is
+    None on a well-formed leased context."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims=_demo_claims(
+            session_id=str(uuid4()),
+            lease_id=str(uuid4()),
+            persona="agency_admin",
+        ),
+    )
+
+    auth = _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
+
+    assert auth.demo_lease_id is not None
+    assert auth.demo_agency_id is None
 
 
 def test_demo_context_with_empty_persona_is_rejected(
@@ -1352,6 +1491,7 @@ def test_auth_context_demo_fields_default_for_existing_constructors() -> None:
     assert auth.demo_session_id is None
     assert auth.demo_lease_id is None
     assert auth.demo_persona is None
+    assert auth.demo_agency_id is None
 
 
 def test_get_auth_context_passes_request_method_and_path_to_verifier(

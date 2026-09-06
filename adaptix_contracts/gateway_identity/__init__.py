@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
 import time
 from dataclasses import dataclass
 
@@ -99,6 +100,15 @@ class LegacyIdentity:
     tenant_id: str
     user_id: str
     email: str
+
+
+# `_legacy_hmac_hex` always produces a SHA-256 hex digest, so a well-formed
+# signature is always exactly 64 hex characters. `hmac.compare_digest`
+# raises TypeError if either `str` operand contains a non-ASCII character
+# (see trustsign_client.py's `_SHA256_HEX_DIGEST` -- same bug class, same
+# fix), so the caller-supplied `signature` must be shape-validated before
+# it ever reaches `verify_legacy_identity`'s `compare_digest` call.
+_LEGACY_SIGNATURE_SHAPE = re.compile(r"\A[0-9a-fA-F]{64}\Z")
 
 
 def _require_secret(shared_secret: str | None) -> str:
@@ -204,7 +214,14 @@ def verify_legacy_identity(
             email=identity.email,
         ),
     )
-    if not hmac.compare_digest(expected, signature):
+    # Shape-check before compare_digest: `signature` is fully
+    # attacker-controlled (the X-Adaptix-Gateway-Signature header on an
+    # ALB-direct, pre-auth request), and compare_digest raises TypeError on
+    # a str operand containing a non-ASCII character rather than returning
+    # False -- a wrong shape must fail closed as a mismatch, not crash.
+    if not _LEGACY_SIGNATURE_SHAPE.match(signature) or not hmac.compare_digest(
+        expected, signature
+    ):
         raise GatewayIdentityMismatch("signature mismatch")
 
 

@@ -16,7 +16,9 @@ you the URL, `headers=`, and `json=` actually sent. Compare them against the
 receiving service's route, its auth dependency, and its request model.
 """
 
+import base64
 import json
+import os
 import pytest
 import httpx
 from datetime import datetime, timezone
@@ -283,58 +285,349 @@ async def test_analytics_client_publish_risk_event():
         assert result is True
 
 
+# ---------------------------------------------------------------------------
+# AuditClient -- contract tests.
+#
+# These follow the instruction in this module's docstring: assert on the URL,
+# the headers and the body actually sent, compared against the receiving
+# service's route, auth dependency and request model.
+#
+# Every test below FAILS against the pre-2026-09-05 AuditClient, which POSTed
+# to /api/v1/audit/entries (a route that exists nowhere) at http://audit:8000
+# (a name Cloud Map does not publish) carrying an empty `Authorization: Bearer`
+# (the service requires a signed gateway context). That is the point: the
+# previous tests asserted only `result is True` and passed against all three
+# faults for the client's entire life.
+# ---------------------------------------------------------------------------
+
+_GW_SECRET = "test-gateway-shared-secret-value"
+
+
+def _audit_capture(captured: dict, statuses=None):
+    """Patch target for httpx.AsyncClient capturing url, headers and body.
+
+    Unlike `_capturing_async_client` above this also records headers and can
+    return a scripted sequence of status codes, which is what the retry and
+    non-retryable-4xx assertions need.
+    """
+    seq = list(statuses or [201])
+    captured.setdefault("calls", [])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["calls"].append(
+            {
+                "url": str(request.url),
+                "headers": dict(request.headers),
+                "body": request.content,
+            }
+        )
+        status = seq.pop(0) if seq else 201
+        return httpx.Response(status, json={})
+
+    def factory(*args, **kwargs):
+        return _RealAsyncClient(*args, **kwargs, transport=httpx.MockTransport(handler))
+
+    return factory
+
+
+def _decoded_context(headers: dict) -> dict:
+    """Return the decoded signed gateway context the client sent."""
+    raw_ctx = headers.get("x-adaptix-auth-context")
+    assert raw_ctx, f"no signed gateway context header; sent {sorted(headers)}"
+    padded = raw_ctx + "=" * (-len(raw_ctx) % 4)
+    return json.loads(base64.urlsafe_b64decode(padded.encode()))
+
+
 @pytest.mark.asyncio
-async def test_audit_client_log_mutation():
-    """Test logging a mutation to audit service."""
+async def test_audit_client_targets_the_real_ingest_route():
+    """The default destination must be the route the Audit service serves.
+
+    Adaptix-Audit-Service backend/audit_app/api/audit.py mounts
+    APIRouter(prefix="/api/v1/audit") and defines @router.post("/events").
+    Cloud Map publishes the service as `audit.adaptix.internal` (port 8000).
+    """
+    from adaptix_contracts.supply_integrations import AuditClient
+
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch.dict(os.environ, {"AUDIT_SERVICE_URL": ""}, clear=False):
+            os.environ.pop("AUDIT_SERVICE_URL", None)
+            with patch("httpx.AsyncClient", _audit_capture(captured)):
+                result = await AuditClient.log_mutation(
+                    tenant_id=uuid4(),
+                    entity_type="narcotic_vial",
+                    entity_id="vial-1",
+                    action="vial_created",
+                )
+
+    assert result is True
+    url = captured["calls"][0]["url"]
+    assert url == "http://audit.adaptix.internal:8000/api/v1/audit/events", url
+    assert "/api/v1/audit/entries" not in url
+
+
+@pytest.mark.asyncio
+async def test_audit_client_sends_signed_context_not_bearer_token():
+    """The service requires a signed gateway context pinned to its audience.
+
+    backend/audit_app/api/gateway_auth.py verifies the signed context and
+    compares `aud` against a hardcoded EXPECTED_AUDIENCE ("adaptix-audit"),
+    and explicitly refuses to fall back to plain headers. An
+    `Authorization: Bearer` built from an unset token is rejected.
+    """
+    from adaptix_contracts.supply_integrations import AuditClient
+
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch("httpx.AsyncClient", _audit_capture(captured)):
+            await AuditClient.log_mutation(
+                tenant_id=uuid4(),
+                entity_type="narcotic_vial",
+                entity_id="vial-1",
+                action="vial_created",
+            )
+
+    headers = captured["calls"][0]["headers"]
+    assert "authorization" not in {k.lower() for k in headers}, (
+        "the audit rail must not send a Bearer token; the service verifies a "
+        "signed gateway context"
+    )
+    assert headers.get("x-adaptix-auth-signature"), "context was not signed"
+    assert _decoded_context(headers)["aud"] == "adaptix-audit"
+
+
+@pytest.mark.asyncio
+async def test_audit_client_body_validates_as_audit_ingest_request():
+    """The body must be the model the route actually accepts.
+
+    `ingest_event(request: AuditIngestRequest, ...)`. The old payload sent
+    entity_type / entity_id / before_state / after_state, none of which are
+    fields on that model.
+    """
+    from adaptix_contracts.schemas.audit_contracts import AuditIngestRequest
     from adaptix_contracts.supply_integrations import AuditClient
 
     tenant_id = uuid4()
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch("httpx.AsyncClient", _audit_capture(captured)):
+            await AuditClient.log_mutation(
+                tenant_id=tenant_id,
+                entity_type="inventory_item",
+                entity_id="item-123",
+                action="stock_adjusted",
+                before_state={"stock": 15},
+                after_state={"stock": 5},
+                reason="usage",
+            )
 
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_response = _mock_success_response()
-
-        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value = mock_client
-
-        result = await AuditClient.log_mutation(
-            tenant_id=tenant_id,
-            entity_type="inventory_item",
-            entity_id="item-123",
-            action="stock_adjusted",
-            actor_user_id="user-123",
-            before_state={"stock": 15},
-            after_state={"stock": 5},
-            reason="usage",
-        )
-
-        assert result is True
+    body = json.loads(captured["calls"][0]["body"])
+    # Round-trips through the receiving model -- the real 422 gate.
+    parsed = AuditIngestRequest.model_validate(body)
+    assert str(parsed.tenant_id) == str(tenant_id)
+    assert parsed.action == "stock_adjusted"
+    assert parsed.resource_type == "inventory_item"
+    assert parsed.resource_id == "item-123"
+    # `changes` is the structured diff; `metadata` is producer context. The
+    # model documents that conflating the two is a defect.
+    assert parsed.changes == {"before": {"stock": 15}, "after": {"stock": 5}}
+    assert parsed.metadata["reason"] == "usage"
 
 
 @pytest.mark.asyncio
-async def test_audit_client_log_approval():
-    """Test logging an approval to audit service."""
+async def test_audit_client_preserves_non_uuid_actor_instead_of_inventing_one():
+    """A non-UUID actor is kept verbatim, never replaced with a fabricated id.
+
+    Callers in this package have always passed plain strings while
+    AuditIngestRequest.actor_user_id is a UUID. Inventing a UUID would put a
+    false actor on an immutable legal record; dropping it would lose evidence.
+    """
+    from adaptix_contracts.schemas.audit_contracts import (
+        AuditActorType,
+        AuditIngestRequest,
+    )
     from adaptix_contracts.supply_integrations import AuditClient
 
-    tenant_id = uuid4()
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch("httpx.AsyncClient", _audit_capture(captured)):
+            await AuditClient.log_mutation(
+                tenant_id=uuid4(),
+                entity_type="inventory_item",
+                entity_id="item-123",
+                action="stock_adjusted",
+                actor_user_id="user-123",
+            )
 
-    with patch("httpx.AsyncClient") as mock_client_class:
-        mock_client = AsyncMock()
-        mock_response = _mock_success_response()
+    parsed = AuditIngestRequest.model_validate(json.loads(captured["calls"][0]["body"]))
+    assert parsed.actor_user_id is None
+    assert parsed.actor_type is AuditActorType.SERVICE
+    assert parsed.metadata["actor_user_id_raw"] == "user-123"
 
-        mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value = mock_client
 
-        result = await AuditClient.log_approval(
-            tenant_id=tenant_id,
-            entity_type="narcotic_discrepancy",
-            entity_id="disc-123",
-            approver_user_id="user-456",
-            approval_type="supervisor_review",
-            reason="Discrepancy resolved",
-        )
+@pytest.mark.asyncio
+async def test_audit_client_passes_through_a_real_uuid_actor():
+    from adaptix_contracts.schemas.audit_contracts import (
+        AuditActorType,
+        AuditIngestRequest,
+    )
+    from adaptix_contracts.supply_integrations import AuditClient
 
-        assert result is True
+    actor = uuid4()
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch("httpx.AsyncClient", _audit_capture(captured)):
+            await AuditClient.log_mutation(
+                tenant_id=uuid4(),
+                entity_type="inventory_item",
+                entity_id="item-123",
+                action="stock_adjusted",
+                actor_user_id=str(actor),
+            )
+
+    parsed = AuditIngestRequest.model_validate(json.loads(captured["calls"][0]["body"]))
+    assert parsed.actor_user_id == actor
+    assert parsed.actor_type is AuditActorType.USER
+    assert "actor_user_id_raw" not in parsed.metadata
+
+
+@pytest.mark.asyncio
+async def test_audit_client_does_not_retry_a_producer_defect():
+    """A non-429 4xx is the producer's fault. Retrying hides it."""
+    from adaptix_contracts.supply_integrations import AuditClient
+
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch(
+            "httpx.AsyncClient", _audit_capture(captured, statuses=[422, 422, 422])
+        ):
+            result = await AuditClient.log_mutation(
+                tenant_id=uuid4(),
+                entity_type="inventory_item",
+                entity_id="item-123",
+                action="stock_adjusted",
+            )
+
+    assert result is False
+    assert len(captured["calls"]) == 1, "a 422 must not be retried"
+
+
+@pytest.mark.asyncio
+async def test_audit_client_retries_transient_failure_then_succeeds():
+    from adaptix_contracts.supply_integrations import AuditClient
+
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch("httpx.AsyncClient", _audit_capture(captured, statuses=[503, 201])):
+            result = await AuditClient.log_mutation(
+                tenant_id=uuid4(),
+                entity_type="inventory_item",
+                entity_id="item-123",
+                action="stock_adjusted",
+            )
+
+    assert result is True
+    assert len(captured["calls"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_audit_client_gives_up_returning_false_after_retries():
+    from adaptix_contracts.supply_integrations import AuditClient
+
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch(
+            "httpx.AsyncClient", _audit_capture(captured, statuses=[503, 503, 503])
+        ):
+            result = await AuditClient.log_mutation(
+                tenant_id=uuid4(),
+                entity_type="inventory_item",
+                entity_id="item-123",
+                action="stock_adjusted",
+            )
+
+    assert result is False
+    assert len(captured["calls"]) == 3, "two retries after the first attempt"
+
+
+@pytest.mark.asyncio
+async def test_audit_client_raise_on_error_surfaces_the_loss():
+    """A caller that cannot tolerate a lost audit record can demand a raise."""
+    from adaptix_contracts.supply_integrations import AuditClient, AuditPublisherError
+
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch(
+            "httpx.AsyncClient", _audit_capture(captured, statuses=[503, 503, 503])
+        ):
+            with pytest.raises(AuditPublisherError):
+                await AuditClient.log_mutation(
+                    tenant_id=uuid4(),
+                    entity_type="narcotic_vial",
+                    entity_id="vial-1",
+                    action="vial_wasted",
+                    raise_on_error=True,
+                )
+
+
+@pytest.mark.asyncio
+async def test_audit_client_missing_signing_secret_raises_rather_than_silently_failing():
+    """An unsigned audit rail cannot work. Say so instead of returning False."""
+    from adaptix_contracts.supply_integrations import AuditClient, AuditPublisherError
+
+    with patch.dict(os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": ""}, clear=False):
+        with pytest.raises(AuditPublisherError):
+            await AuditClient.log_mutation(
+                tenant_id=uuid4(),
+                entity_type="inventory_item",
+                entity_id="item-123",
+                action="stock_adjusted",
+            )
+
+
+@pytest.mark.asyncio
+async def test_audit_client_log_approval_uses_the_same_contract():
+    from adaptix_contracts.schemas.audit_contracts import AuditIngestRequest
+    from adaptix_contracts.supply_integrations import AuditClient
+
+    captured: dict = {}
+    with patch.dict(
+        os.environ, {"ADAPTIX_GATEWAY_SHARED_SECRET": _GW_SECRET}, clear=False
+    ):
+        with patch("httpx.AsyncClient", _audit_capture(captured)):
+            result = await AuditClient.log_approval(
+                tenant_id=uuid4(),
+                entity_type="narcotic_discrepancy",
+                entity_id="disc-123",
+                approver_user_id=str(uuid4()),
+                approval_type="supervisor_review",
+                reason="Discrepancy resolved",
+            )
+
+    assert result is True
+    assert captured["calls"][0]["url"].endswith("/api/v1/audit/events")
+    parsed = AuditIngestRequest.model_validate(json.loads(captured["calls"][0]["body"]))
+    assert parsed.action == "approval_supervisor_review"
+    assert parsed.metadata["approval_type"] == "supervisor_review"
+    assert parsed.metadata["reason"] == "Discrepancy resolved"
 
 
 @pytest.mark.asyncio

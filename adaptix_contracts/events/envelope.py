@@ -8,9 +8,9 @@ Every event must include tenant, actor, correlation, timestamp, idempotency, and
 from __future__ import annotations
 
 from typing import Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 class AdaptixEventEnvelope(BaseModel):
@@ -62,6 +62,39 @@ class AdaptixEventEnvelope(BaseModel):
         default=None,
         description="Optional additional metadata (routing hints, flags, etc.)",
     )
+
+    @field_validator("occurred_at")
+    @classmethod
+    def _normalize_occurred_at_to_utc(cls, value: str) -> str:
+        """Enforce the documented "ISO 8601 UTC" contract for occurred_at.
+
+        The field is a free string with a UTC-claiming description but no
+        enforcement: a producer could send a tz-naive timestamp
+        ("2026-01-01T12:00:00") or a non-UTC offset, and a consumer that
+        parsed it as UTC would misread the instant. This normalizes ONLY the
+        incorrect cases, so the blast radius is exactly the buggy inputs:
+
+        * naive (no tzinfo) -> interpreted as UTC (the documented intent) and
+          stamped ``+00:00``, so consumers no longer have to guess;
+        * a non-UTC offset -> converted to UTC (same instant), so the stored
+          value is genuinely UTC;
+        * an already-UTC string (``Z`` or ``+00:00``) -> returned UNCHANGED,
+          so the representation of the common case (including the
+          default_factory output) never churns;
+        * an empty or unparseable value -> returned UNCHANGED rather than
+          rejected, so this can never break an existing producer.
+        """
+        if not value:
+            return value
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc).isoformat()
+        if parsed.utcoffset() == timedelta(0):
+            return value
+        return parsed.astimezone(timezone.utc).isoformat()
 
     @classmethod
     def create(

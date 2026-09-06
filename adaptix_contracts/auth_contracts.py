@@ -70,12 +70,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import cast, Annotated
+from typing import Any, NamedTuple, cast, Annotated
 from uuid import UUID
 
 from fastapi import Header, HTTPException, Request, status
 from pydantic import BaseModel
 
+from adaptix_contracts.environment import is_production as _is_production
 from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
     GATEWAY_SHARED_SECRET_ENV,
@@ -87,10 +88,12 @@ from adaptix_contracts.gateway_signature import (
 
 logger = logging.getLogger(__name__)
 
-# Environment variable that controls whether the bearer-JWT dev fallback is
-# permitted. Set to "production" or "prod" in real deployments; the fallback
-# is then disabled so every request MUST arrive via API Gateway.
-_ENV_VAR = "ENVIRONMENT"
+# _is_production is imported above from adaptix_contracts.environment (the
+# canonical, single-source definition) under its historical private name so
+# every existing call site in this module is unaffected. It controls whether
+# the bearer-JWT dev fallback is permitted: in the real production
+# environment the fallback is disabled so every request MUST arrive via API
+# Gateway.
 
 # Forensic fix F-24 / APPSEC-CONTRACTS-UNSIGNED-HEADER-TRUST — gateway HMAC
 # verification of injected identity headers.
@@ -164,6 +167,155 @@ def _gateway_hmac_enforce() -> bool:
     return _is_production()
 
 
+_DEMO_CLAIMS_MALFORMED = "Demo auth context claims are malformed."
+
+
+class _DemoBlock(NamedTuple):
+    """Demo identity parsed from a VERIFIED signed context (see ``_parse_demo_block``)."""
+
+    session_id: UUID | None
+    lease_id: UUID | None
+    persona: str | None
+    agency_id: str | None
+
+
+def _reject_demo(log_message: str, detail: str) -> HTTPException:
+    """Log why a signed demo block is refused and build the 401 for it."""
+    logger.warning(log_message)
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+
+
+def _demo_uuid(raw: str, *, family: str, field: str) -> UUID:
+    """Parse a demo identifier claim, or reject the block (never downgrade).
+
+    Raises:
+        HTTPException: 401 when ``raw`` is not a UUID.
+    """
+    try:
+        return UUID(raw)
+    except ValueError as exc:
+        raise _reject_demo(
+            f"signed {family} demo context has malformed {field}; "
+            "rejecting (no silent downgrade).",
+            _DEMO_CLAIMS_MALFORMED,
+        ) from exc
+
+
+def _claim_text(payload: dict[str, Any], name: str) -> str:
+    """Return a claim as stripped text, with ``None``/missing as ``""``."""
+    return str(payload.get(name) or "").strip()
+
+
+class _RawDemoClaims(NamedTuple):
+    """The four demo claims as carried on the wire (text, possibly empty)."""
+
+    session: str
+    lease: str
+    persona: str
+    agency: str
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> _RawDemoClaims:
+        """Read the four demo claims from a verified payload, stripped, ``""`` when absent."""
+        return cls(
+            session=_claim_text(payload, "demo_session_id"),
+            lease=_claim_text(payload, "demo_lease_id"),
+            persona=_claim_text(payload, "demo_persona"),
+            agency=_claim_text(payload, "demo_agency_id"),
+        )
+
+
+def _parse_no_lease_demo(raw: _RawDemoClaims) -> _DemoBlock:
+    """No-lease family: founder Platform Demo Mode / public synthetic sessions.
+
+    No lease semantics. ``demo_session_id`` is optional but must be a UUID
+    when present; ``demo_persona`` and ``demo_agency_id`` are optional.
+    """
+    session_id = (
+        _demo_uuid(raw.session, family="no-lease", field="demo_session_id")
+        if raw.session
+        else None
+    )
+    return _DemoBlock(
+        session_id=session_id,
+        lease_id=None,
+        persona=raw.persona or None,
+        agency_id=raw.agency or None,
+    )
+
+
+def _guard_leased_demo(raw: _RawDemoClaims, *, is_founder: bool) -> None:
+    """Refuse a leased block that names an agency or claims founder.
+
+    Raises:
+        HTTPException: 401 on a mixed-family or founder leased block.
+    """
+    if raw.agency:
+        raise _reject_demo(
+            "signed demo context carries BOTH demo_lease_id and demo_agency_id; rejecting.",
+            "Demo auth context mixes the Cortex Live and no-lease demo families.",
+        )
+    if is_founder:
+        raise _reject_demo(
+            "signed Cortex Live demo context claims founder; rejecting "
+            "(leased demo principals are never founder).",
+            "Demo auth context may not carry founder privilege.",
+        )
+
+
+def _parse_leased_demo(raw: _RawDemoClaims, *, is_founder: bool) -> _DemoBlock:
+    """Cortex Live (leased) family: strict shape, never founder, never an agency.
+
+    Raises:
+        HTTPException: 401 on a mixed-family, founder, malformed or persona-less
+            block.
+    """
+    _guard_leased_demo(raw, is_founder=is_founder)
+    session_id = _demo_uuid(raw.session, family="Cortex Live", field="demo_session_id")
+    lease_id = _demo_uuid(raw.lease, family="Cortex Live", field="demo_lease_id")
+    if not raw.persona:
+        raise _reject_demo(
+            "signed Cortex Live demo context has empty demo_persona; rejecting.",
+            _DEMO_CLAIMS_MALFORMED,
+        )
+    return _DemoBlock(
+        session_id=session_id, lease_id=lease_id, persona=raw.persona, agency_id=None
+    )
+
+
+def _parse_demo_block(payload: dict[str, Any], *, is_founder: bool) -> _DemoBlock:
+    """Parse the demo block of a verified signed context, or reject it with 401.
+
+    Two demo families share ``is_demo`` and are told apart by ``demo_lease_id``,
+    exactly as ``Adaptix-Core-Service`` (``core_app.auth.dependencies.
+    _extract_demo_block``) tells them apart, so Core and every contracts
+    consumer agree about which tokens are usable demo principals:
+
+    * **Cortex Live (leased)** — ``demo_lease_id`` present. The session and
+      lease MUST be UUIDs, ``demo_persona`` MUST be non-empty, the principal may
+      NEVER be founder (founder lifts tenant scoping, which an isolated leased
+      demo tenant must never escape), and it may not also carry
+      ``demo_agency_id``. See ``_parse_leased_demo``.
+    * **No-lease** — founder Platform Demo Mode and the public synthetic
+      ``/demo/<app>`` sessions. No lease semantics: ``demo_session_id`` is
+      optional (but a UUID when present), ``demo_persona`` and
+      ``demo_agency_id`` are optional, and founder is permitted because
+      Platform Demo Mode IS the founder. See ``_parse_no_lease_demo``.
+
+    A malformed block is REJECTED, never downgraded to an ordinary context:
+    every downstream demo safety gate keys off these fields, so a demo token
+    quietly becoming a normal token would strip those protections while keeping
+    the session alive.
+
+    Raises:
+        HTTPException: 401 on any malformed or mixed-family demo block.
+    """
+    raw = _RawDemoClaims.from_payload(payload)
+    if raw.lease:
+        return _parse_leased_demo(raw, is_founder=is_founder)
+    return _parse_no_lease_demo(raw)
+
+
 class AuthContext(BaseModel):
     """Resolved identity injected by the AWS API Gateway Lambda authorizer.
 
@@ -198,6 +350,10 @@ class AuthContext(BaseModel):
             only when ``is_demo`` is true on a verified signed context.
         demo_persona: Active demo persona key (e.g. ``agency_admin``). Set only
             when ``is_demo`` is true on a verified signed context.
+        demo_agency_id: Synthetic demo agency identifier carried by the
+            NO-LEASE demo family (founder Platform Demo Mode and the public
+            synthetic ``/demo/<app>`` sessions). Always ``None`` for a Cortex
+            Live (leased) demo session and for non-demo contexts.
     """
 
     user_id: UUID
@@ -211,12 +367,9 @@ class AuthContext(BaseModel):
     demo_session_id: UUID | None = None
     demo_lease_id: UUID | None = None
     demo_persona: str | None = None
+    demo_agency_id: str | None = None
 
     model_config = {"frozen": True}
-
-
-def _is_production() -> bool:
-    return os.getenv(_ENV_VAR, "").strip().lower() in ("production", "prod")
 
 
 def _parse_roles(raw: str | None) -> list[str]:
@@ -534,40 +687,13 @@ async def get_auth_context(
         demo_session_id: UUID | None = None
         demo_lease_id: UUID | None = None
         demo_persona: str | None = None
+        demo_agency_id: str | None = None
         if is_demo:
-            raw_demo_session = str(
-                verified_payload.get("demo_session_id") or ""
-            ).strip()
-            raw_demo_lease = str(verified_payload.get("demo_lease_id") or "").strip()
-            raw_demo_persona = str(verified_payload.get("demo_persona") or "").strip()
-            try:
-                demo_session_id = UUID(raw_demo_session)
-                demo_lease_id = UUID(raw_demo_lease)
-            except (ValueError, AttributeError) as exc:
-                logger.warning(
-                    "signed demo context has malformed demo_session_id/"
-                    "demo_lease_id; rejecting (no silent downgrade)."
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Demo auth context claims are malformed.",
-                ) from exc
-            if not raw_demo_persona:
-                logger.warning("signed demo context has empty demo_persona; rejecting.")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Demo auth context claims are malformed.",
-                )
-            if is_founder_flag:
-                logger.warning(
-                    "signed demo context claims founder; rejecting "
-                    "(demo principals are never founder)."
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Demo auth context may not carry founder privilege.",
-                )
-            demo_persona = raw_demo_persona
+            demo = _parse_demo_block(verified_payload, is_founder=is_founder_flag)
+            demo_session_id = demo.session_id
+            demo_lease_id = demo.lease_id
+            demo_persona = demo.persona
+            demo_agency_id = demo.agency_id
     else:
         # Unsigned / legacy path (no verifiable signature): trust the injected
         # headers exactly as before. Reachable only when the absent-signature
@@ -583,6 +709,7 @@ async def get_auth_context(
         demo_session_id = None
         demo_lease_id = None
         demo_persona = None
+        demo_agency_id = None
         email = (x_user_email or "").strip()
         is_founder_flag = (x_is_founder or "false").strip().lower() in (
             "true",
@@ -654,6 +781,7 @@ async def get_auth_context(
         demo_session_id=demo_session_id,
         demo_lease_id=demo_lease_id,
         demo_persona=demo_persona,
+        demo_agency_id=demo_agency_id,
     )
 
 
