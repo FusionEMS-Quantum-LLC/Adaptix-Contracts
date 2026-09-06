@@ -15,9 +15,13 @@ name: repo-validation
 #   scripts/generate_tool_inventory.py    (copied)
 #   governance/approved-tools.json        (copied, and drifted into 3 versions)
 #
-# Those files are DELETED when this lands. Leaving them in place would mean two
-# ways to validate one repository, which is the defect being removed rather
-# than a safety net.
+# Those files are removed in a SEPARATE correction, per repository, once the
+# engine is proven to subsume them for that repository. Adoption of this carrier
+# is additive: several repositories carry gates that exist only in the legacy
+# workflow (real-PostgreSQL RLS lanes, merged-with-base migration graph checks,
+# ratcheted frontend scans), and deleting a real gate before proving equivalence
+# would be a regression dressed as cleanup. The end state is still exactly one
+# validation carrier per repository.
 #
 # The push trigger is deliberate. With `pull_request` alone, main was never
 # validated: a defect could land, sit red on main unnoticed, and surface on the
@@ -29,9 +33,16 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Deliberately no workflow_dispatch. A manual run reports under a different
+  # github.ref than the pull_request run, so the two land in separate
+  # concurrency groups and can interleave -- and the later finisher wins a
+  # REQUIRED check. Re-running a transient failure is already possible from the
+  # run's own "Re-run jobs", which reports against the same SHA.
 
 concurrency:
-  group: repo-validation-${{ github.ref }}
+  # Keyed by workflow name as well as ref, so this carrier never shares a
+  # cancellation group with another workflow on the same branch.
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -46,6 +57,14 @@ jobs:
   repo-validation:
     name: adaptix/repo-validation
     runs-on: ubuntu-latest
+    # A hung engine phase must not hold a runner for GitHub's 6-hour default.
+    # 60 is set from measured FULL RUNS, not the longest single phase: under
+    # engine 1.10.0 on 2026-09-03, Adaptix-Core-Service's full validation ran
+    # past 45 minutes and Adaptix-Billing-Service's past 35, legitimately, on
+    # the fleet's largest suites. (Adaptix-Web-App's ~19 minutes is its test
+    # phase alone.) A 30-40 minute ceiling would have killed real runs and
+    # reported them as hangs. Lower this only from a new fleet-wide measurement.
+    timeout-minutes: 60
     steps:
       - name: Checkout repository under validation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,10 +74,16 @@ jobs:
       # Consumers always pin an immutable engine commit. A release wave advances
       # this SHA only after that exact engine revision has passed self-validation
       # and representative canaries. Mutable tags are never validation authority.
-      # This remains on the current production engine until the 1.9.1 engine
-      # merge is proven on main; the fleet-release commit then advances the SHA.
+      # Currently engine 1.10.0, advanced from 1.9.3 on 2026-09-03 after that
+      # exact revision passed adaptix-ops' own gate and five representative
+      # canaries -- with the alembic head assertion observed RUNNING in the
+      # canary logs, not merely reported green, because the impact plan can
+      # exclude gates on a narrow change and a skipped gate proves nothing.
+      # (Dated, not "by this commit": consumers receive this text through
+      # re-sync PRs that do not move the pin, and the sentence must stay true
+      # in both.)
       - name: Validate
-        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@28cb33eeb5d1554eadcd322ac37487da8a1977cb
+        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@edc1c70e4e0da2bbb26b5d76c3bce7d349aba389
         with:
           repository: ${{ github.repository }}
           target-path: repo
