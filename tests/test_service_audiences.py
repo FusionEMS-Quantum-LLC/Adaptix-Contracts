@@ -117,3 +117,39 @@ def test_registry_has_no_duplicate_after_normalization() -> None:
     frozenset while being the same audience to every consumer."""
     normalized = [a.strip().lower() for a in KNOWN_SERVICE_AUDIENCES]
     assert len(normalized) == len(set(normalized))
+
+
+@pytest.mark.parametrize(
+    "audience",
+    [
+        "adaptix-cct",
+        "adaptix-edge",
+        "adaptix-preplan",
+        "adaptix-wildland",
+        "adaptix-xr",
+    ],
+)
+def test_undeployed_domain_service_audiences_are_registered(audience: str) -> None:
+    """Step 1 of "Adding a new service" for the five domain services whose
+    backends exist on ``main`` but which had no AWS footprint.
+
+    Each of ``Adaptix-CCT-Service``, ``Adaptix-Edge-Service``,
+    ``Adaptix-Preplan-Service``, ``Adaptix-Wildland-Service`` and
+    ``Adaptix-XR-Service`` carries a real FastAPI application, Alembic
+    migrations, and a ``backend/Dockerfile`` (Preplan: a root ``Dockerfile``
+    over ``src/``), and each verifies a gateway-signed context through
+    ``adaptix_contracts.auth_contracts``. Verified 2026-09-05 against the live
+    account (793439286972, us-east-1): none of the five had an ECS service, a
+    target group, an RDS instance, or a CodeBuild project, so none could be
+    routed.
+
+    Registering the audience here is deliberately the FIRST step and is inert on
+    its own: the gateway refuses to start with a route whose audience is absent
+    from this registry, and Core issues the founder every audience in this set,
+    so both consumers must learn the string before either a ``RouteEntry`` or an
+    ``ADAPTIX_GATEWAY_EXPECTED_AUDIENCE`` task-definition value can exist. An
+    audience with no route resolves to a structured gateway 404, never a 403 --
+    the reverse order is what produced the ``adaptix-audit`` and
+    ``adaptix-vision`` outages this module was created to prevent.
+    """
+    assert audience in KNOWN_SERVICE_AUDIENCES
