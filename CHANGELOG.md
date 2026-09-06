@@ -12,6 +12,32 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-09-05
+
+### Added
+
+- **`adaptix_contracts.service_audiences`** -- registered `adaptix-cct`,
+  `adaptix-edge`, `adaptix-preplan`, `adaptix-wildland`, and `adaptix-xr`.
+  These are the five AdaptixCore domain services whose backends are real on
+  `main` (FastAPI application, Alembic migrations, container image
+  definition, gateway-signature verification through
+  `adaptix_contracts.auth_contracts`) but which had no AWS footprint at all --
+  verified 2026-09-05 against account 793439286972 / us-east-1: no ECS
+  service, no target group, no RDS instance, no CodeBuild project for any of
+  the five.
+
+  This is step 1 of the three-step "Adding a new service" sequence documented
+  in `service_audiences.py` itself, and it is inert on its own. The gateway
+  refuses to start with a `RouteEntry` whose audience is absent from this
+  registry, and Core sources `_LIVE_SERVICE_AUDIENCES` from the same set, so
+  both consumers must learn the string before a route or a downstream
+  `ADAPTIX_GATEWAY_EXPECTED_AUDIENCE` can be introduced. Doing it in the other
+  order is precisely what produced the `adaptix-audit` and `adaptix-vision`
+  403 outages this module exists to prevent. An audience registered here with
+  no matching route is a structured gateway 404, not a 403.
+
+  Purely additive: no existing audience, name, or behavior changes.
+
 ## [5.5.0] - 2026-09-05
 
 ### Added

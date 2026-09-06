@@ -69,6 +69,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-billing",
         "adaptix-cad",
         "adaptix-calendar",
+        "adaptix-cct",
         "adaptix-communications",
         "adaptix-compliance",
         "adaptix-core",
@@ -79,6 +80,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-customer-success",
         "adaptix-device",
         "adaptix-documents",
+        "adaptix-edge",
         "adaptix-epcr",
         "adaptix-exports",
         "adaptix-facilities",
@@ -115,6 +117,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-patient-identity",
         "adaptix-payments",
         "adaptix-policy",
+        "adaptix-preplan",
         "adaptix-pricing",
         "adaptix-qa",
         "adaptix-qhin",
@@ -132,7 +135,9 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
         "adaptix-trustsign",
         "adaptix-vision",
         "adaptix-voice",
+        "adaptix-wildland",
         "adaptix-workforce",
+        "adaptix-xr",
     }
 )
 
