@@ -20,6 +20,20 @@ from __future__ import annotations
 
 from typing import Final
 
+from adaptix_contracts.epcr.transport_events import (
+    EPCR_TRANSPORT_ARRIVED_DESTINATION,
+    EPCR_TRANSPORT_DESTINATION_UPDATED,
+)
+from adaptix_contracts.family_bridge.events import (
+    BRIDGE_SMS_DELIVERY_UPDATED,
+    BRIDGE_SMS_SENT,
+    BRIDGE_STATUS_UPDATED,
+    BRIDGE_THREAD_CLOSED,
+    BRIDGE_THREAD_OPENED,
+)
+from adaptix_contracts.patient_identity.events import (
+    PATIENT_NOK_CONSENT_CHANGED,
+)
 from adaptix_contracts.cad.events import (
     CAD_INCIDENT_CLOSED,
     CAD_INCIDENT_CREATED,
@@ -210,6 +224,46 @@ HOSPITAL_CATH_LAB_ACTIVATE_RECOMMENDED: Final[str] = (
 # actually emits resolves through PRODUCER_SOURCE_SERVICE_ALIASES.
 # Verified against that repo's origin/main 2026-08-09.
 PATIENT_IDENTITY_MERGED: Final[str] = "patient.identity.merged"
+
+# ``patient.nok.consent.changed`` is imported from
+# ``adaptix_contracts.patient_identity.events`` (typed payload
+# ``PatientNokConsentChangedPayload``). Next-of-kin consent standing is owned
+# by Adaptix-Patient-Identity-Service and no other service may assert that it
+# changed. Registered ahead of its producer because the Family-Bridge
+# activation DAG requires the contract to be published and versioned before
+# either the producer or the consumer can reference it; the producer lands in
+# patient_identity_app/outbox.py under correction FB-004.
+
+# ---------------------------------------------------------------------------
+# ePCR transport-lifecycle events (producer: Adaptix-EPCR-Service, slug ``epcr``)
+# ---------------------------------------------------------------------------
+# Imported from ``adaptix_contracts.epcr.transport_events`` with typed,
+# PHI-bounded payloads. These publish the two transport facts a consumer
+# outside the clinical boundary needs — where the patient is being taken, and
+# whether they have arrived — WITHOUT the unbounded chart spread that
+# ``epcr.chart.updated`` carries. Both map to columns that already exist:
+# ChartDisposition.destination_name/_code (eDisposition.01/.02) and
+# ChartTimes.patient_arrived_at_destination_at (eTimes.11). Producer enqueues
+# onto the existing durable chart-event outbox (epcr_app/outbox_worker.py,
+# which already dispatches unknown event types generically) under correction
+# FB-003.
+
+# ---------------------------------------------------------------------------
+# Family-Bridge events (producer: Adaptix-Communications-Service, slug
+# ``communications``)
+# ---------------------------------------------------------------------------
+# Imported from ``adaptix_contracts.family_bridge.events``. These four ride
+# AdaptixEventEnvelope rather than the operational envelope, which is why they
+# were never gated by ``assert_event_type_registered`` and so went unregistered
+# here since Play P24 landed. They are live today. Producer citations,
+# Adaptix-Communications-Service origin/main e0084abd, verified 2026-09-07:
+#   communications_app/services/family_bridge_service.py:576  bridge.thread.opened
+#   communications_app/services/family_bridge_service.py:451  bridge.sms.sent
+#   communications_app/services/family_bridge_service.py:717  bridge.status.updated
+#   communications_app/services/family_bridge_service.py:773  bridge.thread.closed
+# ``bridge.sms.delivery.updated`` is the fifth and is NOT yet emitted: it
+# carries the Telnyx delivery receipt that turns an "accepted by the gateway"
+# into a real handset outcome, and its producer lands under correction FB-006.
 
 FIRE_INCIDENT_CREATED: Final[str] = "fire.incident.created"
 FIRE_INCIDENT_UPDATED: Final[str] = "fire.incident.updated"
@@ -404,6 +458,20 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     VAS_PROJECTION_PROPOSED: {"version": "1.0", "source_service": "epcr"},
     VAS_PROJECTION_REVIEWED: {"version": "1.0", "source_service": "epcr"},
     PATIENT_IDENTITY_MERGED: {"version": "1.0", "source_service": "patient-identity"},
+    PATIENT_NOK_CONSENT_CHANGED: {
+        "version": "1.0",
+        "source_service": "patient-identity",
+    },
+    EPCR_TRANSPORT_DESTINATION_UPDATED: {"version": "1.0", "source_service": "epcr"},
+    EPCR_TRANSPORT_ARRIVED_DESTINATION: {"version": "1.0", "source_service": "epcr"},
+    BRIDGE_THREAD_OPENED: {"version": "1.0", "source_service": "communications"},
+    BRIDGE_SMS_SENT: {"version": "1.0", "source_service": "communications"},
+    BRIDGE_STATUS_UPDATED: {"version": "1.0", "source_service": "communications"},
+    BRIDGE_THREAD_CLOSED: {"version": "1.0", "source_service": "communications"},
+    BRIDGE_SMS_DELIVERY_UPDATED: {
+        "version": "1.0",
+        "source_service": "communications",
+    },
     WORKFORCE_SHIFT_CANCELLED: {"version": "1.0", "source_service": "workforce"},
     FLEET_UNIT_STATUS_CHANGED: {"version": "1.0", "source_service": "fleet"},
     FLEET_VEHICLE_OUT_OF_SERVICE: {"version": "1.0", "source_service": "fleet"},
@@ -580,6 +648,11 @@ def producer_of(event_type: str) -> ServiceDefinition:
 __all__ = [
     "ALL_EVENTS",
     "ALL_REGISTERED_EVENTS",
+    "BRIDGE_SMS_DELIVERY_UPDATED",
+    "BRIDGE_SMS_SENT",
+    "BRIDGE_STATUS_UPDATED",
+    "BRIDGE_THREAD_CLOSED",
+    "BRIDGE_THREAD_OPENED",
     "BILLING_CALL_CONTEXT_ASSEMBLED",
     "BILLING_CLAIM_CREATED",
     "BILLING_CLAIM_STATUS_CHANGED",
@@ -614,6 +687,8 @@ __all__ = [
     "EPCR_CHART_UPDATED",
     "EPCR_NEMSIS_SUBMIT_FAILED",
     "EPCR_NEMSIS_SUBMIT_SUCCEEDED",
+    "EPCR_TRANSPORT_ARRIVED_DESTINATION",
+    "EPCR_TRANSPORT_DESTINATION_UPDATED",
     "EPCR_VISION_CAPTURE_ACCEPTED",
     "EPCR_VISION_CAPTURE_CREATED",
     "EPCR_VISION_CAPTURE_REJECTED",
@@ -636,6 +711,7 @@ __all__ = [
     "NERIS_SCHEMA_ASSET_REFRESHED",
     "NERIS_VALIDATION_COMPLETED",
     "PATIENT_IDENTITY_MERGED",
+    "PATIENT_NOK_CONSENT_CHANGED",
     "PRODUCER_SOURCE_SERVICE_ALIASES",
     "TRUSTSIGN_DOCUMENT_SIGNED",
     "VAS_OVERLAY_ACCEPTED",

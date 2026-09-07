@@ -5,6 +5,7 @@ service error contracts for the Family-Bridge SMS-to-next-of-kin thread.
 """
 
 from adaptix_contracts.family_bridge.enums import (
+    ComplaintClass,
     ConsentSource,
     ConsentStatus,
     NoKRelationship,
@@ -26,16 +27,19 @@ from adaptix_contracts.family_bridge.errors import (
     to_adaptix_error_code,
 )
 from adaptix_contracts.family_bridge.events import (
+    BRIDGE_SMS_DELIVERY_UPDATED,
     BRIDGE_SMS_SENT,
     BRIDGE_STATUS_UPDATED,
     BRIDGE_THREAD_CLOSED,
     BRIDGE_THREAD_OPENED,
     FAMILY_BRIDGE_EVENTS,
     FAMILY_BRIDGE_SOURCE_SERVICE,
+    BridgeSmsDeliveryUpdatedPayload,
     BridgeSmsSentPayload,
     BridgeStatusUpdatedPayload,
     BridgeThreadClosedPayload,
     BridgeThreadOpenedPayload,
+    build_bridge_sms_delivery_updated_event,
     build_bridge_sms_sent_event,
     build_bridge_status_updated_event,
     build_bridge_thread_closed_event,
@@ -51,14 +55,17 @@ from adaptix_contracts.family_bridge.models import (
 )
 
 __all__ = [
+    "BRIDGE_SMS_DELIVERY_UPDATED",
     "BRIDGE_SMS_SENT",
     "BRIDGE_STATUS_UPDATED",
     "BRIDGE_THREAD_CLOSED",
     "BRIDGE_THREAD_OPENED",
+    "BridgeSmsDeliveryUpdatedPayload",
     "BridgeSmsSentPayload",
     "BridgeStatusUpdatedPayload",
     "BridgeThreadClosedPayload",
     "BridgeThreadOpenedPayload",
+    "ComplaintClass",
     "ConsentSource",
     "ConsentStatus",
     "FAMILY_BRIDGE_EVENTS",
@@ -77,6 +84,7 @@ __all__ = [
     "ThreadCloseReason",
     "ThreadStage",
     "ThreadStatusEvent",
+    "build_bridge_sms_delivery_updated_event",
     "build_bridge_sms_sent_event",
     "build_bridge_status_updated_event",
     "build_bridge_thread_closed_event",
