@@ -8,6 +8,21 @@ name: repo-validation
 # specifics. Everything that decides what must run, whether a phase was
 # skipped, and whether the result is green lives in the engine it calls.
 #
+# EXCEPTION IN THIS REPOSITORY ONLY: Adaptix-Contracts is public and
+# adaptix-ops (which hosts the validation action) is private. A public
+# repository cannot resolve `uses: FusionEMS-Quantum-LLC/adaptix-ops/...`
+# directly -- Actions action resolution requires the calling workflow's
+# token/identity to already have read access to the action's repository, and
+# an anonymous/public run has none. Adaptix-Contracts stays public
+# deliberately: 107 consumer repositories install the contracts package with
+# an unauthenticated `pip install git+https://...`, so flipping visibility
+# would break every one of them. Instead this workflow acquires the same
+# private action at the same pinned revision via a short-lived GitHub App
+# installation token scoped only to adaptix-ops, checks it out locally, and
+# invokes it with a local `uses: ./path` reference. It is still the same
+# canonical engine at the same commit -- nothing about the validation logic
+# is vendored, forked, or duplicated.
+#
 # What it replaces, per repository:
 #   .github/workflows/pr-validation.yml   (copied, with a hardcoded runtime)
 #   scripts/ci/verify-toolchain.sh        (copied)
@@ -71,6 +86,21 @@ jobs:
         with:
           path: repo
 
+      # Adaptix-Contracts is public; adaptix-ops (the action's home) is
+      # private. Mint a short-lived installation token scoped only to
+      # adaptix-ops so the next step can check it out. Uses the org's
+      # ADAPTIX_BOT_APP_ID / ADAPTIX_BOT_PRIVATE_KEY app credentials, not the
+      # job's own GITHUB_TOKEN, which has no access to a private repository
+      # outside Adaptix-Contracts.
+      - name: Mint adaptix-ops access token
+        id: adaptix-ops-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.ADAPTIX_BOT_APP_ID }}
+          private-key: ${{ secrets.ADAPTIX_BOT_PRIVATE_KEY }}
+          owner: FusionEMS-Quantum-LLC
+          repositories: adaptix-ops
+
       # Consumers always pin an immutable engine commit. A release wave advances
       # this SHA only after that exact engine revision has passed self-validation
       # and representative canaries. Mutable tags are never validation authority.
@@ -81,9 +111,20 @@ jobs:
       # exclude gates on a narrow change and a skipped gate proves nothing.
       # (Dated, not "by this commit": consumers receive this text through
       # re-sync PRs that do not move the pin, and the sentence must stay true
-      # in both.)
+      # in both.) Checked out locally here (instead of a remote `uses:`)
+      # solely so this public repository can resolve the private action --
+      # see the file header. Same engine, same pinned revision.
+      - name: Checkout validation engine (adaptix-ops)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: FusionEMS-Quantum-LLC/adaptix-ops
+          ref: a69270b09ccb23bb73f73f1cf42417dc439dcd2f
+          token: ${{ steps.adaptix-ops-token.outputs.token }}
+          persist-credentials: false
+          path: .adaptix-ops
+
       - name: Validate
-        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@a69270b09ccb23bb73f73f1cf42417dc439dcd2f
+        uses: ./.adaptix-ops/validation
         with:
           repository: ${{ github.repository }}
           target-path: repo
