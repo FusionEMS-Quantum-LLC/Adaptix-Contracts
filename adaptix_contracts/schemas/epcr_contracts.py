@@ -335,16 +335,17 @@ class EpcrBillingInterventionsBlock(BaseModel):  # pylint: disable=too-few-publi
     alone. CMS ALS2/SCT policy determination is the Billing consumer's
     responsibility; this block supplies only the underlying facts.
 
-    Absence of the whole block, or of either list, means the producer
-    predates this block (or the chart carried no structured rows to export)
-    — it is NOT evidence that no interventions were performed, and a consumer
-    must not treat it as "zero interventions occurred."
+    Absence semantics are tri-state per list, matching
+    ``EpcrBillingCertificationBlock``: ``None`` means the producer did not
+    collect that category (predates this block, or export unavailable) and is
+    NOT evidence that no interventions were performed — a consumer must not
+    treat it as "zero interventions occurred." An explicit empty list ``[]``
+    is an affirmative producer statement that the chart carried no structured
+    rows of that category.
     """
 
-    procedures: list[EpcrBillingProcedureItem] = Field(default_factory=list)
-    medication_administrations: list[EpcrBillingMedicationAdministrationItem] = Field(
-        default_factory=list
-    )
+    procedures: Optional[list[EpcrBillingProcedureItem]] = None
+    medication_administrations: Optional[list[EpcrBillingMedicationAdministrationItem]] = None
     procedure_total: Optional[int] = None
     medication_administration_total: Optional[int] = None
 
