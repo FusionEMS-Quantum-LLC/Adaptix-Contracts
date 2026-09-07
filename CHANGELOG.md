@@ -12,6 +12,23 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-09-06
+
+### Added
+
+- **`adaptix_contracts.air.far_135_609`** -- canonical shared module for the
+  14 CFR 135.609 VFR weather-minimums table (`resolve`, `stricter_of`,
+  `TerrainClass`, `LightingCondition`, `RegulatoryMinimum`,
+  `lighting_condition`, `LOCAL_FLYING_AREA_MAX_NM`,
+  `LOCAL_AREA_EXAM_VALIDITY_MONTHS`). Adaptix-Air-Service
+  (`air_app/far_135_609.py`) and Adaptix-Air-Service-Pilot
+  (`aviation/engine.py`'s inline `_CFR_135_609_TABLE`) independently declared
+  the same twelve-row federal table; both copies were verified identical
+  2026-09-06 before this module was published. Consumers move to this module
+  in follow-up changes (AIRPILOT-P2-013 parts 2-3); this part only publishes
+  the shared authority. Purely additive: no existing contract, name, or
+  behavior changes.
+
 ## [5.7.0] - 2026-09-06
 
 ### Added
