@@ -109,7 +109,31 @@ class SmsDeliveryStatus(StrEnum):
     SUPPRESSED = "suppressed"
 
 
+class ComplaintClass(StrEnum):
+    """Coarse, PHI-free tone bucket used to select SMS wording.
+
+    This is deliberately a closed set, NOT free text. It exists only to pick
+    one of the pre-written family-facing message templates
+    (``communications_app.services.family_bridge_service._TONE_KEYS``, whose
+    six keys these values mirror exactly).
+
+    It must NEVER carry the chief complaint, the dispatch nature text, an
+    impression, a diagnosis, or any other clinical narrative. Typing the
+    contract field as this enum is what stops a producer from copying the
+    complaint into a value that is published on the Signal Bus and stored on
+    the thread row.
+    """
+
+    CARDIAC = "cardiac"
+    TRAUMA = "trauma"
+    MEDICAL = "medical"
+    BEHAVIORAL = "behavioral"
+    PEDIATRIC = "pediatric"
+    OBSTETRIC = "obstetric"
+
+
 __all__ = [
+    "ComplaintClass",
     "ConsentSource",
     "ConsentStatus",
     "NoKRelationship",
