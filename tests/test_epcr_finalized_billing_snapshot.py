@@ -8,7 +8,11 @@ can mint a real claim — while a legacy 6-key event must still validate.
 
 from __future__ import annotations
 
-from adaptix_contracts.schemas import EpcrBillingSnapshot, EpcrChartFinalizedEvent
+from adaptix_contracts.schemas import (
+    EpcrBillingInterventionsBlock,
+    EpcrBillingSnapshot,
+    EpcrChartFinalizedEvent,
+)
 
 
 def _base() -> dict:
@@ -195,3 +199,61 @@ def test_insurance_and_certification_blocks_validate() -> None:
     assert snap.certification.mileage_to_closest_hospital == 4.2
     # Absent lists stay None (undocumented), never fabricated empties.
     assert snap.certification.cms_transportation_indicator_codes is None
+
+
+def test_performed_interventions_block_validates() -> None:
+    """Structured procedure/medication facts feed ALS2/SCT undercoding detection."""
+    payload = _base()
+    payload["billing_snapshot"] = {
+        "performed_interventions": {
+            "procedures": [
+                {
+                    "procedure_code": "429705000",
+                    "code_system": "SNOMED",
+                    "performed_count": 1,
+                    "successful_count": 1,
+                }
+            ],
+            "medication_administrations": [
+                {
+                    "medication_code": "7052",
+                    "code_system": "RxNorm",
+                    "route_code": "2604007",
+                    "administration_count": 1,
+                }
+            ],
+            "procedure_total": 1,
+            "medication_administration_total": 1,
+        }
+    }
+    snap = EpcrChartFinalizedEvent.model_validate(payload).billing_snapshot
+    assert isinstance(snap.performed_interventions, EpcrBillingInterventionsBlock)
+    assert snap.performed_interventions.procedures[0].procedure_code == "429705000"
+    assert snap.performed_interventions.procedures[0].code_system == "SNOMED"
+    assert snap.performed_interventions.procedures[0].successful_count == 1
+    med = snap.performed_interventions.medication_administrations[0]
+    assert med.medication_code == "7052"
+    assert med.route_code == "2604007"
+    assert snap.performed_interventions.procedure_total == 1
+    assert snap.performed_interventions.medication_administration_total == 1
+
+
+def test_performed_interventions_block_absent_is_valid() -> None:
+    """Absence means 'producer predates this block', never 'zero interventions'."""
+    payload = _base()
+    payload["billing_snapshot"] = {"primary_impression": "chest pain"}
+    snap = EpcrChartFinalizedEvent.model_validate(payload).billing_snapshot
+    assert snap.performed_interventions is None
+
+
+def test_legacy_event_without_performed_interventions_still_parses() -> None:
+    """A pre-5.7.0 producer payload with no performed_interventions key still validates."""
+    payload = _base()
+    payload["billing_snapshot"] = {
+        "chart_status": "finalized",
+        "level_of_service_code": "ALS",
+        "ready_for_billing": True,
+    }
+    event = EpcrChartFinalizedEvent.model_validate(payload)
+    assert event.billing_snapshot.ready_for_billing is True
+    assert event.billing_snapshot.performed_interventions is None

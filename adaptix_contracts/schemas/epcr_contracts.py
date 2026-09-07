@@ -285,6 +285,70 @@ class EpcrBillingCertificationBlock(BaseModel):
     prior_authorization_code_payer: Optional[str] = None  # ePayment.54
 
 
+class EpcrBillingProcedureItem(BaseModel):  # pylint: disable=too-few-public-methods
+    """One performed-procedure fact carried on the finalized event.
+
+    Mirrors a single structured ``Procedure`` row from EPCR's chart truth
+    model at finalize time. ``code_system`` names the coding scheme the code
+    was drawn from (e.g. ``"SNOMED"``) — required context because a bare code
+    string is ambiguous across NEMSIS procedure-code sources. ``performed_count``
+    and ``successful_count`` are raw counts as documented by the crew; a
+    ``None`` ``successful_count`` means the crew did not separately record
+    success/failure, not that the procedure failed.
+    """
+
+    procedure_code: str
+    code_system: Optional[str] = None  # e.g. "SNOMED"
+    performed_count: int = 1
+    successful_count: Optional[int] = None
+
+
+class EpcrBillingMedicationAdministrationItem(BaseModel):  # pylint: disable=too-few-public-methods
+    """One medication-administration fact carried on the finalized event.
+
+    Mirrors a single structured ``MedicationAdministration`` row from EPCR's
+    chart truth model at finalize time. ``code_system`` names the coding
+    scheme (e.g. ``"RxNorm"``). ``route_code`` is the NEMSIS eMedications.10
+    route-of-administration code, carried raw and unparsed — it is what lets
+    the Billing consumer distinguish an IV-push administration from a
+    continuous infusion, which is the fact CMS ALS2 level-of-service
+    determination turns on. ``administration_count`` is the raw count as
+    documented by the crew.
+    """
+
+    medication_code: str
+    code_system: Optional[str] = None  # e.g. "RxNorm"
+    route_code: Optional[str] = None  # NEMSIS eMedications.10
+    administration_count: int = 1
+
+
+class EpcrBillingInterventionsBlock(BaseModel):  # pylint: disable=too-few-public-methods
+    """Performed-intervention facts carried on the finalized event for billing.
+
+    ``procedures`` and ``medication_administrations`` are RAW chart facts
+    derived directly from EPCR's structured ``Procedure`` and
+    ``MedicationAdministration`` rows at finalize time — NEVER parsed or
+    inferred from narrative text. This block exists so Billing's ALS2/SCT
+    undercoding detection can apply CMS level-of-service policy
+    deterministically against real performed-intervention counts and route
+    codes, instead of inferring level of service from ``level_of_service_code``
+    alone. CMS ALS2/SCT policy determination is the Billing consumer's
+    responsibility; this block supplies only the underlying facts.
+
+    Absence of the whole block, or of either list, means the producer
+    predates this block (or the chart carried no structured rows to export)
+    — it is NOT evidence that no interventions were performed, and a consumer
+    must not treat it as "zero interventions occurred."
+    """
+
+    procedures: list[EpcrBillingProcedureItem] = Field(default_factory=list)
+    medication_administrations: list[EpcrBillingMedicationAdministrationItem] = Field(
+        default_factory=list
+    )
+    procedure_total: Optional[int] = None
+    medication_administration_total: Optional[int] = None
+
+
 class EpcrBillingSnapshot(BaseModel):
     """Claim-ready fact set mirrored from EPCR's ChartBillingReadinessExport.
 
@@ -312,6 +376,11 @@ class EpcrBillingSnapshot(BaseModel):
     # their prior behaviour.
     insurance: Optional[EpcrBillingInsuranceBlock] = None
     certification: Optional[EpcrBillingCertificationBlock] = None
+    # Structured performed-procedure and medication-administration facts
+    # (5.7.0) so Billing's ALS2/SCT undercoding detection can apply CMS
+    # level-of-service policy deterministically. Absent on older events —
+    # consumers fall back to their prior behaviour. See the block docstring.
+    performed_interventions: Optional[EpcrBillingInterventionsBlock] = None
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 
