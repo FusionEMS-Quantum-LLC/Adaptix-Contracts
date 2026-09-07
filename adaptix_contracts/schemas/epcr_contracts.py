@@ -285,7 +285,7 @@ class EpcrBillingCertificationBlock(BaseModel):
     prior_authorization_code_payer: Optional[str] = None  # ePayment.54
 
 
-class EpcrBillingProcedureItem(BaseModel):
+class EpcrBillingProcedureItem(BaseModel):  # pylint: disable=too-few-public-methods
     """One performed-procedure fact carried on the finalized event.
 
     Mirrors a single structured ``Procedure`` row from EPCR's chart truth
@@ -303,7 +303,7 @@ class EpcrBillingProcedureItem(BaseModel):
     successful_count: Optional[int] = None
 
 
-class EpcrBillingMedicationAdministrationItem(BaseModel):
+class EpcrBillingMedicationAdministrationItem(BaseModel):  # pylint: disable=too-few-public-methods
     """One medication-administration fact carried on the finalized event.
 
     Mirrors a single structured ``MedicationAdministration`` row from EPCR's
@@ -322,7 +322,7 @@ class EpcrBillingMedicationAdministrationItem(BaseModel):
     administration_count: int = 1
 
 
-class EpcrBillingInterventionsBlock(BaseModel):
+class EpcrBillingInterventionsBlock(BaseModel):  # pylint: disable=too-few-public-methods
     """Performed-intervention facts carried on the finalized event for billing.
 
     ``procedures`` and ``medication_administrations`` are RAW chart facts
