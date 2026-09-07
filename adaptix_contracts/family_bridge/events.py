@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from adaptix_contracts.events.envelope import AdaptixEventEnvelope
 from adaptix_contracts.family_bridge.enums import (
+    ComplaintClass,
     ConsentSource,
     SmsDeliveryStatus,
     ThreadCloseReason,
@@ -41,12 +42,21 @@ BRIDGE_SMS_SENT: Final[str] = "bridge.sms.sent"
 BRIDGE_STATUS_UPDATED: Final[str] = "bridge.status.updated"
 BRIDGE_THREAD_CLOSED: Final[str] = "bridge.thread.closed"
 
+#: A Telnyx delivery receipt (DLR) moved a previously-sent message to its real
+#: terminal provider state. ``bridge.sms.sent`` records only that a message
+#: LEFT the gateway; the provider's own callback is the sole authority for
+#: whether the family's handset actually received it. Publishing the two as
+#: separate facts is what stops an ``accepted`` from being read as
+#: ``delivered``.
+BRIDGE_SMS_DELIVERY_UPDATED: Final[str] = "bridge.sms.delivery.updated"
+
 FAMILY_BRIDGE_EVENTS: frozenset[str] = frozenset(
     {
         BRIDGE_THREAD_OPENED,
         BRIDGE_SMS_SENT,
         BRIDGE_STATUS_UPDATED,
         BRIDGE_THREAD_CLOSED,
+        BRIDGE_SMS_DELIVERY_UPDATED,
     }
 )
 
@@ -85,7 +95,13 @@ class BridgeThreadOpenedPayload(_FamilyBridgeEventPayload):
     nok_contact_id: UUID
     consent_id: UUID
     consent_source: ConsentSource
-    complaint_class: str | None = None
+    complaint_class: ComplaintClass | None = Field(
+        default=None,
+        description=(
+            "Coarse tone bucket ONLY, from the closed ComplaintClass set. Never "
+            "the chief complaint, dispatch nature text, impression or diagnosis."
+        ),
+    )
     destination_facility_id: str | None = None
     eta_at: datetime | None = None
     opened_by_actor_id: str | None = None
@@ -120,6 +136,61 @@ class BridgeSmsSentPayload(_FamilyBridgeEventPayload):
     template_key: str | None = Field(
         default=None,
         description="Which Cortex-drafted wording template was used.",
+    )
+
+
+class BridgeSmsDeliveryUpdatedPayload(_FamilyBridgeEventPayload):
+    """Payload for ``bridge.sms.delivery.updated``.
+
+    Emitted when Telnyx reports the real outcome of a message that
+    ``bridge.sms.sent`` already announced as having left the gateway. Keyed on
+    ``provider_message_id`` because that is the only identifier both sides of
+    the reconciliation share.
+
+    ``delivery_status`` here is authoritative and supersedes the status carried
+    on the earlier ``bridge.sms.sent`` for the same ``provider_message_id``.
+    An out-of-order or duplicate receipt must never move a message backwards
+    out of a terminal state; consumers reconcile on
+    (``provider_message_id``, ``provider_status_at``).
+    """
+
+    provider: str = Field(default="telnyx")
+    provider_message_id: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "The provider's own id for the message. Required — a delivery "
+            "receipt that cannot be tied back to a sent message is not "
+            "reconcilable and must not be published as this event."
+        ),
+    )
+    delivery_status: SmsDeliveryStatus = Field(
+        ...,
+        description=(
+            "Authoritative provider outcome. SUPPRESSED never appears here: "
+            "a suppressed send never reached the provider, so no receipt "
+            "exists for it."
+        ),
+    )
+    provider_status_at: datetime = Field(
+        ...,
+        description=(
+            "When the PROVIDER recorded this status, not when we processed "
+            "the callback. Ordering key for out-of-order receipts."
+        ),
+    )
+    error_code: str | None = Field(
+        default=None,
+        description=(
+            "Provider error code for FAILED/UNDELIVERED. Carried so an "
+            "operator can distinguish a wrong number from a carrier block "
+            "without opening the provider console."
+        ),
+    )
+    attempt: int = Field(
+        default=1,
+        ge=1,
+        description="Which send attempt this receipt describes.",
     )
 
 
@@ -275,17 +346,52 @@ def build_bridge_thread_closed_event(
     )
 
 
+def build_bridge_sms_delivery_updated_event(
+    payload: BridgeSmsDeliveryUpdatedPayload,
+    *,
+    actor_id: str | None = None,
+    causation_id: str | None = None,
+    idempotency_key: str | None = None,
+    source_service: str = FAMILY_BRIDGE_SOURCE_SERVICE,
+) -> AdaptixEventEnvelope:
+    """Build a Signal-Bus-ready envelope for ``bridge.sms.delivery.updated``.
+
+    Idempotency defaults to provider message id + status, so a provider that
+    redelivers the same receipt (Telnyx retries webhooks) cannot produce a
+    second domain effect, while a genuine later transition
+    (``sent`` -> ``delivered``) still gets its own key.
+    """
+
+    return _envelope(
+        BRIDGE_SMS_DELIVERY_UPDATED,
+        payload,
+        actor_id=actor_id,
+        causation_id=causation_id,
+        idempotency_key=(
+            idempotency_key
+            or (
+                "bridge.sms.delivery.updated:"
+                f"{payload.provider_message_id}:{payload.delivery_status.value}"
+            )
+        ),
+        source_service=source_service,
+    )
+
+
 __all__ = [
+    "BRIDGE_SMS_DELIVERY_UPDATED",
     "BRIDGE_SMS_SENT",
     "BRIDGE_STATUS_UPDATED",
     "BRIDGE_THREAD_CLOSED",
     "BRIDGE_THREAD_OPENED",
     "FAMILY_BRIDGE_EVENTS",
     "FAMILY_BRIDGE_SOURCE_SERVICE",
+    "BridgeSmsDeliveryUpdatedPayload",
     "BridgeSmsSentPayload",
     "BridgeStatusUpdatedPayload",
     "BridgeThreadClosedPayload",
     "BridgeThreadOpenedPayload",
+    "build_bridge_sms_delivery_updated_event",
     "build_bridge_sms_sent_event",
     "build_bridge_status_updated_event",
     "build_bridge_thread_closed_event",
