@@ -12,6 +12,42 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-09-06
+
+### Added
+
+- **`adaptix_contracts.air.far_135_609`** -- canonical shared module for the
+  14 CFR 135.609 VFR weather-minimums table (`resolve`, `stricter_of`,
+  `TerrainClass`, `LightingCondition`, `RegulatoryMinimum`,
+  `lighting_condition`, `LOCAL_FLYING_AREA_MAX_NM`,
+  `LOCAL_AREA_EXAM_VALIDITY_MONTHS`). Adaptix-Air-Service
+  (`air_app/far_135_609.py`) and Adaptix-Air-Service-Pilot
+  (`aviation/engine.py`'s inline `_CFR_135_609_TABLE`) independently declared
+  the same twelve-row federal table; both copies were verified identical
+  2026-09-06 before this module was published. Consumers move to this module
+  in follow-up changes (AIRPILOT-P2-013 parts 2-3); this part only publishes
+  the shared authority. Purely additive: no existing contract, name, or
+  behavior changes.
+
+## [5.7.0] - 2026-09-06
+
+### Added
+
+- **`EpcrBillingInterventionsBlock`** on `EpcrBillingSnapshot` (carried by
+  `epcr.chart.finalized`) -- structured performed-procedure and
+  medication-administration facts (`EpcrBillingProcedureItem`,
+  `EpcrBillingMedicationAdministrationItem`) so Billing's ALS2/SCT
+  undercoding detection can apply CMS level-of-service policy
+  deterministically from real chart facts instead of `level_of_service_code`
+  alone. The producer lane is
+  `Adaptix-EPCR-Service/backend/epcr_app` chart finalization outbox; the
+  consumer lane is `Adaptix-Billing-Service/backend/billing_app/event_consumers`
+  undercoding detection. Purely additive: `performed_interventions` is
+  optional on `EpcrBillingSnapshot`, and every field on the new block is
+  optional. Absence means "producer predates this block", never "no
+  interventions were performed". No existing field, name, or behavior
+  changes.
+
 ## [5.6.0] - 2026-09-05
 
 ### Added
