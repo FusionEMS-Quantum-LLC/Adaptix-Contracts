@@ -345,7 +345,9 @@ class EpcrBillingInterventionsBlock(BaseModel):  # pylint: disable=too-few-publi
     """
 
     procedures: Optional[list[EpcrBillingProcedureItem]] = None
-    medication_administrations: Optional[list[EpcrBillingMedicationAdministrationItem]] = None
+    medication_administrations: Optional[
+        list[EpcrBillingMedicationAdministrationItem]
+    ] = None
     procedure_total: Optional[int] = None
     medication_administration_total: Optional[int] = None
 

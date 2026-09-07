@@ -257,6 +257,8 @@ def test_legacy_event_without_performed_interventions_still_parses() -> None:
     event = EpcrChartFinalizedEvent.model_validate(payload)
     assert event.billing_snapshot.ready_for_billing is True
     assert event.billing_snapshot.performed_interventions is None
+
+
 def test_interventions_block_lists_are_tri_state() -> None:
     """None = category not collected; explicit [] = affirmative zero rows."""
     block = EpcrBillingInterventionsBlock.model_validate({})
