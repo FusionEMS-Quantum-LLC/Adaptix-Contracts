@@ -9,6 +9,7 @@ import pytest
 from adaptix_contracts.event_consumers import (
     BILLING_SERVICE_CONSUMER,
     CAD_SERVICE_CONSUMER,
+    COMMUNICATIONS_SERVICE_CONSUMER,
     EPCR_SERVICE_CONSUMER,
     HOSPITAL_SERVICE_CONSUMER,
     KNOWN_EVENT_BUS_CONSUMERS,
@@ -21,6 +22,7 @@ def test_known_event_bus_consumer_registry_is_exactly_the_current_audited_set() 
     assert KNOWN_EVENT_BUS_CONSUMERS == {
         BILLING_SERVICE_CONSUMER,
         CAD_SERVICE_CONSUMER,
+        COMMUNICATIONS_SERVICE_CONSUMER,
         EPCR_SERVICE_CONSUMER,
         HOSPITAL_SERVICE_CONSUMER,
     }
@@ -28,6 +30,8 @@ def test_known_event_bus_consumer_registry_is_exactly_the_current_audited_set() 
 
 def test_is_known_event_bus_consumer_recognizes_canonical_names() -> None:
     assert is_known_event_bus_consumer(BILLING_SERVICE_CONSUMER) is True
+    assert is_known_event_bus_consumer(COMMUNICATIONS_SERVICE_CONSUMER) is True
+    assert COMMUNICATIONS_SERVICE_CONSUMER == "communications-service"
     assert is_known_event_bus_consumer(f"  {EPCR_SERVICE_CONSUMER}  ") is True
     assert is_known_event_bus_consumer("unknown-service") is False
     assert is_known_event_bus_consumer(None) is False
