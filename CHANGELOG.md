@@ -12,6 +12,21 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.10.0] - 2026-09-08
+
+### Added
+
+- **`adaptix_contracts.event_consumers.COMMUNICATIONS_SERVICE_CONSUMER`**
+  (`"communications-service"`), added to `KnownEventBusConsumerName` and
+  `KNOWN_EVENT_BUS_CONSUMERS`. Adaptix-Communications-Service polls the Core
+  event-bus fan-out under this name for the Family-Bridge event types
+  (`epcr.chart.created`, `epcr.chart.patient_identified`, the transport
+  destination/arrival events, `patient.nok.consent_changed`) so those
+  deliveries are durable and per-consumer (FB-T5-001). Verified 2026-09-08
+  against Core `main` (`/api/core/internal/events/pending?consumer=`)
+  and the Communications `internal_events_router` handler set. Purely
+  additive: no existing name, contract or behavior changes.
+
 ## [5.8.0] - 2026-09-06
 
 ### Added

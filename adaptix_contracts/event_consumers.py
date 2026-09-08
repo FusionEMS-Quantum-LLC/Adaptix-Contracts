@@ -20,6 +20,7 @@ from typing import Final, Literal
 __all__ = [
     "BILLING_SERVICE_CONSUMER",
     "CAD_SERVICE_CONSUMER",
+    "COMMUNICATIONS_SERVICE_CONSUMER",
     "EPCR_SERVICE_CONSUMER",
     "HOSPITAL_SERVICE_CONSUMER",
     "KNOWN_EVENT_BUS_CONSUMERS",
@@ -30,12 +31,19 @@ __all__ = [
 
 BILLING_SERVICE_CONSUMER: Final[str] = "billing-service"
 CAD_SERVICE_CONSUMER: Final[str] = "cad-service"
+# Adaptix-Communications-Service polls the fan-out under this name for the
+# Family-Bridge event types (epcr.chart.created, epcr.chart.patient_identified,
+# the transport destination/arrival events and patient.nok.consent_changed).
+# Added 2026-09-08 with the poller that consumes it (FB-T5-001); before that,
+# nothing delivered those events to Communications durably.
+COMMUNICATIONS_SERVICE_CONSUMER: Final[str] = "communications-service"
 EPCR_SERVICE_CONSUMER: Final[str] = "epcr-service"
 HOSPITAL_SERVICE_CONSUMER: Final[str] = "hospital-service"
 
 KnownEventBusConsumerName = Literal[
     "billing-service",
     "cad-service",
+    "communications-service",
     "epcr-service",
     "hospital-service",
 ]
@@ -44,6 +52,7 @@ KNOWN_EVENT_BUS_CONSUMERS: frozenset[str] = frozenset(
     {
         BILLING_SERVICE_CONSUMER,
         CAD_SERVICE_CONSUMER,
+        COMMUNICATIONS_SERVICE_CONSUMER,
         EPCR_SERVICE_CONSUMER,
         HOSPITAL_SERVICE_CONSUMER,
     }
