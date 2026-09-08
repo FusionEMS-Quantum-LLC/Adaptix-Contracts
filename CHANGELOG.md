@@ -2133,7 +2133,7 @@ or repointed.
 
 ### Verified fleet rollout status (live ECS matrix, 2026-07-03)
 
-The fail-closed default keys off `ENVIRONMENT` âˆˆ {`production`, `prod`}.
+The fail-closed default keys off `ENVIRONMENT` ∈ {`production`, `prod`}.
 Live `aws ecs describe-task-definition` sweep of the `adaptix-production`
 cluster on 2026-07-03 showed:
 
@@ -2141,7 +2141,7 @@ cluster on 2026-07-03 showed:
   billing, communications, core, epcr, field, fire, gateway, hl7, hospital,
   telephony, voice. All of these carry `ADAPTIX_GATEWAY_SHARED_SECRET`
   **except air-pilot** (owner: air lane — wire the secret with the pending
-  gateway route/CloudMap work or its first â‰¥1.4.0 rebuild 503s signed traffic).
+  gateway route/CloudMap work or its first ≥1.4.0 rebuild 503s signed traffic).
 - **fire** already runs `ADAPTIX_GATEWAY_HMAC_ENFORCE=true` (enforcement live);
   `fire_taskdef.tf` `ignore_changes` protects it from TF reverts.
 - **investor** lacks the shared secret (inert today — ENVIRONMENT unset).
@@ -2150,7 +2150,7 @@ cluster on 2026-07-03 showed:
   it. Fleet-wide `ENVIRONMENT=production` is a tracked follow-up hardening
   program; flipping it arms enforcement and must be per-service verified.
 
-**Per-service rebuild checklist (run at each service's first deploy on â‰¥1.4.0):**
+**Per-service rebuild checklist (run at each service's first deploy on ≥1.4.0):**
 
 1. Real user path through the gateway → 200.
 2. Forged `X-Is-Founder`/`X-User-Id`/`X-Tenant-Id` direct to the service (no
