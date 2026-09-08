@@ -70,7 +70,7 @@ dev = [
 # `adaptix-contracts[temporal]`; everyone else is unaffected.
 #
 # Range matches Adaptix-Temporal-Service's own pin so the two cannot resolve to
-# incompatible SDK majors â€” they must agree on the Payload/PayloadCodec surface
+# incompatible SDK majors — they must agree on the Payload/PayloadCodec surface
 # this codec is written against.
 
 temporal = [
