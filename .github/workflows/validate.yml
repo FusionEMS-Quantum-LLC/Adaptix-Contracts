@@ -9,7 +9,13 @@ name: Contracts Validation
 
 on:
   pull_request:
-    branches: [main]
+  # `validate` is this repository's REQUIRED check. A merge queue validates a
+  # synthetic merge-group ref; a required check whose workflow does not
+  # subscribe to merge_group never reports there, so the queue does not fail --
+  # it stalls until the entry times out. Subscribed now, before any queue is
+  # enabled here, so enabling one is not the thing that discovers it.
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
 
@@ -18,7 +24,10 @@ permissions:
 
 concurrency:
   group: contracts-validation-${{ github.ref }}
-  cancel-in-progress: true
+  # Only pull_request runs may be superseded. Cancelling a merge-group run
+  # reports the required check as cancelled, which dequeues the pull request;
+  # cancelling a push-to-main run leaves main unjudged.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
