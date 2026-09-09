@@ -119,6 +119,24 @@ from .billing_auth_contracts import (
     BillingAccessResolution,
     BillingOrgSelectorEntry,
 )
+from .billing_managed_v2 import (
+    BillingOperatorRole,
+    BillingPermission,
+    BillingOperatingMode,
+    BillingOrganizationStatus,
+    BillingMembershipStatus,
+    BillingAgencyRelationshipStatus,
+    BillingGrantStatus,
+    BillingAccessBlockedReason,
+    BillingMfaState,
+    BillingOrganizationSummary,
+    BillingOrganizationMembership,
+    BillingAgencyScope,
+    BillingAgencyGrant,
+    BillingAgencySelectorEntry,
+    BillingPortfolioScope,
+    BillingAccessContextV2,
+)
 
 # Billing Clearinghouse
 from .billing_clearinghouse_contracts import (
@@ -1408,6 +1426,23 @@ __all__ = [
     "BillingSignInContext",
     "BillingAccessResolution",
     "BillingOrgSelectorEntry",
+    # Managed Billing V2 (additive; canonical role/permission authority)
+    "BillingOperatorRole",
+    "BillingPermission",
+    "BillingOperatingMode",
+    "BillingOrganizationStatus",
+    "BillingMembershipStatus",
+    "BillingAgencyRelationshipStatus",
+    "BillingGrantStatus",
+    "BillingAccessBlockedReason",
+    "BillingMfaState",
+    "BillingOrganizationSummary",
+    "BillingOrganizationMembership",
+    "BillingAgencyScope",
+    "BillingAgencyGrant",
+    "BillingAgencySelectorEntry",
+    "BillingPortfolioScope",
+    "BillingAccessContextV2",
     # Billing Clearinghouse
     "SubmissionStatus",
     "AckType",
