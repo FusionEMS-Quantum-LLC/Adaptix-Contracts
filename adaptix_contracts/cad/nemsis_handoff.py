@@ -124,47 +124,84 @@ class CadDispatchTimeline(BaseModel):
 class CadDispatchContext(BaseModel):
     """eDispatch section data — CAD-owned dispatch metadata.
 
-    Maps to NEMSIS 3.5.1 eDispatch elements. Previously unmapped; now required
-    for complete state dataset submission.
+    Element numbers here are the official NEMSIS 3.5.1.251001CP2 names. An
+    earlier revision of this model had the whole section shifted (.02 labelled
+    "CAD Record ID", .04 "EMD Performed", .05 "EMD Card", .06 "Area Command"),
+    which pointed every consumer at the wrong element. Names below are taken
+    from the EMS dataset field inventory, not from memory.
 
-    CAD owns these fields: dispatcher determines call type, EMD card, and area command.
-    ePCR must NOT override these without explicit dispatcher correction.
+    CAD owns these fields. ePCR must NOT override them without explicit
+    dispatcher correction.
     """
 
-    # NEMSIS eDispatch.01 — Complaint Reported by Dispatch (call type code)
+    # eDispatch.01 — Dispatch Reason (Mandatory, national).
+    # `call_type` may hold CAD's internal token (e.g. CHEST_PAIN). That token is
+    # NOT a valid eDispatch.01 value; the coded 2301xxx value belongs in
+    # `dispatch_reason_code`. An internal token must never be submitted as if it
+    # were a NEMSIS code.
     call_type: str | None = Field(
         default=None,
-        description="eDispatch.01 — Complaint/call type reported by dispatcher (e.g. CHEST_PAIN, TRAUMA, CARDIAC_ARREST)",
+        description="CAD internal call type token (not a NEMSIS value)",
     )
 
-    # NEMSIS eDispatch.02 — Unit Dispatched CAD Record ID
+    dispatch_reason_code: str | None = Field(
+        default=None,
+        description="eDispatch.01 — Dispatch Reason, official 2301xxx code",
+    )
+
+    # eDispatch.06 — Unit Dispatched CAD Record ID (NOT .02).
     cad_record_id: str | None = Field(
         default=None,
-        description="eDispatch.02 — CAD system record/case ID for this dispatch",
+        description="eDispatch.06 — CAD system record/case ID for this dispatch",
     )
 
-    # NEMSIS eDispatch.03 — Complaint Reported by Dispatch (free text description)
+    # Free-text complaint has no eDispatch element. eDispatch.03 is the EMD
+    # Determinant Code, so this text must never be written there.
     complaint: str | None = Field(
         default=None,
-        description="eDispatch.03 — Dispatch complaint description as reported by dispatcher",
+        description="CAD dispatcher complaint text (CAD context only)",
     )
 
-    # NEMSIS eDispatch.04 — EMD Performed (Yes/No)
+    # eDispatch.02 — EMD Performed (Required, national) (NOT .04).
     emd_performed: bool | None = Field(
         default=None,
-        description="eDispatch.04 — Whether Emergency Medical Dispatch protocol was performed",
+        description="eDispatch.02 — whether EMD protocol was performed",
     )
 
-    # NEMSIS eDispatch.05 — EMD Card Number Used
+    emd_performed_code: str | None = Field(
+        default=None,
+        description="eDispatch.02 — EMD Performed, official 2302xxx code",
+    )
+
+    # eDispatch.03 — EMD Determinant Code (NOT .05).
     emd_card: str | None = Field(
         default=None,
-        description="eDispatch.05 — EMD card/protocol number used (e.g. ProQA, MPDS card number)",
+        description="eDispatch.03 — EMD determinant/card (e.g. ProQA, MPDS)",
     )
 
-    # NEMSIS eDispatch.06 — Area Command
+    emd_determinant: str | None = Field(
+        default=None,
+        description="eDispatch.03 — EMD Determinant Code as sent by CAD",
+    )
+
+    # eDispatch.04 — Dispatch Center Name or ID (NOT .06).
+    center_id: str | None = Field(
+        default=None,
+        description="eDispatch.04 — Dispatch Center Name or ID",
+    )
+
+    # eDispatch.05 — Dispatch Priority (Patient Acuity), official 2305xxx.
+    # Not eSituation.11 / eSituation.13, which are clinician observations.
+    priority_code: str | None = Field(
+        default=None,
+        description="eDispatch.05 — Dispatch Priority, official 2305xxx code",
+    )
+
+    # Agency operational grouping. This is not a NEMSIS element on its own; it
+    # is only eDispatch.04 when it genuinely is the dispatch centre identifier.
     area_command: str | None = Field(
         default=None,
-        description="eDispatch.06 — Geographic area command identifier for this dispatch",
+        description="CAD area command identifier (CAD context only)",
     )
 
 
@@ -204,9 +241,14 @@ class CadNemsisHandoffPayload(BaseModel):
         description="SCHEDULED|UNSCHEDULED|INTERFACILITY|HEMS|etc."
     )
 
-    # NEMSIS eResponse.07 — Primary Role of the Unit
+    # REQUESTED level of care recorded at intake. This is NOT eResponse.07.
+    # eResponse.07 is "Unit Transport and Equipment Capability" and its values
+    # (e.g. "Ground Transport (ALS Equipped)") describe the unit that actually
+    # responded. A request is not an observation of what responded, so the two
+    # are kept separate; the assigned unit's capability is carried below in
+    # `assigned_unit_transport_equipment_capability`.
     level_of_care: str = Field(
-        description="BLS|ALS|CCT|SCT|HEMS|WHEELCHAIR|STRETCHER|UNKNOWN"
+        description="Requested: BLS|ALS|CCT|SCT|HEMS|WHEELCHAIR|STRETCHER|UNKNOWN"
     )
 
     # NEMSIS eResponse.23 — Response Priority
@@ -216,6 +258,26 @@ class CadNemsisHandoffPayload(BaseModel):
     # NEMSIS eResponse.13 — EMS Unit Number
     unit_id: str | None = None
     vehicle_id: str | None = None
+
+    # NEMSIS eResponse.14 — EMS Unit Call Sign (Mandatory, national element).
+    # The dispatch/radio call sign of the assigned unit. Distinct from
+    # eResponse.13 (EMS Vehicle (Unit) Number): many agencies use the same
+    # string for both, but they are separate elements and must not be assumed
+    # interchangeable.
+    assigned_unit_callsign: str | None = None
+
+    # NEMSIS eResponse.07 — Unit Transport and Equipment Capability
+    # (Mandatory, national element). Must be sourced from the assigned unit
+    # record. Deriving it from `level_of_care` would assert that the responding
+    # unit carried equipment that was only ever requested.
+    assigned_unit_transport_equipment_capability: str | None = None
+
+    # NEMSIS eDispatch.05 — Dispatch Priority (Patient Acuity).
+    # Dispatch-side acuity determined during intake/EMD. This is NOT
+    # eSituation.11 (Provider's Primary Impression) and NOT eSituation.13
+    # (Initial Patient Acuity); both are clinician observations made on
+    # arrival and are owned by ePCR.
+    dispatch_priority: str | None = None
 
     # NEMSIS eCrew section
     crew_members: list[CadCrewMemberContext] = Field(default_factory=list)
@@ -228,8 +290,11 @@ class CadNemsisHandoffPayload(BaseModel):
     # NEMSIS eDisposition section
     destination_facility: CadFacilityContext = Field(default_factory=CadFacilityContext)
 
-    # Routing/mileage
-    # NEMSIS eDisposition.17 — Transport Distance
+    # Routing/mileage — CAD operational context only, deliberately unmapped.
+    # eDisposition.17 is "Transport Mode from Scene" and eDisposition.16 is
+    # "EMS Transport Method"; neither carries distance. The only mileage
+    # element in the 3.5.1 dataset is ePayment.48 (Mileage to Closest Hospital
+    # Facility), which measures something else entirely.
     mileage_estimate: float | None = None
     route_eta_minutes: float | None = None
 
@@ -273,6 +338,9 @@ class CadNemsisHandoffPayload(BaseModel):
                 "priority": "high",
                 "unit_id": "UNIT-12",
                 "vehicle_id": "VEH-12",
+                "assigned_unit_callsign": "MEDIC 12",
+                "assigned_unit_transport_equipment_capability": "2207015",
+                "dispatch_priority": "2305003",
                 "crew_members": [
                     {
                         "crew_id": "crew-001",
