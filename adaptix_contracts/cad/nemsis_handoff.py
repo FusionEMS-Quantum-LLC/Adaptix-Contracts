@@ -173,12 +173,15 @@ class CadDispatchContext(BaseModel):
         description="eDispatch.02 — EMD Performed, official 2302xxx code",
     )
 
-    # eDispatch.03 — EMD Determinant Code (NOT .05).
+    # CAD-side determinant input. Pre-dates `emd_determinant` and is kept for
+    # existing callers. It is NOT the authoritative eDispatch.03 value - that
+    # is `emd_determinant` below, so the element has exactly one source.
     emd_card: str | None = Field(
         default=None,
-        description="eDispatch.03 — EMD determinant/card (e.g. ProQA, MPDS)",
+        description="CAD determinant input (e.g. ProQA, MPDS card)",
     )
 
+    # eDispatch.03 — EMD Determinant Code (NOT .05). Authoritative.
     emd_determinant: str | None = Field(
         default=None,
         description="eDispatch.03 — EMD Determinant Code as sent by CAD",
@@ -246,7 +249,7 @@ class CadNemsisHandoffPayload(BaseModel):
     # (e.g. "Ground Transport (ALS Equipped)") describe the unit that actually
     # responded. A request is not an observation of what responded, so the two
     # are kept separate; the assigned unit's capability is carried below in
-    # `assigned_unit_transport_equipment_capability`.
+    # `assigned_unit_capability`.
     level_of_care: str = Field(
         description="Requested: BLS|ALS|CCT|SCT|HEMS|WHEELCHAIR|STRETCHER|UNKNOWN"
     )
@@ -270,14 +273,18 @@ class CadNemsisHandoffPayload(BaseModel):
     # (Mandatory, national element). Must be sourced from the assigned unit
     # record. Deriving it from `level_of_care` would assert that the responding
     # unit carried equipment that was only ever requested.
-    assigned_unit_transport_equipment_capability: str | None = None
+    #
+    # Named to match the key Adaptix-CAD-Service actually emits. The first
+    # revision of this field was `assigned_unit_transport_equipment_capability`,
+    # which no producer ever wrote - the same contract-versus-runtime drift
+    # this model was being corrected for.
+    assigned_unit_capability: str | None = None
 
-    # NEMSIS eDispatch.05 — Dispatch Priority (Patient Acuity).
-    # Dispatch-side acuity determined during intake/EMD. This is NOT
-    # eSituation.11 (Provider's Primary Impression) and NOT eSituation.13
-    # (Initial Patient Acuity); both are clinician observations made on
-    # arrival and are owned by ePCR.
-    dispatch_priority: str | None = None
+    # eDispatch.05 (Dispatch Priority) is NOT carried here. It lives on
+    # `dispatch_context.priority_code`, which is the eDispatch container and
+    # the key CAD emits. A root-level copy was briefly declared here and was
+    # both redundant and unpopulated; one element gets one authoritative
+    # field, or the two silently diverge.
 
     # NEMSIS eCrew section
     crew_members: list[CadCrewMemberContext] = Field(default_factory=list)
@@ -339,8 +346,7 @@ class CadNemsisHandoffPayload(BaseModel):
                 "unit_id": "UNIT-12",
                 "vehicle_id": "VEH-12",
                 "assigned_unit_callsign": "MEDIC 12",
-                "assigned_unit_transport_equipment_capability": "2207015",
-                "dispatch_priority": "2305003",
+                "assigned_unit_capability": "2207015",
                 "crew_members": [
                     {
                         "crew_id": "crew-001",

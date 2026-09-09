@@ -41,18 +41,18 @@ def test_requested_level_and_assigned_capability_are_separate_fields():
     """
     payload = _payload(
         level_of_care="BLS",
-        assigned_unit_transport_equipment_capability="2207019",
+        assigned_unit_capability="2207019",
     )
 
     assert payload.level_of_care == "BLS"
-    assert payload.assigned_unit_transport_equipment_capability == "2207019"
+    assert payload.assigned_unit_capability == "2207019"
 
 
 def test_assigned_capability_is_not_defaulted_from_requested_level():
     """Requesting a level must never assert a capability CAD has not observed."""
     payload = _payload(level_of_care="ALS")
 
-    assert payload.assigned_unit_transport_equipment_capability is None
+    assert payload.assigned_unit_capability is None
 
 
 def test_unit_callsign_is_carried_separately_from_vehicle_number():
@@ -67,13 +67,21 @@ def test_unit_callsign_is_carried_separately_from_vehicle_number():
     assert payload.assigned_unit_callsign == "MEDIC 12"
 
 
-def test_dispatch_priority_survives_round_trip():
-    """eDispatch.05 must reach ePCR; it was previously unreachable end to end."""
-    payload = _payload(dispatch_priority="2305003")
+def test_dispatch_priority_has_exactly_one_home():
+    """eDispatch.05 lives only on dispatch_context.priority_code.
 
-    restored = CadNemsisHandoffPayload.model_validate(payload.model_dump())
+    A root-level `dispatch_priority` was briefly declared alongside it.
+    Two fields for one element diverge the moment one caller sets one and
+    another sets the other, and the root copy was never populated by the
+    producer anyway.
+    """
+    assert "dispatch_priority" not in CadNemsisHandoffPayload.model_fields
+    assert "priority_code" in CadDispatchContext.model_fields
 
-    assert restored.dispatch_priority == "2305003"
+    context = CadDispatchContext(priority_code="2305003")
+    restored = CadDispatchContext.model_validate(context.model_dump())
+
+    assert restored.priority_code == "2305003"
 
 
 def test_dispatch_context_carries_the_coded_edispatch_values():
@@ -119,3 +127,33 @@ def test_mileage_estimate_is_not_presented_as_a_nemsis_element():
     payload = _payload(mileage_estimate=12.4)
 
     assert payload.mileage_estimate == 12.4
+
+
+def test_contract_field_names_match_what_the_producer_emits():
+    """The contract must key the names Adaptix-CAD-Service actually writes.
+
+    Its NEMSIS mapper emits `assigned_unit_capability`, `assigned_unit_callsign`
+    and `dispatch_context["priority_code"]`. An earlier revision of this model
+    declared `assigned_unit_transport_equipment_capability` and a root
+    `dispatch_priority`, neither of which any producer wrote -- so both would
+    have stayed empty forever. That is the same contract-versus-runtime drift
+    this model was being corrected for.
+    """
+    fields = CadNemsisHandoffPayload.model_fields
+
+    assert "assigned_unit_capability" in fields
+    assert "assigned_unit_callsign" in fields
+    assert "assigned_unit_transport_equipment_capability" not in fields
+
+
+def test_edispatch_03_has_a_single_authoritative_field():
+    """`emd_card` is CAD input; `emd_determinant` is the eDispatch.03 value."""
+    context = CadDispatchContext(emd_card="10-D-4", emd_determinant="10-D-4")
+
+    assert context.emd_determinant == "10-D-4"
+    assert "eDispatch.03" in (
+        CadDispatchContext.model_fields["emd_determinant"].description or ""
+    )
+    assert "eDispatch.03" not in (
+        CadDispatchContext.model_fields["emd_card"].description or ""
+    )
