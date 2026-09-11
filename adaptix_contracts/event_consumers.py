@@ -25,6 +25,7 @@ __all__ = [
     "HOSPITAL_SERVICE_CONSUMER",
     "KNOWN_EVENT_BUS_CONSUMERS",
     "KnownEventBusConsumerName",
+    "TRANSPORT_SERVICE_CONSUMER",
     "is_known_event_bus_consumer",
 ]
 
@@ -39,6 +40,12 @@ CAD_SERVICE_CONSUMER: Final[str] = "cad-service"
 COMMUNICATIONS_SERVICE_CONSUMER: Final[str] = "communications-service"
 EPCR_SERVICE_CONSUMER: Final[str] = "epcr-service"
 HOSPITAL_SERVICE_CONSUMER: Final[str] = "hospital-service"
+# Adaptix-Transport-Service polls the fan-out under this name for
+# ``cad.case.created`` (backend/transportlink_app/background_worker.py lines
+# 100 and 147 at bf98ccbc8873, started from main.py line 380). It already
+# polled under this name before the constant existed; naming it here makes
+# it canonical so its subscriptions can be declared in event_subscriptions.
+TRANSPORT_SERVICE_CONSUMER: Final[str] = "transport-service"
 
 KnownEventBusConsumerName = Literal[
     "billing-service",
@@ -46,6 +53,7 @@ KnownEventBusConsumerName = Literal[
     "communications-service",
     "epcr-service",
     "hospital-service",
+    "transport-service",
 ]
 
 KNOWN_EVENT_BUS_CONSUMERS: frozenset[str] = frozenset(
@@ -55,6 +63,7 @@ KNOWN_EVENT_BUS_CONSUMERS: frozenset[str] = frozenset(
         COMMUNICATIONS_SERVICE_CONSUMER,
         EPCR_SERVICE_CONSUMER,
         HOSPITAL_SERVICE_CONSUMER,
+        TRANSPORT_SERVICE_CONSUMER,
     }
 )
 
