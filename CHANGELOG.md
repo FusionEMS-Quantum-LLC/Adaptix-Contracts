@@ -12,6 +12,37 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.13.0] - 2026-09-10
+
+### Added
+
+- **`adaptix_contracts.event_subscriptions`** -- typed declaration of which
+  Core event-bus consumer subscribes to which topic. Core's fan-out offers
+  every event to every consumer, so a consumer's own handler map is the only
+  place its subscriptions exist; this module records those maps for the six
+  consumers whose code proves them (billing, cad, communications, epcr,
+  hospital and transport). Every (consumer, topic) pair carries the
+  repository, commit, file and line that registers or dispatches it.
+  `EVENT_BUS_SUBSCRIPTIONS` (consumer -> topics),
+  `EVENT_BUS_CONSUMER_SERVICE_SLUGS` (consumer -> service-registry slug; None
+  for hospital-service because `ALL_SERVICES` has no Hospital entry),
+  `subscribers_of(topic)` and `subscription_edges()` (producer slug -> topic
+  -> consumer) let Founder Command draw service-to-service links.
+  `UNREGISTERED_SUBSCRIBED_TOPICS` lists the 26 subscribed topics that
+  `ALL_EVENTS` does not register, each with its reason, and
+  `validate_declarations` rejects an unknown consumer, an unknown topic, a
+  slug that names a different repository and a citation not pinned to a
+  commit.
+- **`adaptix_contracts.event_consumers.TRANSPORT_SERVICE_CONSUMER`**
+  (`"transport-service"`), added to `KnownEventBusConsumerName` and
+  `KNOWN_EVENT_BUS_CONSUMERS`. Adaptix-Transport-Service already polls the
+  Core fan-out under this name for `cad.case.created`
+  (`backend/transportlink_app/background_worker.py` lines 100 and 147 at
+  `bf98ccbc8873`).
+
+Both additions are purely additive: no existing name, contract or behavior
+changes.
+
 ## [5.10.0] - 2026-09-08
 
 ### Added
