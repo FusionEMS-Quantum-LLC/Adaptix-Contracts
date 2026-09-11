@@ -68,6 +68,11 @@ LIVE_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
         "billing",
         "Adaptix-Billing-Service/backend/billing_app/services/event_publisher.py:93",
     ),
+    # The literal emission below is real, but at Billing main a6260ebe (verified
+    # 2026-09-10) nothing calls publish_claim_status_changed, so no traffic
+    # carries this type today. Billing's claim-status traffic is
+    # billing.claim.status_updated, inventoried in INDIRECT_ENVELOPE_PRODUCERS.
+    # The row stays so the registration is kept for pinned older consumers.
     (
         "billing.claim.status_changed",
         "billing",
@@ -182,6 +187,10 @@ LIVE_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
 #:   (``source_service="epcr"``).
 #: * ``epcr.vision.*`` / ``hospital.cath_lab.*`` go through the thin wrapper
 #:   ``chart_vision_capture_service.py:728`` (``source_service="epcr"``).
+#: * ``billing.claim.status_updated`` is a ``BillingOutboxEvent`` row that
+#:   ``Adaptix-Billing-Service/backend/billing_app/workers/outbox_publisher.py:290``
+#:   relays with the row's OWN event_type to Core's event bus
+#:   (``source_domain="billing"``); added 2026-09-10 at Billing main a6260ebe.
 #: * ``patient.identity.merged`` is an ``OutboxEvent`` row republished by
 #:   ``Adaptix-Patient-Identity-Service/.../outbox_worker.py:88``.
 #:
@@ -248,6 +257,14 @@ INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
         "evidence.decision_receipt.created",
         "audit",
         "Adaptix-Audit-Service/backend/audit_app/services/evidence_service.py:411",
+    ),
+    # --- Adaptix-Billing-Service, via BillingOutboxEvent ->
+    # billing_app/workers/outbox_publisher.py:290 (the single claim-status helper
+    # publish_claim_status_event writes the row). Audited 2026-09-10. ---
+    (
+        "billing.claim.status_updated",
+        "billing",
+        "Adaptix-Billing-Service/backend/billing_app/services/claim_service.py:178",
     ),
     # --- Adaptix-EPCR-Service, via ChartEventOutbox -> outbox_worker.py:99 ---
     (

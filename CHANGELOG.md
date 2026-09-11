@@ -12,6 +12,36 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.14.0] - 2026-09-10
+
+### Added
+
+- **`adaptix_contracts.events.registry.BILLING_CLAIM_STATUS_UPDATED`**
+  (`"billing.claim.status_updated"`, `source_service="billing"`) in
+  `ALL_EVENTS` and `__all__`. This is the claim-status event
+  Adaptix-Billing-Service really publishes: `publish_claim_status_event` writes
+  the outbox row (`billing_app/services/claim_service.py:178` at Billing `main`
+  `a6260ebe`) and `billing_app/workers/outbox_publisher.py:290` relays it to
+  Core's event bus. ePCR subscribes to it (`epcr_app/main.py:349`), so that
+  subscription is now a registered pair: `subscription_edges()` reports
+  producer `billing` for it, it left `UNREGISTERED_SUBSCRIBED_TOPICS` (26 -> 25
+  topics), and it is inventoried in
+  `tests/test_event_producer_registry_drift.py::INDIRECT_ENVELOPE_PRODUCERS`.
+- Four negative tests in `tests/test_event_subscriptions.py` pin existing
+  `validate_declarations` rules: a consumer declared twice, a topic declared
+  twice in one consumer, a mapped slug that also carries an unmapped reason,
+  and a blank unmapped reason.
+
+### Documented
+
+- `billing.claim.status_changed` stays registered, because a consumer pinned to
+  an older package may still reference it, but `events/registry.py` now records
+  that its only publisher, `BillingEventPublisher.publish_claim_status_changed`
+  (`billing_app/services/event_publisher.py:130`), has no caller in Billing at
+  `a6260ebe`.
+
+Purely additive: no existing name, contract or behavior changes.
+
 ## [5.13.0] - 2026-09-10
 
 ### Added

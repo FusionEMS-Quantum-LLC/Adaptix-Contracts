@@ -174,6 +174,9 @@ def test_subscription_edges_carry_the_registered_producer_or_none() -> None:
         SubscriptionEdge("epcr", "epcr.chart.finalized", "billing-service", "billing"),
         SubscriptionEdge("epcr", "epcr.chart.finalized", "hospital-service", None),
         SubscriptionEdge(None, "cad.case.created", "transport-service", "transport"),
+        SubscriptionEdge(
+            "billing", "billing.claim.status_updated", "epcr-service", "epcr"
+        ),
     }
     assert expected <= set(edges)
     for edge in edges:
@@ -282,3 +285,42 @@ def test_validation_fails_for_a_stale_unregistered_entry() -> None:
     message = "lists 'retired.topic', which no declared consumer subscribes to"
     with pytest.raises(EventSubscriptionDeclarationError, match=re.escape(message)):
         _validate(EVENT_BUS_CONSUMER_DECLARATIONS, unregistered_topics=stale)
+
+
+def test_validation_fails_when_a_consumer_is_declared_twice() -> None:
+    twice = (*EVENT_BUS_CONSUMER_DECLARATIONS, _declaration(TRANSPORT_SERVICE_CONSUMER))
+    message = "'transport-service' is declared more than once"
+    with pytest.raises(EventSubscriptionDeclarationError, match=re.escape(message)):
+        _validate(twice)
+
+
+def test_validation_fails_when_a_consumer_declares_a_topic_twice() -> None:
+    transport = _declaration(TRANSPORT_SERVICE_CONSUMER)
+    first = transport.subscriptions[0]
+    doubled = dataclasses.replace(
+        transport, subscriptions=(*transport.subscriptions, first)
+    )
+    message = (
+        f"'transport-service' subscription {first.topic!r} is declared more than once"
+    )
+    with pytest.raises(EventSubscriptionDeclarationError, match=re.escape(message)):
+        _validate(_replacing(doubled))
+
+
+def test_validation_fails_when_a_mapped_slug_also_has_an_unmapped_reason() -> None:
+    contradictory = dataclasses.replace(
+        _declaration(BILLING_SERVICE_CONSUMER), unmapped_reason="has no service"
+    )
+    message = "'billing-service' maps to 'billing' but also has an unmapped_reason"
+    with pytest.raises(EventSubscriptionDeclarationError, match=re.escape(message)):
+        _validate(_replacing(contradictory))
+
+
+@pytest.mark.parametrize("blank_reason", ["", "   "])
+def test_validation_fails_when_an_unmapped_reason_is_blank(blank_reason: str) -> None:
+    hospital = _declaration(HOSPITAL_SERVICE_CONSUMER)
+    assert hospital.service_slug is None
+    blank = dataclasses.replace(hospital, unmapped_reason=blank_reason)
+    message = "'hospital-service' has no service slug and no unmapped_reason"
+    with pytest.raises(EventSubscriptionDeclarationError, match=re.escape(message)):
+        _validate(_replacing(blank))

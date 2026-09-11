@@ -88,6 +88,7 @@ FLEET_VEHICLE_OUT_OF_SERVICE: Final[str] = "fleet.vehicle.out_of_service"
 # origin/main of Adaptix-Billing-Service, verified 2026-08-09:
 #   billing_app/services/event_publisher.py:34   billing.claim.created
 #   billing_app/services/event_publisher.py:130  billing.claim.status_changed
+#     (no caller today; see the note after this block)
 #   billing_app/services/event_publisher.py:166  billing.payment.received
 #   billing_app/services/event_publisher.py:201  billing.invoice.created
 #   billing_app/services/event_publisher.py:238  billing.invoice.paid
@@ -102,6 +103,29 @@ BILLING_PAYMENT_RECEIVED: Final[str] = "billing.payment.received"
 BILLING_INVOICE_CREATED: Final[str] = "billing.invoice.created"
 BILLING_INVOICE_PAID: Final[str] = "billing.invoice.paid"
 BILLING_CALL_CONTEXT_ASSEMBLED: Final[str] = "billing.call_context.assembled"
+
+# ``billing.claim.status_changed`` stays registered, but no Billing code publishes
+# it today: its only construction site,
+# ``BillingEventPublisher.publish_claim_status_changed``
+# (``billing_app/services/event_publisher.py:130``), has no caller anywhere in
+# Adaptix-Billing-Service at main ``a6260ebe0abd7dc552c6da197451327b66d0b7f7``
+# (verified 2026-09-10). It is kept, not removed, because a consumer pinned to an
+# older adaptix-contracts may still reference the constant. The claim-status
+# event Billing really publishes is ``billing.claim.status_updated`` below.
+#
+# ``billing.claim.status_updated`` is written as a ``BillingOutboxEvent`` row by
+# the single claim-status helper ``publish_claim_status_event`` and relayed with
+# the row's own ``event_type`` to Core's event bus (``source_domain="billing"``)
+# by ``billing_app/workers/outbox_publisher.py:290``, so the string never appears
+# at the relay itself. Producer citations are Adaptix-Billing-Service main
+# ``a6260ebe0abd7dc552c6da197451327b66d0b7f7``, verified 2026-09-10:
+#   billing_app/services/claim_service.py:66    CLAIM_STATUS_UPDATED_EVENT
+#   billing_app/services/claim_service.py:178   enqueue_event(event_type=...)
+# Callers of that helper: services/denial_workflow_service.py:254, 632, 661;
+# services/manual_payment_posting_service.py:174; api/webhooks_office_ally.py:798,
+# 961. ePCR consumes it (Adaptix-EPCR-Service ``epcr_app/main.py:349``). The
+# typed payload is ``schemas.billing_contracts.ClaimStatusUpdatedEvent``.
+BILLING_CLAIM_STATUS_UPDATED: Final[str] = "billing.claim.status_updated"
 
 # Cross-domain: the TrustSign signature completion event is published BY
 # Adaptix-Billing-Service (it owns the TrustSign request tables) so ePCR and the
@@ -408,6 +432,9 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_STATUS_CHANGED: {"version": "1.0", "source_service": "billing"},
+    # billing_app/services/claim_service.py:178 (outbox row relayed by
+    # billing_app/workers/outbox_publisher.py:290)
+    BILLING_CLAIM_STATUS_UPDATED: {"version": "1.0", "source_service": "billing"},
     BILLING_PAYMENT_RECEIVED: {"version": "1.0", "source_service": "billing"},
     BILLING_INVOICE_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_INVOICE_PAID: {"version": "1.0", "source_service": "billing"},
@@ -656,6 +683,7 @@ __all__ = [
     "BILLING_CALL_CONTEXT_ASSEMBLED",
     "BILLING_CLAIM_CREATED",
     "BILLING_CLAIM_STATUS_CHANGED",
+    "BILLING_CLAIM_STATUS_UPDATED",
     "BILLING_CLAIM_UPDATED",
     "BILLING_INVOICE_CREATED",
     "BILLING_INVOICE_PAID",

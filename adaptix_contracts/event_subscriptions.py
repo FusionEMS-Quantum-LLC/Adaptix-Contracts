@@ -460,12 +460,6 @@ UNREGISTERED_SUBSCRIBED_TOPICS: Final[Mapping[str, str]] = MappingProxyType(
         "air.mission.ground_fallback": _NOT_IN_REGISTRY,
         "air.mission.hold": _NOT_IN_REGISTRY,
         "air.mission.launched": _NOT_IN_REGISTRY,
-        "billing.claim.status_updated": (
-            "Not a key of events.registry.ALL_EVENTS, so this contract records no "
-            "producer for it. ALL_EVENTS registers billing.claim.status_changed "
-            "(source 'billing') under a different name; which name reaches the "
-            "ePCR subscriber was not proven by this audit."
-        ),
         "cad.case.created": _NOT_IN_REGISTRY,
         "cad.dispatch.billing_handoff_ready": _NOT_IN_REGISTRY,
         "call.received": _NOT_IN_REGISTRY,
