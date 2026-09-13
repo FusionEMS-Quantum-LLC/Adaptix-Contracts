@@ -266,11 +266,15 @@ INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
         "billing",
         "Adaptix-Billing-Service/backend/billing_app/services/claim_service.py:178",
     ),
-    # --- Adaptix-EPCR-Service, via ChartEventOutbox -> outbox_worker.py:99 ---
+    # --- Adaptix-EPCR-Service, via ChartEventOutbox -> outbox_worker.py:207
+    # (_publish_generic). epcr.chart.amended has TWO producers (legacy
+    # field-diff and canonical signed-version, re-verified 2026-09-13 at
+    # 7eaf0b7e); the inventory keeps one row per event type, the registry
+    # comment cites both. ---
     (
         "epcr.chart.amended",
         "epcr",
-        "Adaptix-EPCR-Service/backend/epcr_app/chart_amendment_service.py:92",
+        "Adaptix-EPCR-Service/backend/epcr_app/chart_amendment_service.py:478",
     ),
     (
         "epcr.chart.billing_handoff",

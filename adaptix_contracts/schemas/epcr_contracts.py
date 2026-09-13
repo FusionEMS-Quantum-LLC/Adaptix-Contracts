@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,22 +24,39 @@ class EpcrChartCreatedEvent(BaseModel):
 class EpcrChartAmendedEvent(BaseModel):
     """Published when a FINALIZED ePCR chart is amended.
 
-    The producer is
-    ``Adaptix-EPCR-Service/backend/epcr_app/chart_amendment_service.py``
-    (``ChartEventOutbox`` row, event type ``epcr.chart.amended``), relayed by
-    ``epcr_app/outbox_worker.py``. ``tenant_id`` is REQUIRED: the relay's
-    generic publish path refuses tenant-less events, so a payload without it
-    can never reach the bus at all — the field being mandatory here keeps the
-    producer honest at validation time instead of at relay time.
+    TWO producers in ``Adaptix-EPCR-Service`` write this event as a
+    ``ChartEventOutbox`` row (event type ``epcr.chart.amended``), and the
+    generic relay ``epcr_app/outbox_worker.py`` (``_publish_generic``) forwards
+    the row's payload unchanged. ``amendment_authority`` says which one:
 
-    The intended consumer is Billing: a clinical amendment landing AFTER the
-    chart was handed to billing must become visible against the claim that
-    was built from the pre-amendment chart, never silently diverge from it.
+    * ``"legacy_field_diff"`` -- ``epcr_app/chart_amendment_service.py``
+      (``create_amendment``). ``amendment_id`` is the append-only
+      ``ChartAmendment`` row id and ``field`` is the chart attribute that was
+      amended (e.g. ``"narrative"``); the consumer can fetch the full
+      before/after detail through the authorized ePCR read path.
+    * ``"canonical_signed_version"`` -- ``epcr_app/api_chart_state_machine.py``
+      (``trustsign_amendment``, the canonical TrustSign signed-version path).
+      ``amendment_id`` is the ``EpcrSignatureArtifact`` id of the sealing
+      signature, ``field`` is the fixed sentinel ``"canonical_signed_version"``
+      (there is no single amended attribute -- a whole new signed version was
+      sealed), and the additive keys ``signed_version_id``,
+      ``supersedes_signed_version_id``, ``signature_id`` and ``document_hash``
+      point at the canonical records.
 
-    ``field`` is the chart attribute that was amended (e.g. ``"narrative"``);
-    ``amendment_id`` is the append-only ``ChartAmendment`` row id so the
-    consumer can fetch the full before/after detail through the authorized
-    ePCR read path if it needs more than the notification.
+    ``amendment_authority`` defaults to ``"legacy_field_diff"`` ONLY so that
+    payloads emitted before the discriminator existed still validate; every
+    producer MUST set it explicitly, and it becomes required in the next major.
+    A consumer must branch on it: treating a canonical ``amendment_id`` as a
+    ``ChartAmendment`` pointer misfiles the reference.
+
+    ``tenant_id`` is REQUIRED: the relay's generic publish path refuses
+    tenant-less events, so a payload without it can never reach the bus at
+    all -- the field being mandatory here keeps the producer honest at
+    validation time instead of at relay time.
+
+    The consumer is Billing: a clinical amendment landing AFTER the chart was
+    handed to billing must become visible against the claim that was built
+    from the pre-amendment chart, never silently diverge from it.
     """
 
     event_type: str = "epcr.chart.amended"
@@ -49,8 +66,19 @@ class EpcrChartAmendedEvent(BaseModel):
     tenant_id: str
     field: str
 
+    amendment_authority: Literal["legacy_field_diff", "canonical_signed_version"] = (
+        "legacy_field_diff"
+    )
+
     actor_id: Optional[str] = None
     amended_at: Optional[datetime] = None
+
+    # Canonical signed-version pointers. Present only when
+    # ``amendment_authority == "canonical_signed_version"``.
+    signed_version_id: Optional[str] = None
+    supersedes_signed_version_id: Optional[str] = None
+    signature_id: Optional[str] = None
+    document_hash: Optional[str] = None
 
 
 class EpcrChartFinalizedEvent(BaseModel):
