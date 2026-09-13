@@ -12,6 +12,33 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.16.0] - 2026-09-13
+
+### Added
+
+- **`adaptix_contracts.auth_contracts.AuthContext.session_jti`** — the
+  gateway-signed session identity (`str | None`, default `None`).
+  `Adaptix-Gateway` (`backend/app/services/auth_context.py::sign_context`)
+  has signed `session_jti` into every downstream auth context for some time —
+  Core's session table (`core_user_sessions.jti`) is keyed on it for logout
+  revocation — but the shared verifier (`get_auth_context`) dropped the claim
+  entirely, so no contracts consumer could read it off `AuthContext`. This
+  blocked `Adaptix-NEMSIS-Service`'s `require_auth()` from calling Core's
+  per-request WARDS export-grant verification endpoint
+  (`POST /api/v1/core/internal/nemsis/wards-export-grants/verify`), which
+  needs the caller's `session_jti` in its request body; NEMSIS currently
+  hardcodes `jti=""` for that call.
+  Populated ONLY from a VERIFIED signed gateway context. An unsigned/legacy
+  header request always yields `None` — there is no unsigned header for this
+  claim. On a signed context, `""` (no session identity on the inbound token)
+  and an absent claim (a context signed before this field existed) are kept
+  distinct: `""` surfaces as `""`, a missing key surfaces as `None`. Collapsing
+  the two would erase the exact distinction Core's own revocation logic
+  depends on to fall back safely.
+  Expand-only: a new optional field with a `None` default. No existing
+  producer, consumer, or test is broken by this change.
+  Ledger: `CONTRACTS-AUTHCONTEXT-SESSION-JTI-001`.
+
 ## [5.15.0] - 2026-09-12
 
 ### Added

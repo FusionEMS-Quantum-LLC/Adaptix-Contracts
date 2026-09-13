@@ -1573,3 +1573,124 @@ def test_get_auth_context_mounts_as_fastapi_dependency() -> None:
         "request" not in response.text.lower()
         or "Missing gateway identity" in response.text
     )
+
+
+# ---------------------------------------------------------------------------
+# CONTRACTS-AUTHCONTEXT-SESSION-JTI-001 — session_jti propagation.
+# ---------------------------------------------------------------------------
+
+
+def test_signed_session_jti_surfaces_on_auth_context(_gateway_secret: str) -> None:
+    """A verified signed context's ``session_jti`` claim reaches AuthContext.
+
+    The gateway signs ``session_jti`` (the inbound token's session identity,
+    distinct from the per-request ``jti``) so Core can match it against
+    ``core_user_sessions.jti`` for per-request WARDS grant verification.
+    Before this fix the shared verifier dropped the claim entirely.
+    """
+    user_id = uuid4()
+    tenant_id = uuid4()
+    session_jti = str(uuid4())
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims={"session_jti": session_jti},
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.session_jti == session_jti
+
+
+def test_signed_empty_session_jti_surfaces_as_empty_string_not_none(
+    _gateway_secret: str,
+) -> None:
+    """A signed ``session_jti: ""`` (no session identity on the inbound token)
+    must surface as ``""``, never as ``None``.
+
+    The gateway signs the literal empty string (never a fabricated UUID) when
+    the inbound token carries no session identity, and Core's own revocation
+    intentionally falls back safely on that empty string. Collapsing "" to
+    None here would erase the distinction between "no session identity" (safe
+    fallback) and "gateway context predates this claim" (see the next test).
+    """
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+        extra_claims={"session_jti": ""},
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.session_jti == ""
+    assert auth.session_jti is not None
+
+
+def test_signed_context_without_session_jti_claim_defaults_to_none(
+    _gateway_secret: str,
+) -> None:
+    """A verified signed context that omits ``session_jti`` entirely (a
+    context minted by a gateway build that predates this claim) must surface
+    ``None``, not ``""`` — the two are deliberately distinct states."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+    ctx_b64, sig = _sign_gateway_context(
+        user_id=str(user_id),
+        tenant_id=str(tenant_id),
+    )
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_adaptix_auth_context=ctx_b64,
+            x_adaptix_auth_signature=sig,
+            x_adaptix_auth_path="gateway-v1",
+        )
+    )
+
+    assert auth.session_jti is None
+
+
+def test_unsigned_path_has_no_session_jti() -> None:
+    """Regression: the unsigned/legacy header path carries no session_jti
+    header of any kind, so ``AuthContext.session_jti`` stays ``None`` (no
+    accidental session-identity grant from an unverified source)."""
+    user_id = uuid4()
+    tenant_id = uuid4()
+
+    auth = asyncio.run(
+        get_auth_context(
+            x_user_id=str(user_id),
+            x_tenant_id=str(tenant_id),
+            x_user_roles="agency_admin",
+        )
+    )
+
+    assert auth.session_jti is None
+
+
+def test_auth_context_session_jti_defaults_for_existing_constructors() -> None:
+    """Backward compatibility: existing construction sites need no new field."""
+    from adaptix_contracts.auth_contracts import AuthContext
+
+    auth = AuthContext(user_id=uuid4(), tenant_id=uuid4())
+    assert auth.session_jti is None

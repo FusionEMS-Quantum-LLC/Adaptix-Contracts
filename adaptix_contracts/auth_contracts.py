@@ -354,6 +354,22 @@ class AuthContext(BaseModel):
             NO-LEASE demo family (founder Platform Demo Mode and the public
             synthetic ``/demo/<app>`` sessions). Always ``None`` for a Cortex
             Live (leased) demo session and for non-demo contexts.
+        session_jti: The SESSION identity Core minted at login and persisted
+            as ``core_user_sessions.jti`` (CONTRACTS-AUTHCONTEXT-SESSION-JTI-001).
+            Populated ONLY from a VERIFIED signed gateway context, and only
+            when that context actually carries the ``session_jti`` claim — the
+            unsigned/legacy header path has no such header, so it stays
+            ``None`` there. An empty string (``""``) is a real, distinct
+            value: the gateway signs ``""`` when the inbound token carries no
+            session identity, and Core's own revocation intentionally falls
+            back safely on that empty string. Never treat ``""`` as
+            equivalent to ``None`` here — collapsing them would erase the
+            distinction that lets Core detect "no session identity" instead
+            of "gateway context predates this claim". This is a distinct
+            identity from any per-request correlation id (the gateway's own
+            ``jti`` claim, forwarded as ``X-Request-Id``): ``jti`` is
+            per-REQUEST while ``session_jti`` is per-SESSION and is what
+            Core's ``core_user_sessions`` table keys revocation on.
     """
 
     user_id: UUID
@@ -368,6 +384,7 @@ class AuthContext(BaseModel):
     demo_lease_id: UUID | None = None
     demo_persona: str | None = None
     demo_agency_id: str | None = None
+    session_jti: str | None = None
 
     model_config = {"frozen": True}
 
@@ -673,6 +690,16 @@ async def get_auth_context(
             else []
         )
         mfa_verified = verified_payload.get("mfa_verified") is True
+        # CONTRACTS-AUTHCONTEXT-SESSION-JTI-001: the gateway signs
+        # ``session_jti`` unconditionally (empty string when the inbound
+        # token carries no session identity — see the AuthContext docstring
+        # for why "" and missing-key are kept distinct). ``.get()`` returns
+        # ``None`` only when the key itself is absent (a signed context
+        # minted before this claim existed), never for a signed "" value.
+        _raw_session_jti = verified_payload.get("session_jti")
+        session_jti: str | None = (
+            str(_raw_session_jti) if _raw_session_jti is not None else None
+        )
 
         # Cortex Live demo context — honoured ONLY from the verified signed
         # payload. A demo context that is present but malformed is REJECTED
@@ -705,6 +732,7 @@ async def get_auth_context(
         roles = _parse_roles(x_user_roles)
         scopes = []
         mfa_verified = False
+        session_jti = None
         is_demo = False
         demo_session_id = None
         demo_lease_id = None
@@ -782,6 +810,7 @@ async def get_auth_context(
         demo_lease_id=demo_lease_id,
         demo_persona=demo_persona,
         demo_agency_id=demo_agency_id,
+        session_jti=session_jti,
     )
 
 
