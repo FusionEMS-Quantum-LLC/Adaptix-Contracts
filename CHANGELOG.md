@@ -12,6 +12,28 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.17.0] - 2026-09-13
+
+### Added
+
+- **`EpcrChartAmendedEvent.amendment_authority`
+  (EPCR-AMENDMENT-SINGLE-AUTHORITY-001).** `epcr.chart.amended` has two
+  producers in Adaptix-EPCR-Service: the legacy field-diff route
+  (`chart_amendment_service.create_amendment`) and, since EPCR #641, the
+  canonical TrustSign signed-version route
+  (`api_chart_state_machine.trustsign_amendment`). Their `amendment_id`
+  semantics differ (`ChartAmendment` row id vs. `EpcrSignatureArtifact` id)
+  and only the canonical producer stamped a discriminator, which the schema
+  did not declare and the sole consumer (Billing) ignored. The schema now
+  declares `amendment_authority: Literal["legacy_field_diff",
+  "canonical_signed_version"]` plus the additive canonical pointers
+  `signed_version_id`, `supersedes_signed_version_id`, `signature_id` and
+  `document_hash`. The discriminator defaults to `"legacy_field_diff"` for
+  the transition only (every pre-existing payload came from that producer);
+  producers must set it explicitly and it becomes required in the next
+  major. Registry and drift inventory now cite both producers and the
+  current relay line.
+
 ## [5.16.0] - 2026-09-13
 
 ### Added

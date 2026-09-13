@@ -162,12 +162,20 @@ EPCR_CHART_NEMSIS_EXPORT_COMPLETED: Final[str] = "epcr.chart.nemsis_export_compl
 # republished onto the shared contract envelope
 # (``adaptix_contracts.event_contracts.EventSchema``, ``source_service="epcr"``)
 # by the generic relay at
-# ``Adaptix-EPCR-Service/backend/epcr_app/outbox_worker.py:99``. That relay
+# ``Adaptix-EPCR-Service/backend/epcr_app/outbox_worker.py:207``
+# (``_publish_generic``; was ``:99`` when first audited). That relay
 # passes the row's own ``event_type``, so the string never appears literally at
 # the envelope construction site — which is exactly why these stayed invisible
 # to the earlier producer audit and unregistered here. Producer citations are
 # origin/main of Adaptix-EPCR-Service, verified 2026-08-09:
-#   epcr_app/chart_amendment_service.py:92        epcr.chart.amended
+#   epcr_app/chart_amendment_service.py:478       epcr.chart.amended
+#     (legacy field-diff producer, ``amendment_authority="legacy_field_diff"``)
+#   epcr_app/api_chart_state_machine.py:802       epcr.chart.amended
+#     (canonical TrustSign signed-version producer,
+#     ``amendment_authority="canonical_signed_version"``; re-verified
+#     2026-09-13 at Adaptix-EPCR-Service ``7eaf0b7e``). Both producers write
+#     the same ``ChartEventOutbox`` row type; consumers branch on the
+#     discriminator declared by ``schemas.epcr_contracts.EpcrChartAmendedEvent``.
 #   epcr_app/api_chart_cortex_lifecycle.py:102    epcr.chart.billing_handoff
 #   epcr_app/chart_finalization_service.py:57     epcr.nemsis_submit.failed
 #   epcr_app/chart_finalization_service.py:58     epcr.nemsis_submit.succeeded
