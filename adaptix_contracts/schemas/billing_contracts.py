@@ -23,7 +23,30 @@ from pydantic import BaseModel, Field
 
 
 class ClaimStatus(str, Enum):
-    """Lifecycle status of a billing claim."""
+    """Lifecycle status of a billing claim.
+
+    ``corrected``, ``void`` and ``written_off`` are terminal/administrative
+    states carried by Adaptix-Billing-Service's own ``ClaimStatus`` model
+    (billing_app/models/claim.py:31,35,36 at Billing ``main``
+    ``dd67026a``). ``CORRECTED`` is demonstrably wired to the
+    ``billing.claim.status_updated`` event today: Billing's state machine
+    (``claim_lifecycle.py``) permits ``CORRECTED → PAID`` and
+    ``CORRECTED → PARTIALLY_PAID`` on ``TransitionSource.MANUAL_PAYMENT``,
+    and ``publish_claim_status_event`` (``claim_service.py:108-190``) gates
+    only on ``new_status`` — so a manual payment posted against a corrected
+    claim publishes ``old_status="corrected"``. Without ``CORRECTED`` in
+    this enum, ``ClaimStatusUpdatedEvent.model_validate`` in the ePCR
+    event consumer (``epcr_app/event_consumers.py:364-370``) rejected the
+    incoming event and the chart's billing status never updated.
+
+    ``VOID`` and ``WRITTEN_OFF`` are pinned here for wire compatibility so
+    the enum matches the producer's model exactly; whether every path that
+    SETS them today also emits the status-updated event is a separate,
+    Billing-side concern (see the ``_tool_void`` note under
+    CONTRACTS-CLAIMSTATUS-ENUM-001 follow-ons). Adding them here is
+    strictly additive, matches the producer model, and closes the
+    producer/consumer desync for the paths that already emit.
+    """
 
     DRAFT = "draft"
     READY = "ready"
@@ -35,6 +58,9 @@ class ClaimStatus(str, Enum):
     PARTIALLY_PAID = "partially_paid"
     PAID = "paid"
     CLOSED = "closed"
+    CORRECTED = "corrected"
+    VOID = "void"
+    WRITTEN_OFF = "written_off"
 
 
 class DenialStatus(str, Enum):
