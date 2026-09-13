@@ -18,6 +18,7 @@ from adaptix_contracts.schemas import (
     ClaimCreatedEvent,
     ClaimLineItem,
     ClaimStatus,
+    ClaimStatusUpdatedEvent,
     ClearinghouseProvider,
     DomainEvent,
     TrustSignExecutionResponse,
@@ -210,3 +211,78 @@ def test_trustsign_execution_response_round_trip_with_evidence_fields() -> None:
     assert restored.provider == "trustsign"
     assert restored.verification_id == "verify_123"
     assert restored.signed_document_hash == "sha256:abc123"
+
+
+# ── CONTRACTS-CLAIMSTATUS-ENUM-001 ────────────────────────────────────────
+# The three terminal/administrative claim statuses added in 5.15.0.
+# Adaptix-Billing-Service's own ClaimStatus model already carries them and
+# publish_claim_status_event emits at least "corrected" on manual-payment
+# transitions; without them here, ClaimStatusUpdatedEvent.model_validate
+# rejected the incoming event and the ePCR consumer dropped it. These
+# tests lock in string-instantiation, enum-lookup, and event-schema
+# round-trip so a downstream change that removes any of them fails at
+# unit-test time.
+
+
+@pytest.mark.parametrize(
+    ("wire_value", "member"),
+    [
+        ("corrected", ClaimStatus.CORRECTED),
+        ("void", ClaimStatus.VOID),
+        ("written_off", ClaimStatus.WRITTEN_OFF),
+    ],
+)
+def test_claim_status_5_15_0_members_instantiate_from_wire_strings(
+    wire_value: str, member: ClaimStatus
+) -> None:
+    """Each new ClaimStatus value must instantiate from its serialized string
+    form. This is the exact path used by pydantic model_validate on incoming
+    event payloads — the assertion the ePCR consumer's model_validate makes
+    at event_consumers.py:364-370."""
+    assert ClaimStatus(wire_value) is member
+    assert member.value == wire_value
+    assert isinstance(member, str)
+
+
+def test_claim_status_updated_event_accepts_5_15_0_terminal_statuses() -> None:
+    """ClaimStatusUpdatedEvent.model_validate must accept the three new
+    terminal statuses across `status`, `old_status`, and `new_status`. This
+    is the exact wire path Adaptix-Billing-Service publishes on
+    `billing.claim.status_updated`; before 5.15.0 an incoming payload with
+    `old_status="corrected"` was rejected by validation and the ePCR chart's
+    billing status never updated."""
+    updated_at = _timestamp()
+
+    for status_value in ("corrected", "void", "written_off"):
+        payload = {
+            "event_type": "billing.claim.status_updated",
+            "claim_id": "claim-1",
+            "tenant_id": "tenant-1",
+            "status": status_value,
+            "old_status": status_value,
+            "new_status": status_value,
+            "updated_at": updated_at.isoformat(),
+        }
+
+        event = ClaimStatusUpdatedEvent.model_validate(payload)
+
+        assert event.status == ClaimStatus(status_value)
+        assert event.old_status == ClaimStatus(status_value)
+        assert event.new_status == ClaimStatus(status_value)
+
+
+def test_claim_status_updated_event_still_rejects_unknown_status() -> None:
+    """Additive enum extension must not accidentally accept arbitrary
+    strings — pydantic still enforces the enum. This locks in the failure
+    mode a downstream regression that widens ClaimStatus to `str` would
+    introduce."""
+    with pytest.raises(ValidationError):
+        ClaimStatusUpdatedEvent.model_validate(
+            {
+                "event_type": "billing.claim.status_updated",
+                "claim_id": "claim-1",
+                "tenant_id": "tenant-1",
+                "new_status": "not_a_real_status",
+                "updated_at": _timestamp().isoformat(),
+            }
+        )

@@ -12,6 +12,50 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.15.0] - 2026-09-12
+
+### Added
+
+- **`adaptix_contracts.schemas.billing_contracts.ClaimStatus`** gains three
+  terminal/administrative values carried by Adaptix-Billing-Service's
+  `ClaimStatus` model (`billing_app/models/claim.py:31,35,36` at Billing
+  `main` `dd67026a`):
+
+  - `CORRECTED = "corrected"`
+  - `VOID = "void"`
+  - `WRITTEN_OFF = "written_off"`
+
+  **Demonstrably on-the-wire today:** `CORRECTED`. Billing's state machine
+  (`claim_lifecycle.py`) permits `CORRECTED → PAID` and
+  `CORRECTED → PARTIALLY_PAID` on `TransitionSource.MANUAL_PAYMENT`, and
+  `publish_claim_status_event` (`claim_service.py:108-190`) gates only on
+  `new_status`, so a manual payment posted against a corrected claim
+  publishes `old_status="corrected"`. Without `CORRECTED` in the Contracts
+  enum, `ClaimStatusUpdatedEvent.model_validate` in the ePCR event consumer
+  (`epcr_app/event_consumers.py:364-370`) rejected the event under a broad
+  `except Exception`, logged and returned False → the chart's billing
+  status never updated. That path is now closed for producers on this
+  Contracts pin and consumers on any pin `>= 5.15.0`.
+
+  **Pinned for wire compatibility with the producer's model:** `VOID` and
+  `WRITTEN_OFF`. `billing_app/api/cortex_tools.py::_tool_void` currently
+  writes `claim.status = "written_off"` directly on the model without
+  calling `publish_claim_status_event`, so `WRITTEN_OFF` and `VOID` are
+  not demonstrably on the wire yet — that Billing-side gap is a separate
+  follow-on correction. Adding them here is additive, matches the
+  producer's own enum, and closes the desync for the paths that already
+  emit while removing an obstacle for the paths that should.
+
+  Additive-only: existing consumers keep matching the old values;
+  appending a member to a `str, Enum` subclass is wire-compatible for
+  producer pins, but a CONSUMER pinned to `<= 5.14.0` will still reject
+  the new values. Both Billing (`dd67026a`) and ePCR (their current
+  pins) predate this Contracts commit; both must re-pin to a commit
+  containing 5.15.0 for the fix to reach production. Fleet re-pin wave is
+  tracked separately under `CONTRACTS-STALE-PIN-FLEET-DEFECT-CLASS`.
+
+  Ledger: `CONTRACTS-CLAIMSTATUS-ENUM-001` (P1).
+
 ## [5.14.0] - 2026-09-10
 
 ### Added

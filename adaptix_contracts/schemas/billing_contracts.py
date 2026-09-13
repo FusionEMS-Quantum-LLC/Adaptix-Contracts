@@ -23,7 +23,26 @@ from pydantic import BaseModel, Field
 
 
 class ClaimStatus(str, Enum):
-    """Lifecycle status of a billing claim."""
+    """Lifecycle status of a billing claim.
+
+    Values before ``CORRECTED`` are the normal claim-processing lifecycle:
+    a claim is drafted, readied, submitted, accepted or rejected at the
+    clearinghouse, denied or appealed at the payer, and eventually paid
+    (fully or partially) or closed.
+
+    ``CORRECTED``, ``VOID`` and ``WRITTEN_OFF`` are terminal or
+    administrative states that come after that lifecycle. ``CORRECTED``
+    identifies a claim reissued to replace an earlier submission (a
+    subsequent ``TransitionSource.MANUAL_PAYMENT`` can still move it to
+    ``PAID`` or ``PARTIALLY_PAID``). ``VOID`` identifies a submission
+    withdrawn or canceled without payment. ``WRITTEN_OFF`` identifies a
+    balance the agency has declared uncollectible.
+
+    All three values are already carried by the Adaptix-Billing-Service
+    ``ClaimStatus`` model; adding them here is strictly additive and
+    aligns this shared contract with the producer. See CHANGELOG 5.15.0
+    for the specific wire evidence and the fleet-repin caveat.
+    """
 
     DRAFT = "draft"
     READY = "ready"
@@ -35,6 +54,9 @@ class ClaimStatus(str, Enum):
     PARTIALLY_PAID = "partially_paid"
     PAID = "paid"
     CLOSED = "closed"
+    CORRECTED = "corrected"
+    VOID = "void"
+    WRITTEN_OFF = "written_off"
 
 
 class DenialStatus(str, Enum):
