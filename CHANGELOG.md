@@ -12,6 +12,66 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.20.0] - 2026-09-17
+
+### Added
+
+- **`adaptix_contracts.commercial` — the founder's quote rules become catalog
+  terms (COMMERCIAL-CATALOG-003).** The founder decided on 2026-09-17 how every
+  quote is priced, and required one source of truth across the website, the
+  quoting system, Billing and Cortex. `CommercialTerms` gains four required
+  fields, set on `WI-LAUNCH-2026.1` and exported in `commercial_catalog.json`:
+  - `standalone_price_max_applications = 1`: a quote holding two or more
+    application offers is priced as Platform plus each offer's add-on price,
+    never as a standalone price plus add-ons. An offer whose standalone price
+    includes other offers counts as one offer; when the quote is priced as
+    Platform plus add-ons, each included offer is quoted as its own add-on (CCT
+    Clinical plus Adaptix Billing is Platform plus the CCT, ePCR and Billing
+    add-ons). Package prices are a separate purchase path this rule does not
+    change.
+  - `quote_validity_calendar_days = 30`.
+  - `discount_stacking = DiscountStacking.ADDITIVE`: eligible discount rates
+    are added and the combined rate is applied once to the same eligible base;
+    discounts are never compounded.
+  - `billable_encounter_recognition =
+    UsageRecognitionPoint.FIRST_CLEARINGHOUSE_ACCEPTANCE`: an encounter becomes
+    a usage unit once, when the clearinghouse first accepts a claim for it. A
+    rejected claim creates no unit, and resubmissions or corrections of the same
+    encounter never create another.
+  The export also lists the `usage_recognition_points` and
+  `discount_stacking_modes` vocabularies.
+
+### Changed
+
+- `validate_offer_catalog` refuses a catalog whose annual-prepay discount can
+  reach a `MANAGED_SERVICE` charge, the class of the Managed Billing fee.
+  Prepay discounts the Platform and subscription portion only, never usage or
+  the Managed Billing fee. The Adaptix Billing fee is the agency's own software
+  subscription (`APPLICATION_SUBSCRIPTION`) and stays eligible, as the founder
+  plan's billing example states (section 257). The validator also requires both
+  new counts to be positive integers and both new modes to be their enums.
+  `WI-LAUNCH-2026.1` already left `MANAGED_SERVICE` out of its prepay-eligible
+  classes, so no price changes.
+
+### Downstream impact
+
+- None expected. The four required fields are a disclosed addition, not a
+  silent one (`DEPRECATION_POLICY.md`), because no consumer constructs
+  `CommercialTerms`:
+  - It and `WI-LAUNCH-2026.1` first shipped in 5.19.0 on the same day.
+  - `WI_LAUNCH_2026_1` in this repository is its only constructor, and no other
+    repository references `CommercialTerms`.
+  - adaptix-ops records 5.19.0 as the approved Contracts release, but no
+    consumer pins it. The one consumer repin (Adaptix-Billing-Service #1212)
+    was closed unmerged.
+- The narrower prepay rule applies only to catalog data this repository
+  authors.
+- Both JSON exports only gain keys. The one existing value that changes is
+  `contracts_version`, which every release updates.
+- A consumer can pin 5.20.0 only after two things exist: the `v5.20.0` release
+  tag, and a validation engine approving this revision (an adaptix-ops approval
+  plus an engine promotion).
+
 ## [5.19.0] - 2026-09-17
 
 ### Added

@@ -59,6 +59,7 @@ from adaptix_contracts.commercial.terms import (
     CommunityEligibilityCriterion,
     CommunityEligibilityDecision,
     CommunityEligibilityOutcome,
+    DiscountStacking,
     DiscountType,
 )
 from adaptix_contracts.commercial.usage import (
@@ -69,6 +70,7 @@ from adaptix_contracts.commercial.usage import (
     UsageMetric,
     UsageRate,
     UsageRateBasis,
+    UsageRecognitionPoint,
 )
 
 __all__ = [
@@ -91,6 +93,7 @@ __all__ = [
     "CommunityEligibilityDecision",
     "CommunityEligibilityOutcome",
     "CustomerSegment",
+    "DiscountStacking",
     "DiscountType",
     "MonthlyPrice",
     "OfferAvailability",
@@ -113,6 +116,7 @@ __all__ = [
     "UsageMetric",
     "UsageRate",
     "UsageRateBasis",
+    "UsageRecognitionPoint",
     "fixed_price",
     "is_cent_amount",
     "starting_price",

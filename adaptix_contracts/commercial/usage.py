@@ -10,6 +10,10 @@ an ERA, payment posting or reposting, or a rebill
 (:class:`SameEncounterActivity`). Managed Billing counts exactly the same units
 at a different rate; there is no second definition of a claim.
 
+The unit is recognised once, at the first clearinghouse acceptance of a claim
+for the encounter (:class:`UsageRecognitionPoint`, founder decision
+2026-09-17): a claim the clearinghouse rejects creates no unit.
+
 Deduplication is enforced server-side on the canonical encounter identity and
 is never inferred from EDI transaction counts. :class:`BillableEncounterUsageKey`
 is the uniqueness key: tenant + canonical billable encounter + usage metric
@@ -38,6 +42,7 @@ __all__ = [
     "UsageMetric",
     "UsageRate",
     "UsageRateBasis",
+    "UsageRecognitionPoint",
 ]
 
 
@@ -86,6 +91,16 @@ class UsageRate:
                 f"{self.metric.value}: a {self.basis.value} rate must not carry a "
                 f"unit_price, got {self.unit_price!r}"
             )
+
+
+class UsageRecognitionPoint(str, enum.Enum):
+    """The moment a billable encounter becomes a usage unit."""
+
+    #: The first time the clearinghouse accepts a claim for the encounter. A
+    #: claim the clearinghouse rejects creates no unit, and no later submission,
+    #: resubmission or correction for the same encounter creates another
+    #: (:class:`SameEncounterActivity`).
+    FIRST_CLEARINGHOUSE_ACCEPTANCE = "first_clearinghouse_acceptance"
 
 
 class SameEncounterActivity(str, enum.Enum):

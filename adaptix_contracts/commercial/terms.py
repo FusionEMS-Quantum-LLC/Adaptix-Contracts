@@ -15,6 +15,7 @@ from datetime import date
 from decimal import Decimal
 
 from adaptix_contracts.commercial.charges import ChargeClass
+from adaptix_contracts.commercial.usage import UsageRecognitionPoint
 
 __all__ = [
     "DISCOUNTS_REQUIRING_FOUNDER_APPROVAL",
@@ -22,6 +23,7 @@ __all__ = [
     "CommunityEligibilityCriterion",
     "CommunityEligibilityDecision",
     "CommunityEligibilityOutcome",
+    "DiscountStacking",
     "DiscountType",
 ]
 
@@ -46,6 +48,15 @@ DISCOUNTS_REQUIRING_FOUNDER_APPROVAL: frozenset[DiscountType] = frozenset(
 )
 
 
+class DiscountStacking(str, enum.Enum):
+    """How a quote combines more than one eligible discount."""
+
+    #: The eligible discount rates are added together and the combined rate is
+    #: applied once to the same eligible base amount. Discounts are never
+    #: compounded one after another (founder decision 2026-09-17).
+    ADDITIVE = "additive"
+
+
 @dataclass(frozen=True)
 class CommercialTerms:  # pylint: disable=too-many-instance-attributes
     """The standard commercial terms of one catalog version.
@@ -60,7 +71,8 @@ class CommercialTerms:  # pylint: disable=too-many-instance-attributes
     #: The annual-prepay discount rate (``Decimal("0.10")`` is 10%).
     annual_prepay_discount_rate: Decimal
     #: The only charge classes the annual-prepay discount applies to without
-    #: an explicit contract term; never usage or pass-through charges.
+    #: an explicit contract term; never usage, managed-service (the Managed
+    #: Billing fee) or pass-through charges.
     annual_prepay_eligible_charge_classes: frozenset[ChargeClass]
     #: Premium over standard 12-month subscription pricing when month-to-month
     #: is offered.
@@ -90,6 +102,23 @@ class CommercialTerms:  # pylint: disable=too-many-instance-attributes
     #: Patient-payment software is part of Adaptix Billing; processor, card and
     #: ACH fees are pass-through charges.
     patient_payments_software_included_with_billing: bool
+    #: The most application offers a new customer's quote may hold and still
+    #: be priced at a standalone (Platform-inclusive) price. A quote holding
+    #: more is priced as Platform plus the add-on price of each offer it holds,
+    #: never as a standalone price plus add-ons (founder decision 2026-09-17).
+    #: An offer whose standalone price includes other offers
+    #: (``standalone_includes_offers``, such as CCT Clinical) counts as one
+    #: offer, but when the quote is priced as Platform plus add-ons each
+    #: included offer is quoted as its own add-on: CCT Clinical plus Adaptix
+    #: Billing is Platform plus the CCT, ePCR and Billing add-ons. Package
+    #: prices are a separate purchase path and are unaffected.
+    standalone_price_max_applications: int
+    #: Calendar days a quote stays valid after it is issued.
+    quote_validity_calendar_days: int
+    #: How eligible discounts combine on one quote.
+    discount_stacking: DiscountStacking
+    #: When a billable encounter becomes a usage unit.
+    billable_encounter_recognition: UsageRecognitionPoint
 
 
 class CommunityEligibilityCriterion(str, enum.Enum):

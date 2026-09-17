@@ -30,6 +30,7 @@ from adaptix_contracts.commercial import (
     NOT_OFFERED_PRICE,
     ChargeClass,
     CustomerSegment,
+    DiscountStacking,
     DiscountType,
     MonthlyPrice,
     OfferAvailability,
@@ -39,6 +40,7 @@ from adaptix_contracts.commercial import (
     UsageMetric,
     UsageRate,
     UsageRateBasis,
+    UsageRecognitionPoint,
     fixed_price,
     starting_price,
 )
@@ -294,6 +296,32 @@ class TestFounderPrices:
         assert terms.standard_support_included
         assert terms.patient_payments_software_included_with_billing
 
+    def test_founder_quote_rules(self) -> None:
+        """Founder decisions 2026-09-17: one source of truth for every quote surface."""
+        terms = CATALOG.terms
+        # Two or more applications are Platform plus add-ons, never standalone.
+        assert terms.standalone_price_max_applications == 1
+        assert terms.quote_validity_calendar_days == 30
+        assert terms.discount_stacking is DiscountStacking.ADDITIVE
+        assert (
+            terms.billable_encounter_recognition
+            is UsageRecognitionPoint.FIRST_CLEARINGHOUSE_ACCEPTANCE
+        )
+        # Prepay reaches the Platform and subscription portion only. The Managed
+        # Billing fee and usage are never discounted; the Adaptix Billing fee is
+        # the agency's own software subscription and stays eligible (plan
+        # section 257). Pinning both classes keeps a re-classed fee from
+        # silently gaining or losing the discount.
+        eligible = terms.annual_prepay_eligible_charge_classes
+        managed_billing_fee = CATALOG.offer("managed_billing").charge_class
+        adaptix_billing_fee = CATALOG.offer("billing").charge_class
+        assert managed_billing_fee is ChargeClass.MANAGED_SERVICE
+        assert managed_billing_fee not in eligible
+        assert ChargeClass.USAGE not in eligible
+        assert adaptix_billing_fee is ChargeClass.APPLICATION_SUBSCRIPTION
+        assert adaptix_billing_fee in eligible
+        assert ChargeClass.PLATFORM_SUBSCRIPTION in eligible
+
     @pytest.mark.parametrize(
         ("encounters", "expected_annual"),
         [(500, Decimal("21940")), (2000, Decimal("33940")), (5000, Decimal("57940"))],
@@ -523,6 +551,17 @@ class TestExports:
         assert community["add_on"] == {"basis": "fixed", "amount": "495.00"}
         assert community["standalone"] == {"basis": "fixed", "amount": "995.00"}
         assert exported["terms"]["standard_migration_fee"] == "0.00"  # type: ignore[index]
+
+    def test_export_carries_the_founder_quote_rules(self) -> None:
+        exported = export_offer_catalog(CATALOG)
+        terms = exported["terms"]
+        assert terms["standalone_price_max_applications"] == 1  # type: ignore[index]
+        assert terms["quote_validity_calendar_days"] == 30  # type: ignore[index]
+        assert terms["discount_stacking"] == "additive"  # type: ignore[index]
+        assert (
+            terms["billable_encounter_recognition"]  # type: ignore[index]
+            == "first_clearinghouse_acceptance"
+        )
 
     def test_export_refuses_a_fraction_of_a_cent_instead_of_rounding(self) -> None:
         sub_cent = dataclasses.replace(

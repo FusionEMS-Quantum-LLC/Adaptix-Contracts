@@ -507,6 +507,44 @@ class TestTerms:
         )
         _rejects(replace(CATALOG, terms=terms), "subscription charges only")
 
+    def test_annual_prepay_never_reaches_the_managed_billing_fee(self) -> None:
+        terms = replace(
+            CATALOG.terms,
+            annual_prepay_eligible_charge_classes=CATALOG.terms.annual_prepay_eligible_charge_classes
+            | {ChargeClass.MANAGED_SERVICE},
+        )
+        _rejects(replace(CATALOG, terms=terms), "subscription charges only")
+
+    @pytest.mark.parametrize(
+        "field_name",
+        ["standalone_price_max_applications", "quote_validity_calendar_days"],
+    )
+    @pytest.mark.parametrize("value", [0, -30, True, 30.0, "30", None])
+    def test_quote_counts_are_positive_integers(
+        self, field_name: str, value: object
+    ) -> None:
+        _rejects(
+            replace(CATALOG, terms=replace(CATALOG.terms, **{field_name: value})),
+            f"terms.{field_name} must be a positive integer",
+        )
+
+    @pytest.mark.parametrize("value", ["additive", None, 1])
+    def test_discount_stacking_must_be_the_enum(self, value: object) -> None:
+        _rejects(
+            replace(CATALOG, terms=replace(CATALOG.terms, discount_stacking=value)),
+            "terms.discount_stacking must be a DiscountStacking",
+        )
+
+    @pytest.mark.parametrize("value", ["first_clearinghouse_acceptance", None])
+    def test_usage_recognition_must_be_the_enum(self, value: object) -> None:
+        _rejects(
+            replace(
+                CATALOG,
+                terms=replace(CATALOG.terms, billable_encounter_recognition=value),
+            ),
+            "terms.billable_encounter_recognition must be a UsageRecognitionPoint",
+        )
+
     def test_rates_are_between_zero_and_one(self) -> None:
         _rejects(
             replace(
