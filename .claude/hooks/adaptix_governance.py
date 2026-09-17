@@ -8,6 +8,7 @@ from typing import Any
 
 ROOT = Path.cwd()
 LOCAL_COMMAND_TIMEOUT_SECONDS = 0.2
+REMOTES_PREFIX = "refs/remotes/"
 
 
 def run(*args: str) -> tuple[int, str, str]:
@@ -66,9 +67,8 @@ def working_tree_changes() -> list[str]:
 
 
 def upstream_state() -> tuple[int, int] | None:
-    code, out, _ = run(
-        "git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}"
-    )
+    revspec = "HEAD...@{upstream}"
+    code, out, _ = run("git", "rev-list", "--left-right", "--count", revspec)
     if code != 0:
         return None
     parts = out.split()
@@ -96,7 +96,15 @@ def canonical_remote_branch() -> tuple[str, str] | None:
     code, out, _ = run(
         "git",
         "for-each-ref",
-        "--format=%(refname:short)|%(symref:short)",
+        # %(refname), NOT %(refname:short). Git shortens
+        # refs/remotes/<remote>/HEAD to the bare remote name -- "origin", not
+        # "origin/HEAD" -- because that is the spelling which resolves a
+        # remote's default branch (`git log origin`). The short form therefore
+        # never ends in "/HEAD", so the suffix test below matched nothing and
+        # this function returned None for every correctly configured clone,
+        # blocking completion while reporting it as a local repository
+        # misconfiguration. The full refname keeps the "/HEAD" suffix.
+        "--format=%(refname)|%(symref:short)",
         "refs/remotes",
     )
     if code != 0:
@@ -107,10 +115,11 @@ def canonical_remote_branch() -> tuple[str, str] | None:
         ref, separator, target = raw_line.partition("|")
         ref = ref.strip()
         target = target.strip()
-        if not separator or not ref.endswith("/HEAD") or not target:
+        remote_head = ref.startswith(REMOTES_PREFIX) and ref.endswith("/HEAD")
+        if not separator or not remote_head or not target:
             continue
 
-        remote = ref[: -len("/HEAD")]
+        remote = ref[len(REMOTES_PREFIX) : -len("/HEAD")]
         remote_prefix = f"{remote}/"
         if not remote or not target.startswith(remote_prefix):
             continue
@@ -130,11 +139,10 @@ def canonical_remote_branch() -> tuple[str, str] | None:
     if len(candidates) > 1:
         upstream = current_upstream_ref()
         if upstream:
-            matches = [
-                candidate
-                for candidate in candidates
-                if upstream.startswith(f"{candidate[0]}/")
-            ]
+            matches = []
+            for candidate in candidates:
+                if upstream.startswith(f"{candidate[0]}/"):
+                    matches.append(candidate)
             if len(matches) == 1:
                 _, remote_branch, local_branch = matches[0]
                 return remote_branch, local_branch
@@ -230,8 +238,7 @@ def main() -> int:
 
     if event == "SessionStart":
         sys.stdout.write(
-            "AdaptixCore lifecycle active. Reuse active work and finish the "
-            "branch/PR lifecycle before advancing.\n"
+            "AdaptixCore lifecycle active. Reuse active work and finish the branch/PR lifecycle before advancing.\n"
         )
         return 0
 
