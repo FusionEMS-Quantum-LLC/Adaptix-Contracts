@@ -67,9 +67,8 @@ def working_tree_changes() -> list[str]:
 
 
 def upstream_state() -> tuple[int, int] | None:
-    code, out, _ = run(
-        "git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}"
-    )
+    revspec = "HEAD...@{upstream}"
+    code, out, _ = run("git", "rev-list", "--left-right", "--count", revspec)
     if code != 0:
         return None
     parts = out.split()
@@ -116,12 +115,8 @@ def canonical_remote_branch() -> tuple[str, str] | None:
         ref, separator, target = raw_line.partition("|")
         ref = ref.strip()
         target = target.strip()
-        if (
-            not separator
-            or not ref.startswith(REMOTES_PREFIX)
-            or not ref.endswith("/HEAD")
-            or not target
-        ):
+        remote_head = ref.startswith(REMOTES_PREFIX) and ref.endswith("/HEAD")
+        if not separator or not remote_head or not target:
             continue
 
         remote = ref[len(REMOTES_PREFIX) : -len("/HEAD")]
@@ -144,11 +139,10 @@ def canonical_remote_branch() -> tuple[str, str] | None:
     if len(candidates) > 1:
         upstream = current_upstream_ref()
         if upstream:
-            matches = [
-                candidate
-                for candidate in candidates
-                if upstream.startswith(f"{candidate[0]}/")
-            ]
+            matches = []
+            for candidate in candidates:
+                if upstream.startswith(f"{candidate[0]}/"):
+                    matches.append(candidate)
             if len(matches) == 1:
                 _, remote_branch, local_branch = matches[0]
                 return remote_branch, local_branch
@@ -244,8 +238,7 @@ def main() -> int:
 
     if event == "SessionStart":
         sys.stdout.write(
-            "AdaptixCore lifecycle active. Reuse active work and finish the "
-            "branch/PR lifecycle before advancing.\n"
+            "AdaptixCore lifecycle active. Reuse active work and finish the branch/PR lifecycle before advancing.\n"
         )
         return 0
 
