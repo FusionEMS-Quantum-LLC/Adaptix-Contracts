@@ -111,11 +111,9 @@ OPERATIONS_APPLICATIONS: tuple[ApplicationDefinition, ...] = (
             ),
         ),
         workspaces=(
-            _ws("new_request", "New Request", "/workspace/transportlink/requests/new"),
-            _ws("forms", "Forms", "/workspace/transportlink/forms"),
-            _ws(
-                "intelligence", "Intelligence", "/workspace/transportlink/intelligence"
-            ),
+            _ws("new_request", "New Request", "/transportlink/requests/new"),
+            _ws("forms", "Forms", "/transportlink/forms"),
+            _ws("intelligence", "Intelligence", "/transportlink/intelligence"),
             _ws("schedule", "Daily Schedule", "/workspace/transport/schedule"),
             _ws("hazards", "Hazard Reports", "/workspace/transport/hazards"),
             _ws("mci", "MCI Incidents", "/workspace/transport/mci"),

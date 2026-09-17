@@ -525,7 +525,7 @@
           "description": "",
           "display_name": "New Request",
           "modules": [],
-          "route": "/workspace/transportlink/requests/new",
+          "route": "/transportlink/requests/new",
           "visibility": "tenant",
           "workspace_id": "new_request"
         },
@@ -533,7 +533,7 @@
           "description": "",
           "display_name": "Forms",
           "modules": [],
-          "route": "/workspace/transportlink/forms",
+          "route": "/transportlink/forms",
           "visibility": "tenant",
           "workspace_id": "forms"
         },
@@ -541,7 +541,7 @@
           "description": "",
           "display_name": "Intelligence",
           "modules": [],
-          "route": "/workspace/transportlink/intelligence",
+          "route": "/transportlink/intelligence",
           "visibility": "tenant",
           "workspace_id": "intelligence"
         },

@@ -12,6 +12,18 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Changed
+
+- **TransportLink workspace routes point at the canonical `/transportlink`
+  application.** Adaptix-Web-App PR #2989 (founder ruling 2026-09-17) makes
+  `/transportlink` the one TransportLink application and turns
+  `/workspace/transportlink/**` into permanent compatibility redirects, so the
+  pages that own these surfaces are now `/transportlink/requests/new`,
+  `/transportlink/forms` and `/transportlink/intelligence`. The registry's
+  `new_request`, `forms` and `intelligence` workspaces now name those routes
+  (the Web-App mirror's route-truth test requires a real page, not a
+  redirect). `schedule`, `hazards`, `mci` and `rollups` are unchanged.
+
 ## [5.18.0] - 2026-09-17
 
 ### Added
