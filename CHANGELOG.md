@@ -12,8 +12,66 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.19.0] - 2026-09-17
+
+### Added
+
+- **`adaptix_contracts.commercial` — the WI-LAUNCH-2026.1 Platform +
+  Applications + Packages + Usage offer catalog (COMMERCIAL-CATALOG-002).** The
+  founder locked a new commercial model on 2026-09-17: every organization pays
+  for AdaptixCore Platform once (Community $495, Standard $995,
+  Regional/Enterprise from $2,495), adds applications at a published add-on
+  price (or a Platform-inclusive standalone entry price), buys packages as
+  discounts, and pays usage only where usage drives cost — Adaptix Billing $8
+  and Managed Billing $30/$35 per accepted billable encounter, never a
+  percentage of collections. The `wi-launch-v1` volume-band catalog could not
+  represent any of that. New vocabulary: `CustomerSegment`, `PlatformPlan`,
+  `MonthlyPrice`/`PriceBasis`, `ApplicationOffer` (add-on and standalone price
+  per segment, additional operational base / facility pricing, required and
+  excluded offers, canonical module grants), `PackageOffer`,
+  `UsageMetric`/`UsageRate`, the billable-encounter unit
+  (`BillableEncounterUsageKey`, `SameEncounterActivity`, `UsageLedgerState`),
+  `ChargeClass`, `PassThroughChargeType`, `CommercialTerms`, `DiscountType`,
+  Community eligibility criteria and decision record, and `QuoteSection`.
+  `commercial.wi_launch_2026_1.WI_LAUNCH_2026_1` seeds the locked prices and is
+  validated at import by `commercial.offer_validation.validate_offer_catalog`:
+  grants must be canonical module ids that reach a service; a published offer
+  must open an active tenant application with no dark workspace and reach its
+  primary services; an activation-pending offer grants nothing; only a billing
+  service is priced per billable encounter; standalone prices never undercut
+  Platform plus add-ons; packages cost more than Platform and never more than
+  Platform plus their add-ons; billing add-ons net the Platform the customer
+  already pays; annual prepay never reaches usage or pass-through charges.
+  Platform grants the Core foundation, onboarding, Administration (devices,
+  integrations, HL7, imports, exports) and search. It grants no Cortex module
+  yet: `cortex` mints the founder-only `adaptix-cortex` audience, and it is also
+  the Gateway entitlement key for Core's tenant `/api/v1/cortex/route`,
+  `/capabilities` and `/budget` and, with `ai`, for the AI service's
+  `/api/v1/cortex/acuity-prediction` and `/demand-forecast`. Which grants
+  deliver the Cortex Core sold with Platform is decided separately; until then
+  a Platform-only tenant reaches none of those routes.
+  `commercial.offer_catalogs.get_offer_catalog(version)`
+  resolves any carried version so a quote stays explainable after prices
+  change, and `adaptix_contracts/commercial_catalog.json`
+  (`scripts/export_commercial_catalog.py`) is the committed machine-readable
+  form for non-Python consumers. Contracts still carries no price calculation.
+  Critical Care Transport, Cortex Pro and every package containing CCT are
+  `activation_pending`: priced, never sellable until the product exists.
+  Wildland is deliberately absent (founder: do not publish; no application
+  exists yet).
+- **`application_registry.offers_selling_application`** — the offer ids whose
+  grants open an application, resolved through the same gate logic as a route.
+
 ### Changed
 
+- **`application_catalog.json` now links applications to WI-LAUNCH-2026.1
+  offers.** `sold_as` lists offer ids and `pricing_catalog_version` is
+  `WI-LAUNCH-2026.1`; every active tenant application is sold by at least one
+  offer (Air Operations, MIH / Community Paramedicine, Community Risk Reduction
+  and Finance were previously sold under no product).
+  `export_application_catalog` accepts `offer_catalog=`; `pricing_catalog=`
+  still exports the `wi-launch-v1` linkage, and passing both is an error.
+  `wi-launch-v1` itself is unchanged.
 - **TransportLink workspace routes point at the canonical `/transportlink`
   application.** Adaptix-Web-App PR #2989 (founder ruling 2026-09-17) makes
   `/transportlink` the one TransportLink application and turns

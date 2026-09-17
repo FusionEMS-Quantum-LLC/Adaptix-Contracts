@@ -205,10 +205,11 @@
       "position": 1,
       "primary_services": [],
       "sold_as": [
+        "air_operations",
         "billing",
         "cad",
-        "hems_ops",
-        "hospital"
+        "hospital_facility_operations",
+        "managed_billing"
       ],
       "source": "Web-App main 35b4a12e app/ route tree; src/lib/api/missionControl.ts reads /api/v1/cad/units, /api/v1/cad/incidents, /api/v1/hospital/hospitals, /api/v1/billing/cortex/insights, /api/v1/billing/revenue/command, /api/v1/air/adsb/bbox — an aggregation surface that owns no domain records, so it declares `aggregates` instead of a primary service. Offered when the tenant holds ANY aggregated product. Deliberately has no workspaces: it is one board (app/workspace/mission-control/page.tsx is the only page), not a family of surfaces.",
       "status": "active",
@@ -238,8 +239,7 @@
         "adaptix-cad"
       ],
       "sold_as": [
-        "cad",
-        "hems_ops"
+        "cad"
       ],
       "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/cad -> adaptix-cad; module_registry cad",
       "status": "active",
@@ -375,9 +375,7 @@
         "adaptix-crew"
       ],
       "sold_as": [
-        "crewlink",
-        "hems_ops",
-        "mdt"
+        "field_operations"
       ],
       "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/mdt -> adaptix-cad, /api/v1/crewlink -> adaptix-cad + adaptix-crew, /api/v1/crew -> adaptix-crew, /api/v1/field -> adaptix-field. The umbrella shell route is the MDT surface until a dedicated field shell exists; CrewLink and Crew are workspaces with their own module gates, so consolidation widens no entitlement.",
       "status": "active",
@@ -598,7 +596,9 @@
       "primary_services": [
         "adaptix-air"
       ],
-      "sold_as": [],
+      "sold_as": [
+        "air_operations"
+      ],
       "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/air AND /api/v1/air-pilot -> adaptix-air. Adaptix-Air-Service-Pilot has no gateway audience of its own, so the pilot surface is a workspace of this application, never a second app.",
       "status": "active",
       "supporting_services": [],
@@ -742,7 +742,7 @@
         "adaptix-hospital"
       ],
       "sold_as": [
-        "hospital"
+        "hospital_facility_operations"
       ],
       "source": "Web-App main 35b4a12e app/ route tree (layout gates module 'hospital'); Gateway main 5658fb1c routes.py /api/v1/hospital -> adaptix-hospital, /api/v1/facilities -> adaptix-facilities. Facility-Registry-Service owns facility data; this is the human workspace. Hospital staff authenticate through their own portal session, not the agency JWT.",
       "status": "active",
@@ -852,8 +852,7 @@
         "adaptix-epcr"
       ],
       "sold_as": [
-        "epcr",
-        "hems_ops"
+        "epcr"
       ],
       "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/epcr -> adaptix-epcr; module_registry epcr",
       "status": "active",
@@ -994,7 +993,9 @@
       "primary_services": [
         "adaptix-mih"
       ],
-      "sold_as": [],
+      "sold_as": [
+        "mih_community_paramedicine"
+      ],
       "source": "Web-App main 35b4a12e app/ route tree (layout gates module 'mih_community_paramedicine'; _components read /api/v1/mih/escalations, /thresholds, /utilization via useModuleData — real data binding, no placeholders); gateway mih_route.py -> adaptix-mih; production GET /api/v1/mih/healthz 200 on 2026-09-17. Runtime operator journey not yet proven by this registry — status reflects route, gate and live backend, not Tier-5 evidence.",
       "status": "active",
       "supporting_services": [],
@@ -1018,8 +1019,7 @@
         "adaptix-epcr"
       ],
       "sold_as": [
-        "epcr",
-        "hems_ops"
+        "epcr"
       ],
       "source": "Web-App main 35b4a12e app/ route tree (app/quality reads /api/v1/quality x17 and /api/v1/epcr x12; routes registry gates /quality on the epcr entitlement — there is no 'quality' module id); Gateway main 5658fb1c routes.py /api/v1/quality AND /api/v1/qa -> adaptix-epcr. Adaptix-QA-Service (adaptix-qa) consumes finalized-chart events; it is not the surface's routed backend.",
       "status": "active",
@@ -1193,7 +1193,8 @@
         "adaptix-fire"
       ],
       "sold_as": [
-        "fire"
+        "community_risk_reduction",
+        "fire_operations"
       ],
       "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/fire -> adaptix-fire, /api/v1/neris -> adaptix-neris. Preplan, Hydrant and Wildland services are NOT gateway-routed (no /api/v1/preplan|hydrant|wildland RouteEntry; Preplan-Service has no ECS footprint per PREPLAN-SERVICE-NOT-DEPLOYED), so their surfaces here are served by Fire-Service and they are not listed as supporting services until they are routed.",
       "status": "active",
@@ -1380,7 +1381,9 @@
       "primary_services": [
         "adaptix-fire"
       ],
-      "sold_as": [],
+      "sold_as": [
+        "community_risk_reduction"
+      ],
       "source": "Web-App main 35b4a12e app/ route tree (app/workspace/fire/crr is the only CRR surface); Gateway main 5658fb1c routes.py /api/v1/crr -> adaptix-fire; module_registry crr (audience adaptix-fire, implies fire). Adaptix-CRR-Service has no gateway audience yet. CRR is a distinct job with its own purchasable module, so it is a separate application whose root currently lives under the Fire route tree; route ownership resolves by longest prefix.",
       "status": "active",
       "supporting_services": [],
@@ -1427,7 +1430,7 @@
       ],
       "sold_as": [
         "billing",
-        "hems_ops"
+        "managed_billing"
       ],
       "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/billing -> adaptix-billing (+ core), /api/v1/payments -> adaptix-payments, /api/v1/trustsign -> adaptix-trustsign. Patient/claim receivables live HERE, never in Finance. Office Ally is a migration-only adapter and belongs to Administration imports, not to Billing's live path (Stedi is the only live clearinghouse).",
       "status": "active",
@@ -1639,7 +1642,9 @@
       "primary_services": [
         "adaptix-finance"
       ],
-      "sold_as": [],
+      "sold_as": [
+        "finance"
+      ],
       "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/finance -> adaptix-finance. Company/accounting A/R only — patient/claim A/R is Billing's.",
       "status": "active",
       "supporting_services": [],
@@ -1679,7 +1684,7 @@
         "adaptix-workforce"
       ],
       "sold_as": [
-        "scheduling"
+        "workforce"
       ],
       "source": "Web-App main 35b4a12e app/ route tree (app/workspace/workforce/layout.tsx gates ANY-OF workforce/scheduling/labor; /workspace/training gates 'training'); Gateway main 5658fb1c routes.py /api/v1/workforce -> adaptix-workforce + adaptix-labor, /api/v1/scheduling AND /api/v1/labor -> adaptix-labor, /api/v1/hr -> adaptix-hr, /api/v1/training -> adaptix-training. The application is offered when ANY of its products is held (an HR-only tenant has /workspace/hr today and must still find it); entitlements stay separate per workspace: a scheduling-only tenant sees the Schedule workspaces, never Labor, HR or Training (module_registry: scheduling implies none of them).",
       "status": "active",
@@ -1929,9 +1934,11 @@
         "adaptix-assetops"
       ],
       "sold_as": [
-        "fleet",
-        "inventory",
-        "narcotics"
+        "asset_operations",
+        "fleet_only",
+        "inventory_only",
+        "medications_only",
+        "narcotics_only"
       ],
       "source": "Web-App main 35b4a12e app/ route tree (app/workspace/operations/page.tsx: 'AdaptixCore-AssetOps hub', reads /api/v1/assetops x37); Gateway main 5658fb1c routes.py /api/v1/assetops -> adaptix-assetops, /api/v1/fleet -> adaptix-fleet, /api/v1/inventory -> adaptix-inventory, /api/v1/medications -> adaptix-medications, /api/v1/narcotics -> adaptix-narcotics. AssetOps orchestrates; each domain service keeps its own truth (no second inventory, narcotics log or vehicle registry). Device management is Administration's, referenced here.",
       "status": "active",
@@ -2173,7 +2180,7 @@
         "adaptix-analytics"
       ],
       "sold_as": [
-        "analytics"
+        "intelligence_analytics"
       ],
       "source": "Web-App main 35b4a12e app/ route tree (reports reads /api/v1/reports + cross-module report prefixes; analytics reads /api/v1/analytics x64 + graph; ask carries its own ModuleGate 'intelligence'); Gateway main 5658fb1c routes.py /api/v1/reports AND /api/v1/intelligence -> adaptix-core, /api/v1/analytics -> adaptix-analytics, /api/v1/graph -> adaptix-graph. The root is Reports because it is served by Core and reachable by every tenant; Analytics is a workspace behind the sold 'analytics' module (its backend mints no audience without it, so an ungated entry would be a control that can only fail).",
       "status": "active",
@@ -2234,7 +2241,7 @@
         "adaptix-documents"
       ],
       "sold_as": [
-        "compliance"
+        "governance"
       ],
       "source": "Web-App main 35b4a12e app/ route tree (compliance reads /api/v1/compliance x205; documents reads /api/v1/forms x68 + /api/v1/documents x36; audit-logs reads /api/v1/admin); Gateway main 5658fb1c routes.py /api/v1/compliance -> adaptix-compliance (+ core), /api/v1/documents -> adaptix-documents, /api/v1/policy, /api/v1/legal, /api/v1/audit, /api/v1/forms -> their own audiences. Audit-Service is a capability this application reads; it is not the application.",
       "status": "active",
@@ -2425,7 +2432,7 @@
     "Adaptix-Mobile-Shell",
     "Adaptix-Transport-Request-App"
   ],
-  "contracts_version": "5.18.0",
+  "contracts_version": "5.19.0",
   "domains": [
     {
       "domain": "command",
@@ -2472,7 +2479,7 @@
       "position": 10
     }
   ],
-  "pricing_catalog_version": "wi-launch-v1",
+  "pricing_catalog_version": "WI-LAUNCH-2026.1",
   "schema_version": 1,
   "shared_capabilities": [
     {

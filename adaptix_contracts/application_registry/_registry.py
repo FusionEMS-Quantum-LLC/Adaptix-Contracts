@@ -22,6 +22,7 @@ from adaptix_contracts.application_registry._validation import (
     validate_application_definition,
     validate_shared_capability_definition,
 )
+from adaptix_contracts.commercial.offers import ApplicationOffer
 from adaptix_contracts.commercial.pricing_catalog import (
     CommercialApplicationKey,
     CommercialPricingCatalog,
@@ -335,6 +336,32 @@ def sold_products_for_application(
         ):
             sold.append(key)
     return tuple(sold)
+
+
+def offers_selling_application(
+    application_id: str, offers: Iterable[ApplicationOffer]
+) -> tuple[str, ...]:
+    """The ids of the offers whose grants open this application, sorted.
+
+    The offer-catalog counterpart of :func:`sold_products_for_application`: it
+    follows each granted module into :func:`applications_unlocked_by`, the
+    same resolution a route gate uses, so an offer that reaches the
+    application only through a bundle implication is still reported. An
+    activation-pending offer that grants nothing sells nothing.
+    """
+
+    require_application(application_id)
+    return tuple(
+        sorted(
+            offer.offer_id
+            for offer in offers
+            if any(
+                app.canonical_id == application_id
+                for module_id in offer.grants_modules
+                for app in applications_unlocked_by(module_id)
+            )
+        )
+    )
 
 
 def route_owner(pathname: str) -> RouteOwner | None:
