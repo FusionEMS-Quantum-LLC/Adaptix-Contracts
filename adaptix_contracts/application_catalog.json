@@ -1,0 +1,2700 @@
+{
+  "applications": [
+    {
+      "aggregates": [],
+      "canonical_id": "founder_command",
+      "canonical_route": "/workspace/founder-command",
+      "clients": [
+        "Adaptix-Android-Founder-Command"
+      ],
+      "description": "Run the AdaptixCore company and supervise the platform from one place.",
+      "display_name": "Founder Command",
+      "domain": "command",
+      "modules": [],
+      "portals": [],
+      "position": 0,
+      "primary_services": [
+        "adaptix-founder"
+      ],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/founder-command -> adaptix-founder + core, billing, calendar, investor, nemsis; ModuleSwitcher 'Founder' bucket (20 rows, all founderOnly) — those rows are internal workspaces here",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-billing",
+        "adaptix-calendar",
+        "adaptix-core",
+        "adaptix-investor",
+        "adaptix-nemsis"
+      ],
+      "visibility": "founder",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "War Room",
+          "modules": [],
+          "route": "/workspace/founder-command/war-room",
+          "visibility": "founder",
+          "workspace_id": "war_room"
+        },
+        {
+          "description": "",
+          "display_name": "Agencies",
+          "modules": [],
+          "route": "/workspace/founder-command/agencies",
+          "visibility": "founder",
+          "workspace_id": "agencies"
+        },
+        {
+          "description": "",
+          "display_name": "Dispatch Outages",
+          "modules": [],
+          "route": "/workspace/founder-command/dispatch-outages",
+          "visibility": "founder",
+          "workspace_id": "dispatch_outages"
+        },
+        {
+          "description": "",
+          "display_name": "Revenue",
+          "modules": [],
+          "route": "/workspace/founder-command/revenue",
+          "visibility": "founder",
+          "workspace_id": "revenue"
+        },
+        {
+          "description": "",
+          "display_name": "Finance Ledger",
+          "modules": [],
+          "route": "/workspace/founder-command/finance/ledger",
+          "visibility": "founder",
+          "workspace_id": "finance_ledger"
+        },
+        {
+          "description": "",
+          "display_name": "P&L",
+          "modules": [],
+          "route": "/workspace/founder-command/finance/p-and-l",
+          "visibility": "founder",
+          "workspace_id": "profit_and_loss"
+        },
+        {
+          "description": "",
+          "display_name": "Statements",
+          "modules": [],
+          "route": "/workspace/founder-command/finance/revenue",
+          "visibility": "founder",
+          "workspace_id": "statements"
+        },
+        {
+          "description": "",
+          "display_name": "Investors",
+          "modules": [],
+          "route": "/workspace/founder-command/investors",
+          "visibility": "founder",
+          "workspace_id": "investors"
+        },
+        {
+          "description": "",
+          "display_name": "AWS Infrastructure Health",
+          "modules": [],
+          "route": "/workspace/founder-command/platform/infrastructure",
+          "visibility": "founder",
+          "workspace_id": "infrastructure"
+        },
+        {
+          "description": "",
+          "display_name": "Platform Health",
+          "modules": [],
+          "route": "/workspace/founder-command/platform/health",
+          "visibility": "founder",
+          "workspace_id": "platform_health"
+        },
+        {
+          "description": "",
+          "display_name": "Tenant Readiness",
+          "modules": [],
+          "route": "/workspace/founder-command/platform/tenant-readiness",
+          "visibility": "founder",
+          "workspace_id": "tenant_readiness"
+        },
+        {
+          "description": "",
+          "display_name": "Realtime Status",
+          "modules": [],
+          "route": "/workspace/founder-command/realtime",
+          "visibility": "founder",
+          "workspace_id": "realtime"
+        },
+        {
+          "description": "",
+          "display_name": "Founder Sandbox",
+          "modules": [],
+          "route": "/workspace/founder-command/sandbox",
+          "visibility": "founder",
+          "workspace_id": "sandbox"
+        },
+        {
+          "description": "",
+          "display_name": "QA & Testing",
+          "modules": [],
+          "route": "/workspace/founder-command/qa",
+          "visibility": "founder",
+          "workspace_id": "qa_testing"
+        },
+        {
+          "description": "",
+          "display_name": "Social Command",
+          "modules": [],
+          "route": "/workspace/founder-command/social",
+          "visibility": "founder",
+          "workspace_id": "social_command"
+        },
+        {
+          "description": "",
+          "display_name": "Video Studio",
+          "modules": [],
+          "route": "/workspace/founder-command/video-studio",
+          "visibility": "founder",
+          "workspace_id": "video_studio"
+        },
+        {
+          "description": "",
+          "display_name": "CAD Command",
+          "modules": [],
+          "route": "/workspace/founder-command/cad",
+          "visibility": "founder",
+          "workspace_id": "cad_command"
+        },
+        {
+          "description": "",
+          "display_name": "Fire Command",
+          "modules": [],
+          "route": "/workspace/founder-command/fire",
+          "visibility": "founder",
+          "workspace_id": "fire_command"
+        },
+        {
+          "description": "",
+          "display_name": "Air Command",
+          "modules": [],
+          "route": "/workspace/founder-command/air",
+          "visibility": "founder",
+          "workspace_id": "air_command"
+        }
+      ]
+    },
+    {
+      "aggregates": [
+        "air_operations",
+        "billing",
+        "cad",
+        "hospital_facility_operations"
+      ],
+      "canonical_id": "operations_command",
+      "canonical_route": "/workspace/mission-control",
+      "clients": [],
+      "description": "Cross-domain operational oversight: live calls, units, hospitals and revenue signals on one board.",
+      "display_name": "Operations Command",
+      "domain": "command",
+      "modules": [
+        "air",
+        "billing",
+        "cad",
+        "hospital"
+      ],
+      "portals": [],
+      "position": 1,
+      "primary_services": [],
+      "sold_as": [
+        "billing",
+        "cad",
+        "hems_ops",
+        "hospital"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; src/lib/api/missionControl.ts reads /api/v1/cad/units, /api/v1/cad/incidents, /api/v1/hospital/hospitals, /api/v1/billing/cortex/insights, /api/v1/billing/revenue/command, /api/v1/air/adsb/bbox — an aggregation surface that owns no domain records, so it declares `aggregates` instead of a primary service. Offered when the tenant holds ANY aggregated product. Deliberately has no workspaces: it is one board (app/workspace/mission-control/page.tsx is the only page), not a family of surfaces.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-air",
+        "adaptix-billing",
+        "adaptix-cad",
+        "adaptix-hospital"
+      ],
+      "visibility": "tenant",
+      "workspaces": []
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "cad",
+      "canonical_route": "/workspace/cad",
+      "clients": [],
+      "description": "Receive work, assign units and follow every response through to close.",
+      "display_name": "CAD",
+      "domain": "operations",
+      "modules": [
+        "cad"
+      ],
+      "portals": [],
+      "position": 2,
+      "primary_services": [
+        "adaptix-cad"
+      ],
+      "sold_as": [
+        "cad",
+        "hems_ops"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/cad -> adaptix-cad; module_registry cad",
+      "status": "active",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Dispatch Board",
+          "modules": [],
+          "route": "/workspace/cad/dispatch",
+          "visibility": "tenant",
+          "workspace_id": "dispatch"
+        },
+        {
+          "description": "",
+          "display_name": "Incidents",
+          "modules": [],
+          "route": "/workspace/cad/incidents",
+          "visibility": "tenant",
+          "workspace_id": "incidents"
+        },
+        {
+          "description": "",
+          "display_name": "Intake",
+          "modules": [],
+          "route": "/workspace/cad/intake",
+          "visibility": "tenant",
+          "workspace_id": "intake"
+        },
+        {
+          "description": "",
+          "display_name": "Units",
+          "modules": [],
+          "route": "/workspace/cad/units",
+          "visibility": "tenant",
+          "workspace_id": "units"
+        },
+        {
+          "description": "",
+          "display_name": "Map",
+          "modules": [],
+          "route": "/workspace/cad/map",
+          "visibility": "tenant",
+          "workspace_id": "map"
+        },
+        {
+          "description": "",
+          "display_name": "Tracking",
+          "modules": [],
+          "route": "/workspace/cad/tracking",
+          "visibility": "tenant",
+          "workspace_id": "tracking"
+        },
+        {
+          "description": "",
+          "display_name": "Communications",
+          "modules": [],
+          "route": "/workspace/cad/comms",
+          "visibility": "tenant",
+          "workspace_id": "communications"
+        },
+        {
+          "description": "",
+          "display_name": "Facilities",
+          "modules": [],
+          "route": "/workspace/cad/facilities",
+          "visibility": "tenant",
+          "workspace_id": "facilities"
+        },
+        {
+          "description": "",
+          "display_name": "Hospitals",
+          "modules": [],
+          "route": "/workspace/cad/hospitals",
+          "visibility": "tenant",
+          "workspace_id": "hospitals"
+        },
+        {
+          "description": "",
+          "display_name": "Premise Hazards",
+          "modules": [],
+          "route": "/workspace/cad/premise-hazards",
+          "visibility": "tenant",
+          "workspace_id": "premise_hazards"
+        },
+        {
+          "description": "",
+          "display_name": "Transports",
+          "modules": [],
+          "route": "/workspace/cad/transports",
+          "visibility": "tenant",
+          "workspace_id": "transports"
+        },
+        {
+          "description": "",
+          "display_name": "Analytics",
+          "modules": [],
+          "route": "/workspace/cad/analytics",
+          "visibility": "tenant",
+          "workspace_id": "analytics"
+        },
+        {
+          "description": "",
+          "display_name": "Settings",
+          "modules": [],
+          "route": "/workspace/cad/settings",
+          "visibility": "tenant",
+          "workspace_id": "settings"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "field_operations",
+      "canonical_route": "/workspace/mdt",
+      "clients": [
+        "Adaptix-Android-CrewLink",
+        "Adaptix-Android-MDT"
+      ],
+      "description": "What the crew works from in the unit: status, assignment, navigation, paging and messages.",
+      "display_name": "Field Operations",
+      "domain": "operations",
+      "modules": [
+        "crew",
+        "crewlink",
+        "mdt"
+      ],
+      "portals": [],
+      "position": 3,
+      "primary_services": [
+        "adaptix-cad",
+        "adaptix-crew"
+      ],
+      "sold_as": [
+        "crewlink",
+        "hems_ops",
+        "mdt"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/mdt -> adaptix-cad, /api/v1/crewlink -> adaptix-cad + adaptix-crew, /api/v1/crew -> adaptix-crew, /api/v1/field -> adaptix-field. The umbrella shell route is the MDT surface until a dedicated field shell exists; CrewLink and Crew are workspaces with their own module gates, so consolidation widens no entitlement.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-field"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "MDT",
+          "modules": [
+            "mdt"
+          ],
+          "route": "/workspace/mdt",
+          "visibility": "tenant",
+          "workspace_id": "mdt"
+        },
+        {
+          "description": "",
+          "display_name": "Unit Status",
+          "modules": [
+            "mdt"
+          ],
+          "route": "/workspace/mdt/status",
+          "visibility": "tenant",
+          "workspace_id": "mdt_status"
+        },
+        {
+          "description": "",
+          "display_name": "Navigation",
+          "modules": [
+            "mdt"
+          ],
+          "route": "/workspace/mdt/map",
+          "visibility": "tenant",
+          "workspace_id": "mdt_map"
+        },
+        {
+          "description": "",
+          "display_name": "Messages",
+          "modules": [
+            "mdt"
+          ],
+          "route": "/workspace/mdt/messages",
+          "visibility": "tenant",
+          "workspace_id": "mdt_messages"
+        },
+        {
+          "description": "",
+          "display_name": "CrewLink",
+          "modules": [
+            "crewlink"
+          ],
+          "route": "/workspace/crewlink",
+          "visibility": "tenant",
+          "workspace_id": "crewlink"
+        },
+        {
+          "description": "",
+          "display_name": "Roster",
+          "modules": [
+            "crewlink"
+          ],
+          "route": "/workspace/crewlink/roster",
+          "visibility": "tenant",
+          "workspace_id": "crewlink_roster"
+        },
+        {
+          "description": "",
+          "display_name": "Shifts",
+          "modules": [
+            "crewlink"
+          ],
+          "route": "/workspace/crewlink/shifts",
+          "visibility": "tenant",
+          "workspace_id": "crewlink_shifts"
+        },
+        {
+          "description": "",
+          "display_name": "Push-to-Talk",
+          "modules": [
+            "crewlink"
+          ],
+          "route": "/workspace/crewlink/ptt",
+          "visibility": "tenant",
+          "workspace_id": "crewlink_ptt"
+        },
+        {
+          "description": "",
+          "display_name": "Devices",
+          "modules": [
+            "crewlink"
+          ],
+          "route": "/workspace/crewlink/devices",
+          "visibility": "tenant",
+          "workspace_id": "crewlink_devices"
+        },
+        {
+          "description": "",
+          "display_name": "Crew",
+          "modules": [
+            "crew"
+          ],
+          "route": "/workspace/crew",
+          "visibility": "tenant",
+          "workspace_id": "crew"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "transportlink",
+      "canonical_route": "/transportlink",
+      "clients": [
+        "Adaptix-Transport-Request-App"
+      ],
+      "description": "Schedule and run interfacility and non-emergency transports end to end.",
+      "display_name": "TransportLink",
+      "domain": "operations",
+      "modules": [
+        "transportlink"
+      ],
+      "portals": [
+        {
+          "audience": "transport_requester",
+          "display_name": "Transport Status Portal",
+          "entry_route": "/transportlink/portal",
+          "portal_id": "transport_status_portal"
+        }
+      ],
+      "position": 4,
+      "primary_services": [
+        "adaptix-transport"
+      ],
+      "sold_as": [
+        "transportlink"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (app/transportlink/page.tsx is the navigated root on main; routes registry PUBLIC product entry); Gateway main 5658fb1c routes.py /api/v1/transport AND /api/v1/transportlink -> adaptix-transport (module_registry records adaptix-transportlink for the module; the gateway is the routing truth and is what is recorded here). The external requester/status portal stays a separate audience surface.",
+      "status": "active",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "New Request",
+          "modules": [],
+          "route": "/workspace/transportlink/requests/new",
+          "visibility": "tenant",
+          "workspace_id": "new_request"
+        },
+        {
+          "description": "",
+          "display_name": "Forms",
+          "modules": [],
+          "route": "/workspace/transportlink/forms",
+          "visibility": "tenant",
+          "workspace_id": "forms"
+        },
+        {
+          "description": "",
+          "display_name": "Intelligence",
+          "modules": [],
+          "route": "/workspace/transportlink/intelligence",
+          "visibility": "tenant",
+          "workspace_id": "intelligence"
+        },
+        {
+          "description": "",
+          "display_name": "Daily Schedule",
+          "modules": [],
+          "route": "/workspace/transport/schedule",
+          "visibility": "tenant",
+          "workspace_id": "schedule"
+        },
+        {
+          "description": "",
+          "display_name": "Hazard Reports",
+          "modules": [],
+          "route": "/workspace/transport/hazards",
+          "visibility": "tenant",
+          "workspace_id": "hazards"
+        },
+        {
+          "description": "",
+          "display_name": "MCI Incidents",
+          "modules": [],
+          "route": "/workspace/transport/mci",
+          "visibility": "tenant",
+          "workspace_id": "mci"
+        },
+        {
+          "description": "",
+          "display_name": "Status Rollups",
+          "modules": [],
+          "route": "/workspace/transport/analytics",
+          "visibility": "tenant",
+          "workspace_id": "rollups"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "air_operations",
+      "canonical_route": "/workspace/air",
+      "clients": [
+        "Adaptix-Android-Air",
+        "Adaptix-Android-AirPilot"
+      ],
+      "description": "Air-medical missions from request through flight following and post-flight.",
+      "display_name": "Air Operations",
+      "domain": "operations",
+      "modules": [
+        "air"
+      ],
+      "portals": [],
+      "position": 5,
+      "primary_services": [
+        "adaptix-air"
+      ],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/air AND /api/v1/air-pilot -> adaptix-air. Adaptix-Air-Service-Pilot has no gateway audience of its own, so the pilot surface is a workspace of this application, never a second app.",
+      "status": "active",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Missions",
+          "modules": [],
+          "route": "/workspace/air/missions",
+          "visibility": "tenant",
+          "workspace_id": "missions"
+        },
+        {
+          "description": "",
+          "display_name": "Aircraft",
+          "modules": [],
+          "route": "/workspace/air/aircraft",
+          "visibility": "tenant",
+          "workspace_id": "aircraft"
+        },
+        {
+          "description": "",
+          "display_name": "Weather",
+          "modules": [],
+          "route": "/workspace/air/weather",
+          "visibility": "tenant",
+          "workspace_id": "weather"
+        },
+        {
+          "description": "",
+          "display_name": "Weight & Balance",
+          "modules": [],
+          "route": "/workspace/air/weight-balance",
+          "visibility": "tenant",
+          "workspace_id": "weight_balance"
+        },
+        {
+          "description": "",
+          "display_name": "Helipads",
+          "modules": [],
+          "route": "/workspace/air/helipads",
+          "visibility": "tenant",
+          "workspace_id": "helipads"
+        },
+        {
+          "description": "",
+          "display_name": "Landing Requests",
+          "modules": [],
+          "route": "/workspace/air/landing-requests",
+          "visibility": "tenant",
+          "workspace_id": "landing_requests"
+        },
+        {
+          "description": "",
+          "display_name": "Flight Following",
+          "modules": [],
+          "route": "/workspace/air/tracking",
+          "visibility": "tenant",
+          "workspace_id": "tracking"
+        },
+        {
+          "description": "",
+          "display_name": "Duty & Rest",
+          "modules": [],
+          "route": "/workspace/air/duty-rest",
+          "visibility": "tenant",
+          "workspace_id": "duty_rest"
+        },
+        {
+          "description": "",
+          "display_name": "Risk (FRAT)",
+          "modules": [],
+          "route": "/workspace/air/risk",
+          "visibility": "tenant",
+          "workspace_id": "risk"
+        },
+        {
+          "description": "",
+          "display_name": "Maintenance",
+          "modules": [],
+          "route": "/workspace/air/maintenance",
+          "visibility": "tenant",
+          "workspace_id": "maintenance"
+        },
+        {
+          "description": "",
+          "display_name": "Airworthiness",
+          "modules": [],
+          "route": "/workspace/air/airworthiness",
+          "visibility": "tenant",
+          "workspace_id": "airworthiness"
+        },
+        {
+          "description": "",
+          "display_name": "Inspections",
+          "modules": [],
+          "route": "/workspace/air/inspections",
+          "visibility": "tenant",
+          "workspace_id": "inspections"
+        },
+        {
+          "description": "",
+          "display_name": "Post-Flight",
+          "modules": [],
+          "route": "/workspace/air/post-flight",
+          "visibility": "tenant",
+          "workspace_id": "post_flight"
+        },
+        {
+          "description": "",
+          "display_name": "Pilot Operations",
+          "modules": [],
+          "route": "/workspace/air-pilot",
+          "visibility": "tenant",
+          "workspace_id": "pilot_operations"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "hospital_facility_operations",
+      "canonical_route": "/workspace/hospital",
+      "clients": [],
+      "description": "Destination capacity, diversion, bed reservations, transfers and patient handoff.",
+      "display_name": "Hospital / Facility Operations",
+      "domain": "operations",
+      "modules": [
+        "hospital"
+      ],
+      "portals": [
+        {
+          "audience": "hospital_staff",
+          "display_name": "Hospital Portal",
+          "entry_route": "/hospital/login",
+          "portal_id": "hospital_portal"
+        }
+      ],
+      "position": 6,
+      "primary_services": [
+        "adaptix-hospital"
+      ],
+      "sold_as": [
+        "hospital"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (layout gates module 'hospital'); Gateway main 5658fb1c routes.py /api/v1/hospital -> adaptix-hospital, /api/v1/facilities -> adaptix-facilities. Facility-Registry-Service owns facility data; this is the human workspace. Hospital staff authenticate through their own portal session, not the agency JWT.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-facilities"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Handoffs",
+          "modules": [],
+          "route": "/workspace/hospital/handoffs",
+          "visibility": "tenant",
+          "workspace_id": "handoffs"
+        },
+        {
+          "description": "",
+          "display_name": "Incoming",
+          "modules": [],
+          "route": "/workspace/hospital/incoming",
+          "visibility": "tenant",
+          "workspace_id": "incoming"
+        },
+        {
+          "description": "",
+          "display_name": "Transfers",
+          "modules": [],
+          "route": "/workspace/hospital/transfers",
+          "visibility": "tenant",
+          "workspace_id": "transfers"
+        },
+        {
+          "description": "",
+          "display_name": "Capacity",
+          "modules": [],
+          "route": "/workspace/hospital/capacity",
+          "visibility": "tenant",
+          "workspace_id": "capacity"
+        },
+        {
+          "description": "",
+          "display_name": "Bed Reservations",
+          "modules": [],
+          "route": "/workspace/hospital/bed-reservations",
+          "visibility": "tenant",
+          "workspace_id": "bed_reservations"
+        },
+        {
+          "description": "",
+          "display_name": "Facility Registry",
+          "modules": [],
+          "route": "/workspace/hospital/facility-registry",
+          "visibility": "tenant",
+          "workspace_id": "facility_registry"
+        },
+        {
+          "description": "",
+          "display_name": "HIE",
+          "modules": [],
+          "route": "/workspace/hospital/hie",
+          "visibility": "tenant",
+          "workspace_id": "hie"
+        },
+        {
+          "description": "",
+          "display_name": "Analytics",
+          "modules": [],
+          "route": "/workspace/hospital/analytics",
+          "visibility": "tenant",
+          "workspace_id": "analytics"
+        },
+        {
+          "description": "",
+          "display_name": "Integrations",
+          "modules": [],
+          "route": "/workspace/hospital/integrations",
+          "visibility": "tenant",
+          "workspace_id": "integrations"
+        },
+        {
+          "description": "",
+          "display_name": "Audit",
+          "modules": [],
+          "route": "/workspace/hospital/audit",
+          "visibility": "tenant",
+          "workspace_id": "audit"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "epcr",
+      "canonical_route": "/workspace/epcr",
+      "clients": [
+        "Adaptix-Android-EPCR"
+      ],
+      "description": "Document, validate, sign and submit the patient care record.",
+      "display_name": "ePCR",
+      "domain": "clinical",
+      "modules": [
+        "epcr"
+      ],
+      "portals": [],
+      "position": 7,
+      "primary_services": [
+        "adaptix-epcr"
+      ],
+      "sold_as": [
+        "epcr",
+        "hems_ops"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/epcr -> adaptix-epcr; module_registry epcr",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-nemsis",
+        "adaptix-patient-identity",
+        "adaptix-trustsign"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Charts",
+          "modules": [],
+          "route": "/workspace/epcr/charts",
+          "visibility": "tenant",
+          "workspace_id": "charts"
+        },
+        {
+          "description": "",
+          "display_name": "New Chart",
+          "modules": [],
+          "route": "/workspace/epcr/charts/new",
+          "visibility": "tenant",
+          "workspace_id": "new_chart"
+        },
+        {
+          "description": "",
+          "display_name": "My Work",
+          "modules": [],
+          "route": "/workspace/epcr/my-work",
+          "visibility": "tenant",
+          "workspace_id": "my_work"
+        },
+        {
+          "description": "",
+          "display_name": "Worklist",
+          "modules": [],
+          "route": "/workspace/epcr/worklist",
+          "visibility": "tenant",
+          "workspace_id": "worklist"
+        },
+        {
+          "description": "",
+          "display_name": "Queue",
+          "modules": [],
+          "route": "/workspace/epcr/queue",
+          "visibility": "tenant",
+          "workspace_id": "queue"
+        },
+        {
+          "description": "",
+          "display_name": "Validation",
+          "modules": [],
+          "route": "/workspace/epcr/validation",
+          "visibility": "tenant",
+          "workspace_id": "validation"
+        },
+        {
+          "description": "",
+          "display_name": "Signatures",
+          "modules": [],
+          "route": "/workspace/epcr/sign",
+          "visibility": "tenant",
+          "workspace_id": "sign"
+        },
+        {
+          "description": "",
+          "display_name": "Amendments",
+          "modules": [],
+          "route": "/workspace/epcr/amendments",
+          "visibility": "tenant",
+          "workspace_id": "amendments"
+        },
+        {
+          "description": "",
+          "display_name": "Submissions",
+          "modules": [],
+          "route": "/workspace/epcr/submissions",
+          "visibility": "tenant",
+          "workspace_id": "submissions"
+        },
+        {
+          "description": "",
+          "display_name": "QA",
+          "modules": [],
+          "route": "/workspace/epcr/qa",
+          "visibility": "tenant",
+          "workspace_id": "qa"
+        },
+        {
+          "description": "",
+          "display_name": "Reports",
+          "modules": [],
+          "route": "/workspace/epcr/reports",
+          "visibility": "tenant",
+          "workspace_id": "reports"
+        },
+        {
+          "description": "",
+          "display_name": "Analytics",
+          "modules": [],
+          "route": "/workspace/epcr/analytics",
+          "visibility": "tenant",
+          "workspace_id": "analytics"
+        },
+        {
+          "description": "",
+          "display_name": "Interoperability",
+          "modules": [],
+          "route": "/workspace/epcr/interoperability",
+          "visibility": "tenant",
+          "workspace_id": "interoperability"
+        },
+        {
+          "description": "",
+          "display_name": "Settings",
+          "modules": [],
+          "route": "/workspace/epcr/settings",
+          "visibility": "tenant",
+          "workspace_id": "settings"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "mih_community_paramedicine",
+      "canonical_route": "/workspace/mih",
+      "clients": [],
+      "description": "Mobile integrated healthcare: enrolled people, programs, visits, escalations and follow-up.",
+      "display_name": "MIH / Community Paramedicine",
+      "domain": "clinical",
+      "modules": [
+        "mih_community_paramedicine"
+      ],
+      "portals": [],
+      "position": 8,
+      "primary_services": [
+        "adaptix-mih"
+      ],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree (layout gates module 'mih_community_paramedicine'; _components read /api/v1/mih/escalations, /thresholds, /utilization via useModuleData — real data binding, no placeholders); gateway mih_route.py -> adaptix-mih; production GET /api/v1/mih/healthz 200 on 2026-09-17. Runtime operator journey not yet proven by this registry — status reflects route, gate and live backend, not Tier-5 evidence.",
+      "status": "active",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": []
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "clinical_quality",
+      "canonical_route": "/quality",
+      "clients": [],
+      "description": "Chart review, peer review, medical-director oversight and quality-improvement trends.",
+      "display_name": "Clinical Quality",
+      "domain": "clinical",
+      "modules": [
+        "epcr"
+      ],
+      "portals": [],
+      "position": 9,
+      "primary_services": [
+        "adaptix-epcr"
+      ],
+      "sold_as": [
+        "epcr",
+        "hems_ops"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (app/quality reads /api/v1/quality x17 and /api/v1/epcr x12; routes registry gates /quality on the epcr entitlement — there is no 'quality' module id); Gateway main 5658fb1c routes.py /api/v1/quality AND /api/v1/qa -> adaptix-epcr. Adaptix-QA-Service (adaptix-qa) consumes finalized-chart events; it is not the surface's routed backend.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-qa"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "QA",
+          "modules": [],
+          "route": "/quality/qa",
+          "visibility": "tenant",
+          "workspace_id": "qa"
+        },
+        {
+          "description": "",
+          "display_name": "Cases",
+          "modules": [],
+          "route": "/quality/qa/cases",
+          "visibility": "tenant",
+          "workspace_id": "qa_cases"
+        },
+        {
+          "description": "",
+          "display_name": "Peer Review",
+          "modules": [],
+          "route": "/quality/qa/peer-review",
+          "visibility": "tenant",
+          "workspace_id": "peer_review"
+        },
+        {
+          "description": "",
+          "display_name": "Triggers",
+          "modules": [],
+          "route": "/quality/qa/triggers",
+          "visibility": "tenant",
+          "workspace_id": "triggers"
+        },
+        {
+          "description": "",
+          "display_name": "Chart Review",
+          "modules": [],
+          "route": "/quality/qa/chart",
+          "visibility": "tenant",
+          "workspace_id": "chart_review"
+        },
+        {
+          "description": "",
+          "display_name": "Medical Director",
+          "modules": [],
+          "route": "/quality/medical-director",
+          "visibility": "tenant",
+          "workspace_id": "medical_director"
+        },
+        {
+          "description": "",
+          "display_name": "Review Queue",
+          "modules": [],
+          "route": "/quality/medical-director/review-queue",
+          "visibility": "tenant",
+          "workspace_id": "review_queue"
+        },
+        {
+          "description": "",
+          "display_name": "Protocols",
+          "modules": [],
+          "route": "/quality/medical-director/protocols",
+          "visibility": "tenant",
+          "workspace_id": "protocols"
+        },
+        {
+          "description": "",
+          "display_name": "Variances",
+          "modules": [],
+          "route": "/quality/medical-director/variances",
+          "visibility": "tenant",
+          "workspace_id": "variances"
+        },
+        {
+          "description": "",
+          "display_name": "Quality Improvement",
+          "modules": [],
+          "route": "/quality/qi",
+          "visibility": "tenant",
+          "workspace_id": "qi"
+        },
+        {
+          "description": "",
+          "display_name": "Initiatives",
+          "modules": [],
+          "route": "/quality/qi/initiatives",
+          "visibility": "tenant",
+          "workspace_id": "initiatives"
+        },
+        {
+          "description": "",
+          "display_name": "Trends",
+          "modules": [],
+          "route": "/quality/qi/trends",
+          "visibility": "tenant",
+          "workspace_id": "trends"
+        },
+        {
+          "description": "",
+          "display_name": "Accreditation",
+          "modules": [],
+          "route": "/quality/qi/accreditation",
+          "visibility": "tenant",
+          "workspace_id": "accreditation"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "cct",
+      "canonical_route": null,
+      "clients": [],
+      "description": "Critical care transport operations. Backend contracts exist; no operator surface is offered yet.",
+      "display_name": "Critical Care Transport",
+      "domain": "clinical",
+      "modules": [],
+      "portals": [],
+      "position": 10,
+      "primary_services": [],
+      "sold_as": [],
+      "source": "No app/ route on Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py routes no /api/v1/cct prefix (adaptix-cct is a declared audience only); production GET /api/v1/cct/healthz -> 401 at the gateway edge. module_registry cct_transport_ops is a Stripe bundle marker, not an application entitlement. Activation requires route, gateway route, server authorization, deployment and runtime proof.",
+      "status": "deferred",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": []
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "citizen_patient",
+      "canonical_route": null,
+      "clients": [
+        "Adaptix-Citizen-App"
+      ],
+      "description": "A separate patient- and community-facing application. Not built or deployed.",
+      "display_name": "Citizen / Patient",
+      "domain": "clinical",
+      "modules": [],
+      "portals": [],
+      "position": 11,
+      "primary_services": [],
+      "sold_as": [],
+      "source": "Adaptix-Citizen-App exists in the fleet inventory; no web route, no gateway route, no audience. Patient-Identity-Service is NOT this application. The patient billing portal is Billing's portal, not this.",
+      "status": "deferred",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": []
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "fire_operations",
+      "canonical_route": "/workspace/fire",
+      "clients": [
+        "Adaptix-Android-Fire"
+      ],
+      "description": "Fire incidents, apparatus, stations, hydrants, preplans, inspections and NERIS reporting.",
+      "display_name": "Fire Operations",
+      "domain": "fire",
+      "modules": [
+        "fire"
+      ],
+      "portals": [],
+      "position": 12,
+      "primary_services": [
+        "adaptix-fire"
+      ],
+      "sold_as": [
+        "fire"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/fire -> adaptix-fire, /api/v1/neris -> adaptix-neris. Preplan, Hydrant and Wildland services are NOT gateway-routed (no /api/v1/preplan|hydrant|wildland RouteEntry; Preplan-Service has no ECS footprint per PREPLAN-SERVICE-NOT-DEPLOYED), so their surfaces here are served by Fire-Service and they are not listed as supporting services until they are routed.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-neris"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Incidents",
+          "modules": [],
+          "route": "/workspace/fire/incidents",
+          "visibility": "tenant",
+          "workspace_id": "incidents"
+        },
+        {
+          "description": "",
+          "display_name": "Apparatus",
+          "modules": [],
+          "route": "/workspace/fire/apparatus",
+          "visibility": "tenant",
+          "workspace_id": "apparatus"
+        },
+        {
+          "description": "",
+          "display_name": "Stations",
+          "modules": [],
+          "route": "/workspace/fire/stations",
+          "visibility": "tenant",
+          "workspace_id": "stations"
+        },
+        {
+          "description": "",
+          "display_name": "Personnel",
+          "modules": [],
+          "route": "/workspace/fire/personnel",
+          "visibility": "tenant",
+          "workspace_id": "personnel"
+        },
+        {
+          "description": "",
+          "display_name": "Unit Status",
+          "modules": [],
+          "route": "/workspace/fire/unit-status",
+          "visibility": "tenant",
+          "workspace_id": "unit_status"
+        },
+        {
+          "description": "",
+          "display_name": "Hydrants",
+          "modules": [],
+          "route": "/workspace/fire/hydrants",
+          "visibility": "tenant",
+          "workspace_id": "hydrants"
+        },
+        {
+          "description": "",
+          "display_name": "Hydrant Registry",
+          "modules": [],
+          "route": "/workspace/fire/hydrant-registry",
+          "visibility": "tenant",
+          "workspace_id": "hydrant_registry"
+        },
+        {
+          "description": "",
+          "display_name": "Hydrant Flow Tests",
+          "modules": [],
+          "route": "/workspace/fire/hydrant-flow-tests",
+          "visibility": "tenant",
+          "workspace_id": "hydrant_flow_tests"
+        },
+        {
+          "description": "",
+          "display_name": "Preplans",
+          "modules": [],
+          "route": "/workspace/fire/preplans",
+          "visibility": "tenant",
+          "workspace_id": "preplans"
+        },
+        {
+          "description": "",
+          "display_name": "Inspections",
+          "modules": [],
+          "route": "/workspace/fire/inspections",
+          "visibility": "tenant",
+          "workspace_id": "inspections"
+        },
+        {
+          "description": "",
+          "display_name": "Occupancies",
+          "modules": [],
+          "route": "/workspace/fire/occupancies",
+          "visibility": "tenant",
+          "workspace_id": "occupancies"
+        },
+        {
+          "description": "",
+          "display_name": "Hazards",
+          "modules": [],
+          "route": "/workspace/fire/hazards",
+          "visibility": "tenant",
+          "workspace_id": "hazards"
+        },
+        {
+          "description": "",
+          "display_name": "NERIS",
+          "modules": [],
+          "route": "/workspace/fire/neris",
+          "visibility": "tenant",
+          "workspace_id": "neris"
+        },
+        {
+          "description": "",
+          "display_name": "Response Timeline",
+          "modules": [],
+          "route": "/workspace/fire/response-timeline",
+          "visibility": "tenant",
+          "workspace_id": "response_timeline"
+        },
+        {
+          "description": "",
+          "display_name": "CAD Connect",
+          "modules": [],
+          "route": "/workspace/fire/cad-connect",
+          "visibility": "tenant",
+          "workspace_id": "cad_connect"
+        },
+        {
+          "description": "",
+          "display_name": "Code Library",
+          "modules": [],
+          "route": "/workspace/fire/code-library",
+          "visibility": "tenant",
+          "workspace_id": "code_library"
+        },
+        {
+          "description": "",
+          "display_name": "Enforcement",
+          "modules": [],
+          "route": "/workspace/fire/enforcement",
+          "visibility": "tenant",
+          "workspace_id": "enforcement"
+        },
+        {
+          "description": "",
+          "display_name": "Notices",
+          "modules": [],
+          "route": "/workspace/fire/notices",
+          "visibility": "tenant",
+          "workspace_id": "notices"
+        },
+        {
+          "description": "",
+          "display_name": "Station Alerting",
+          "modules": [],
+          "route": "/workspace/fire/station-alerting",
+          "visibility": "tenant",
+          "workspace_id": "station_alerting"
+        },
+        {
+          "description": "",
+          "display_name": "Settings",
+          "modules": [],
+          "route": "/workspace/fire/settings",
+          "visibility": "tenant",
+          "workspace_id": "settings"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "community_risk_reduction",
+      "canonical_route": "/workspace/fire/crr",
+      "clients": [],
+      "description": "Risk assessments, households, campaigns, interventions and outcomes for community risk reduction.",
+      "display_name": "Community Risk Reduction",
+      "domain": "fire",
+      "modules": [
+        "crr"
+      ],
+      "portals": [],
+      "position": 13,
+      "primary_services": [
+        "adaptix-fire"
+      ],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree (app/workspace/fire/crr is the only CRR surface); Gateway main 5658fb1c routes.py /api/v1/crr -> adaptix-fire; module_registry crr (audience adaptix-fire, implies fire). Adaptix-CRR-Service has no gateway audience yet. CRR is a distinct job with its own purchasable module, so it is a separate application whose root currently lives under the Fire route tree; route ownership resolves by longest prefix.",
+      "status": "active",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "ISO Package",
+          "modules": [],
+          "route": "/workspace/fire/crr/iso-package",
+          "visibility": "tenant",
+          "workspace_id": "iso_package"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "billing",
+      "canonical_route": "/workspace/billing",
+      "clients": [],
+      "description": "EMS revenue cycle: eligibility, coding, claims, clearinghouse, remittance, denials, appeals and patient balances.",
+      "display_name": "Billing",
+      "domain": "revenue",
+      "modules": [
+        "billing"
+      ],
+      "portals": [
+        {
+          "audience": "billing_operator",
+          "display_name": "Agency Billing Portal",
+          "entry_route": "/billing/portal",
+          "portal_id": "agency_billing_portal"
+        },
+        {
+          "audience": "patient",
+          "display_name": "Patient Billing Portal",
+          "entry_route": "/patient-portal",
+          "portal_id": "patient_billing_portal"
+        }
+      ],
+      "position": 14,
+      "primary_services": [
+        "adaptix-billing"
+      ],
+      "sold_as": [
+        "billing",
+        "hems_ops"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/billing -> adaptix-billing (+ core), /api/v1/payments -> adaptix-payments, /api/v1/trustsign -> adaptix-trustsign. Patient/claim receivables live HERE, never in Finance. Office Ally is a migration-only adapter and belongs to Administration imports, not to Billing's live path (Stedi is the only live clearinghouse).",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-payments",
+        "adaptix-trustsign"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Work Queue",
+          "modules": [],
+          "route": "/workspace/billing/work-queue",
+          "visibility": "tenant",
+          "workspace_id": "work_queue"
+        },
+        {
+          "description": "",
+          "display_name": "Claims",
+          "modules": [],
+          "route": "/workspace/billing/claims",
+          "visibility": "tenant",
+          "workspace_id": "claims"
+        },
+        {
+          "description": "",
+          "display_name": "Eligibility",
+          "modules": [],
+          "route": "/workspace/billing/eligibility",
+          "visibility": "tenant",
+          "workspace_id": "eligibility"
+        },
+        {
+          "description": "",
+          "display_name": "Clearinghouse",
+          "modules": [],
+          "route": "/workspace/billing/clearinghouse",
+          "visibility": "tenant",
+          "workspace_id": "clearinghouse"
+        },
+        {
+          "description": "",
+          "display_name": "Stedi",
+          "modules": [],
+          "route": "/workspace/billing/stedi",
+          "visibility": "tenant",
+          "workspace_id": "stedi"
+        },
+        {
+          "description": "",
+          "display_name": "ERA / 835",
+          "modules": [],
+          "route": "/workspace/billing/era",
+          "visibility": "tenant",
+          "workspace_id": "era"
+        },
+        {
+          "description": "",
+          "display_name": "EOB Posting",
+          "modules": [],
+          "route": "/workspace/billing/eob-posting",
+          "visibility": "tenant",
+          "workspace_id": "eob_posting"
+        },
+        {
+          "description": "",
+          "display_name": "Denials",
+          "modules": [],
+          "route": "/workspace/billing/denials",
+          "visibility": "tenant",
+          "workspace_id": "denials"
+        },
+        {
+          "description": "",
+          "display_name": "Appeals",
+          "modules": [],
+          "route": "/workspace/billing/appeals",
+          "visibility": "tenant",
+          "workspace_id": "appeals"
+        },
+        {
+          "description": "",
+          "display_name": "Resubmissions",
+          "modules": [],
+          "route": "/workspace/billing/resubmissions",
+          "visibility": "tenant",
+          "workspace_id": "resubmissions"
+        },
+        {
+          "description": "",
+          "display_name": "Underpayments",
+          "modules": [],
+          "route": "/workspace/billing/underpayments",
+          "visibility": "tenant",
+          "workspace_id": "underpayments"
+        },
+        {
+          "description": "",
+          "display_name": "A/R",
+          "modules": [],
+          "route": "/workspace/billing/ar",
+          "visibility": "tenant",
+          "workspace_id": "accounts_receivable"
+        },
+        {
+          "description": "",
+          "display_name": "Patient Balances",
+          "modules": [],
+          "route": "/workspace/billing/patients",
+          "visibility": "tenant",
+          "workspace_id": "patients"
+        },
+        {
+          "description": "",
+          "display_name": "Statements",
+          "modules": [],
+          "route": "/workspace/billing/statements",
+          "visibility": "tenant",
+          "workspace_id": "statements"
+        },
+        {
+          "description": "",
+          "display_name": "Payers",
+          "modules": [],
+          "route": "/workspace/billing/payers",
+          "visibility": "tenant",
+          "workspace_id": "payers"
+        },
+        {
+          "description": "",
+          "display_name": "CMS-1500 Studio",
+          "modules": [],
+          "route": "/workspace/billing?section=studio",
+          "visibility": "tenant",
+          "workspace_id": "cms1500_studio"
+        },
+        {
+          "description": "",
+          "display_name": "Go-Live Readiness",
+          "modules": [],
+          "route": "/workspace/billing/readiness",
+          "visibility": "tenant",
+          "workspace_id": "readiness"
+        },
+        {
+          "description": "",
+          "display_name": "Imports",
+          "modules": [],
+          "route": "/workspace/billing/imports",
+          "visibility": "tenant",
+          "workspace_id": "imports"
+        },
+        {
+          "description": "",
+          "display_name": "Migration",
+          "modules": [],
+          "route": "/workspace/billing/migration",
+          "visibility": "tenant",
+          "workspace_id": "migration"
+        },
+        {
+          "description": "",
+          "display_name": "Integrations",
+          "modules": [],
+          "route": "/workspace/billing/integrations",
+          "visibility": "tenant",
+          "workspace_id": "integrations"
+        },
+        {
+          "description": "",
+          "display_name": "Revenue Intelligence",
+          "modules": [],
+          "route": "/workspace/billing/intelligence",
+          "visibility": "tenant",
+          "workspace_id": "intelligence"
+        },
+        {
+          "description": "",
+          "display_name": "Revenue",
+          "modules": [],
+          "route": "/workspace/billing/revenue",
+          "visibility": "tenant",
+          "workspace_id": "revenue"
+        },
+        {
+          "description": "",
+          "display_name": "Subscription",
+          "modules": [],
+          "route": "/workspace/billing/settings/subscription",
+          "visibility": "tenant",
+          "workspace_id": "subscription"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "finance",
+      "canonical_route": "/workspace/finance",
+      "clients": [],
+      "description": "Company financial management: ledger, P&L, budgets, expenses and corporate receivables.",
+      "display_name": "Finance",
+      "domain": "revenue",
+      "modules": [
+        "finance"
+      ],
+      "portals": [],
+      "position": 15,
+      "primary_services": [
+        "adaptix-finance"
+      ],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/finance -> adaptix-finance. Company/accounting A/R only — patient/claim A/R is Billing's.",
+      "status": "active",
+      "supporting_services": [],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "General Ledger",
+          "modules": [],
+          "route": "/workspace/finance/ledger",
+          "visibility": "tenant",
+          "workspace_id": "ledger"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "workforce",
+      "canonical_route": "/workspace/workforce",
+      "clients": [
+        "Adaptix-Android-Workforce"
+      ],
+      "description": "Staff the organization: scheduling, people, labor, HR, training, credentials and availability.",
+      "display_name": "Workforce",
+      "domain": "workforce",
+      "modules": [
+        "hr",
+        "labor",
+        "scheduling",
+        "training",
+        "workforce"
+      ],
+      "portals": [],
+      "position": 16,
+      "primary_services": [
+        "adaptix-labor",
+        "adaptix-workforce"
+      ],
+      "sold_as": [
+        "scheduling"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (app/workspace/workforce/layout.tsx gates ANY-OF workforce/scheduling/labor; /workspace/training gates 'training'); Gateway main 5658fb1c routes.py /api/v1/workforce -> adaptix-workforce + adaptix-labor, /api/v1/scheduling AND /api/v1/labor -> adaptix-labor, /api/v1/hr -> adaptix-hr, /api/v1/training -> adaptix-training. The application is offered when ANY of its products is held (an HR-only tenant has /workspace/hr today and must still find it); entitlements stay separate per workspace: a scheduling-only tenant sees the Schedule workspaces, never Labor, HR or Training (module_registry: scheduling implies none of them).",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-hr",
+        "adaptix-training"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Schedule",
+          "modules": [
+            "scheduling"
+          ],
+          "route": "/workspace/workforce/schedule",
+          "visibility": "tenant",
+          "workspace_id": "schedule"
+        },
+        {
+          "description": "",
+          "display_name": "EMS Schedule",
+          "modules": [
+            "scheduling"
+          ],
+          "route": "/workspace/workforce?section=ems-schedule",
+          "visibility": "tenant",
+          "workspace_id": "ems_schedule"
+        },
+        {
+          "description": "",
+          "display_name": "Shifts",
+          "modules": [
+            "scheduling"
+          ],
+          "route": "/workspace/workforce/shifts",
+          "visibility": "tenant",
+          "workspace_id": "shifts"
+        },
+        {
+          "description": "",
+          "display_name": "Open Shifts",
+          "modules": [
+            "scheduling"
+          ],
+          "route": "/workspace/workforce/open-shifts",
+          "visibility": "tenant",
+          "workspace_id": "open_shifts"
+        },
+        {
+          "description": "",
+          "display_name": "Shift Swaps",
+          "modules": [
+            "scheduling"
+          ],
+          "route": "/workspace/workforce/shift-swaps",
+          "visibility": "tenant",
+          "workspace_id": "shift_swaps"
+        },
+        {
+          "description": "",
+          "display_name": "Time Off",
+          "modules": [
+            "scheduling"
+          ],
+          "route": "/workspace/workforce/time-off",
+          "visibility": "tenant",
+          "workspace_id": "time_off"
+        },
+        {
+          "description": "",
+          "display_name": "Labor",
+          "modules": [
+            "labor"
+          ],
+          "route": "/workspace/workforce?section=labor-overview",
+          "visibility": "tenant",
+          "workspace_id": "labor"
+        },
+        {
+          "description": "",
+          "display_name": "Overtime",
+          "modules": [
+            "labor"
+          ],
+          "route": "/workspace/workforce/overtime",
+          "visibility": "tenant",
+          "workspace_id": "overtime"
+        },
+        {
+          "description": "",
+          "display_name": "Timecards",
+          "modules": [
+            "labor"
+          ],
+          "route": "/workspace/workforce/timecards",
+          "visibility": "tenant",
+          "workspace_id": "timecards"
+        },
+        {
+          "description": "",
+          "display_name": "Time Clock",
+          "modules": [
+            "labor"
+          ],
+          "route": "/workspace/workforce/time-clock",
+          "visibility": "tenant",
+          "workspace_id": "time_clock"
+        },
+        {
+          "description": "",
+          "display_name": "Payroll",
+          "modules": [
+            "labor"
+          ],
+          "route": "/workspace/workforce/payroll",
+          "visibility": "tenant",
+          "workspace_id": "payroll"
+        },
+        {
+          "description": "",
+          "display_name": "People",
+          "modules": [
+            "labor",
+            "scheduling",
+            "workforce"
+          ],
+          "route": "/workspace/workforce/directory",
+          "visibility": "tenant",
+          "workspace_id": "people"
+        },
+        {
+          "description": "",
+          "display_name": "Credentials",
+          "modules": [
+            "labor",
+            "scheduling",
+            "workforce"
+          ],
+          "route": "/workspace/workforce/credentials",
+          "visibility": "tenant",
+          "workspace_id": "credentials"
+        },
+        {
+          "description": "",
+          "display_name": "Certifications",
+          "modules": [
+            "labor",
+            "scheduling",
+            "workforce"
+          ],
+          "route": "/workspace/workforce/certifications",
+          "visibility": "tenant",
+          "workspace_id": "certifications"
+        },
+        {
+          "description": "",
+          "display_name": "Availability",
+          "modules": [
+            "labor",
+            "scheduling",
+            "workforce"
+          ],
+          "route": "/workspace/workforce/availability",
+          "visibility": "tenant",
+          "workspace_id": "availability"
+        },
+        {
+          "description": "",
+          "display_name": "Fatigue",
+          "modules": [
+            "labor",
+            "scheduling",
+            "workforce"
+          ],
+          "route": "/workspace/workforce/fatigue",
+          "visibility": "tenant",
+          "workspace_id": "fatigue"
+        },
+        {
+          "description": "",
+          "display_name": "Readiness",
+          "modules": [
+            "labor",
+            "scheduling",
+            "workforce"
+          ],
+          "route": "/workspace/workforce/readiness",
+          "visibility": "tenant",
+          "workspace_id": "readiness"
+        },
+        {
+          "description": "",
+          "display_name": "Mission Command",
+          "modules": [
+            "labor",
+            "scheduling",
+            "workforce"
+          ],
+          "route": "/workspace/workforce/mission-command",
+          "visibility": "tenant",
+          "workspace_id": "mission_command"
+        },
+        {
+          "description": "",
+          "display_name": "HR",
+          "modules": [
+            "hr"
+          ],
+          "route": "/workspace/hr",
+          "visibility": "tenant",
+          "workspace_id": "hr"
+        },
+        {
+          "description": "",
+          "display_name": "Training",
+          "modules": [
+            "training"
+          ],
+          "route": "/workspace/training",
+          "visibility": "tenant",
+          "workspace_id": "training"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "asset_operations",
+      "canonical_route": "/workspace/operations",
+      "clients": [
+        "Adaptix-Android-Inventory",
+        "Adaptix-Android-Narcotics"
+      ],
+      "description": "Physical operational assets: fleet, inventory, medications, narcotics, work orders, purchasing and audits.",
+      "display_name": "Asset Operations",
+      "domain": "logistics",
+      "modules": [
+        "assetops",
+        "fleet",
+        "inventory",
+        "medications",
+        "narcotics"
+      ],
+      "portals": [],
+      "position": 17,
+      "primary_services": [
+        "adaptix-assetops"
+      ],
+      "sold_as": [
+        "fleet",
+        "inventory",
+        "narcotics"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (app/workspace/operations/page.tsx: 'AdaptixCore-AssetOps hub', reads /api/v1/assetops x37); Gateway main 5658fb1c routes.py /api/v1/assetops -> adaptix-assetops, /api/v1/fleet -> adaptix-fleet, /api/v1/inventory -> adaptix-inventory, /api/v1/medications -> adaptix-medications, /api/v1/narcotics -> adaptix-narcotics. AssetOps orchestrates; each domain service keeps its own truth (no second inventory, narcotics log or vehicle registry). Device management is Administration's, referenced here.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-fleet",
+        "adaptix-inventory",
+        "adaptix-medications",
+        "adaptix-narcotics"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Asset Register",
+          "modules": [
+            "assetops"
+          ],
+          "route": "/workspace/operations/asset-register",
+          "visibility": "tenant",
+          "workspace_id": "asset_register"
+        },
+        {
+          "description": "",
+          "display_name": "DVIR",
+          "modules": [
+            "assetops"
+          ],
+          "route": "/workspace/operations/dvir",
+          "visibility": "tenant",
+          "workspace_id": "dvir"
+        },
+        {
+          "description": "",
+          "display_name": "Work Orders",
+          "modules": [
+            "assetops"
+          ],
+          "route": "/workspace/operations/work-orders",
+          "visibility": "tenant",
+          "workspace_id": "work_orders"
+        },
+        {
+          "description": "",
+          "display_name": "Purchase Orders",
+          "modules": [
+            "assetops"
+          ],
+          "route": "/workspace/operations/purchase-orders",
+          "visibility": "tenant",
+          "workspace_id": "purchase_orders"
+        },
+        {
+          "description": "",
+          "display_name": "Vendors",
+          "modules": [
+            "assetops"
+          ],
+          "route": "/workspace/operations/vendors",
+          "visibility": "tenant",
+          "workspace_id": "vendors"
+        },
+        {
+          "description": "",
+          "display_name": "Audit Cycles",
+          "modules": [
+            "assetops"
+          ],
+          "route": "/workspace/operations/audit-cycles",
+          "visibility": "tenant",
+          "workspace_id": "audit_cycles"
+        },
+        {
+          "description": "",
+          "display_name": "Cost Analytics",
+          "modules": [
+            "assetops"
+          ],
+          "route": "/workspace/operations/analytics",
+          "visibility": "tenant",
+          "workspace_id": "cost_analytics"
+        },
+        {
+          "description": "",
+          "display_name": "Fleet",
+          "modules": [
+            "fleet"
+          ],
+          "route": "/workspace/fleet",
+          "visibility": "tenant",
+          "workspace_id": "fleet"
+        },
+        {
+          "description": "",
+          "display_name": "Inventory",
+          "modules": [
+            "inventory"
+          ],
+          "route": "/workspace/inventory",
+          "visibility": "tenant",
+          "workspace_id": "inventory"
+        },
+        {
+          "description": "",
+          "display_name": "Medications",
+          "modules": [
+            "medications"
+          ],
+          "route": "/workspace/medications",
+          "visibility": "tenant",
+          "workspace_id": "medications"
+        },
+        {
+          "description": "",
+          "display_name": "Narcotics",
+          "modules": [
+            "narcotics"
+          ],
+          "route": "/workspace/narcotics",
+          "visibility": "tenant",
+          "workspace_id": "narcotics"
+        },
+        {
+          "description": "",
+          "display_name": "Vault Inventory",
+          "modules": [
+            "narcotics"
+          ],
+          "route": "/workspace/narcotics/inventory",
+          "visibility": "tenant",
+          "workspace_id": "narcotics_vault"
+        },
+        {
+          "description": "",
+          "display_name": "Par Levels",
+          "modules": [
+            "narcotics"
+          ],
+          "route": "/workspace/narcotics/par-levels",
+          "visibility": "tenant",
+          "workspace_id": "narcotics_par_levels"
+        },
+        {
+          "description": "",
+          "display_name": "Chain of Custody",
+          "modules": [
+            "narcotics"
+          ],
+          "route": "/workspace/narcotics/chain-of-custody",
+          "visibility": "tenant",
+          "workspace_id": "narcotics_chain_of_custody"
+        },
+        {
+          "description": "",
+          "display_name": "Witness",
+          "modules": [
+            "narcotics"
+          ],
+          "route": "/workspace/narcotics/witness",
+          "visibility": "tenant",
+          "workspace_id": "narcotics_witness"
+        },
+        {
+          "description": "",
+          "display_name": "Waste",
+          "modules": [
+            "narcotics"
+          ],
+          "route": "/workspace/narcotics/waste",
+          "visibility": "tenant",
+          "workspace_id": "narcotics_waste"
+        },
+        {
+          "description": "",
+          "display_name": "Discrepancies",
+          "modules": [
+            "narcotics"
+          ],
+          "route": "/workspace/narcotics/discrepancies",
+          "visibility": "tenant",
+          "workspace_id": "narcotics_discrepancies"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "business_operations",
+      "canonical_route": "/workspace/crm",
+      "clients": [],
+      "description": "Internal commercial work: CRM, customer success, partners, marketing, support and office operations.",
+      "display_name": "Business Operations",
+      "domain": "business",
+      "modules": [],
+      "portals": [],
+      "position": 18,
+      "primary_services": [
+        "adaptix-crm"
+      ],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree (app/workspace/crm reads /api/v1/crm x124 + /api/v1/marketing x9; app/workspace/support); Gateway main 5658fb1c routes.py /api/v1/crm -> adaptix-crm, customer-success, partner, marketing, office each -> their own audience. Customer Success, Partner, Marketing and Office have no web surface of their own on main; they are services this application will host as workspaces. Visibility stays ADMIN because both rows were admin-only before.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-customer-success",
+        "adaptix-marketing",
+        "adaptix-office",
+        "adaptix-partner"
+      ],
+      "visibility": "admin",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "CRM",
+          "modules": [],
+          "route": "/workspace/crm",
+          "visibility": "admin",
+          "workspace_id": "crm"
+        },
+        {
+          "description": "",
+          "display_name": "Support",
+          "modules": [],
+          "route": "/workspace/support",
+          "visibility": "admin",
+          "workspace_id": "support"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "intelligence_analytics",
+      "canonical_route": "/workspace/reports",
+      "clients": [],
+      "description": "Reports, analytics and the governed natural-language console (Ask AdaptixCore).",
+      "display_name": "Intelligence & Analytics",
+      "domain": "intelligence",
+      "modules": [],
+      "portals": [],
+      "position": 19,
+      "primary_services": [
+        "adaptix-analytics"
+      ],
+      "sold_as": [
+        "analytics"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (reports reads /api/v1/reports + cross-module report prefixes; analytics reads /api/v1/analytics x64 + graph; ask carries its own ModuleGate 'intelligence'); Gateway main 5658fb1c routes.py /api/v1/reports AND /api/v1/intelligence -> adaptix-core, /api/v1/analytics -> adaptix-analytics, /api/v1/graph -> adaptix-graph. The root is Reports because it is served by Core and reachable by every tenant; Analytics is a workspace behind the sold 'analytics' module (its backend mints no audience without it, so an ungated entry would be a control that can only fail).",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-core",
+        "adaptix-graph"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Analytics",
+          "modules": [
+            "analytics"
+          ],
+          "route": "/workspace/analytics",
+          "visibility": "tenant",
+          "workspace_id": "analytics"
+        },
+        {
+          "description": "",
+          "display_name": "Ask AdaptixCore",
+          "modules": [
+            "intelligence"
+          ],
+          "route": "/workspace/ask",
+          "visibility": "tenant",
+          "workspace_id": "ask"
+        },
+        {
+          "description": "",
+          "display_name": "Cortex Intelligence",
+          "modules": [
+            "intelligence"
+          ],
+          "route": "/workspace/intelligence",
+          "visibility": "tenant",
+          "workspace_id": "intelligence"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "governance",
+      "canonical_route": "/workspace/compliance",
+      "clients": [],
+      "description": "Compliance, documents, policies, legal and audit evidence.",
+      "display_name": "Governance",
+      "domain": "governance",
+      "modules": [
+        "compliance",
+        "documents"
+      ],
+      "portals": [],
+      "position": 20,
+      "primary_services": [
+        "adaptix-compliance",
+        "adaptix-documents"
+      ],
+      "sold_as": [
+        "compliance"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (compliance reads /api/v1/compliance x205; documents reads /api/v1/forms x68 + /api/v1/documents x36; audit-logs reads /api/v1/admin); Gateway main 5658fb1c routes.py /api/v1/compliance -> adaptix-compliance (+ core), /api/v1/documents -> adaptix-documents, /api/v1/policy, /api/v1/legal, /api/v1/audit, /api/v1/forms -> their own audiences. Audit-Service is a capability this application reads; it is not the application.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-audit",
+        "adaptix-forms",
+        "adaptix-legal",
+        "adaptix-policy"
+      ],
+      "visibility": "tenant",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Documents",
+          "modules": [
+            "documents"
+          ],
+          "route": "/workspace/documents",
+          "visibility": "tenant",
+          "workspace_id": "documents"
+        },
+        {
+          "description": "",
+          "display_name": "Audit Logs",
+          "modules": [
+            "compliance",
+            "documents"
+          ],
+          "route": "/workspace/audit-logs",
+          "visibility": "admin",
+          "workspace_id": "audit_logs"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "administration",
+      "canonical_route": "/workspace/admin",
+      "clients": [],
+      "description": "Organization, users, roles, applications and entitlements, devices, integrations, imports/exports, onboarding and platform configuration.",
+      "display_name": "Administration",
+      "domain": "administration",
+      "modules": [],
+      "portals": [],
+      "position": 21,
+      "primary_services": [
+        "adaptix-core"
+      ],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree (admin reads /api/v1/users, core, organization, agency; api-keys, hl7, integrations, device x51, onboarding x46; /workspace/ai surfaces founder-command AI telemetry with no gate of its own, so it stays ADMIN); Gateway main 5658fb1c routes.py /api/v1/admin, agency, users, api-keys, onboarding -> adaptix-core; /api/v1/app-management, device, integrations, hl7, imports, exports, officeally -> their own audiences. /workspace/interop and /workspace/interoperability are both real pages today; consolidating them is Web-App work, not a registry decision. Office Ally lives here as a historical import adapter, never as a billing path.",
+      "status": "active",
+      "supporting_services": [
+        "adaptix-app-management",
+        "adaptix-device",
+        "adaptix-exports",
+        "adaptix-hl7",
+        "adaptix-imports",
+        "adaptix-integrations",
+        "adaptix-officeally"
+      ],
+      "visibility": "admin",
+      "workspaces": [
+        {
+          "description": "",
+          "display_name": "Agency",
+          "modules": [],
+          "route": "/workspace/admin/agency",
+          "visibility": "admin",
+          "workspace_id": "agency"
+        },
+        {
+          "description": "",
+          "display_name": "Organization",
+          "modules": [],
+          "route": "/workspace/admin/organization",
+          "visibility": "admin",
+          "workspace_id": "organization"
+        },
+        {
+          "description": "",
+          "display_name": "API Keys",
+          "modules": [],
+          "route": "/workspace/api-keys",
+          "visibility": "admin",
+          "workspace_id": "api_keys"
+        },
+        {
+          "description": "",
+          "display_name": "Integrations",
+          "modules": [],
+          "route": "/workspace/integrations",
+          "visibility": "admin",
+          "workspace_id": "integrations"
+        },
+        {
+          "description": "",
+          "display_name": "HL7 Interface Engine",
+          "modules": [],
+          "route": "/workspace/hl7",
+          "visibility": "admin",
+          "workspace_id": "hl7"
+        },
+        {
+          "description": "",
+          "display_name": "Interop",
+          "modules": [],
+          "route": "/workspace/interop",
+          "visibility": "admin",
+          "workspace_id": "interop"
+        },
+        {
+          "description": "",
+          "display_name": "Interoperability",
+          "modules": [],
+          "route": "/workspace/interoperability",
+          "visibility": "admin",
+          "workspace_id": "interoperability"
+        },
+        {
+          "description": "",
+          "display_name": "Devices",
+          "modules": [
+            "device"
+          ],
+          "route": "/workspace/device",
+          "visibility": "admin",
+          "workspace_id": "devices"
+        },
+        {
+          "description": "",
+          "display_name": "Onboarding",
+          "modules": [],
+          "route": "/workspace/onboarding",
+          "visibility": "admin",
+          "workspace_id": "onboarding"
+        },
+        {
+          "description": "",
+          "display_name": "Settings",
+          "modules": [],
+          "route": "/settings",
+          "visibility": "admin",
+          "workspace_id": "settings"
+        },
+        {
+          "description": "",
+          "display_name": "AI Administration",
+          "modules": [],
+          "route": "/workspace/ai",
+          "visibility": "admin",
+          "workspace_id": "ai_administration"
+        }
+      ]
+    },
+    {
+      "aggregates": [],
+      "canonical_id": "demos",
+      "canonical_route": "/workspace/demos",
+      "clients": [],
+      "description": "Founder / development demo launcher. Not a production application.",
+      "display_name": "Demos",
+      "domain": "administration",
+      "modules": [],
+      "portals": [],
+      "position": 22,
+      "primary_services": [],
+      "sold_as": [],
+      "source": "Web-App main 35b4a12e app/ route tree (app/workspace/demos/page.tsx links founder-command demo surfaces; no backend calls). Listed so status enforcement has a real EXPERIMENTAL entry to exclude from customer navigation.",
+      "status": "experimental",
+      "supporting_services": [],
+      "visibility": "founder",
+      "workspaces": []
+    }
+  ],
+  "client_repositories": [
+    "Adaptix-Android-Air",
+    "Adaptix-Android-AirPilot",
+    "Adaptix-Android-Command",
+    "Adaptix-Android-CrewLink",
+    "Adaptix-Android-EPCR",
+    "Adaptix-Android-Fire",
+    "Adaptix-Android-Founder-Command",
+    "Adaptix-Android-Inventory",
+    "Adaptix-Android-MDT",
+    "Adaptix-Android-Narcotics",
+    "Adaptix-Android-Workforce",
+    "Adaptix-Citizen-App",
+    "Adaptix-Mobile-Shell",
+    "Adaptix-Transport-Request-App"
+  ],
+  "contracts_version": "5.18.0",
+  "domains": [
+    {
+      "domain": "command",
+      "position": 0
+    },
+    {
+      "domain": "operations",
+      "position": 1
+    },
+    {
+      "domain": "clinical",
+      "position": 2
+    },
+    {
+      "domain": "fire",
+      "position": 3
+    },
+    {
+      "domain": "revenue",
+      "position": 4
+    },
+    {
+      "domain": "workforce",
+      "position": 5
+    },
+    {
+      "domain": "logistics",
+      "position": 6
+    },
+    {
+      "domain": "business",
+      "position": 7
+    },
+    {
+      "domain": "intelligence",
+      "position": 8
+    },
+    {
+      "domain": "governance",
+      "position": 9
+    },
+    {
+      "domain": "administration",
+      "position": 10
+    }
+  ],
+  "pricing_catalog_version": "wi-launch-v1",
+  "schema_version": 1,
+  "shared_capabilities": [
+    {
+      "capability_id": "search",
+      "description": "Tenant-scoped search across indexed records.",
+      "display_name": "Search",
+      "modules": [],
+      "position": 0,
+      "route": "/workspace/search",
+      "services": [
+        "adaptix-search"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/search -> adaptix-search",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "notifications",
+      "description": "A person's own notifications and alerts.",
+      "display_name": "Notifications",
+      "modules": [],
+      "position": 1,
+      "route": "/workspace/notifications",
+      "services": [
+        "adaptix-core"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/notifications -> adaptix-core",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "calendar",
+      "description": "Platform calendar events, reminders and booking.",
+      "display_name": "Calendar",
+      "modules": [],
+      "position": 2,
+      "route": "/workspace/calendar",
+      "services": [
+        "adaptix-calendar"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/calendar -> adaptix-calendar",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "communications",
+      "description": "Phone, SMS, email, fax, voicemail, templates and consent across applications.",
+      "display_name": "Communications",
+      "modules": [
+        "communications"
+      ],
+      "position": 3,
+      "route": "/workspace/communications",
+      "services": [
+        "adaptix-communications",
+        "adaptix-telephony"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (reads /api/v1/communications x37, telephony x17, templates, consent, communications-hub); Gateway main 5658fb1c routes.py all -> adaptix-communications / adaptix-telephony",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "telephony",
+      "description": "Call queues, presence, scripts and voicemail.",
+      "display_name": "Telephony",
+      "modules": [
+        "telephony"
+      ],
+      "position": 4,
+      "route": "/workspace/telephony",
+      "services": [
+        "adaptix-telephony"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/telephony -> adaptix-telephony",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "voice",
+      "description": "Real-time voice rooms tied to incidents and cases.",
+      "display_name": "Voice",
+      "modules": [
+        "communications"
+      ],
+      "position": 5,
+      "route": "/workspace/voice",
+      "services": [
+        "adaptix-voice"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; routes registry gates /voice on the communications entitlement; Gateway main 5658fb1c routes.py /api/v1/voice -> adaptix-voice",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "trustsign",
+      "description": "AdaptixCore's signature authority: signing requests, verification and the signed archive.",
+      "display_name": "TrustSign",
+      "modules": [],
+      "position": 6,
+      "route": "/workspace/trustsign",
+      "services": [
+        "adaptix-trustsign"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/trustsign AND /api/v1/verifications -> adaptix-trustsign",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "nemsis",
+      "description": "NEMSIS dataset registry, validation and state submission plumbing.",
+      "display_name": "NEMSIS",
+      "modules": [
+        "nemsis"
+      ],
+      "position": 7,
+      "route": "/workspace/nemsis",
+      "services": [
+        "adaptix-nemsis"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/nemsis AND /api/v1/wards -> adaptix-nemsis",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "terminology",
+      "description": "Reference terminology, code sets and concept governance.",
+      "display_name": "Terminology",
+      "modules": [],
+      "position": 8,
+      "route": "/workspace/terminology/concepts",
+      "services": [
+        "adaptix-terminology"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (app/workspace/terminology has NO root page.tsx — only concepts, mappings, review and sources; concepts is the entry); Gateway main 5658fb1c routes.py /api/v1/terminology -> adaptix-terminology",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "graph",
+      "description": "Microsoft Graph integration surfaces (mail, calendar, files).",
+      "display_name": "Graph",
+      "modules": [],
+      "position": 9,
+      "route": "/workspace/graph",
+      "services": [
+        "adaptix-graph"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree; Gateway main 5658fb1c routes.py /api/v1/graph -> adaptix-graph",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "cortex",
+      "description": "Cross-platform AI assistance consumed by every application; this is its own operator surface.",
+      "display_name": "Cortex",
+      "modules": [
+        "ai",
+        "cortex"
+      ],
+      "position": 10,
+      "route": "/workspace/cortex-ai",
+      "services": [
+        "adaptix-ai",
+        "adaptix-bedrock",
+        "adaptix-cortex"
+      ],
+      "source": "Web-App main 35b4a12e app/ route tree (app/workspace/cortex-ai reads /api/v1/ai x38); Gateway main 5658fb1c routes.py /api/v1/ai -> adaptix-ai, /api/v1/cortex -> adaptix-cortex + core; the pricing catalog sells Cortex as module 'cortex' and the runtime grant is 'ai', so either opens the surface. Cortex is an intelligence layer, never a business application; founder-only Cortex administration is Administration's workspace.",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "forms",
+      "description": "Structured forms consumed by Documents, ePCR and TransportLink.",
+      "display_name": "Forms",
+      "modules": [],
+      "position": 11,
+      "route": null,
+      "services": [
+        "adaptix-forms"
+      ],
+      "source": "Gateway main 5658fb1c routes.py /api/v1/forms -> adaptix-forms; surfaced inside Governance/Documents",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "payments",
+      "description": "Payment handling consumed by Billing, Finance, portals and subscriptions. Never a second money ledger.",
+      "display_name": "Payments",
+      "modules": [],
+      "position": 12,
+      "route": null,
+      "services": [
+        "adaptix-payments"
+      ],
+      "source": "Gateway main 5658fb1c routes.py /api/v1/payments -> adaptix-payments",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "audit",
+      "description": "Immutable cross-service audit trails and the evidence graph.",
+      "display_name": "Audit",
+      "modules": [],
+      "position": 13,
+      "route": null,
+      "services": [
+        "adaptix-audit"
+      ],
+      "source": "Gateway main 5658fb1c routes.py /api/v1/audit -> adaptix-audit + core",
+      "visibility": "tenant"
+    },
+    {
+      "capability_id": "patient_identity",
+      "description": "Master patient index and matching consumed by clinical applications.",
+      "display_name": "Patient Identity",
+      "modules": [],
+      "position": 14,
+      "route": null,
+      "services": [
+        "adaptix-patient-identity"
+      ],
+      "source": "module_registry patient_identity (audience adaptix-patient-identity)",
+      "visibility": "tenant"
+    }
+  ],
+  "source_repository": "FusionEMS-Quantum-LLC/Adaptix-Contracts",
+  "statuses": [
+    "active",
+    "deferred",
+    "experimental",
+    "retired"
+  ],
+  "visibilities": [
+    "tenant",
+    "admin",
+    "founder"
+  ]
+}
