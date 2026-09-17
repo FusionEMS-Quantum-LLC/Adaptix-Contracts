@@ -42,7 +42,12 @@ from adaptix_contracts.commercial.offers import (
     starting_price,
 )
 from adaptix_contracts.commercial.pricing_catalog import ANNUAL_DISCOUNT_RATE
-from adaptix_contracts.commercial.terms import CommercialTerms, DiscountType
+from adaptix_contracts.commercial.terms import (
+    CommercialTerms,
+    DiscountStacking,
+    DiscountType,
+)
+from adaptix_contracts.commercial.usage import UsageRecognitionPoint
 
 __all__ = ["WI_LAUNCH_2026_1"]
 
@@ -133,6 +138,13 @@ WI_LAUNCH_2026_1 = CommercialOfferCatalog(
         standard_remote_onboarding_included=True,
         standard_support_included=True,
         patient_payments_software_included_with_billing=True,
+        # Founder decisions 2026-09-17. A quote holding two or more application
+        # offers is priced as Platform plus add-ons, never as a standalone price
+        # plus add-ons.
+        standalone_price_max_applications=1,
+        quote_validity_calendar_days=30,
+        discount_stacking=DiscountStacking.ADDITIVE,
+        billable_encounter_recognition=UsageRecognitionPoint.FIRST_CLEARINGHOUSE_ACCEPTANCE,
     ),
 )
 

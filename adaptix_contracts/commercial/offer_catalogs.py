@@ -30,11 +30,13 @@ from adaptix_contracts.commercial.terms import (
     DISCOUNTS_REQUIRING_FOUNDER_APPROVAL,
     CommercialTerms,
     CommunityEligibilityCriterion,
+    DiscountStacking,
 )
 from adaptix_contracts.commercial.usage import (
     SameEncounterActivity,
     UsageLedgerState,
     UsageRate,
+    UsageRecognitionPoint,
 )
 from adaptix_contracts.commercial.wi_launch_2026_1 import WI_LAUNCH_2026_1
 
@@ -195,6 +197,10 @@ def _terms_record(terms: CommercialTerms) -> dict[str, object]:
         "patient_payments_software_included_with_billing": (
             terms.patient_payments_software_included_with_billing
         ),
+        "standalone_price_max_applications": terms.standalone_price_max_applications,
+        "quote_validity_calendar_days": terms.quote_validity_calendar_days,
+        "discount_stacking": terms.discount_stacking.value,
+        "billable_encounter_recognition": terms.billable_encounter_recognition.value,
     }
 
 
@@ -237,6 +243,8 @@ def export_offer_catalogs(*, contracts_version: str) -> dict[str, object]:
             activity.value for activity in SameEncounterActivity
         ],
         "usage_ledger_states": [state.value for state in UsageLedgerState],
+        "usage_recognition_points": [point.value for point in UsageRecognitionPoint],
+        "discount_stacking_modes": [mode.value for mode in DiscountStacking],
         "community_eligibility_criteria": [
             criterion.value for criterion in CommunityEligibilityCriterion
         ],

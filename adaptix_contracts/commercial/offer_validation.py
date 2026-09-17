@@ -42,8 +42,8 @@ from adaptix_contracts.commercial.offers import (
     ScalingUnit,
     SegmentPrice,
 )
-from adaptix_contracts.commercial.terms import CommercialTerms
-from adaptix_contracts.commercial.usage import UsageMetric
+from adaptix_contracts.commercial.terms import CommercialTerms, DiscountStacking
+from adaptix_contracts.commercial.usage import UsageMetric, UsageRecognitionPoint
 from adaptix_contracts.module_registry import (
     expand_entitlements,
     module_audiences,
@@ -87,10 +87,15 @@ _OFFER_CHARGE_CLASSES = {
     ),
 }
 
-#: Charge classes the annual-prepay discount may never reach automatically.
+#: Charge classes the annual-prepay discount may never reach automatically. The
+#: Managed Billing fee (``MANAGED_SERVICE``) is excluded by founder decision
+#: 2026-09-17: prepay discounts the Platform and subscription portion only. The
+#: Adaptix Billing fee is the agency's own software subscription
+#: (``APPLICATION_SUBSCRIPTION``) and stays eligible (founder plan section 257).
 _NEVER_PREPAY_DISCOUNTED = frozenset(
     {
         ChargeClass.USAGE,
+        ChargeClass.MANAGED_SERVICE,
         ChargeClass.PASS_THROUGH,
         ChargeClass.PROFESSIONAL_SERVICE,
         ChargeClass.MAINTAINED_INTERFACE,
@@ -561,6 +566,11 @@ def _validate_rates_and_periods(terms: CommercialTerms) -> None:
         ("multi_year_term_months", terms.multi_year_term_months),
         ("strategic_pilot_min_days", terms.strategic_pilot_min_days),
         ("strategic_pilot_max_days", terms.strategic_pilot_max_days),
+        (
+            "standalone_price_max_applications",
+            terms.standalone_price_max_applications,
+        ),
+        ("quote_validity_calendar_days", terms.quote_validity_calendar_days),
     ):
         _require(
             isinstance(value, int) and not isinstance(value, bool) and value > 0,
@@ -596,10 +606,18 @@ def _validate_terms(terms: CommercialTerms) -> None:
     _require(
         bool(eligible) and not eligible & _NEVER_PREPAY_DISCOUNTED,
         "terms: annual prepay applies to subscription charges only, never usage, "
-        "pass-through, professional-service or interface charges",
+        "managed-service, pass-through, professional-service or interface charges",
     )
     _require(
         bool(terms.allowed_discounts), "terms: allowed_discounts must not be empty"
+    )
+    _require(
+        isinstance(terms.discount_stacking, DiscountStacking),
+        "terms.discount_stacking must be a DiscountStacking",
+    )
+    _require(
+        isinstance(terms.billable_encounter_recognition, UsageRecognitionPoint),
+        "terms.billable_encounter_recognition must be a UsageRecognitionPoint",
     )
 
 
@@ -612,8 +630,8 @@ def validate_offer_catalog(catalog: CommercialOfferCatalog) -> None:
     segment pricing, per-encounter usage only on billing services, standalone
     prices against Platform plus add-ons, package prices above Platform and
     never above Platform plus add-ons, billing add-ons net of Platform, and
-    terms that never discount usage or pass-through charges. It never computes
-    a customer's price.
+    terms that never discount usage, managed-service or pass-through charges.
+    It never computes a customer's price.
     """
 
     _validate_identity(catalog)

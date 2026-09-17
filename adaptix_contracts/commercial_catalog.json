@@ -1875,6 +1875,8 @@
           "package_subscription",
           "platform_subscription"
         ],
+        "billable_encounter_recognition": "first_clearinghouse_acceptance",
+        "discount_stacking": "additive",
         "discounts_requiring_founder_approval": [
           "founder_approved_exception"
         ],
@@ -1884,6 +1886,8 @@
         "multi_year_term_months": 36,
         "onsite_daily_rate": "2000.00",
         "patient_payments_software_included_with_billing": true,
+        "quote_validity_calendar_days": 30,
+        "standalone_price_max_applications": 1,
         "standard_migration_fee": "0.00",
         "standard_remote_onboarding_included": true,
         "standard_support_included": true,
@@ -1904,7 +1908,10 @@
     "not_large_regional_shared_service",
     "not_large_for_profit_transport_enterprise"
   ],
-  "contracts_version": "5.19.0",
+  "contracts_version": "5.20.0",
+  "discount_stacking_modes": [
+    "additive"
+  ],
   "pass_through_charge_types": [
     "insurance_discovery",
     "exceptional_eligibility_or_discovery_volume",
@@ -1951,5 +1958,8 @@
     "recorded",
     "reversed",
     "adjusted"
+  ],
+  "usage_recognition_points": [
+    "first_clearinghouse_acceptance"
   ]
 }
