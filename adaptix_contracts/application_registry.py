@@ -989,7 +989,10 @@ _APPLICATIONS: tuple[ApplicationDefinition, ...] = (
     _app(
         "billing",
         "Billing",
-        "EMS revenue cycle: eligibility, coding, claims, clearinghouse, remittance, denials, appeals and patient balances.",
+        (
+            "EMS revenue cycle: eligibility, coding, claims, clearinghouse, "
+            "remittance, denials, appeals and patient balances."
+        ),
         domain=ApplicationDomain.REVENUE,
         canonical_route="/workspace/billing",
         modules=("billing",),
@@ -1425,7 +1428,10 @@ _APPLICATIONS: tuple[ApplicationDefinition, ...] = (
     _app(
         "administration",
         "Administration",
-        "Organization, users, roles, applications and entitlements, devices, integrations, imports/exports, onboarding and platform configuration.",
+        (
+            "Organization, users, roles, applications and entitlements, devices, "
+            "integrations, imports/exports, onboarding and platform configuration."
+        ),
         domain=ApplicationDomain.ADMINISTRATION,
         canonical_route="/workspace/admin",
         visibility=ApplicationVisibility.ADMIN,
@@ -1817,6 +1823,16 @@ def validate_application_definition(
     registry passes every registered id, a test may pass a synthetic set.
     """
 
+    _validate_identity(app)
+    if app.canonical_route is not None:
+        _validate_route(app.canonical_id, app.canonical_route, allow_query=False)
+    _validate_status_shape(app)
+    _validate_modules(app.canonical_id, app.modules)
+    _validate_ownership(app, known_application_ids)
+    _validate_children(app)
+
+
+def _validate_identity(app: ApplicationDefinition) -> None:
     owner = app.canonical_id
     if not _is_valid_id(owner):
         raise ValueError(f"{owner!r}: canonical_id must be {_ID_PATTERN_DESCRIPTION}")
@@ -1829,10 +1845,13 @@ def validate_application_definition(
     if not isinstance(app.visibility, ApplicationVisibility):
         raise ValueError(f"{owner}: visibility must be an ApplicationVisibility")
 
-    if app.canonical_route is not None:
-        _validate_route(owner, app.canonical_route, allow_query=False)
-    _validate_status_shape(app)
-    _validate_modules(owner, app.modules)
+
+def _validate_ownership(
+    app: ApplicationDefinition, known_application_ids: Iterable[str]
+) -> None:
+    """Services, aggregates and clients: who implements and ships the application."""
+
+    owner = app.canonical_id
     _validate_services(owner, app.primary_services)
     _validate_services(owner, app.supporting_services)
     overlap = app.primary_services & app.supporting_services
@@ -1857,6 +1876,11 @@ def validate_application_definition(
                 f"{owner}: client {client!r} is not in KNOWN_CLIENT_REPOSITORIES"
             )
 
+
+def _validate_children(app: ApplicationDefinition) -> None:
+    """Workspaces and portals: unique ids, valid routes, explicit umbrella gates."""
+
+    owner = app.canonical_id
     seen_workspace_ids: set[str] = set()
     for workspace in app.workspaces:
         if workspace.workspace_id in seen_workspace_ids:
