@@ -120,8 +120,12 @@ OPERATIONS_APPLICATIONS: tuple[ApplicationDefinition, ...] = (
             _ws("rollups", "Status Rollups", "/workspace/transport/analytics"),
         ),
         source=(
-            f"{_WEB} (app/transportlink/page.tsx is the navigated root on main; "
-            "routes registry PUBLIC product entry); "
+            "Web-App main 0aeaf034 (app/transportlink/page.tsx is the navigated root, "
+            "gated by ModuleGateBoundary module=transportlink in "
+            "app/transportlink/layout.tsx; src/lib/routes/registry.ts deliberately does "
+            "not list /transportlink as public: only /transportlink-portal, "
+            "/transportlink/portal, /transportlink/portal/embed and the "
+            "/transportlink/sign/ prefix are public); "
             f"{_GW} /api/v1/transport AND /api/v1/transportlink -> adaptix-transport "
             "(module_registry records adaptix-transportlink for the module; the "
             "gateway is the routing truth and is what is recorded here). The "
