@@ -8,6 +8,7 @@ from typing import Any
 
 ROOT = Path.cwd()
 LOCAL_COMMAND_TIMEOUT_SECONDS = 0.2
+REMOTES_PREFIX = "refs/remotes/"
 
 
 def run(*args: str) -> tuple[int, str, str]:
@@ -96,7 +97,15 @@ def canonical_remote_branch() -> tuple[str, str] | None:
     code, out, _ = run(
         "git",
         "for-each-ref",
-        "--format=%(refname:short)|%(symref:short)",
+        # %(refname), NOT %(refname:short). Git shortens
+        # refs/remotes/<remote>/HEAD to the bare remote name -- "origin", not
+        # "origin/HEAD" -- because that is the spelling which resolves a
+        # remote's default branch (`git log origin`). The short form therefore
+        # never ends in "/HEAD", so the suffix test below matched nothing and
+        # this function returned None for every correctly configured clone,
+        # blocking completion while reporting it as a local repository
+        # misconfiguration. The full refname keeps the "/HEAD" suffix.
+        "--format=%(refname)|%(symref:short)",
         "refs/remotes",
     )
     if code != 0:
@@ -107,10 +116,15 @@ def canonical_remote_branch() -> tuple[str, str] | None:
         ref, separator, target = raw_line.partition("|")
         ref = ref.strip()
         target = target.strip()
-        if not separator or not ref.endswith("/HEAD") or not target:
+        if (
+            not separator
+            or not ref.startswith(REMOTES_PREFIX)
+            or not ref.endswith("/HEAD")
+            or not target
+        ):
             continue
 
-        remote = ref[: -len("/HEAD")]
+        remote = ref[len(REMOTES_PREFIX) : -len("/HEAD")]
         remote_prefix = f"{remote}/"
         if not remote or not target.startswith(remote_prefix):
             continue
