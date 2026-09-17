@@ -527,7 +527,14 @@ class TestTerms:
         )
 
     @pytest.mark.parametrize(
-        "fee", [Decimal("0.125"), Decimal("-1.00"), Decimal("NaN")]
+        "fee",
+        [
+            Decimal("0.125"),
+            Decimal("-1.00"),
+            Decimal("NaN"),
+            Decimal("sNaN"),
+            Decimal("-0"),
+        ],
     )
     def test_migration_fee_is_zero_or_a_cent_amount(self, fee: Decimal) -> None:
         _rejects(

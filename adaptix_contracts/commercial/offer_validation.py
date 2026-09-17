@@ -583,9 +583,13 @@ def _validate_terms(terms: CommercialTerms) -> None:
         and is_cent_amount(terms.maintained_interface_monthly_starting_price),
         "terms: onsite and maintained-interface prices must be cent amounts",
     )
+    # ``is_zero`` rather than ``== 0``: comparing a signalling NaN raises
+    # InvalidOperation instead of failing validation. A negative zero is
+    # refused because it would export as the price text "-0.00".
     fee = terms.standard_migration_fee
     _require(
-        isinstance(fee, Decimal) and (fee == 0 or is_cent_amount(fee)),
+        isinstance(fee, Decimal)
+        and ((fee.is_zero() and not fee.is_signed()) or is_cent_amount(fee)),
         "terms: the standard migration fee must be zero or a cent amount",
     )
     eligible = terms.annual_prepay_eligible_charge_classes
