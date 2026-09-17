@@ -29,8 +29,8 @@ from adaptix_contracts import __version__  # noqa: E402
 from adaptix_contracts.application_registry import (  # noqa: E402
     export_application_catalog,
 )
-from adaptix_contracts.commercial.wisconsin_launch_catalog import (  # noqa: E402
-    WI_LAUNCH_CATALOG,
+from adaptix_contracts.commercial.wi_launch_2026_1 import (  # noqa: E402
+    WI_LAUNCH_2026_1,
 )
 
 
@@ -63,7 +63,7 @@ def render_catalog() -> str:
     """
 
     catalog = export_application_catalog(
-        contracts_version=__version__, pricing_catalog=WI_LAUNCH_CATALOG
+        contracts_version=__version__, offer_catalog=WI_LAUNCH_2026_1
     )
     catalog["source_repository"] = "FusionEMS-Quantum-LLC/Adaptix-Contracts"
     return json.dumps(catalog, indent=2, sort_keys=True, ensure_ascii=False) + "\n"

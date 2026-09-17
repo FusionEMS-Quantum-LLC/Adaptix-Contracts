@@ -16,8 +16,10 @@ from adaptix_contracts.application_registry._model import (
 from adaptix_contracts.application_registry._registry import (
     APPLICATION_REGISTRY,
     SHARED_CAPABILITY_REGISTRY,
+    offers_selling_application,
     sold_products_for_application,
 )
+from adaptix_contracts.commercial.offers import CommercialOfferCatalog
 from adaptix_contracts.commercial.pricing_catalog import CommercialPricingCatalog
 
 
@@ -41,17 +43,28 @@ def _portal_record(portal: PortalDefinition) -> dict[str, object]:
     }
 
 
-def _application_record(
-    app: ApplicationDefinition, position: int, catalog: CommercialPricingCatalog | None
-) -> dict[str, object]:
-    sold_as = (
-        sorted(
-            key.value
-            for key in sold_products_for_application(app.canonical_id, catalog)
+def _sold_as(
+    app: ApplicationDefinition,
+    pricing_catalog: CommercialPricingCatalog | None,
+    offer_catalog: CommercialOfferCatalog | None,
+) -> list[str]:
+    if app.status is not ApplicationStatus.ACTIVE:
+        return []
+    if offer_catalog is not None:
+        return list(
+            offers_selling_application(app.canonical_id, offer_catalog.offers.values())
         )
-        if catalog is not None and app.status is ApplicationStatus.ACTIVE
-        else []
-    )
+    if pricing_catalog is not None:
+        return sorted(
+            key.value
+            for key in sold_products_for_application(app.canonical_id, pricing_catalog)
+        )
+    return []
+
+
+def _application_record(
+    app: ApplicationDefinition, position: int, sold_as: list[str]
+) -> dict[str, object]:
     return {
         "canonical_id": app.canonical_id,
         "display_name": app.display_name,
@@ -67,7 +80,8 @@ def _application_record(
         "clients": sorted(app.clients),
         "workspaces": [_workspace_record(w) for w in app.workspaces],
         "portals": [_portal_record(p) for p in app.portals],
-        # Priced products (pricing-catalog keys) that unlock this application.
+        # Catalog offers (or, for the superseded pricing catalog, its product
+        # keys) whose grants unlock this application.
         "sold_as": sold_as,
         # Presentation order inside the domain. Explicit so a consumer sorting
         # by id does not reorder the founder's intended navigation.
@@ -93,7 +107,10 @@ def _capability_record(
 
 
 def export_application_catalog(
-    *, contracts_version: str, pricing_catalog: CommercialPricingCatalog | None = None
+    *,
+    contracts_version: str,
+    pricing_catalog: CommercialPricingCatalog | None = None,
+    offer_catalog: CommercialOfferCatalog | None = None,
 ) -> dict[str, object]:
     """The registry as a deterministic, JSON-serialisable catalog.
 
@@ -101,18 +118,28 @@ def export_application_catalog(
     what Adaptix-Web-App mirrors into its generated TypeScript. It carries the
     schema version and the producing package version; the generator records
     the source repository. Ordering is registry order (presentation), recorded
-    as ``position`` so consumers never have to guess it. When a pricing
-    catalog is supplied each application also lists the products it is
-    ``sold_as``; the pricing catalog version is recorded alongside so the
-    linkage is attributable.
+    as ``position`` so consumers never have to guess it. When a catalog is
+    supplied each application also lists what it is ``sold_as`` -- offer ids
+    for an offer catalog, product keys for the superseded pricing catalog --
+    and that catalog's version is recorded alongside so the linkage is
+    attributable. ``sold_as`` reflects exactly one catalog version, so passing
+    both is an error.
     """
 
+    if pricing_catalog is not None and offer_catalog is not None:
+        raise ValueError(
+            "pass pricing_catalog or offer_catalog, not both: sold_as reflects "
+            "exactly one catalog version"
+        )
+    catalog_version: str | None = None
+    if offer_catalog is not None:
+        catalog_version = offer_catalog.catalog_version
+    elif pricing_catalog is not None:
+        catalog_version = pricing_catalog.catalog_version
     return {
         "schema_version": CATALOG_SCHEMA_VERSION,
         "contracts_version": contracts_version,
-        "pricing_catalog_version": (
-            None if pricing_catalog is None else pricing_catalog.catalog_version
-        ),
+        "pricing_catalog_version": catalog_version,
         "domains": [
             {"domain": domain.value, "position": index}
             for index, domain in enumerate(ApplicationDomain)
@@ -120,7 +147,9 @@ def export_application_catalog(
         "statuses": [status.value for status in ApplicationStatus],
         "visibilities": [visibility.value for visibility in ApplicationVisibility],
         "applications": [
-            _application_record(app, index, pricing_catalog)
+            _application_record(
+                app, index, _sold_as(app, pricing_catalog, offer_catalog)
+            )
             for index, app in enumerate(APPLICATION_REGISTRY.values())
         ],
         "shared_capabilities": [

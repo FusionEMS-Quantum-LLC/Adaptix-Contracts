@@ -51,22 +51,29 @@ actually calls, not the service the name suggests. That is why Clinical
 Quality's primary service is ``adaptix-epcr`` (``/api/v1/quality`` and
 ``/api/v1/qa`` both route there) and TransportLink's is ``adaptix-transport``.
 
-Relationship to ``commercial.pricing_catalog``
-----------------------------------------------
-``CommercialApplicationKey`` is the SOLD product vocabulary. It is not renamed
-or replaced. The chain is one direction with no copies::
+Relationship to the commercial catalogs
+---------------------------------------
+The current SOLD vocabulary is the offer catalog (``commercial.offers``,
+seeded as ``commercial.wi_launch_2026_1``). The chain is one direction with no
+copies::
 
-    sold product (pricing catalog)  --module_canonical_id-->
+    offer (offer catalog)  --grants_modules-->
     entitlement module (module_registry)  --modules / workspace.modules-->
     application or workspace (this registry)  --services-->
     running service (gateway audience)
 
-:func:`applications_unlocked_by` answers "a tenant who bought exactly this
-module — where do they go?", :func:`sold_products_for_application` answers
-the reverse, and ``tests/test_application_registry.py`` fails when a priced
-product unlocks nothing: a customer charged for a product with no place in
-the product is the navigation analogue of ``module_registry``'s
-billable-but-dark SKU.
+:func:`applications_unlocked_by` answers "a tenant who holds exactly this
+module — where do they go?" and :func:`offers_selling_application` answers the
+reverse. ``commercial.offer_validation`` refuses to publish an offer whose
+grants leave its application gated, a workspace dark, or a primary service
+unreached: a customer charged for a product with no place in the product is
+the navigation analogue of ``module_registry``'s billable-but-dark SKU.
+
+The superseded pricing catalog (``commercial.pricing_catalog``,
+``wi-launch-v1``) keeps its own linkage: ``CommercialApplicationKey`` follows
+``module_canonical_id`` into :func:`applications_unlocked_by`, and
+:func:`sold_products_for_application` answers the reverse for anything still
+priced on that version.
 
 What is deliberately NOT an application
 ---------------------------------------
@@ -117,6 +124,7 @@ from adaptix_contracts.application_registry._registry import (
     is_application_entitled,
     is_workspace_entitled,
     navigable_applications,
+    offers_selling_application,
     require_application,
     route_owner,
     sold_products_for_application,
@@ -149,6 +157,7 @@ __all__ = [
     "is_application_entitled",
     "is_workspace_entitled",
     "navigable_applications",
+    "offers_selling_application",
     "require_application",
     "route_owner",
     "sold_products_for_application",
