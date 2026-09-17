@@ -320,10 +320,11 @@ def test_shared_capabilities_are_never_applications() -> None:
 
 
 def test_docuseal_is_absent_everywhere() -> None:
-    source = (REPO_ROOT / "adaptix_contracts" / "application_registry.py").read_text(
-        encoding="utf-8"
-    )
-    assert "docuseal" not in source.lower()
+    package = REPO_ROOT / "adaptix_contracts" / "application_registry"
+    sources = sorted(package.rglob("*.py"))
+    assert sources, package
+    for source in sources:
+        assert "docuseal" not in source.read_text(encoding="utf-8").lower(), source
     catalog = json.dumps(export_application_catalog(contracts_version="0"))
     assert "docuseal" not in catalog.lower()
 
@@ -390,7 +391,7 @@ def test_no_route_has_two_owners() -> None:
 def test_a_duplicate_route_across_applications_is_rejected_at_build() -> None:
     """The import-time index refuses two owners for one path."""
 
-    from adaptix_contracts import application_registry as module
+    from adaptix_contracts.application_registry import _registry as module
 
     original = module._APPLICATIONS
     duplicate = _app(canonical_id="synthetic_dup", canonical_route="/workspace/billing")
@@ -689,7 +690,7 @@ def test_application_gate_short_circuits_a_workspace_the_tenant_could_otherwise_
     the same gate the public function uses.
     """
 
-    from adaptix_contracts.application_registry import _workspace_entitled
+    from adaptix_contracts.application_registry._registry import _workspace_entitled
 
     app = _app(
         modules=frozenset({"cad"}),
