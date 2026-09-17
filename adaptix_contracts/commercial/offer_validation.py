@@ -52,9 +52,31 @@ from adaptix_contracts.module_registry import (
 
 __all__ = ["validate_offer_catalog"]
 
-_IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
-_CATALOG_VERSION = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{4}\.\d+$")
-_CURRENCY = re.compile(r"^[A-Z]{3}$")
+_LOWER_WORD = re.compile(r"[a-z0-9]+")
+_UPPER_WORD = re.compile(r"[A-Z0-9]+")
+_VERSION_NUMBER = re.compile(r"[0-9]{4}\.[0-9]+")
+_CURRENCY = re.compile(r"[A-Z]{3}")
+
+
+def _is_snake_case_id(value: str) -> bool:
+    """Lower snake_case: a letter first, then lower-case words joined by single underscores."""
+
+    return value[:1].isalpha() and all(
+        _LOWER_WORD.fullmatch(word) for word in value.split("_")
+    )
+
+
+def _is_catalog_version(value: str) -> bool:
+    """Upper-case words joined by hyphens, then ``-YYYY.N`` (``WI-LAUNCH-2026.1``)."""
+
+    prefix, separator, number = value.rpartition("-")
+    return (
+        bool(separator)
+        and prefix[:1].isalpha()
+        and all(_UPPER_WORD.fullmatch(word) for word in prefix.split("-"))
+        and _VERSION_NUMBER.fullmatch(number) is not None
+    )
+
 
 _OFFER_CHARGE_CLASSES = {
     OfferKind.APPLICATION: frozenset({ChargeClass.APPLICATION_SUBSCRIPTION}),
@@ -92,11 +114,11 @@ def _fixed_amount(price: MonthlyPrice) -> Decimal | None:
 def _validate_identity(catalog: CommercialOfferCatalog) -> None:
     version = catalog.catalog_version
     _require(
-        bool(_CATALOG_VERSION.match(version)),
+        _is_catalog_version(version),
         f"catalog_version {version!r} must look like WI-LAUNCH-2026.1",
     )
     _require(
-        bool(_CURRENCY.match(catalog.currency)),
+        _CURRENCY.fullmatch(catalog.currency) is not None,
         f"{version}: currency {catalog.currency!r} must be an ISO 4217 code",
     )
     _require(bool(catalog.jurisdiction.strip()), f"{version}: jurisdiction is required")
@@ -378,7 +400,7 @@ def _validate_offer(
     _require(
         offer.offer_id == key, f"{owner}: stored under a key other than its offer_id"
     )
-    _require(bool(_IDENTIFIER.match(key)), f"{owner}: offer ids are lower snake_case")
+    _require(_is_snake_case_id(key), f"{owner}: offer ids are lower snake_case")
     _require(bool(offer.display_name.strip()), f"{owner}: display_name is required")
     _validate_grants(owner, offer.grants_modules)
     _validate_offer_target(owner, offer)
@@ -511,7 +533,7 @@ def _validate_package(
         package.package_id == key,
         f"{owner}: stored under a key other than its package_id",
     )
-    _require(bool(_IDENTIFIER.match(key)), f"{owner}: package ids are lower snake_case")
+    _require(_is_snake_case_id(key), f"{owner}: package ids are lower snake_case")
     _require(bool(package.display_name.strip()), f"{owner}: display_name is required")
     _require(
         bool(package.includes_offers), f"{owner}: a package includes at least one offer"
@@ -561,10 +583,10 @@ def _validate_terms(terms: CommercialTerms) -> None:
         and is_cent_amount(terms.maintained_interface_monthly_starting_price),
         "terms: onsite and maintained-interface prices must be cent amounts",
     )
+    fee = terms.standard_migration_fee
     _require(
-        isinstance(terms.standard_migration_fee, Decimal)
-        and terms.standard_migration_fee >= 0,
-        "terms: the standard migration fee must be a non-negative Decimal",
+        isinstance(fee, Decimal) and (fee == 0 or is_cent_amount(fee)),
+        "terms: the standard migration fee must be zero or a cent amount",
     )
     eligible = terms.annual_prepay_eligible_charge_classes
     _require(

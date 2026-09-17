@@ -30,7 +30,7 @@ class ChargeClass(str, enum.Enum):
     #: Metered usage the catalog prices, such as an accepted billable encounter.
     USAGE = "usage"
     #: A third-party cost passed through transparently.
-    PASS_THROUGH = "pass_through"
+    PASS_THROUGH = "pass_through"  # nosec B105  # noqa: S105
     #: Optional professional services such as onsite implementation days.
     PROFESSIONAL_SERVICE = "professional_service"
     #: A custom interface FusionEMS continuously maintains for one customer.

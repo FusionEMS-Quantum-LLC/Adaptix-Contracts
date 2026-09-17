@@ -140,6 +140,25 @@ class TestCatalogIdentity:
     def test_version_shape(self) -> None:
         _rejects(replace(CATALOG, catalog_version="wi launch"), "must look like")
 
+    @pytest.mark.parametrize(
+        "version",
+        [
+            "wi-launch-2026.1",
+            "WI--LAUNCH-2026.1",
+            "-WI-2026.1",
+            "1WI-2026.1",
+            "WI-LAUNCH-26.1",
+            "WI-LAUNCH-2026",
+            "WI-LAUNCH-2026.1\n",
+            "WI-LAUNCH-2026.1a",
+        ],
+    )
+    def test_version_shape_is_exact(self, version: str) -> None:
+        _rejects(replace(CATALOG, catalog_version=version), "must look like")
+
+    def test_currency_code_is_exact(self) -> None:
+        _rejects(replace(CATALOG, currency="USD\n"), "ISO 4217")
+
     def test_cannot_supersede_itself(self) -> None:
         _rejects(
             replace(CATALOG, supersedes=CATALOG.catalog_version), "supersede itself"
@@ -169,6 +188,15 @@ class TestOffers:
         _rejects(
             _with_offer(CATALOG.offer("cad"), key="dispatch"),
             "key other than its offer_id",
+        )
+
+    @pytest.mark.parametrize(
+        "offer_id", ["CAD", "_cad", "cad_", "cad__pro", "1cad", "cad-pro", "cad\n"]
+    )
+    def test_offer_id_is_exact_lower_snake_case(self, offer_id: str) -> None:
+        _rejects(
+            _with_offer(replace(CATALOG.offer("cad"), offer_id=offer_id)),
+            "lower snake_case",
         )
 
     def test_grant_must_be_a_canonical_id(self) -> None:
@@ -359,6 +387,17 @@ class TestOffers:
 
 
 class TestPackages:
+    @pytest.mark.parametrize(
+        "package_id", ["Community_EMS", "community__ems", "community_ems_"]
+    )
+    def test_package_id_is_exact_lower_snake_case(self, package_id: str) -> None:
+        _rejects(
+            _with_package(
+                replace(CATALOG.package("community_ems"), package_id=package_id)
+            ),
+            "lower snake_case",
+        )
+
     def test_package_includes_known_offers(self) -> None:
         _rejects(
             _with_package(
@@ -485,6 +524,15 @@ class TestTerms:
                 CATALOG, terms=replace(CATALOG.terms, strategic_pilot_min_days=200)
             ),
             "cannot exceed",
+        )
+
+    @pytest.mark.parametrize(
+        "fee", [Decimal("0.125"), Decimal("-1.00"), Decimal("NaN")]
+    )
+    def test_migration_fee_is_zero_or_a_cent_amount(self, fee: Decimal) -> None:
+        _rejects(
+            replace(CATALOG, terms=replace(CATALOG.terms, standard_migration_fee=fee)),
+            "zero or a cent amount",
         )
 
 

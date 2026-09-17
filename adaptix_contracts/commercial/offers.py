@@ -189,7 +189,7 @@ class QuoteSection(str, enum.Enum):
     APPLICATIONS = "applications"
     PACKAGE_ADJUSTMENT = "package_adjustment"
     USAGE = "usage"
-    PASS_THROUGH = "pass_through"
+    PASS_THROUGH = "pass_through"  # nosec B105  # noqa: S105
 
 
 @dataclass(frozen=True)

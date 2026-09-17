@@ -61,7 +61,7 @@ class UsageRateBasis(str, enum.Enum):
     NEGOTIATED = "negotiated"
     #: The actual third-party cost, passed through transparently or with a
     #: markup documented in the contract.
-    PASS_THROUGH = "pass_through"
+    PASS_THROUGH = "pass_through"  # nosec B105  # noqa: S105
     #: Metered internally; no customer-facing usage charge is published yet.
     POLICY_PENDING = "policy_pending"
 

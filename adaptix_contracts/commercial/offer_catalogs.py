@@ -14,6 +14,7 @@ computed here, because calculation belongs to the pricing/billing service.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from decimal import Decimal
 from types import MappingProxyType
 
 from adaptix_contracts.commercial.charges import PassThroughChargeType
@@ -72,12 +73,30 @@ def get_offer_catalog(catalog_version: str) -> CommercialOfferCatalog:
         ) from None
 
 
+_CENT = Decimal("0.01")
+
+
+def _money_text(amount: Decimal) -> str:
+    """``amount`` as exact text with two decimal places, e.g. ``"1395.00"``.
+
+    A fraction of a cent is refused rather than rounded, so the exported file
+    can never state a different price than the catalog it was exported from.
+    """
+
+    cents = amount.quantize(_CENT)
+    if cents != amount:
+        raise ValueError(
+            f"money amount {amount!r} is finer than a cent and cannot be exported exactly"
+        )
+    return str(cents)
+
+
 def _price(price: MonthlyPrice | None) -> dict[str, str | None] | None:
     if price is None:
         return None
     return {
         "basis": price.basis.value,
-        "amount": None if price.amount is None else f"{price.amount:.2f}",
+        "amount": None if price.amount is None else _money_text(price.amount),
     }
 
 
@@ -85,7 +104,7 @@ def _usage_rate(rate: UsageRate) -> dict[str, str | None]:
     return {
         "metric": rate.metric.value,
         "basis": rate.basis.value,
-        "unit_price": None if rate.unit_price is None else f"{rate.unit_price:.2f}",
+        "unit_price": None if rate.unit_price is None else _money_text(rate.unit_price),
     }
 
 
@@ -159,11 +178,11 @@ def _terms_record(terms: CommercialTerms) -> dict[str, object]:
         ),
         "strategic_pilot_min_days": terms.strategic_pilot_min_days,
         "strategic_pilot_max_days": terms.strategic_pilot_max_days,
-        "onsite_daily_rate": f"{terms.onsite_daily_rate:.2f}",
-        "maintained_interface_monthly_starting_price": (
-            f"{terms.maintained_interface_monthly_starting_price:.2f}"
+        "onsite_daily_rate": _money_text(terms.onsite_daily_rate),
+        "maintained_interface_monthly_starting_price": _money_text(
+            terms.maintained_interface_monthly_starting_price
         ),
-        "standard_migration_fee": f"{terms.standard_migration_fee:.2f}",
+        "standard_migration_fee": _money_text(terms.standard_migration_fee),
         "allowed_discounts": sorted(
             discount.value for discount in terms.allowed_discounts
         ),

@@ -522,6 +522,17 @@ class TestExports:
         assert community["segment"] == "community"
         assert community["add_on"] == {"basis": "fixed", "amount": "495.00"}
         assert community["standalone"] == {"basis": "fixed", "amount": "995.00"}
+        assert exported["terms"]["standard_migration_fee"] == "0.00"  # type: ignore[index]
+
+    def test_export_refuses_a_fraction_of_a_cent_instead_of_rounding(self) -> None:
+        sub_cent = dataclasses.replace(
+            CATALOG,
+            terms=dataclasses.replace(
+                CATALOG.terms, standard_migration_fee=Decimal("0.125")
+            ),
+        )
+        with pytest.raises(ValueError, match="finer than a cent"):
+            export_offer_catalog(sub_cent)
 
     def test_committed_commercial_catalog_json_is_current(self) -> None:
         """``adaptix_contracts/commercial_catalog.json`` must be regenerated with every
