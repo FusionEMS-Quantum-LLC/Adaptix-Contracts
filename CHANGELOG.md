@@ -12,6 +12,21 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Application registry: TransportLink `source` no longer calls the app root
+  a public route.** The `transportlink` application's evidence said
+  `/transportlink` was a "routes registry PUBLIC product entry". Since
+  Adaptix-Web-App #2989 (merged `262d348d`), `/transportlink` is the
+  authenticated operator application, gated by the `transportlink` module.
+  Web-App `src/lib/routes/registry.ts` deliberately leaves it off the public
+  list. The public TransportLink routes are `/transportlink-portal`,
+  `/transportlink/portal`, `/transportlink/portal/embed` and the
+  `/transportlink/sign/` prefix. The stale wording invited treating the app
+  root as public, which would skip the login check. Wording-only:
+  `application_catalog.json` is regenerated with the same `source` text, and
+  no routes, modules, workspaces or portals change.
+
 ## [5.20.0] - 2026-09-17
 
 ### Added
