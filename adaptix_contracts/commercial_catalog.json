@@ -259,7 +259,7 @@
           "excludes_offers": [],
           "grants_modules": [],
           "kind": "application",
-          "notes": "CCT Clinical is the Platform-inclusive entry price and includes ePCR and Clinical Quality.",
+          "notes": "CCT Clinical is the Platform-inclusive entry price and includes ePCR and Clinical Quality. CCT has no patient chart of its own, so requires_offers names ePCR (COMMERCIAL-CATALOG-004): no package may sell CCT without the ePCR clinical foundation it depends on.",
           "offer_id": "cct",
           "prices": [
             {
@@ -302,7 +302,9 @@
               "usage_rates": []
             }
           ],
-          "requires_offers": [],
+          "requires_offers": [
+            "epcr"
+          ],
           "scaling_unit": null,
           "standalone_display_name": "CCT Clinical",
           "standalone_includes_offers": [

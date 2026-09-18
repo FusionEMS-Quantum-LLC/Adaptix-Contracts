@@ -191,6 +191,7 @@ _CLINICAL_AND_DISPATCH = (
             regional=(starting_price("1495"), CUSTOM_QUOTE_PRICE),
         ),
         application_id="cct",
+        requires_offers=frozenset({"epcr"}),
         standalone_includes_offers=frozenset({"epcr"}),
         standalone_display_name="CCT Clinical",
         availability_reason=(
@@ -201,7 +202,10 @@ _CLINICAL_AND_DISPATCH = (
         ),
         notes=(
             "CCT Clinical is the Platform-inclusive entry price and includes "
-            "ePCR and Clinical Quality."
+            "ePCR and Clinical Quality. CCT has no patient chart of its own, "
+            "so requires_offers names ePCR (COMMERCIAL-CATALOG-004): no "
+            "package may sell CCT without the ePCR clinical foundation it "
+            "depends on."
         ),
     ),
     _application(

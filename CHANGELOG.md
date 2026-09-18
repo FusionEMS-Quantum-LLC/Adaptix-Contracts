@@ -14,6 +14,19 @@ from the installed package metadata).
 
 ### Fixed
 
+- **`adaptix_contracts.commercial` — CCT offers must include the ePCR chart
+  (COMMERCIAL-CATALOG-004).** CCT is sold as "CCT Clinical": Platform + ePCR +
+  Clinical Quality + CCT, because CCT has no chart of its own and depends on
+  ePCR as the canonical clinical record. Nothing enforced that a package
+  selling `cct` also included `epcr`; all 10 seeded WI-LAUNCH-2026.1 packages
+  happened to satisfy it, but a future catalog edit could have shipped one
+  that did not. The `cct` `ApplicationOffer` now declares
+  `requires_offers=frozenset({"epcr"})`, the same general mechanism Community
+  Risk Reduction already uses to require Fire Operations.
+  `_validate_package_composition` already enforces `requires_offers` for
+  every offer in every package, so this is a data change activating an
+  existing generic invariant, not a new one-off check.
+
 - **Application registry: TransportLink `source` no longer calls the app root
   a public route.** The `transportlink` application's evidence said
   `/transportlink` was a "routes registry PUBLIC product entry". Since

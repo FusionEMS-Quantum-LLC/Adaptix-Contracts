@@ -497,6 +497,32 @@ class TestPackages:
         )
         _rejects(_with_package(replace(package, prices=twice)), "at most once")
 
+    def test_package_with_cct_must_also_include_epcr(self) -> None:
+        # COMMERCIAL-CATALOG-004: CCT has no chart of its own, so a package
+        # cannot sell it without the ePCR clinical foundation it depends on.
+        # This is the generic `requires_offers` invariant every offer already
+        # gets from `_validate_package_composition`, not a CCT-specific check.
+        package = CATALOG.package("community_fire_ems_cct")
+        _rejects(
+            _with_package(
+                replace(package, includes_offers=frozenset({"cct", "field_operations"}))
+            ),
+            "requires",
+        )
+
+
+def test_every_cct_package_also_includes_epcr() -> None:
+    """COMMERCIAL-CATALOG-004: every seeded WI-LAUNCH-2026.1 package proves the
+    invariant, not just the negative case above."""
+
+    cct_packages = [
+        package
+        for package in CATALOG.packages.values()
+        if "cct" in package.includes_offers
+    ]
+    assert cct_packages
+    assert all("epcr" in package.includes_offers for package in cct_packages)
+
 
 class TestTerms:
     def test_annual_prepay_never_reaches_usage(self) -> None:
