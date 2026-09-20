@@ -12,6 +12,28 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.22.0] - 2026-09-20
+
+### Added
+
+- **WI-LAUNCH-2026.2 commercial catalog (CORTEX-CORE-ENTITLEMENT-001 /
+  ENTITLEMENT-SUPPORTING-GRANTS-001).** A new catalog version. WI-LAUNCH-2026.1
+  is unchanged and still carried for anything already priced on it. Prices,
+  packages, terms and application offers are the same. Platform now also
+  grants Cortex Core (`ai`, the command-bar `/api/v1/ai` module — not
+  founder-only `cortex`) and the supporting services sold applications already
+  call (`forms`, `facilities`, `graph`, `patient_identity`). Those ids are the
+  ones Core already persists on `module_entitlements` and Policy/Gateway
+  already gate. `offer_catalogs.CURRENT_OFFER_CATALOG` points at 2026.2.
+  `commercial_catalog.json` names `current_catalog_version`.
+
+### Downstream impact
+
+- Additive. Tag `v5.21.0` remains the last 2026.1-only release and is not
+  moved. New quotes and new Platform provisioning should pin 5.22.0 after the
+  `v5.22.0` tag exists and the validation engine approves this revision.
+  Existing contracts stay on WI-LAUNCH-2026.1 until renewal.
+
 ## [5.21.0] - 2026-09-20
 
 ### Added

@@ -9,6 +9,7 @@ Wisconsin launch plan sections 128-129 and 314).
 ``adaptix_contracts/commercial_catalog.json`` for non-Python consumers. It
 serializes catalog DATA only: no annual, prorated or discounted figure is
 computed here, because calculation belongs to the pricing/billing service.
+``current_catalog_version`` names the catalog new quotes must use.
 """
 
 from __future__ import annotations
@@ -39,9 +40,11 @@ from adaptix_contracts.commercial.usage import (
     UsageRecognitionPoint,
 )
 from adaptix_contracts.commercial.wi_launch_2026_1 import WI_LAUNCH_2026_1
+from adaptix_contracts.commercial.wi_launch_2026_2 import WI_LAUNCH_2026_2
 
 __all__ = [
     "COMMERCIAL_OFFER_CATALOGS",
+    "CURRENT_OFFER_CATALOG",
     "OFFER_CATALOG_SCHEMA_VERSION",
     "UnknownCommercialCatalogVersionError",
     "export_offer_catalogs",
@@ -58,9 +61,18 @@ class UnknownCommercialCatalogVersionError(KeyError):
 
 
 #: Catalog version -> catalog. Read-only; every entry validated at import.
+#: Insertion order is oldest first so exports stay stable when a version is
+#: added: earlier contracts keep their recorded version; new quotes use
+#: ``CURRENT_OFFER_CATALOG``.
 COMMERCIAL_OFFER_CATALOGS: Mapping[str, CommercialOfferCatalog] = MappingProxyType(
-    {WI_LAUNCH_2026_1.catalog_version: WI_LAUNCH_2026_1}
+    {
+        WI_LAUNCH_2026_1.catalog_version: WI_LAUNCH_2026_1,
+        WI_LAUNCH_2026_2.catalog_version: WI_LAUNCH_2026_2,
+    }
 )
+
+#: The catalog new quotes and new Platform provisioning must use.
+CURRENT_OFFER_CATALOG: CommercialOfferCatalog = WI_LAUNCH_2026_2
 
 
 def get_offer_catalog(catalog_version: str) -> CommercialOfferCatalog:
@@ -236,6 +248,7 @@ def export_offer_catalogs(*, contracts_version: str) -> dict[str, object]:
     return {
         "schema_version": OFFER_CATALOG_SCHEMA_VERSION,
         "contracts_version": contracts_version,
+        "current_catalog_version": CURRENT_OFFER_CATALOG.catalog_version,
         "segments": [segment.value for segment in CustomerSegment],
         "quote_sections": [section.value for section in QuoteSection],
         "pass_through_charge_types": [kind.value for kind in PassThroughChargeType],
