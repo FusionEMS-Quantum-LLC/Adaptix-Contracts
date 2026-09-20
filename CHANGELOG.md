@@ -12,6 +12,28 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **`adaptix_contracts.events.bus_limits.BUS_CORRELATION_ID_MAX_LENGTH = 300`
+  (LABOR-CORE-CORRELATION-ID-WIDTH-MISMATCH-001).** The single owner of the
+  Core event-bus `correlation_id` width. Three services had each declared
+  their own — Labor `varchar(300)`, Core `varchar(255)`, CAD `varchar(100)`
+  (since widened to 300 by CAD migration 075) — so the narrowest hop silently
+  defined the platform limit and nothing asserted they agreed. 300 is the
+  widest *declared* producer column (`labor_app/shift_outbox.py`
+  `LaborShiftOutboxEvent.idempotency_key`), not the 130/132 characters the
+  current key formula happens to emit. Also re-exported from
+  `adaptix_contracts.events`.
+
+### Downstream impact
+
+- Additive; no existing symbol changed. Consumers that persist a bus
+  `correlation_id` should declare the column from this constant and assert the
+  equality in their own suite, so a future drift is a red build instead of a
+  dropped event. Raising the value later is a catalog-only PostgreSQL change;
+  lowering it destroys audit linkage and consuming migrations are expected to
+  refuse it.
+
 ## [5.22.0] - 2026-09-20
 
 ### Added
