@@ -46,6 +46,7 @@ from adaptix_contracts.commercial import (
 )
 from adaptix_contracts.commercial.offer_catalogs import (
     COMMERCIAL_OFFER_CATALOGS,
+    CURRENT_OFFER_CATALOG,
     UnknownCommercialCatalogVersionError,
     export_offer_catalog,
     get_offer_catalog,
@@ -516,8 +517,13 @@ class TestApplicationRegistryLinkage:
 
 class TestVersioning:
     def test_carried_versions(self) -> None:
-        assert set(COMMERCIAL_OFFER_CATALOGS) == {"WI-LAUNCH-2026.1"}
+        assert set(COMMERCIAL_OFFER_CATALOGS) == {
+            "WI-LAUNCH-2026.1",
+            "WI-LAUNCH-2026.2",
+        }
         assert get_offer_catalog("WI-LAUNCH-2026.1") is CATALOG
+        assert CURRENT_OFFER_CATALOG.catalog_version == "WI-LAUNCH-2026.2"
+        assert get_offer_catalog("WI-LAUNCH-2026.2") is CURRENT_OFFER_CATALOG
 
     def test_unknown_version_raises(self) -> None:
         with pytest.raises(UnknownCommercialCatalogVersionError):

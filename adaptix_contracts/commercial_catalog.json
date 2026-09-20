@@ -1898,6 +1898,1910 @@
         "strategic_pilot_max_days": 180,
         "strategic_pilot_min_days": 90
       }
+    },
+    {
+      "catalog_version": "WI-LAUNCH-2026.2",
+      "currency": "USD",
+      "effective_date": "2026-09-20",
+      "jurisdiction": "US-WI",
+      "offers": [
+        {
+          "application_id": "epcr",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "ePCR",
+          "excludes_offers": [],
+          "grants_modules": [
+            "epcr",
+            "nemsis"
+          ],
+          "kind": "application",
+          "notes": "Clinical Quality is included with ePCR: the clinical_quality application opens on the same epcr entitlement. NEMSIS reporting is part of ePCR as sold, never a separate integration fee, so nemsis is granted.",
+          "offer_id": "epcr",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "495.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "995.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "cad",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "CAD",
+          "excludes_offers": [],
+          "grants_modules": [
+            "cad"
+          ],
+          "kind": "application",
+          "notes": "Operational dispatch and work management. Operations Command opens on the cad entitlement where the customer's applications provide its data.",
+          "offer_id": "cad",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "995.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "1495.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "2495.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "3495.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "field_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Field Operations",
+          "excludes_offers": [],
+          "grants_modules": [
+            "crew",
+            "crewlink",
+            "mdt"
+          ],
+          "kind": "application",
+          "notes": "",
+          "offer_id": "field_operations",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "895.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "transportlink",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "TransportLink",
+          "excludes_offers": [],
+          "grants_modules": [
+            "transport"
+          ],
+          "kind": "application",
+          "notes": "Grants transport, which implies transportlink: the application gates on transportlink, and its primary service adaptix-transport is reached through transport.",
+          "offer_id": "transportlink",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "595.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1595.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "cct",
+          "availability": "activation_pending",
+          "availability_reason": "The cct application is deferred: it has no entitlement module, no routed operator workspace, and its service is not deployed. The price is decided; CCT-ACTIVATE-001 must deliver the application before it is sold.",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Critical Care Transport",
+          "excludes_offers": [],
+          "grants_modules": [],
+          "kind": "application",
+          "notes": "CCT Clinical is the Platform-inclusive entry price and includes ePCR and Clinical Quality. CCT has no patient chart of its own, so requires_offers names ePCR (COMMERCIAL-CATALOG-004): no package may sell CCT without the ePCR clinical foundation it depends on.",
+          "offer_id": "cct",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "1395.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "2795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "1495.00",
+                "basis": "starting_at"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [
+            "epcr"
+          ],
+          "scaling_unit": null,
+          "standalone_display_name": "CCT Clinical",
+          "standalone_includes_offers": [
+            "epcr"
+          ]
+        },
+        {
+          "application_id": "mih_community_paramedicine",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "MIH / Community Paramedicine",
+          "excludes_offers": [],
+          "grants_modules": [
+            "mih_community_paramedicine"
+          ],
+          "kind": "application",
+          "notes": "",
+          "offer_id": "mih_community_paramedicine",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "595.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1595.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "hospital_facility_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Hospital / Facility Operations",
+          "excludes_offers": [],
+          "grants_modules": [
+            "hospital"
+          ],
+          "kind": "application",
+          "notes": "Prices are for the first facility; each additional facility is priced separately. Large health systems are quoted.",
+          "offer_id": "hospital_facility_operations",
+          "prices": [
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "995.00",
+                "basis": "fixed"
+              },
+              "additional_unit": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "segment": "standard",
+              "standalone": {
+                "amount": "1995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": "facility",
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "air_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Air Operations / HEMS",
+          "excludes_offers": [],
+          "grants_modules": [
+            "air"
+          ],
+          "kind": "application",
+          "notes": "Prices are for the first operational base. An additional base is published only inside HEMS Complete; elsewhere it is quoted. Grants air, not hems_ops: the hems_ops Stripe bundle implies CAD, CrewLink, MDT, ePCR and Billing and does not open Air Operations.",
+          "offer_id": "air_operations",
+          "prices": [
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "3995.00",
+                "basis": "fixed"
+              },
+              "additional_unit": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "segment": "standard",
+              "standalone": {
+                "amount": "4995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": "operational_base",
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "fire_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Fire Operations",
+          "excludes_offers": [],
+          "grants_modules": [
+            "fire",
+            "neris"
+          ],
+          "kind": "application",
+          "notes": "Incident operations and command, NERIS reporting, stations and apparatus, preplans, occupancies and hazards, hydrants and flow tests, prevention and inspections, hose and readiness, station alerting and normal Fire analytics are features of Fire Operations, never separate charges.",
+          "offer_id": "fire_operations",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "595.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "1095.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "1295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "2295.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "community_risk_reduction",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Community Risk Reduction",
+          "excludes_offers": [],
+          "grants_modules": [
+            "crr"
+          ],
+          "kind": "application",
+          "notes": "Requires Fire Operations; no standalone entry price is published.",
+          "offer_id": "community_risk_reduction",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "195.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [
+            "fire_operations"
+          ],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "workforce",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Workforce",
+          "excludes_offers": [],
+          "grants_modules": [
+            "hr",
+            "training",
+            "workforce"
+          ],
+          "kind": "application",
+          "notes": "Scheduling, labor, HR and training are Workforce capabilities, not products. workforce implies scheduling and labor; hr and training are granted so their workspaces open.",
+          "offer_id": "workforce",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "895.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "asset_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Asset Operations",
+          "excludes_offers": [
+            "fleet_only",
+            "inventory_only",
+            "medications_only",
+            "narcotics_only"
+          ],
+          "grants_modules": [
+            "assetops",
+            "fleet",
+            "inventory",
+            "medications",
+            "narcotics"
+          ],
+          "kind": "application",
+          "notes": "Asset Operations Complete. Controlled-substance activation still follows the tenant's state rules at provisioning.",
+          "offer_id": "asset_operations",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "495.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "995.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "asset_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Fleet only",
+          "excludes_offers": [
+            "asset_operations"
+          ],
+          "grants_modules": [
+            "fleet"
+          ],
+          "kind": "application_module",
+          "notes": "For customers who want only one component; Asset Operations Complete is the default offer.",
+          "offer_id": "fleet_only",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "195.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "asset_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Inventory only",
+          "excludes_offers": [
+            "asset_operations"
+          ],
+          "grants_modules": [
+            "inventory"
+          ],
+          "kind": "application_module",
+          "notes": "For customers who want only one component; Asset Operations Complete is the default offer.",
+          "offer_id": "inventory_only",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "asset_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Medications only",
+          "excludes_offers": [
+            "asset_operations"
+          ],
+          "grants_modules": [
+            "medications"
+          ],
+          "kind": "application_module",
+          "notes": "For customers who want only one component; Asset Operations Complete is the default offer.",
+          "offer_id": "medications_only",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "195.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "asset_operations",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Narcotics only",
+          "excludes_offers": [
+            "asset_operations"
+          ],
+          "grants_modules": [
+            "narcotics"
+          ],
+          "kind": "application_module",
+          "notes": "For customers who want only one component; Asset Operations Complete is the default offer.",
+          "offer_id": "narcotics_only",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "595.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "finance",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Finance",
+          "excludes_offers": [],
+          "grants_modules": [
+            "finance"
+          ],
+          "kind": "application",
+          "notes": "",
+          "offer_id": "finance",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "595.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1595.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "governance",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Governance",
+          "excludes_offers": [],
+          "grants_modules": [
+            "compliance",
+            "documents"
+          ],
+          "kind": "application",
+          "notes": "",
+          "offer_id": "governance",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "195.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "695.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1395.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "intelligence_analytics",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Intelligence & Analytics",
+          "excludes_offers": [],
+          "grants_modules": [
+            "analytics",
+            "intelligence"
+          ],
+          "kind": "application",
+          "notes": "The application has no application-level module gate; its analytics and intelligence workspaces gate on these grants.",
+          "offer_id": "intelligence_analytics",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": "595.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1595.00",
+                "basis": "fixed"
+              },
+              "usage_rates": []
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": []
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": null,
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": "communications",
+          "charge_class": "application_subscription",
+          "display_name": "Communications",
+          "excludes_offers": [],
+          "grants_modules": [
+            "communications",
+            "telephony"
+          ],
+          "kind": "capability",
+          "notes": "Software price plus actual carrier usage, passed through transparently or with a documented markup.",
+          "offer_id": "communications",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "195.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "695.00",
+                "basis": "fixed"
+              },
+              "usage_rates": [
+                {
+                  "basis": "pass_through",
+                  "metric": "communications_carrier_usage",
+                  "unit_price": null
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": "395.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1395.00",
+                "basis": "fixed"
+              },
+              "usage_rates": [
+                {
+                  "basis": "pass_through",
+                  "metric": "communications_carrier_usage",
+                  "unit_price": null
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": [
+                {
+                  "basis": "pass_through",
+                  "metric": "communications_carrier_usage",
+                  "unit_price": null
+                }
+              ]
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": null,
+          "availability": "activation_pending",
+          "availability_reason": "No entitlement distinguishes Cortex Pro automation from Cortex Core, and the grants that deliver Cortex Core are not yet decided, so a Cortex Pro purchase could not be enforced.",
+          "capability_id": "cortex",
+          "charge_class": "application_subscription",
+          "display_name": "Cortex Pro Automation",
+          "excludes_offers": [],
+          "grants_modules": [],
+          "kind": "capability",
+          "notes": "Provider-heavy overages follow a transparent usage policy, metered internally with administrator warnings instead of a per-operator token counter.",
+          "offer_id": "cortex_pro",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "295.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": [
+                {
+                  "basis": "policy_pending",
+                  "metric": "cortex_provider_usage",
+                  "unit_price": null
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": "595.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": [
+                {
+                  "basis": "policy_pending",
+                  "metric": "cortex_provider_usage",
+                  "unit_price": null
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "not_offered"
+              },
+              "usage_rates": [
+                {
+                  "basis": "policy_pending",
+                  "metric": "cortex_provider_usage",
+                  "unit_price": null
+                }
+              ]
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "billing",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "application_subscription",
+          "display_name": "Adaptix Billing",
+          "excludes_offers": [
+            "managed_billing"
+          ],
+          "grants_modules": [
+            "billing"
+          ],
+          "kind": "billing_service",
+          "notes": "The agency performs its own billing. Usage is per accepted billable encounter and never a percentage of collections. Patient-payment software is included; processor, card and ACH fees pass through.",
+          "offer_id": "billing",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "300.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "795.00",
+                "basis": "fixed"
+              },
+              "usage_rates": [
+                {
+                  "basis": "per_unit",
+                  "metric": "billable_encounter",
+                  "unit_price": "8.00"
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": "500.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "1495.00",
+                "basis": "fixed"
+              },
+              "usage_rates": [
+                {
+                  "basis": "per_unit",
+                  "metric": "billable_encounter",
+                  "unit_price": "8.00"
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": "2995.00",
+                "basis": "starting_at"
+              },
+              "usage_rates": [
+                {
+                  "basis": "negotiated",
+                  "metric": "billable_encounter",
+                  "unit_price": null
+                }
+              ]
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        },
+        {
+          "application_id": "billing",
+          "availability": "published",
+          "availability_reason": "",
+          "capability_id": null,
+          "charge_class": "managed_service",
+          "display_name": "Adaptix Managed Billing",
+          "excludes_offers": [
+            "billing"
+          ],
+          "grants_modules": [
+            "managed_billing"
+          ],
+          "kind": "billing_service",
+          "notes": "FusionEMS performs the billing work: 0% of collections, no revenue share and no success fee. An existing Platform customer's add-on nets the Platform it already pays; public entry pricing is the standalone price.",
+          "offer_id": "managed_billing",
+          "prices": [
+            {
+              "add_on": {
+                "amount": "1500.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "community",
+              "standalone": {
+                "amount": "1995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": [
+                {
+                  "basis": "per_unit",
+                  "metric": "billable_encounter",
+                  "unit_price": "30.00"
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": "2000.00",
+                "basis": "fixed"
+              },
+              "additional_unit": null,
+              "segment": "standard",
+              "standalone": {
+                "amount": "2995.00",
+                "basis": "fixed"
+              },
+              "usage_rates": [
+                {
+                  "basis": "per_unit",
+                  "metric": "billable_encounter",
+                  "unit_price": "35.00"
+                }
+              ]
+            },
+            {
+              "add_on": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "additional_unit": null,
+              "segment": "regional_enterprise",
+              "standalone": {
+                "amount": null,
+                "basis": "custom_quote"
+              },
+              "usage_rates": [
+                {
+                  "basis": "negotiated",
+                  "metric": "billable_encounter",
+                  "unit_price": null
+                }
+              ]
+            }
+          ],
+          "requires_offers": [],
+          "scaling_unit": null,
+          "standalone_display_name": null,
+          "standalone_includes_offers": []
+        }
+      ],
+      "packages": [
+        {
+          "availability": "published",
+          "availability_reason": "",
+          "builds_on_packages": [],
+          "display_name": "Community EMS",
+          "includes_offers": [
+            "asset_operations",
+            "epcr",
+            "field_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "",
+          "package_id": "community_ems",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "1495.00",
+                "basis": "fixed"
+              },
+              "segment": "community"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "published",
+          "availability_reason": "",
+          "builds_on_packages": [],
+          "display_name": "Community Fire Complete",
+          "includes_offers": [
+            "asset_operations",
+            "community_risk_reduction",
+            "fire_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "",
+          "package_id": "community_fire_complete",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "1995.00",
+                "basis": "fixed"
+              },
+              "segment": "community"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "published",
+          "availability_reason": "",
+          "builds_on_packages": [
+            "community_ems",
+            "community_fire_complete"
+          ],
+          "display_name": "Community Fire + EMS",
+          "includes_offers": [
+            "asset_operations",
+            "community_risk_reduction",
+            "epcr",
+            "field_operations",
+            "fire_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "",
+          "package_id": "community_fire_ems",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "2495.00",
+                "basis": "fixed"
+              },
+              "segment": "community"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "activation_pending",
+          "availability_reason": "Includes Critical Care Transport, which is activation-pending; the package is sold only once CCT is active.",
+          "builds_on_packages": [
+            "community_fire_ems"
+          ],
+          "display_name": "Community Fire + EMS + CCT",
+          "includes_offers": [
+            "asset_operations",
+            "cct",
+            "community_risk_reduction",
+            "epcr",
+            "field_operations",
+            "fire_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "",
+          "package_id": "community_fire_ems_cct",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "2995.00",
+                "basis": "fixed"
+              },
+              "segment": "community"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "published",
+          "availability_reason": "",
+          "builds_on_packages": [],
+          "display_name": "Wisconsin EMS Complete",
+          "includes_offers": [
+            "asset_operations",
+            "communications",
+            "epcr",
+            "field_operations",
+            "finance",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "Billing stays optional: an existing Standard Platform customer adds Adaptix Billing at its add-on price plus per-encounter usage.",
+          "package_id": "wisconsin_ems_complete",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "4995.00",
+                "basis": "fixed"
+              },
+              "segment": "standard"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "published",
+          "availability_reason": "",
+          "builds_on_packages": [],
+          "display_name": "Wisconsin Fire Complete",
+          "includes_offers": [
+            "asset_operations",
+            "communications",
+            "community_risk_reduction",
+            "fire_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "",
+          "package_id": "wisconsin_fire_complete",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "4995.00",
+                "basis": "fixed"
+              },
+              "segment": "standard"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "published",
+          "availability_reason": "",
+          "builds_on_packages": [
+            "wisconsin_ems_complete",
+            "wisconsin_fire_complete"
+          ],
+          "display_name": "Wisconsin Fire + EMS Complete",
+          "includes_offers": [
+            "asset_operations",
+            "communications",
+            "community_risk_reduction",
+            "epcr",
+            "field_operations",
+            "finance",
+            "fire_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "The full Fire and full EMS operating stack.",
+          "package_id": "wisconsin_fire_ems_complete",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "6995.00",
+                "basis": "fixed"
+              },
+              "segment": "standard"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "activation_pending",
+          "availability_reason": "Includes Critical Care Transport, which is activation-pending; the package is sold only once CCT is active.",
+          "builds_on_packages": [
+            "wisconsin_fire_ems_complete"
+          ],
+          "display_name": "Wisconsin Fire + EMS + CCT Complete",
+          "includes_offers": [
+            "asset_operations",
+            "cct",
+            "communications",
+            "community_risk_reduction",
+            "epcr",
+            "field_operations",
+            "finance",
+            "fire_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "",
+          "package_id": "wisconsin_fire_ems_cct_complete",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "7995.00",
+                "basis": "fixed"
+              },
+              "segment": "standard"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "activation_pending",
+          "availability_reason": "Includes Critical Care Transport, which is activation-pending; the package is sold only once CCT is active.",
+          "builds_on_packages": [
+            "wisconsin_fire_ems_cct_complete"
+          ],
+          "display_name": "Operations Complete",
+          "includes_offers": [
+            "asset_operations",
+            "cad",
+            "cct",
+            "communications",
+            "community_risk_reduction",
+            "epcr",
+            "field_operations",
+            "finance",
+            "fire_operations",
+            "governance",
+            "intelligence_analytics",
+            "transportlink",
+            "workforce"
+          ],
+          "notes": "Adds CAD, TransportLink and Operations Command, which opens on the CAD entitlement. Billing remains usage-priced and separate.",
+          "package_id": "operations_complete",
+          "prices": [
+            {
+              "additional_unit": null,
+              "monthly": {
+                "amount": "9995.00",
+                "basis": "fixed"
+              },
+              "segment": "standard"
+            }
+          ],
+          "scaling_unit": null
+        },
+        {
+          "availability": "activation_pending",
+          "availability_reason": "Includes Critical Care Transport, which is activation-pending; the package is sold only once CCT is active.",
+          "builds_on_packages": [],
+          "display_name": "HEMS Complete",
+          "includes_offers": [
+            "air_operations",
+            "asset_operations",
+            "cct",
+            "epcr",
+            "field_operations",
+            "governance",
+            "intelligence_analytics",
+            "workforce"
+          ],
+          "notes": "Price is for the first operational base; each additional base is priced separately. Billing can be added separately.",
+          "package_id": "hems_complete",
+          "prices": [
+            {
+              "additional_unit": {
+                "amount": "1495.00",
+                "basis": "fixed"
+              },
+              "monthly": {
+                "amount": "7995.00",
+                "basis": "fixed"
+              },
+              "segment": "standard"
+            }
+          ],
+          "scaling_unit": "operational_base"
+        }
+      ],
+      "platform": {
+        "grants_modules": [
+          "ai",
+          "core",
+          "device",
+          "exports",
+          "facilities",
+          "forms",
+          "graph",
+          "hl7",
+          "imports",
+          "integration",
+          "onboarding",
+          "patient_identity",
+          "search"
+        ],
+        "plans": [
+          {
+            "display_name": "Community Platform",
+            "monthly": {
+              "amount": "495.00",
+              "basis": "fixed"
+            },
+            "segment": "community"
+          },
+          {
+            "display_name": "Standard Platform",
+            "monthly": {
+              "amount": "995.00",
+              "basis": "fixed"
+            },
+            "segment": "standard"
+          },
+          {
+            "display_name": "Regional / Enterprise Platform",
+            "monthly": {
+              "amount": "2495.00",
+              "basis": "starting_at"
+            },
+            "segment": "regional_enterprise"
+          }
+        ]
+      },
+      "supersedes": "WI-LAUNCH-2026.1",
+      "terms": {
+        "allowed_discounts": [
+          "annual_prepay",
+          "community_eligibility",
+          "founder_approved_exception",
+          "founding_agency_pilot",
+          "multi_year",
+          "package",
+          "strategic_reference_customer"
+        ],
+        "annual_prepay_discount_rate": "0.10",
+        "annual_prepay_eligible_charge_classes": [
+          "application_subscription",
+          "package_subscription",
+          "platform_subscription"
+        ],
+        "billable_encounter_recognition": "first_clearinghouse_acceptance",
+        "discount_stacking": "additive",
+        "discounts_requiring_founder_approval": [
+          "founder_approved_exception"
+        ],
+        "maintained_interface_monthly_starting_price": "195.00",
+        "month_to_month_premium_rate": "0.15",
+        "multi_year_max_annual_subscription_increase_rate": "0.03",
+        "multi_year_term_months": 36,
+        "onsite_daily_rate": "2000.00",
+        "patient_payments_software_included_with_billing": true,
+        "quote_validity_calendar_days": 30,
+        "standalone_price_max_applications": 1,
+        "standard_migration_fee": "0.00",
+        "standard_remote_onboarding_included": true,
+        "standard_support_included": true,
+        "standard_term_months": 12,
+        "standard_users_unlimited": true,
+        "strategic_pilot_max_days": 180,
+        "strategic_pilot_min_days": 90
+      }
     }
   ],
   "community_eligibility_criteria": [
@@ -1910,7 +3814,8 @@
     "not_large_regional_shared_service",
     "not_large_for_profit_transport_enterprise"
   ],
-  "contracts_version": "5.21.0",
+  "contracts_version": "5.22.0",
+  "current_catalog_version": "WI-LAUNCH-2026.2",
   "discount_stacking_modes": [
     "additive"
   ],

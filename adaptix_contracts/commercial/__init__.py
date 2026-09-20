@@ -2,9 +2,10 @@
 
 Current model (COMMERCIAL-CATALOG-002): Platform + Applications + Packages +
 Usage. ``offers`` holds the shapes, ``charges``, ``usage`` and ``terms`` the
-supporting vocabulary, and ``wi_launch_2026_1`` the first seeded version
-(``WI-LAUNCH-2026.1``). ``offer_catalogs`` resolves any carried version and
-exports the JSON form. Those catalog modules import ``application_registry``
+supporting vocabulary, ``wi_launch_2026_1`` the first seeded version
+(``WI-LAUNCH-2026.1``, left unchanged), and ``wi_launch_2026_2`` the current
+version (``WI-LAUNCH-2026.2``). ``offer_catalogs`` resolves any carried version
+and exports the JSON form. Those catalog modules import ``application_registry``
 for validation and are therefore imported explicitly, never from this package
 root, because ``application_registry`` imports ``pricing_catalog``.
 
