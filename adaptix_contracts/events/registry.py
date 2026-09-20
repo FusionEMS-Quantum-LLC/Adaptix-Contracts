@@ -55,14 +55,26 @@ BILLING_CLAIM_UPDATED: Final[str] = "billing.claim.updated"
 EPCR_CHART_UPDATED: Final[str] = "epcr.chart.updated"
 
 # ---------------------------------------------------------------------------
-# Workforce operational events (EventBridge backbone, Phase 1)
+# Workforce-named shift facts (producer: Adaptix-Labor-Service, slug ``labor``)
 # ---------------------------------------------------------------------------
-# Emitted by Adaptix-Workforce-Service (service registry slug ``workforce``) when
-# a shift is cancelled — i.e. the shift is vacated / the staff assignment is
-# removed. ``source_service="workforce"`` resolves via SERVICE_BY_SLUG, so this
-# event is NOT one of the 27 ``schedule.*`` events that carry the
-# ``scheduling`` source; it is a workforce-owned event whose producer is
-# the live Workforce service. See tests/test_workforce_event_backbone.py.
+# CAD already listens for these two topic strings. Labor is the only service
+# that still writes operational shifts (Labor main
+# ``fbf878aeb38e07b8349b360684b36afd940cd367``). Workforce's cancelled
+# producer is behind the orphan-write guard. The names stay
+# ``workforce.shift.*`` because that is the live CAD subscription; the
+# producer is Labor. These are NOT the 27 ``schedule.*`` events that carry
+# ``source_service="scheduling"``.
+#
+# Indirect outbox production: Labor stages a ``LaborShiftOutboxEvent`` row
+# in the same transaction as the shift write, then
+# ``labor_app/shift_outbox_relay.py`` republishes the row's own event_type
+# to Core with ``source_service="labor"`` when CORE_EVENT_BUS_URL and
+# CORE_EVENT_BUS_TOKEN are set. Producer citations, Adaptix-Labor-Service
+# main ``fbf878aeb38e07b8349b360684b36afd940cd367``, verified 2026-09-20:
+#   labor_app/shift_outbox.py:191  workforce.shift.created
+#   labor_app/shift_outbox.py:203  workforce.shift.cancelled
+# See tests/test_workforce_event_backbone.py.
+WORKFORCE_SHIFT_CREATED: Final[str] = "workforce.shift.created"
 WORKFORCE_SHIFT_CANCELLED: Final[str] = "workforce.shift.cancelled"
 
 # ---------------------------------------------------------------------------
@@ -507,7 +519,8 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
         "version": "1.0",
         "source_service": "communications",
     },
-    WORKFORCE_SHIFT_CANCELLED: {"version": "1.0", "source_service": "workforce"},
+    WORKFORCE_SHIFT_CREATED: {"version": "1.0", "source_service": "labor"},
+    WORKFORCE_SHIFT_CANCELLED: {"version": "1.0", "source_service": "labor"},
     FLEET_UNIT_STATUS_CHANGED: {"version": "1.0", "source_service": "fleet"},
     FLEET_VEHICLE_OUT_OF_SERVICE: {"version": "1.0", "source_service": "fleet"},
     FIRE_INCIDENT_CREATED: {"version": "1.0", "source_service": "fire"},
@@ -758,6 +771,7 @@ __all__ = [
     "VAS_PROJECTION_PROPOSED",
     "VAS_PROJECTION_REVIEWED",
     "WORKFORCE_SHIFT_CANCELLED",
+    "WORKFORCE_SHIFT_CREATED",
     "get_all_events",
     "is_registered",
     "producer_of",

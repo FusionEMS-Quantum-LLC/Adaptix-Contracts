@@ -478,7 +478,6 @@ UNREGISTERED_SUBSCRIBED_TOPICS: Final[Mapping[str, str]] = MappingProxyType(
         "hospital.incoming_patient.cancelled": _NOT_IN_REGISTRY,
         "workforce.ot.filled": _NOT_IN_REGISTRY,
         "workforce.schedule.change": _NOT_IN_REGISTRY,
-        "workforce.shift.created": _NOT_IN_REGISTRY,
         "workforce.vacancy.created": _NOT_IN_REGISTRY,
     }
 )
