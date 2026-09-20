@@ -12,6 +12,21 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **Platform migration contracts (CORTEX-MIG-CONTRACT-001).** New modules
+  sit beside the existing billing-vendor lifecycle in
+  `migration_contracts.py` (still schema 2.9.0, still the only
+  `MigrationState` machine). They add `MigrationRun` / `MigrationSource` /
+  `MigrationPlan` / `MigrationEntityPlan`, a domain×entity catalog,
+  mapping authority with always-deterministic field classes, a
+  category→action exception table, cutover readiness plus human+fresh-MFA
+  approval, lineage/rollback/evidence, historical provenance, and the
+  `POST /api/v1/<domain>/migration/import` envelope with mandatory
+  side-effect suppression. Existing event shapes stay unpublished in
+  `events.registry` until a live producer exists. No Billing, Imports,
+  Cortex, Gateway, or Web files are changed here.
+
 ### Fixed
 
 - **`adaptix_contracts.commercial` — CCT offers must include the ePCR chart
