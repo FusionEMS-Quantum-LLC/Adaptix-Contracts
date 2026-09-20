@@ -429,6 +429,19 @@ INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
         "patient-identity",
         "Adaptix-Patient-Identity-Service/backend/patient_identity_app/outbox.py:173",
     ),
+    # --- Adaptix-Labor-Service, via LaborShiftOutboxEvent ->
+    # labor_app/shift_outbox_relay.py (row event_type + source_service="labor").
+    # Audited 2026-09-20 at Labor main fbf878aeb38e07b8349b360684b36afd940cd367.
+    (
+        "workforce.shift.created",
+        "labor",
+        "Adaptix-Labor-Service/backend/labor_app/shift_outbox.py:191",
+    ),
+    (
+        "workforce.shift.cancelled",
+        "labor",
+        "Adaptix-Labor-Service/backend/labor_app/shift_outbox.py:203",
+    ),
 )
 
 _EXPECTED_PRODUCER_SERVICE = {

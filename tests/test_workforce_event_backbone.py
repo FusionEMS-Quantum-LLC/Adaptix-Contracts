@@ -1,4 +1,4 @@
-"""Drift + contract guards for the Workforce operational event backbone (Phase 1).
+"""Drift + contract guards for Labor-produced workforce.shift.* facts.
 
 Mirrors the style established by ``test_scheduling_service_registration.py``
 (PR #112): every registered event's ``source_service`` must resolve to a real
@@ -7,11 +7,12 @@ the directive mandates.
 
 Covered here:
 
-* ``workforce.shift.cancelled`` is registered and its ``source_service`` resolves
-  to the live Workforce service (slug ``workforce``);
-* it is a workforce-owned event, NOT one of the 27 ``schedule.*`` events that
-  carry ``source_service="scheduling"`` — the reconciliation the prior finding
-  asked for;
+* ``workforce.shift.created`` and ``workforce.shift.cancelled`` are registered
+  and their ``source_service`` resolves to the live Labor service (slug
+  ``labor``);
+* they are Labor-produced facts that keep the ``workforce.shift.*`` names CAD
+  already listens for, NOT one of the 27 ``schedule.*`` events that carry
+  ``source_service="scheduling"``;
 * ``OperationalEventEnvelope`` (schema_version 1.0) carries all nine mandated
   fields, is tenant-scoped, idempotent, traceable and round-trips losslessly.
 """
@@ -30,14 +31,16 @@ from adaptix_contracts.events.operational_envelope import (
     assert_event_type_registered,
 )
 from adaptix_contracts.events.registry import (
-    WORKFORCE_SHIFT_CANCELLED,
     ALL_EVENTS,
+    WORKFORCE_SHIFT_CANCELLED,
+    WORKFORCE_SHIFT_CREATED,
     is_registered,
+    producer_of,
 )
 from adaptix_contracts.scheduling.events import ALL_SCHEDULING_EVENTS
 from adaptix_contracts.schemas.service_registry import (
+    LABOR_SERVICE,
     SERVICE_BY_SLUG,
-    WORKFORCE_SERVICE,
 )
 
 
@@ -55,25 +58,37 @@ def _resolve_source_service(source_service: str):
 # ---------------------------------------------------------------------------
 
 
-def test_workforce_shift_cancelled_is_registered() -> None:
-    assert WORKFORCE_SHIFT_CANCELLED == "workforce.shift.cancelled"
-    assert is_registered(WORKFORCE_SHIFT_CANCELLED) is True
-    assert ALL_EVENTS[WORKFORCE_SHIFT_CANCELLED] == {
+@pytest.mark.parametrize(
+    ("constant", "event_type"),
+    [
+        (WORKFORCE_SHIFT_CREATED, "workforce.shift.created"),
+        (WORKFORCE_SHIFT_CANCELLED, "workforce.shift.cancelled"),
+    ],
+)
+def test_workforce_shift_event_is_registered_to_labor(
+    constant: str, event_type: str
+) -> None:
+    assert constant == event_type
+    assert is_registered(event_type) is True
+    assert ALL_EVENTS[event_type] == {
         "version": "1.0",
-        "source_service": "workforce",
+        "source_service": "labor",
     }
+    assert producer_of(event_type) is LABOR_SERVICE
 
 
-def test_workforce_event_source_service_resolves_to_workforce_service() -> None:
-    meta = ALL_EVENTS[WORKFORCE_SHIFT_CANCELLED]
-    assert _resolve_source_service(meta["source_service"]) is WORKFORCE_SERVICE
+def test_workforce_event_source_service_resolves_to_labor_service() -> None:
+    for event_type in (WORKFORCE_SHIFT_CREATED, WORKFORCE_SHIFT_CANCELLED):
+        meta = ALL_EVENTS[event_type]
+        assert _resolve_source_service(meta["source_service"]) is LABOR_SERVICE
 
 
 def test_workforce_event_is_not_a_scheduling_event() -> None:
-    # Reconciliation: the event is workforce-owned, not one of the 27 schedule.*
-    # events that declare source_service="scheduling".
-    assert WORKFORCE_SHIFT_CANCELLED not in ALL_SCHEDULING_EVENTS
-    assert not WORKFORCE_SHIFT_CANCELLED.startswith("schedule.")
+    # Reconciliation: Labor produces these facts; they are not schedule.* events
+    # that declare source_service="scheduling".
+    for event_type in (WORKFORCE_SHIFT_CREATED, WORKFORCE_SHIFT_CANCELLED):
+        assert event_type not in ALL_SCHEDULING_EVENTS
+        assert not event_type.startswith("schedule.")
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +100,7 @@ def _valid_kwargs() -> dict:
     return dict(
         event_type=WORKFORCE_SHIFT_CANCELLED,
         tenant_id="tenant-123",
-        source_service="workforce",
+        source_service="labor",
         source_record_id="shift-abc",
         source_version=2,
         observed_at="2026-07-24T20:00:00+00:00",
