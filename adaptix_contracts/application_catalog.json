@@ -2432,7 +2432,7 @@
     "Adaptix-Mobile-Shell",
     "Adaptix-Transport-Request-App"
   ],
-  "contracts_version": "5.20.0",
+  "contracts_version": "5.21.0",
   "domains": [
     {
       "domain": "command",
