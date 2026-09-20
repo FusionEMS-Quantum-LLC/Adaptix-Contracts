@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field, field_validator
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from adaptix_contracts.events.bus_limits import BUS_CORRELATION_ID_MAX_LENGTH
+
 
 class AdaptixEventEnvelope(BaseModel):
     """
@@ -39,6 +41,7 @@ class AdaptixEventEnvelope(BaseModel):
     source_service: str = Field(..., description="Service that published this event")
     correlation_id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
+        max_length=BUS_CORRELATION_ID_MAX_LENGTH,
         description="Correlation ID for tracing across services",
     )
     causation_id: str | None = Field(

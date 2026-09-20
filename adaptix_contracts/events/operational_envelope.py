@@ -36,6 +36,7 @@ from typing import Any, Final
 from pydantic import BaseModel, Field, field_validator
 
 from adaptix_contracts.ai.connection import DataClassification
+from adaptix_contracts.events.bus_limits import BUS_CORRELATION_ID_MAX_LENGTH
 from adaptix_contracts.events.registry import is_registered
 
 #: Current operational-envelope contract version. Bump on any breaking change to
@@ -130,7 +131,9 @@ class OperationalEventEnvelope(BaseModel):
         ..., description="ISO-8601 UTC instant the change takes effect"
     )
     correlation_id: str = Field(
-        default_factory=_new_uuid, description="Trace id shared across related events"
+        default_factory=_new_uuid,
+        max_length=BUS_CORRELATION_ID_MAX_LENGTH,
+        description="Trace id shared across related events",
     )
     idempotency_key: str = Field(
         default_factory=_new_uuid, description="Stable key for dedupe on retry/replay"

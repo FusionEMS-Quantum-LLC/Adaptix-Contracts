@@ -12,7 +12,22 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.23.0] - 2026-09-20
+
 ### Added
+
+- **The envelope now enforces the width it owns
+  (LABOR-CORE-CORRELATION-ID-WIDTH-MISMATCH-001).**
+  `AdaptixEventEnvelope.correlation_id` and
+  `OperationalEventEnvelope.correlation_id` carry
+  `max_length=BUS_CORRELATION_ID_MAX_LENGTH`, read from the owner rather than
+  restated as a literal. Owning the number stopped three services disagreeing
+  about it; it did not stop a producer emitting a key none of them can store.
+  Until now the first thing to notice an over-length id was whichever consumer
+  was narrowest, at INSERT, after the event had already been published and
+  acknowledged -- the shape of the original CAD outage
+  (CAD-WORKFORCE-SYNC-CORRELATION-ID-TRUNCATION-001). The bound belongs where
+  the key is built.
 
 - **`adaptix_contracts.events.bus_limits.BUS_CORRELATION_ID_MAX_LENGTH = 300`
   (LABOR-CORE-CORRELATION-ID-WIDTH-MISMATCH-001).** The single owner of the
@@ -27,6 +42,21 @@ from the installed package metadata).
 
 ### Downstream impact
 
+- **This can now raise where it previously accepted.** A producer that builds a
+  `correlation_id` longer than 300 characters gets a `ValidationError` at
+  envelope construction instead of a successful publish and a later loss. No
+  current producer is close: the widest declared one is Labor at 300, its key
+  formula emits 130-132 characters today, and Core defaults to a 36-character
+  uuid4. Any producer that *was* exceeding 300 was already losing the id at the
+  narrowest consumer, so this surfaces an existing defect rather than creating
+  one -- but it surfaces it as an exception, so treat it as a behaviour change
+  and pin deliberately.
+- Truncating to fit is never the remedy. A shortened correlation id is worse
+  than a null: it still looks joinable and is not. Widen the consumer, or fix
+  the producer's key formula.
+- `idempotency_key` on the operational envelope is deliberately NOT bounded
+  here. No owner has been established for its width, and inventing one from
+  this card's evidence would repeat the mistake this card is about.
 - Additive; no existing symbol changed. Consumers that persist a bus
   `correlation_id` should declare the column from this constant and assert the
   equality in their own suite, so a future drift is a red build instead of a
