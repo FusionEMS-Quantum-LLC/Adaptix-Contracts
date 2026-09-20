@@ -7,6 +7,7 @@ rejects it, so a validator that stopped checking would turn a test red.
 
 from __future__ import annotations
 
+import enum
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
@@ -34,6 +35,7 @@ from adaptix_contracts.commercial import (
     UsageRateBasis,
     fixed_price,
 )
+from adaptix_contracts.commercial.offers import starting_price
 from adaptix_contracts.commercial.offer_validation import validate_offer_catalog
 from adaptix_contracts.commercial.offers import ApplicationOffer
 from adaptix_contracts.commercial.wi_launch_2026_1 import WI_LAUNCH_2026_1
@@ -41,6 +43,20 @@ from adaptix_contracts.commercial.wi_launch_2026_1 import WI_LAUNCH_2026_1
 CATALOG = WI_LAUNCH_2026_1
 STANDARD = CustomerSegment.STANDARD
 COMMUNITY = CustomerSegment.COMMUNITY
+REGIONAL = CustomerSegment.REGIONAL_ENTERPRISE
+
+
+class _FutureBasis(str, enum.Enum):
+    """A price basis ``offer_validation`` has never been taught.
+
+    Stands in for a fifth ``PriceBasis`` member added by a later change without
+    a decision about how the guards should treat it. It cannot be a real
+    ``PriceBasis`` member, because an Enum cannot be extended at runtime -- and
+    that is the point: what is under test is the guard's behaviour on a basis
+    absent from both of its classification sets.
+    """
+
+    TIERED = "tiered"
 
 
 def _with_offer(
@@ -613,3 +629,119 @@ def test_offer_kinds_cover_every_seeded_offer() -> None:
 
 def test_segment_price_type_is_exported() -> None:
     assert isinstance(CATALOG.offer("cad").price_for(STANDARD), SegmentPrice)
+
+
+class TestPriceBasisIsNeverSilentlySkipped:
+    """COMMERCIAL-CATALOG-PRICE-GUARD-NONFIXED-001.
+
+    The price guards used to read an amount off a price only when its basis was
+    ``FIXED`` and treat every other basis as "nothing to compare". That was not
+    latent: WI-LAUNCH-2026.1 already prices the Regional/Enterprise Platform
+    plan and the billing standalone ``STARTING_AT``, and the Platform plan feeds
+    all four guards -- so a regional standalone of $1 under a $2495 Platform
+    validated clean. These tests pin the three cases the module must now
+    distinguish: a published amount (FIXED), a published floor (STARTING_AT),
+    and a basis the guards have not been taught.
+    """
+
+    def test_fixed_standalone_is_checked_against_the_floor(self) -> None:
+        """The pre-existing FIXED behaviour must not regress."""
+        _rejects(
+            _with_offer(
+                _replace_price(
+                    CATALOG.offer("epcr"), STANDARD, standalone=fixed_price("1500")
+                )
+            ),
+            "below Platform",
+        )
+
+    def test_starting_at_standalone_is_checked_on_its_floor(self) -> None:
+        """A STARTING_AT price publishes a real number; the guard must read it.
+
+        Before the fix this exact catalog validated clean.
+        """
+        _rejects(
+            _with_offer(
+                _replace_price(
+                    CATALOG.offer("epcr"), REGIONAL, standalone=starting_price("1")
+                )
+            ),
+            "below Platform",
+        )
+
+    def test_starting_at_standalone_above_the_floor_is_accepted(self) -> None:
+        """Checked, not merely refused: a sound STARTING_AT price still passes."""
+        validate_offer_catalog(
+            _with_offer(
+                _replace_price(
+                    CATALOG.offer("epcr"), REGIONAL, standalone=starting_price("9995")
+                )
+            )
+        )
+
+    def test_the_regional_segment_is_actually_guarded_now(self) -> None:
+        """The Platform plan whose STARTING_AT basis disabled every regional guard."""
+        assert (
+            CATALOG.platform_plan(REGIONAL).monthly.basis is PriceBasis.STARTING_AT
+        ), "this regression test is meaningless if the regional Platform is FIXED"
+        _rejects(
+            _with_package(
+                replace(
+                    CATALOG.packages["community_ems"],
+                    prices=(PackagePrice(REGIONAL, monthly=starting_price("1")),),
+                )
+            ),
+            "does not exceed the Platform price",
+        )
+
+    def test_an_unhandled_basis_fails_loudly_instead_of_skipping(self) -> None:
+        """A future third basis must break the build, not reopen the hole.
+
+        ``_FutureBasis`` stands in for a ``PriceBasis`` member added later and
+        not classified in ``offer_validation``: it is a basis value the guards
+        have never been taught, which is exactly the condition that let
+        STARTING_AT fall through to ``None`` in the first place.
+        """
+        _rejects(
+            _with_offer(
+                _replace_price(
+                    CATALOG.offer("epcr"),
+                    REGIONAL,
+                    standalone=MonthlyPrice(_FutureBasis.TIERED),  # type: ignore[arg-type]
+                )
+            ),
+            "cannot evaluate",
+        )
+
+    def test_unpublished_bases_still_skip_deliberately(self) -> None:
+        """CUSTOM_QUOTE / NOT_OFFERED publish no number, so there is nothing to compare.
+
+        This is the one skip that is correct, and it must stay a skip rather
+        than becoming a refusal: the catalog uses CUSTOM_QUOTE precisely so it
+        does not have to invent a number.
+        """
+        assert (
+            CATALOG.offer("epcr").price_for(REGIONAL).add_on.basis
+            is PriceBasis.CUSTOM_QUOTE
+        )
+        validate_offer_catalog(CATALOG)
+
+    def test_netting_refuses_to_equate_prices_published_on_different_bases(
+        self,
+    ) -> None:
+        """add_on = standalone - platform is an identity, not an inequality.
+
+        A FIXED add-on cannot equal a FIXED standalone minus a Platform FLOOR,
+        so mixing bases is refused rather than compared on the numbers.
+        """
+        _rejects(
+            _with_offer(
+                _replace_price(
+                    CATALOG.offer("billing"),
+                    REGIONAL,
+                    standalone=fixed_price("5000"),
+                    add_on=fixed_price("2505"),
+                )
+            ),
+            "same basis",
+        )

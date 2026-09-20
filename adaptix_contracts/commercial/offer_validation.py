@@ -110,10 +110,54 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
-def _fixed_amount(price: MonthlyPrice) -> Decimal | None:
-    """The amount of a FIXED price; ``None`` for every other basis."""
+#: Bases that publish no number at all, so a price guard has nothing to compare.
+#: ``CUSTOM_QUOTE`` is sold with the price always quoted and ``NOT_OFFERED`` is
+#: not sold through that purchase path at all -- in both cases the catalog
+#: deliberately carries no amount ("rather than an invented number"), so
+#: skipping is the only honest behaviour and is NOT the defect below.
+_UNPUBLISHED_PRICE_BASES = frozenset({PriceBasis.CUSTOM_QUOTE, PriceBasis.NOT_OFFERED})
 
-    return price.amount if price.basis is PriceBasis.FIXED else None
+
+def _published_amount(where: str, label: str, price: MonthlyPrice) -> Decimal | None:
+    """The number this price publishes, or ``None`` when it publishes none.
+
+    This used to be ``_fixed_amount``, which returned the amount for
+    ``PriceBasis.FIXED`` and ``None`` for EVERY other basis
+    (COMMERCIAL-CATALOG-PRICE-GUARD-NONFIXED-001). Every caller then treated
+    ``None`` as "nothing to compare, return", so a ``STARTING_AT`` price -- which
+    publishes a real number a customer reads off the price sheet -- silently
+    disabled the guard it was passed to.
+
+    That was not a latent hole. WI-LAUNCH-2026.1 already prices the
+    Regional/Enterprise Platform plan at ``starting_price("2495")`` and the
+    billing offer's regional standalone at ``starting_price("2995")``, and the
+    Platform plan is an input to all four price guards -- so the floor, netting
+    and both package guards were dead for the whole REGIONAL_ENTERPRISE segment.
+    A regional standalone of $1 under a $2495 Platform validated clean.
+
+    A ``STARTING_AT`` amount is now compared on the floor it publishes, which is
+    the number the catalog actually advertises and the one an author mistypes.
+    The guards therefore assert publishable consistency -- the advertised entry
+    price is not below the sum of the advertised parts -- which is the only
+    claim a catalog of floors can support, and exactly what these guards exist
+    to check.
+
+    Any basis that is neither published nor explicitly unpublished RAISES. A
+    fifth ``PriceBasis`` added later cannot quietly reopen this by falling
+    through to ``None``: it fails the build of the first catalog that uses it,
+    and whoever adds it has to decide here which kind it is.
+    """
+
+    if price.basis in _PUBLISHED_PRICE_BASES:
+        return price.amount
+    if price.basis in _UNPUBLISHED_PRICE_BASES:
+        return None
+    raise ValueError(
+        f"{where}: {label} uses price basis {price.basis.value!r}, which the "
+        "catalog price guards cannot evaluate. Decide in offer_validation "
+        "whether it publishes a comparable amount or publishes none, and add "
+        "it to _PUBLISHED_PRICE_BASES or _UNPUBLISHED_PRICE_BASES."
+    )
 
 
 def _validate_identity(catalog: CommercialOfferCatalog) -> None:
@@ -350,18 +394,37 @@ def _validate_standalone_floor(
     price: SegmentPrice,
     catalog: CommercialOfferCatalog,
 ) -> None:
-    """A Platform-inclusive entry price never undercuts Platform plus its add-ons."""
+    """A Platform-inclusive entry price never undercuts Platform plus its add-ons.
+
+    The parts that DO publish an amount are summed even when a sibling part
+    publishes none. Every published amount is positive (``is_cent_amount``), so
+    dropping an unpriced part can only make the floor SMALLER -- the sum of the
+    known parts is still a floor the standalone must clear, and requiring it
+    can never reject a catalog that the full sum would have accepted.
+
+    Bailing out on the first unpriced part, as this did before, is what let a
+    regional standalone of $1 validate against a $2495 Platform: the offer's own
+    ``add_on`` is quoted rather than published, so one ``CUSTOM_QUOTE`` beside
+    the Platform price switched the entire comparison off.
+    """
 
     parts = [catalog.platform_plan(price.segment).monthly, price.add_on]
     parts.extend(
         catalog.offers[included].price_for(price.segment).add_on
         for included in sorted(offer.standalone_includes_offers)
     )
-    standalone = _fixed_amount(price.standalone)
-    amounts = [_fixed_amount(part) for part in parts]
-    if standalone is None or None in amounts:
+    standalone = _published_amount(where, "standalone", price.standalone)
+    if standalone is None:
         return
-    floor = sum((amount for amount in amounts if amount is not None), Decimal(0))
+    amounts = [
+        amount
+        for index, part in enumerate(parts)
+        if (amount := _published_amount(where, f"standalone floor part {index}", part))
+        is not None
+    ]
+    if not amounts:
+        return
+    floor = sum(amounts, Decimal(0))
     _require(
         standalone >= floor,
         f"{where}: standalone {standalone} is below Platform plus included add-ons {floor}",
@@ -373,11 +436,27 @@ def _validate_platform_netting(
 ) -> None:
     """A billing add-on is the entry price net of the Platform the customer pays."""
 
-    platform = _fixed_amount(catalog.platform_plan(price.segment).monthly)
-    standalone = _fixed_amount(price.standalone)
-    add_on = _fixed_amount(price.add_on)
+    platform_price = catalog.platform_plan(price.segment).monthly
+    platform = _published_amount(where, "Platform monthly", platform_price)
+    standalone = _published_amount(where, "standalone", price.standalone)
+    add_on = _published_amount(where, "add_on", price.add_on)
     if platform is None or standalone is None or add_on is None:
         return
+    # Netting is an exact arithmetic identity, not an inequality, so the three
+    # prices must describe the same KIND of number before subtracting them. A
+    # FIXED add-on cannot equal a FIXED standalone minus a Platform floor: the
+    # customer pays at least that floor, so the true add-on is at most the
+    # difference and equals it only at the floor. Mixing bases here would
+    # assert something the catalog does not claim, so it is refused rather than
+    # compared. (Every basis in play publishes an amount by this point; a
+    # basis that publishes none has already returned above.)
+    bases = {platform_price.basis, price.standalone.basis, price.add_on.basis}
+    _require(
+        len(bases) == 1,
+        f"{where}: Platform {platform_price.basis.value}, standalone "
+        f"{price.standalone.basis.value} and add-on {price.add_on.basis.value} "
+        "must be published on the same basis to be netted against each other",
+    )
     _require(
         add_on == standalone - platform,
         f"{where}: add-on {add_on} must equal standalone {standalone} minus "
@@ -479,15 +558,26 @@ def _validate_package_is_a_discount(
     price: PackagePrice,
     catalog: CommercialOfferCatalog,
 ) -> None:
-    """Packages are discounts: never above Platform plus their included add-ons."""
+    """Packages are discounts: never above Platform plus their included add-ons.
 
-    monthly = _fixed_amount(price.monthly)
+    Unlike the standalone floor above, this guard bounds the package price from
+    ABOVE, so every part must publish an amount. Summing only the known parts
+    would understate the total and reject a package that the full total would
+    have accepted -- a false failure, not a stricter check. The asymmetry is
+    deliberate: dropping a positive unknown is safe under ``>=`` and unsafe
+    under ``<=``.
+    """
+
+    monthly = _published_amount(where, "package monthly", price.monthly)
     parts = [catalog.platform_plan(price.segment).monthly]
     parts.extend(
         catalog.offers[offer_id].price_for(price.segment).add_on
         for offer_id in sorted(package.includes_offers)
     )
-    amounts = [_fixed_amount(part) for part in parts]
+    amounts = [
+        _published_amount(where, f"package part {index}", part)
+        for index, part in enumerate(parts)
+    ]
     if monthly is None or None in amounts:
         return
     total = sum((amount for amount in amounts if amount is not None), Decimal(0))
@@ -502,8 +592,10 @@ def _validate_package_exceeds_platform(
 ) -> None:
     """A package includes Platform and at least one application, so it costs more."""
 
-    monthly = _fixed_amount(price.monthly)
-    platform = _fixed_amount(catalog.platform_plan(price.segment).monthly)
+    monthly = _published_amount(where, "package monthly", price.monthly)
+    platform = _published_amount(
+        where, "Platform monthly", catalog.platform_plan(price.segment).monthly
+    )
     if monthly is None or platform is None:
         return
     _require(
