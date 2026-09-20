@@ -12,9 +12,11 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.21.0] - 2026-09-20
+
 ### Added
 
-- **Platform migration contracts (CORTEX-MIG-CONTRACT-001).** New modules
+- **Platform migration contracts (CORTEX-MIG-CONTRACT-001 / #329).** New modules
   sit beside the existing billing-vendor lifecycle in
   `migration_contracts.py` (still schema 2.9.0, still the only
   `MigrationState` machine). They add `MigrationRun` / `MigrationSource` /
@@ -26,6 +28,24 @@ from the installed package metadata).
   side-effect suppression. Existing event shapes stay unpublished in
   `events.registry` until a live producer exists. No Billing, Imports,
   Cortex, Gateway, or Web files are changed here.
+
+- **Labor is the named producer of shift create and cancel facts (#330).**
+  CAD already listens for `workforce.shift.created` and
+  `workforce.shift.cancelled`. Labor is the service that writes those
+  facts. Contracts now names Labor as the producer and registers both
+  facts.
+
+### Changed
+
+- **anyio 4.13.0 → 4.14.2** on this repository's lock (Dependabot security
+  bump already on main).
+
+### Downstream impact
+
+- Additive. Tag `v5.20.0` remains `50883b93` (COMMERCIAL-CATALOG-003) and
+  is not moved. This release is the first tag that includes #329.
+- A consumer can pin 5.21.0 only after two things exist: the `v5.21.0`
+  release tag, and a validation engine approving this revision.
 
 ### Fixed
 

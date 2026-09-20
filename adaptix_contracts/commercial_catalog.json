@@ -1910,7 +1910,7 @@
     "not_large_regional_shared_service",
     "not_large_for_profit_transport_enterprise"
   ],
-  "contracts_version": "5.20.0",
+  "contracts_version": "5.21.0",
   "discount_stacking_modes": [
     "additive"
   ],
