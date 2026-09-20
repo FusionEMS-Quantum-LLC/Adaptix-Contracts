@@ -34,7 +34,9 @@ class MigrationExceptionAction(str, Enum):
     BLOCK_GROUP = "block_group"
 
 
-EXCEPTION_CATEGORY_ACTIONS: dict[MigrationExceptionCategory, MigrationExceptionAction] = {
+EXCEPTION_CATEGORY_ACTIONS: dict[
+    MigrationExceptionCategory, MigrationExceptionAction
+] = {
     MigrationExceptionCategory.SOURCE_FIELD_MISSING: MigrationExceptionAction.HUMAN_REVIEW,
     MigrationExceptionCategory.MAPPING_MISMATCH: MigrationExceptionAction.HUMAN_REVIEW,
     MigrationExceptionCategory.CODE_CROSSWALK_MISSING: MigrationExceptionAction.BLOCK_RECORD,

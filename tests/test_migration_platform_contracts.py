@@ -123,7 +123,9 @@ def test_confidence_none_is_absent_not_low() -> None:
 
 def test_exception_table_covers_every_existing_category() -> None:
     assert set(EXCEPTION_CATEGORY_ACTIONS) == set(MigrationExceptionCategory)
-    assert action_for_category("not-a-category") is MigrationExceptionAction.HUMAN_REVIEW
+    assert (
+        action_for_category("not-a-category") is MigrationExceptionAction.HUMAN_REVIEW
+    )
     assert (
         action_for_category(MigrationExceptionCategory.FINANCIAL_IMBALANCE)
         is MigrationExceptionAction.BLOCK_CUTOVER

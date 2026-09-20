@@ -48,7 +48,9 @@ class MappingConfidenceBand(str, Enum):
     HIGH = "high"
 
 
-def confidence_band_for(confidence: MigrationConfidence | float | None) -> MappingConfidenceBand:
+def confidence_band_for(
+    confidence: MigrationConfidence | float | None,
+) -> MappingConfidenceBand:
     """Map a 0-1 score onto a band. ``None`` is ``ABSENT``, never ``LOW``."""
 
     if confidence is None:

@@ -73,13 +73,13 @@ def evaluate_cutover_readiness(
     }:
         reasons.append("reconciliation_not_balanced")
     blocking = [
-        row
-        for row in exceptions
-        if row.blocking or action_blocks_cutover(row.action)
+        row for row in exceptions if row.blocking or action_blocks_cutover(row.action)
     ]
     if blocking:
         reasons.append("blocking_exceptions")
-    if any(row.action is MigrationExceptionAction.BLOCK_MIGRATION for row in exceptions):
+    if any(
+        row.action is MigrationExceptionAction.BLOCK_MIGRATION for row in exceptions
+    ):
         reasons.append("migration_blocked")
     return CutoverReadiness(
         tenant_id=tenant_id,

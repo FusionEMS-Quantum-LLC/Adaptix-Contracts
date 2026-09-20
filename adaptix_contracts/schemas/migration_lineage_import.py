@@ -131,7 +131,9 @@ class DomainMigrationImportRequest(BaseModel):
         present = set(self.suppress_side_effects)
         missing = required - present
         if missing:
-            raise ValueError("historical import missing required side-effect suppression")
+            raise ValueError(
+                "historical import missing required side-effect suppression"
+            )
         return self
 
 
