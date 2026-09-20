@@ -105,6 +105,12 @@ class SideEffectName(str, Enum):
 DEFAULT_SIDE_EFFECT_SUPPRESSION: frozenset[SideEffectName] = frozenset(SideEffectName)
 
 
+def default_side_effect_suppression() -> list[SideEffectName]:
+    """Return a mutable copy of the mandatory historical-import suppression set."""
+
+    return list(DEFAULT_SIDE_EFFECT_SUPPRESSION)
+
+
 class DomainMigrationImportRequest(BaseModel):
     """Envelope for POST /api/v1/<domain>/migration/import."""
 
@@ -114,7 +120,7 @@ class DomainMigrationImportRequest(BaseModel):
     entity: str
     provenance: HistoricalRecordProvenance
     suppress_side_effects: list[SideEffectName] = Field(
-        default_factory=lambda: list(DEFAULT_SIDE_EFFECT_SUPPRESSION)
+        default_factory=default_side_effect_suppression
     )
     dry_run: bool = True
     payload_hash_sha256: Optional[str] = Field(
