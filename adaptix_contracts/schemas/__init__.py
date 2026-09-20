@@ -875,6 +875,49 @@ from .migration_contracts import (
     MigrationRolledBack,
 )
 
+# Platform migration authority (additive; does not replace billing-vendor lifecycle)
+from .migration_platform_run import (
+    PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION,
+    PLATFORM_ENTITY_CATALOG,
+    MigrationDomain,
+    PlatformEntity,
+    catalog_entity,
+    MigrationRun,
+    MigrationSource,
+    MigrationEntityPlan,
+    MigrationPlan,
+)
+from .migration_mapping_authority import (
+    DeterministicFieldClass,
+    ALWAYS_DETERMINISTIC_FIELD_CLASSES,
+    MappingConfidenceBand,
+    confidence_band_for,
+    requires_human_review,
+    MappingDecision,
+)
+from .migration_exception_actions import (
+    MigrationExceptionAction,
+    EXCEPTION_CATEGORY_ACTIONS,
+    action_for_category,
+    action_blocks_cutover,
+    MigrationExceptionRecord,
+)
+from .migration_cutover_authority import (
+    CutoverReadiness,
+    evaluate_cutover_readiness,
+    CutoverApproval,
+)
+from .migration_lineage_import import (
+    MigrationLineage,
+    RollbackPlan,
+    MigrationEvidence,
+    HistoricalRecordProvenance,
+    SideEffectName,
+    DEFAULT_SIDE_EFFECT_SUPPRESSION,
+    DomainMigrationImportRequest,
+    DomainMigrationImportResponse,
+)
+
 # NEMSIS
 from .nemsis_exports import (
     ExportLifecycleStatus,
@@ -1860,6 +1903,38 @@ __all__ = [
     "OpenARActivated",
     "MigrationCompleted",
     "MigrationRolledBack",
+    # Platform migration authority
+    "PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION",
+    "PLATFORM_ENTITY_CATALOG",
+    "MigrationDomain",
+    "PlatformEntity",
+    "catalog_entity",
+    "MigrationRun",
+    "MigrationSource",
+    "MigrationEntityPlan",
+    "MigrationPlan",
+    "DeterministicFieldClass",
+    "ALWAYS_DETERMINISTIC_FIELD_CLASSES",
+    "MappingConfidenceBand",
+    "confidence_band_for",
+    "requires_human_review",
+    "MappingDecision",
+    "MigrationExceptionAction",
+    "EXCEPTION_CATEGORY_ACTIONS",
+    "action_for_category",
+    "action_blocks_cutover",
+    "MigrationExceptionRecord",
+    "CutoverReadiness",
+    "evaluate_cutover_readiness",
+    "CutoverApproval",
+    "MigrationLineage",
+    "RollbackPlan",
+    "MigrationEvidence",
+    "HistoricalRecordProvenance",
+    "SideEffectName",
+    "DEFAULT_SIDE_EFFECT_SUPPRESSION",
+    "DomainMigrationImportRequest",
+    "DomainMigrationImportResponse",
     # NEMSIS
     "ExportLifecycleStatus",
     "ExportFailureType",
