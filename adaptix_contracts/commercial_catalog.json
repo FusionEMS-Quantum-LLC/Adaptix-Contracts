@@ -3814,7 +3814,7 @@
     "not_large_regional_shared_service",
     "not_large_for_profit_transport_enterprise"
   ],
-  "contracts_version": "5.22.0",
+  "contracts_version": "5.23.0",
   "current_catalog_version": "WI-LAUNCH-2026.2",
   "discount_stacking_modes": [
     "additive"
