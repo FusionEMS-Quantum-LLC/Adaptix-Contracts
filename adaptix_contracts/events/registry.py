@@ -93,6 +93,55 @@ FLEET_UNIT_STATUS_CHANGED: Final[str] = "fleet.unit.status_changed"
 FLEET_VEHICLE_OUT_OF_SERVICE: Final[str] = "fleet.vehicle.out_of_service"
 
 # ---------------------------------------------------------------------------
+# CAD case/dispatch events (producer: Adaptix-CAD-Service, slug ``cad``)
+# ---------------------------------------------------------------------------
+# Same outbox-relay pattern as the CAD block already in ALL_EVENTS: each is
+# staged as a ``CadOutboxEvent`` row (event_type is a caller-supplied
+# parameter, so the literal appears one hop up at the call site) and then
+# POSTed to Core's cross-service ingest by the generic relay
+# ``cad_app/outbox_relay.py`` (``OutboxRelay``, source_domain="cad"), which is
+# what lets a Core-polling consumer receive them. Producer citations,
+# Adaptix-CAD-Service origin/main ``cdec4fdc177f00387870399d14bac1a905752ca2``,
+# verified 2026-09-21:
+#   cad_app/api/case_router.py:197  cad.case.created
+#     (``publish_outbox(event_type="cad.case.created")``)
+#   cad_app/services/auto_billing_handoff_service.py:60  cad.dispatch.billing_handoff_ready
+#     (``BILLING_HANDOFF_OUTBOX_EVENT`` constant, published via
+#     ``publish_outbox`` at auto_billing_handoff_service.py:398)
+# See tests/test_event_producer_registry_drift.py ``INDIRECT_ENVELOPE_PRODUCERS``.
+CAD_CASE_CREATED: Final[str] = "cad.case.created"
+CAD_DISPATCH_BILLING_HANDOFF_READY: Final[str] = "cad.dispatch.billing_handoff_ready"
+
+# ---------------------------------------------------------------------------
+# Air (HEMS) mission-lifecycle events (producer: Adaptix-Air-Service, slug ``air``)
+# ---------------------------------------------------------------------------
+# Every mission transition other domains act on is staged as an
+# ``AirOutboxEvent`` row (``air_app/services/__init__.py``
+# ``add_outbox_event(event_type=...)``) and then POSTed to Core's cross-service
+# ingest (``{CORE_EVENT_BUS_URL}/api/v1/events/internal/receive``,
+# source_domain="air") by the durable relay ``air_app/event_relay.py``
+# (``_publish_to_core``). The literal appears one hop up: at the
+# ``add_outbox_event`` call for ``completed``/``hold`` and in the
+# ``_TRANSITION_EVENT_TYPES`` map for the rest. Producer citations,
+# Adaptix-Air-Service origin/main ``b19f97b5c817e50d114847d8455e4a34ef91e78c``,
+# verified 2026-09-21 (all in air_app/services/__init__.py):
+#   :266  air.mission.completed        :370  air.mission.hold
+#   :536  air.mission.accepted         :537  air.mission.declined
+#   :538  air.mission.launched         :540  air.mission.arrived
+#   :541  air.mission.cancelled        :542  air.mission.aborted
+#   :543  air.mission.ground_fallback
+# See tests/test_event_producer_registry_drift.py ``INDIRECT_ENVELOPE_PRODUCERS``.
+AIR_MISSION_ACCEPTED: Final[str] = "air.mission.accepted"
+AIR_MISSION_DECLINED: Final[str] = "air.mission.declined"
+AIR_MISSION_LAUNCHED: Final[str] = "air.mission.launched"
+AIR_MISSION_ARRIVED: Final[str] = "air.mission.arrived"
+AIR_MISSION_CANCELLED: Final[str] = "air.mission.cancelled"
+AIR_MISSION_ABORTED: Final[str] = "air.mission.aborted"
+AIR_MISSION_GROUND_FALLBACK: Final[str] = "air.mission.ground_fallback"
+AIR_MISSION_HOLD: Final[str] = "air.mission.hold"
+AIR_MISSION_COMPLETED: Final[str] = "air.mission.completed"
+
+# ---------------------------------------------------------------------------
 # Billing domain events (producer: Adaptix-Billing-Service, slug ``billing``)
 # ---------------------------------------------------------------------------
 # Every constant below is emitted TODAY through the shared contract envelope
@@ -201,6 +250,20 @@ EPCR_CHART_BILLING_HANDOFF: Final[str] = "epcr.chart.billing_handoff"
 EPCR_CHART_HOSPITAL_HANDOFF: Final[str] = "epcr.chart.hospital_handoff"
 EPCR_NEMSIS_SUBMIT_FAILED: Final[str] = "epcr.nemsis_submit.failed"
 EPCR_NEMSIS_SUBMIT_SUCCEEDED: Final[str] = "epcr.nemsis_submit.succeeded"
+
+# ``epcr.chart.patient_identified`` is written to the same ``ChartEventOutbox``
+# table and republished onto the shared envelope by the generic relay
+# ``epcr_app/outbox_worker.py`` (``source_service="epcr"``), exactly like the
+# outbox-relayed events above. It fires when a chart's patient identity is
+# resolved so Family-Bridge activation can react. Producer citation,
+# Adaptix-EPCR-Service origin/main ``9a6cdd750fd49ab587bcbd0ca809fc4b64f52570``,
+# verified 2026-09-21:
+#   epcr_app/chart_service.py:376  epcr.chart.patient_identified
+#     (``event_type=PATIENT_IDENTIFIED_EVENT_TYPE``; constant at
+#     chart_service.py:321). Consumed by Communications (family-bridge
+#     activation). See tests/test_event_producer_registry_drift.py
+#     ``INDIRECT_ENVELOPE_PRODUCERS``.
+EPCR_CHART_PATIENT_IDENTIFIED: Final[str] = "epcr.chart.patient_identified"
 
 # CareGraph / CPAE / VAS are ePCR-owned clinical sub-domains. Their events take
 # the same ``ChartEventOutbox`` -> ``outbox_worker.py:99`` relay, so they too
@@ -449,6 +512,20 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     CAD_INTAKE_UPDATED: {"version": "1.0", "source_service": "cad"},
     # cad_app/services/intake_repository.py:539
     CAD_INTAKE_CANCELLED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/api/case_router.py:197 (CadOutboxEvent relayed by cad_app/outbox_relay.py)
+    CAD_CASE_CREATED: {"version": "1.0", "source_service": "cad"},
+    # cad_app/services/auto_billing_handoff_service.py:60 (relayed by cad_app/outbox_relay.py)
+    CAD_DISPATCH_BILLING_HANDOFF_READY: {"version": "1.0", "source_service": "cad"},
+    # air_app/services/__init__.py (AirOutboxEvent relayed by air_app/event_relay.py)
+    AIR_MISSION_ACCEPTED: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_DECLINED: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_LAUNCHED: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_ARRIVED: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_CANCELLED: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_ABORTED: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_GROUND_FALLBACK: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_HOLD: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_COMPLETED: {"version": "1.0", "source_service": "air"},
     BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_STATUS_CHANGED: {"version": "1.0", "source_service": "billing"},
@@ -476,6 +553,8 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     EPCR_CHART_HOSPITAL_HANDOFF: {"version": "1.0", "source_service": "epcr"},
     EPCR_NEMSIS_SUBMIT_FAILED: {"version": "1.0", "source_service": "epcr"},
     EPCR_NEMSIS_SUBMIT_SUCCEEDED: {"version": "1.0", "source_service": "epcr"},
+    # epcr_app/chart_service.py:376 (ChartEventOutbox relayed by epcr_app/outbox_worker.py)
+    EPCR_CHART_PATIENT_IDENTIFIED: {"version": "1.0", "source_service": "epcr"},
     EPCR_VISION_CAPTURE_CREATED: {"version": "1.0", "source_service": "epcr"},
     EPCR_VISION_CAPTURE_ACCEPTED: {"version": "1.0", "source_service": "epcr"},
     EPCR_VISION_VITAL_SIGNS_ACCEPTED: {"version": "1.0", "source_service": "epcr"},

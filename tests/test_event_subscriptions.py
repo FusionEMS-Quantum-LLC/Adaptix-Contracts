@@ -173,7 +173,7 @@ def test_subscription_edges_carry_the_registered_producer_or_none() -> None:
     expected = {
         SubscriptionEdge("epcr", "epcr.chart.finalized", "billing-service", "billing"),
         SubscriptionEdge("epcr", "epcr.chart.finalized", "hospital-service", None),
-        SubscriptionEdge(None, "cad.case.created", "transport-service", "transport"),
+        SubscriptionEdge("cad", "cad.case.created", "transport-service", "transport"),
         SubscriptionEdge(
             "billing", "billing.claim.status_updated", "epcr-service", "epcr"
         ),
@@ -241,8 +241,8 @@ def test_validation_fails_when_an_unmapped_repository_has_a_service() -> None:
 
 
 def test_validation_fails_when_an_unregistered_topic_becomes_registered() -> None:
-    registered = frozenset(ALL_EVENTS) | {"cad.case.created"}
-    message = "'cad.case.created' is registered in ALL_EVENTS; remove it"
+    registered = frozenset(ALL_EVENTS) | {"workforce.ot.filled"}
+    message = "'workforce.ot.filled' is registered in ALL_EVENTS; remove it"
     with pytest.raises(EventSubscriptionDeclarationError, match=re.escape(message)):
         _validate(EVENT_BUS_CONSUMER_DECLARATIONS, registered_topics=registered)
 

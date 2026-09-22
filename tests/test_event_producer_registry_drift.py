@@ -442,6 +442,78 @@ INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
         "labor",
         "Adaptix-Labor-Service/backend/labor_app/shift_outbox.py:203",
     ),
+    # --- Adaptix-CAD-Service, via CadOutboxEvent -> cad_app/outbox_relay.py
+    # (same generic relay as the cad.* rows above; event_type is a
+    # caller-supplied parameter). Verified 2026-09-21 at CAD origin/main
+    # cdec4fdc177f00387870399d14bac1a905752ca2. ---
+    (
+        "cad.case.created",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/api/case_router.py:197",
+    ),
+    (
+        "cad.dispatch.billing_handoff_ready",
+        "cad",
+        "Adaptix-CAD-Service/backend/cad_app/services/auto_billing_handoff_service.py:60",
+    ),
+    # --- Adaptix-Air-Service, via AirOutboxEvent -> air_app/event_relay.py
+    # (_publish_to_core POSTs to Core, source_domain="air"). The literal is one
+    # hop up: the add_outbox_event call for completed/hold, the
+    # _TRANSITION_EVENT_TYPES map for the rest. Verified 2026-09-21 at Air
+    # origin/main b19f97b5c817e50d114847d8455e4a34ef91e78c. ---
+    (
+        "air.mission.accepted",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:536",
+    ),
+    (
+        "air.mission.declined",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:537",
+    ),
+    (
+        "air.mission.launched",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:538",
+    ),
+    (
+        "air.mission.arrived",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:540",
+    ),
+    (
+        "air.mission.cancelled",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:541",
+    ),
+    (
+        "air.mission.aborted",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:542",
+    ),
+    (
+        "air.mission.ground_fallback",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:543",
+    ),
+    (
+        "air.mission.hold",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:370",
+    ),
+    (
+        "air.mission.completed",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:266",
+    ),
+    # --- Adaptix-EPCR-Service, via ChartEventOutbox -> epcr_app/outbox_worker.py
+    # generic relay (same pattern as the epcr.chart.* rows above). Verified
+    # 2026-09-21 at EPCR origin/main 9a6cdd750fd49ab587bcbd0ca809fc4b64f52570. ---
+    (
+        "epcr.chart.patient_identified",
+        "epcr",
+        "Adaptix-EPCR-Service/backend/epcr_app/chart_service.py:376",
+    ),
 )
 
 _EXPECTED_PRODUCER_SERVICE = {
