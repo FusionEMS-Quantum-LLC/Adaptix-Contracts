@@ -445,40 +445,70 @@ _NOT_IN_REGISTRY: Final[str] = (
     "producer for it."
 )
 
+# Reasons a subscribed topic stays unregistered even though a producer-shaped
+# emitter was found in the workspace. Registering any of these would either
+# record a producer that does not reach the Core operational backbone this
+# registry governs, or stamp a source_service that is not a service-registry
+# slug. Verified 2026-09-21.
+_CREWLINK_OUTBOX_UNRELAYED: Final[str] = (
+    "Adaptix-Crew-Service stages this on a CrewlinkOutboxEvent row "
+    "(crewlink_app/services/service_impl.py -> crewlink_app/outbox.py "
+    "publish_outbox), but nothing drains that outbox to Core: the service "
+    "starts only a RosterPoller and its sole outbound event path is the "
+    "SignalCore SQS queue (intelligence_events.py), so the topic never reaches "
+    "the Core event bus these consumers poll. No producer is recorded until a "
+    "relay to Core exists."
+)
+_CORE_EVENTBUS_NOT_BACKBONE: Final[str] = (
+    "Produced by Adaptix-Core-Service (core_app/flow_guard/flow_guard_service.py "
+    "-> core_app/events/bus.py EventBus.publish), which is Core's fire-and-forget "
+    "push transport to downstream /internal/events, not the outbox-relay "
+    "operational backbone this registry governs. No Core-EventBus event type is "
+    "registered in ALL_EVENTS; this stays consistent with that boundary."
+)
+_COMMS_WAVE4_IN_PROCESS: Final[str] = (
+    "Produced by Adaptix-Communications-Service "
+    "(communications_app/services/wave4_events.py, wave4 event_integration bus), "
+    "whose relay dispatches to in-process subscribers; no relay forwards it to "
+    "the Core operational backbone, so no producer is recorded here."
+)
+_HOSPITAL_NO_SLUG: Final[str] = (
+    "Produced by Adaptix-Hospital-Service (hospital_app/api/incoming.py), which "
+    "has no ServiceDefinition in schemas.service_registry.ALL_SERVICES, so there "
+    "is no direct source_service slug to stamp. Registering it would fail the "
+    "direct-slug rule in events/registry.py."
+)
+_WORKFORCE_NO_PRODUCER: Final[str] = (
+    "No service in the workspace emits this string; Adaptix-CAD-Service only "
+    "consumes it (cad_app/workforce_event_consumer.py). " + _NOT_IN_REGISTRY
+)
+
 #: Topics a declared consumer subscribes to that ``ALL_EVENTS`` does not
 #: register, each with the reason. Registering one means proving its producer
 #: (``events/registry.py`` cites a producer file and line for its entries); once
 #: a topic is registered the tests require its entry here to be removed.
 UNREGISTERED_SUBSCRIBED_TOPICS: Final[Mapping[str, str]] = MappingProxyType(
     {
-        "air.mission.aborted": _NOT_IN_REGISTRY,
-        "air.mission.accepted": _NOT_IN_REGISTRY,
-        "air.mission.arrived": _NOT_IN_REGISTRY,
-        "air.mission.cancelled": _NOT_IN_REGISTRY,
-        "air.mission.completed": _NOT_IN_REGISTRY,
-        "air.mission.declined": _NOT_IN_REGISTRY,
-        "air.mission.ground_fallback": _NOT_IN_REGISTRY,
-        "air.mission.hold": _NOT_IN_REGISTRY,
-        "air.mission.launched": _NOT_IN_REGISTRY,
-        "cad.case.created": _NOT_IN_REGISTRY,
-        "cad.dispatch.billing_handoff_ready": _NOT_IN_REGISTRY,
-        "call.received": _NOT_IN_REGISTRY,
-        "crewlink.cad.page_escalated": _NOT_IN_REGISTRY,
-        "crewlink.page.acknowledged": _NOT_IN_REGISTRY,
-        "epcr.chart.patient_identified": _NOT_IN_REGISTRY,
+        # air.mission.*, cad.case.created, cad.dispatch.billing_handoff_ready and
+        # epcr.chart.patient_identified were registered in events/registry.py once
+        # their outbox-relay-to-Core producers were proven, so they are no longer
+        # listed here (the tests require a registered topic's entry to be removed).
+        "call.received": _COMMS_WAVE4_IN_PROCESS,
+        "crewlink.cad.page_escalated": _CREWLINK_OUTBOX_UNRELAYED,
+        "crewlink.page.acknowledged": _CREWLINK_OUTBOX_UNRELAYED,
         "epcr.completed": (
             "Not a key of events.registry.ALL_EVENTS, so this contract records no "
             "producer for it. Hospital routes it to the same handler as "
-            "epcr.chart.finalized."
+            "epcr.chart.finalized; no ePCR code emits this string."
         ),
-        "flow_guard.incident_created": _NOT_IN_REGISTRY,
-        "hospital.incoming.acknowledged": _NOT_IN_REGISTRY,
-        "hospital.incoming.diverted": _NOT_IN_REGISTRY,
-        "hospital.incoming_patient.arrived": _NOT_IN_REGISTRY,
-        "hospital.incoming_patient.cancelled": _NOT_IN_REGISTRY,
-        "workforce.ot.filled": _NOT_IN_REGISTRY,
-        "workforce.schedule.change": _NOT_IN_REGISTRY,
-        "workforce.vacancy.created": _NOT_IN_REGISTRY,
+        "flow_guard.incident_created": _CORE_EVENTBUS_NOT_BACKBONE,
+        "hospital.incoming.acknowledged": _HOSPITAL_NO_SLUG,
+        "hospital.incoming.diverted": _HOSPITAL_NO_SLUG,
+        "hospital.incoming_patient.arrived": _HOSPITAL_NO_SLUG,
+        "hospital.incoming_patient.cancelled": _HOSPITAL_NO_SLUG,
+        "workforce.ot.filled": _WORKFORCE_NO_PRODUCER,
+        "workforce.schedule.change": _WORKFORCE_NO_PRODUCER,
+        "workforce.vacancy.created": _WORKFORCE_NO_PRODUCER,
     }
 )
 
