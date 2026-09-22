@@ -13,6 +13,32 @@ validation:
   mode: on-demand
   authority: repo-native
   command: "bash scripts/ci/verify-toolchain.sh"
+  # GOV-GAP-09. This repository now carries the canonical
+  # .github/workflows/repo-validation.yml (the adaptix/repo-validation required
+  # check) and the retired .github/workflows/validate.yml is gone. The engine
+  # (FusionEMS-Quantum-LLC/adaptix-ops/validation) reads the flat per-gate keys
+  # below and runs each through run_declared_or, REPLACING its archetype
+  # default. They reproduce exactly what scripts/ci/verify-toolchain.sh ran
+  # under the retired carrier, so retiring validate.yml drops no coverage:
+  #   * lint / unit are declared EQUAL to the engine contract-library defaults
+  #     (validation/profiles/defaults.py _python_gates), taking per-gate
+  #     ownership rather than running an unnamed default.
+  #   * typecheck runs the plugin mypy AND the plugin-less consumer view
+  #     (mypy-consumer-view.ini) that verify-toolchain.sh added -- the check a
+  #     plugin-enabled `mypy .` is structurally unable to perform.
+  #   * scan is the repo-scanners hook. It maps to the lint gate, which the
+  #     planner selects broadly and which push / merge_group run unconditionally
+  #     (they carry no plan), so it runs on every gating path. It carries the
+  #     two remaining unconditional checks: `uv lock --check` (a stale lock
+  #     passes `uv sync --frozen`) and validate_contracts.py, the release
+  #     evidence DEPRECATION_POLICY.md requires.
+  # ruff format, adx laws and the toolchain-policy inventory run as engine
+  # defaults; security / build map to no ADAPTIX_CMD_* for Python, so declaring
+  # them would report nothing.
+  lint: "uv run ruff check --output-format=concise ."
+  typecheck: "uv run mypy . && uv run mypy --config-file mypy-consumer-view.ini adaptix_contracts"
+  unit: 'uv run pytest --junitxml="$ADAPTIX_FINDINGS_DIR/pytest-junit.xml"'
+  scan: "uv lock --check && uv run python validate_contracts.py"
 
 deployment:
   deployable: false

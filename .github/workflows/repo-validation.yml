@@ -1,0 +1,294 @@
+name: repo-validation
+
+# THE ONLY VALIDATION WORKFLOW A REPOSITORY MAY CARRY.
+#
+# ONE template, two spellings of its engine reference, in
+# FusionEMS-Quantum-LLC/adaptix-ops:
+#   validation/carrier-workflow-parallel.yml  the engine commit left as a
+#                                             placeholder, for adoption tooling;
+#   validation/carrier-workflow.yml           the same text with
+#                                             config/platform-standard.yaml
+#                                             validationEngine.canonicalCommit
+#                                             written in -- what every
+#                                             repository carries.
+# npm test proves the second is exactly the first with that substitution.
+#
+# There is no single-job shape any more (VAL-NO-60-REQUIRED-PATH-001). That
+# carrier WAS the required check, so its one job had to hold the whole plan and
+# carried a 60-minute ceiling; the owner's final directive bounds the required
+# path at plan 2 + the slowest matrix entry (10 at most) + aggregate 1, 15
+# absolute, and a repository that cannot fit is fixed by fanning out, never by a
+# longer ceiling.
+#
+# The push trigger is deliberate. With `pull_request` alone, main was never
+# validated: a defect could land, sit red on main unnoticed, and surface on the
+# next unrelated pull request, which inherited the blame. Measured case --
+# Adaptix-EPCR-Service PR #438 failed on a broken Alembic migration chain that
+# landed on main on 2026-08-19 and had nothing to do with that PR's change.
+#
+# WHY THE FAN-OUT LIVES HERE AND NOT IN A REUSABLE WORKFLOW
+#
+# The first attempt put plan/gates/aggregate in a reusable workflow inside
+# adaptix-ops, which checked the engine out with actions/checkout. The
+# Adaptix-Web-App canary proved that cannot work:
+#
+#   fatal: repository 'https://github.com/FusionEMS-Quantum-LLC/adaptix-ops/'
+#   not found
+#
+# A reusable workflow executes with the CALLER's GITHUB_TOKEN, which has no
+# access to a different private repository. An ACTION reference does work --
+# GitHub's runtime resolves it with its own credentials, which is why 107
+# carriers already call `adaptix-ops/validation@<sha>` with no token at all.
+#
+# `uses:` cannot take an expression, which is what pushed the first design into
+# a reusable workflow. A carrier does not need one: it can write the SHA
+# literally, exactly as every carrier already does.
+#
+# So this file has three jobs and still holds NO validation logic. It does not
+# know what a gate is, which gates exist, or whether this repository may fan
+# out; the engine decides all of that and hands back a matrix. The contract was
+# always "identical in every repository and free of validation logic" -- never
+# "one job".
+#
+# THE SHA APPEARS FOUR TIMES AND ALL FOUR MUST MATCH. Two are `uses:` lines
+# against the same immutable engine commit; the other two pass that same commit
+# in as `engine-sha`, which the planner seals into the capsule and each worker
+# compares against its own.
+#
+# The `uses:` pins are what GitHub resolves; the `engine-sha` inputs are what
+# make a mismatch VISIBLE. Before the capsule, a carrier that advanced one pin
+# and not the other ran a planner and a phase runner from different revisions
+# and nothing could tell -- both jobs went green, and the plan had simply come
+# from other code than the phases that executed it. Now a worker's engine-sha
+# must equal the one sealed into the capsule it was handed, so that divergence
+# fails at the first step instead of passing unnoticed.
+
+on:
+  pull_request:
+  # A merge queue validates a SYNTHETIC merge-group ref: the target branch plus
+  # every queued change. A workflow producing a required check must subscribe to
+  # this event, or the check never reports against that ref and the queue does
+  # not fail -- it STALLS until the entry times out and is dequeued.
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Deliberately false for merge_group. Cancelling a merge-group run reports its
+  # required check as cancelled, which dequeues the pull request.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # WHAT MUST RUN, and whether it can be split. Cheap by construction: the
+  # planner, the execution graph and the matrix decision are pure standard
+  # library, so no engine install happens here.
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    # The directive's planner budget: <30s target, 2 minutes hard. Measured on
+    # the four parallel carriers (2026-09-14 fleet survey): plan p95 24s.
+    timeout-minutes: 2
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      fan_out: ${{ steps.plan.outputs.fan_out }}
+      gate_count: ${{ steps.plan.outputs.gate_count }}
+      # The sealed capsule and how it travels. Every gate job materializes and
+      # verifies THIS capsule before spending a runner on anything.
+      capsule_mode: ${{ steps.plan.outputs.capsule_mode }}
+      capsule_payload: ${{ steps.plan.outputs.capsule_payload }}
+      capsule_artifact: ${{ steps.plan.outputs.capsule_artifact }}
+      capsule_digest: ${{ steps.plan.outputs.capsule_digest }}
+    steps:
+      - name: Checkout repository under validation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+          # The planner takes ONE exact diff against the pull request's base, so
+          # that commit has to be reachable. The default shallow fetch has only
+          # the tested revision, and a base it cannot read escalates the whole
+          # plan to every gate -- safe, but it silently discards the narrowing
+          # this packet exists to make trustworthy.
+          fetch-depth: 0
+      - name: Plan
+        id: plan
+        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation/plan@824f61692fb4c5bfedbbde6866c008e5a5c3b17c
+        with:
+          repository: ${{ github.repository }}
+          target-path: repo
+          # THE SAME LITERAL as both `uses:` lines. The planner seals it into the
+          # capsule and every worker compares it against the value ITS `uses:`
+          # line carried, so advancing one pin and not the other becomes a hard
+          # failure rather than a planner and a phase runner from two revisions.
+          engine-sha: 824f61692fb4c5bfedbbde6866c008e5a5c3b17c  # pragma: allowlist secret
+
+  # ONE execution job, ALWAYS run. Whether validation is split is a property of
+  # the MATRIX, never of a job condition: a job-level `if:` lets a required job
+  # be SKIPPED, and a skipped job is not a failed one. The matrix always carries
+  # at least one entry, and an empty `gate` means "the whole plan".
+  gates:
+    name: ${{ matrix.label }}
+    needs: [plan]
+    runs-on: ubuntu-latest
+    # Per ENTRY, from the directive table in validation/matrix.py: FAST 5, unit
+    # shard 9, lint/scan, contract, migration, integration and build 10. The
+    # planner refuses a gate with no budget and, on pull_request/merge_group, a
+    # whole-plan job (PLAN_CONFIGURATION_ERROR), so every entry it emits
+    # carries an integer at or below 10.
+    #
+    # NO FALLBACK. The retired or-sixty fallback turned a lost key into an
+    # hour-long ceiling nobody would ever see. tests/test_matrix_fan_out.py
+    # asserts every entry of either shape carries an integer, and
+    # tests/test_no_60_required_path.py refuses any `||` here.
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      # A failing gate must not cancel its siblings. Cancelling them reproduces
+      # the exact defect this replaces: one red gate hiding four others, so the
+      # repository reports one problem and conceals the rest.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Checkout repository under validation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: repo
+      - name: Validate
+        uses: FusionEMS-Quantum-LLC/adaptix-ops/validation@824f61692fb4c5bfedbbde6866c008e5a5c3b17c
+        with:
+          repository: ${{ github.repository }}
+          target-path: repo
+          # Empty means the whole plan, which is exactly the single-job case.
+          gates: ${{ matrix.gate }}
+          # Present only on a shard entry, empty on every other job -- where an
+          # empty value leaves the manifest's own unit command untouched.
+          unit-command: ${{ matrix.command }}
+          # THE CAPSULE. These six lines travel together: the action refuses a
+          # job that carries some of them and not others, because a partial
+          # forward is indistinguishable from a legacy job and would silently
+          # re-plan. `gates` and `unit-command` above are verified AGAINST the
+          # capsule's own record for this job_id, so a carrier that edits either
+          # one fails instead of quietly running something else.
+          capsule-mode: ${{ needs.plan.outputs.capsule_mode }}
+          capsule-payload: ${{ needs.plan.outputs.capsule_payload }}
+          capsule-artifact: ${{ needs.plan.outputs.capsule_artifact }}
+          capsule-digest: ${{ needs.plan.outputs.capsule_digest }}
+          job-id: ${{ matrix.job_id }}
+          engine-sha: 824f61692fb4c5bfedbbde6866c008e5a5c3b17c  # pragma: allowlist secret
+          # Optional. The action itself only publishes when gates is
+          # empty (the single-job/whole-plan entry), so a fanned-out
+          # gate/shard never attempts a partial-coverage publish.
+          codacy_project_token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+
+  # The job name IS the required status check name. Branch protection requires
+  # the literal string `adaptix/repo-validation` in every enforced repository,
+  # so this name is a contract: renaming the job silently detaches the gate, and
+  # a required check whose name never appears blocks every pull request forever
+  # as "Expected". Do not rename it.
+  repo-validation:
+    name: adaptix/repo-validation
+    needs: [plan, gates]
+    # Without always(), a failed plan or gate leaves this SKIPPED -- and a
+    # skipped required check is not a failed one, so the pull request would sit
+    # "Expected" instead of going red.
+    if: always()
+    runs-on: ubuntu-latest
+    # The directive's final-aggregate budget: <30s target, 1 minute hard. It
+    # reads three job results and writes a summary.
+    timeout-minutes: 1
+    steps:
+      - name: Verdict
+        shell: bash
+        env:
+          PLAN: ${{ needs.plan.result }}
+          GATES: ${{ needs.gates.result }}
+          FAN_OUT: ${{ needs.plan.outputs.fan_out }}
+          GATE_COUNT: ${{ needs.plan.outputs.gate_count }}
+          CAPSULE_MODE: ${{ needs.plan.outputs.capsule_mode }}
+          CAPSULE_DIGEST: ${{ needs.plan.outputs.capsule_digest }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### AdaptixCore repo-validation"
+            echo ""
+            echo "| stage | result |"
+            echo "| --- | --- |"
+            echo "| plan | \`${PLAN}\` |"
+            echo "| capsule | \`${CAPSULE_DIGEST:-none}\` via \`${CAPSULE_MODE:-legacy}\` |"
+            echo "| fan out | \`${FAN_OUT:-unknown}\` over ${GATE_COUNT:-?} gate(s) |"
+            echo "| gates | \`${GATES}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # CLASSIFY THE RED, DO NOT COLLAPSE IT (VAL-ORG-STATE-CLASS-001).
+          #
+          # Every non-success state stays RED -- a cancelled or skipped run is
+          # not a pass, and nothing here weakens that. What changes is that the
+          # verdict NAMES which kind of red it is. This check is REQUIRED, so a
+          # cancellation here blocks a merge; reporting it in the same words as
+          # a failed gate sends people hunting a defect that does not exist.
+          classify() {
+            case "$1" in
+              success)   echo "PASS" ;;
+              failure)   echo "REAL_GATE_FAILURE" ;;
+              cancelled) echo "CANCELLED" ;;
+              skipped)   echo "NOT_RUN" ;;
+              *)         echo "UNKNOWN" ;;
+            esac
+          }
+          PLAN_CLASS="$(classify "${PLAN}")"
+          GATES_CLASS="$(classify "${GATES}")"
+
+          {
+            echo "| plan class | \`${PLAN_CLASS}\` |"
+            echo "| gates class | \`${GATES_CLASS}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${PLAN}" != 'success' ]; then
+            echo "adaptix/repo-validation: RED [${PLAN_CLASS}] â€” planning reported '${PLAN}'." >&2
+            echo "Without a plan there is no statement of what should have run," >&2
+            echo "so nothing can be called validated." >&2
+            exit 1
+          fi
+
+          # 'success' only. Skipped and cancelled are not passed, and the matrix
+          # always has at least one entry -- so 'skipped' here means something
+          # went wrong, not that there was nothing to do.
+          if [ "${GATES}" != 'success' ]; then
+            echo "adaptix/repo-validation: RED [${GATES_CLASS}] â€” validation reported '${GATES}'." >&2
+            case "${GATES_CLASS}" in
+              REAL_GATE_FAILURE)
+                echo "A gate failed. Open the per-gate jobs above for the failing phase." >&2
+                ;;
+              CANCELLED)
+                echo "A gate job reported 'cancelled'. There are two causes and" >&2
+                echo "they are NOT equally likely here, so do not stop at the word:" >&2
+                echo "" >&2
+                echo "  KILLED BY OUR OWN CEILING -- a job hit its timeout-minutes." >&2
+                echo "    GitHub reports a timed-out job as 'cancelled', never as" >&2
+                echo "    'failure'. This IS a defect: the budget did not fit the" >&2
+                echo "    work. It is the cause you should assume when this verdict" >&2
+                echo "    prints at all, because a superseded run cancels THIS job" >&2
+                echo "    too and you would not be reading this." >&2
+                echo "  SUPERSEDED -- a newer push cancelled the run." >&2
+                echo "" >&2
+                echo "VAL-SHARD-BUDGET-HEADROOM-001: reading every 'cancelled' as" >&2
+                echo "supersession is how sixteen red jobs were dismissed for weeks" >&2
+                echo "while only one was a real test failure. The per-job table above" >&2
+                echo "names which job and how long it ran; compare that against its" >&2
+                echo "ceiling before concluding anything." >&2
+                ;;
+              NOT_RUN)
+                echo "The gates job did not run. That is an engine or configuration" >&2
+                echo "problem, not a finding about this change." >&2
+                ;;
+              *)
+                echo "Unrecognised gate result. Treated as red because it is not a pass." >&2
+                ;;
+            esac
+            exit 1
+          fi
+
+          echo "adaptix/repo-validation: GREEN â€” ${GATE_COUNT} gate(s), fan_out=${FAN_OUT}"
