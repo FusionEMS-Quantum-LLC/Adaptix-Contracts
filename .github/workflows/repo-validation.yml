@@ -247,7 +247,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "${PLAN}" != 'success' ]; then
-            echo "adaptix/repo-validation: RED [${PLAN_CLASS}] â€” planning reported '${PLAN}'." >&2
+            echo "adaptix/repo-validation: RED [${PLAN_CLASS}] — planning reported '${PLAN}'." >&2
             echo "Without a plan there is no statement of what should have run," >&2
             echo "so nothing can be called validated." >&2
             exit 1
@@ -257,7 +257,7 @@ jobs:
           # always has at least one entry -- so 'skipped' here means something
           # went wrong, not that there was nothing to do.
           if [ "${GATES}" != 'success' ]; then
-            echo "adaptix/repo-validation: RED [${GATES_CLASS}] â€” validation reported '${GATES}'." >&2
+            echo "adaptix/repo-validation: RED [${GATES_CLASS}] — validation reported '${GATES}'." >&2
             case "${GATES_CLASS}" in
               REAL_GATE_FAILURE)
                 echo "A gate failed. Open the per-gate jobs above for the failing phase." >&2
@@ -291,4 +291,4 @@ jobs:
             exit 1
           fi
 
-          echo "adaptix/repo-validation: GREEN â€” ${GATE_COUNT} gate(s), fan_out=${FAN_OUT}"
+          echo "adaptix/repo-validation: GREEN — ${GATE_COUNT} gate(s), fan_out=${FAN_OUT}"
