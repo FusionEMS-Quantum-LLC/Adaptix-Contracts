@@ -1,10 +1,20 @@
 # AdaptixCore canonical Dependabot config (generated — do not hand-edit;
-# regenerate with scripts/cb/gen-dependabot-config.py). Policy 2026-06-17:
-# weekly, grouped patch/minor (one PR/ecosystem), separate major PRs,
-# security updates always on, PR limits to prevent noise. Auto-merge of
-# patch/minor low-risk non-critical PRs is handled server-side by
-# scripts/cb/pr-automation.py (AWS CodeBuild governance job) — never by
-# Dependabot comment commands.
+# regenerate with scripts/cb/gen-dependabot-config.py). Policy 2026-06-17,
+# multi-directory grouping fixed 2026-09-08: weekly, grouped patch/minor
+# (one PR per dependency per ecosystem, across every directory of that
+# ecosystem via groups.<name>.group-by: dependency-name — GitHub docs:
+# dependabot-options-reference, section `group-by` under `groups`),
+# separate major PRs (their own `major` group, also one per dependency
+# across directories), security updates always on, PR limits to prevent
+# noise. Auto-merge of patch/minor low-risk non-critical PRs is handled
+# server-side by scripts/cb/pr-automation.py (AWS CodeBuild governance
+# job) — never by Dependabot comment commands.
+#
+# Repository-specific holds (a dependency this repo cannot upgrade yet)
+# are declared in that generator, not here: NPM_VERSION_HOLDS for a
+# version-bounded hold, EXPO_PINNED_NPM / COORDINATED_ANDROID_TOOLCHAIN
+# for the fleet-wide ones. A hold added by hand to this file is silently
+# deleted the next time the generator runs.
 version: 2
 updates:
   - package-ecosystem: "uv"
@@ -29,5 +39,16 @@ updates:
       patch-and-minor:
         applies-to: version-updates
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "FusionEMS-Quantum-LLC/adaptix-ops"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      - dependency-name: "FusionEMS-Quantum-LLC/adaptix-ops/*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     labels:
       - "dependencies"
