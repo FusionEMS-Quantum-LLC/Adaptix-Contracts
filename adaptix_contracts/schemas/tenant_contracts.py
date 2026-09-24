@@ -17,6 +17,32 @@ class TenantStatus(str, enum.Enum):
     PENDING_SETUP = "pending_setup"
 
 
+class TenantType(str, enum.Enum):
+    """The governed classification of a tenant, fixed when it is created.
+
+    ``customer`` is an agency that uses Adaptix. ``production_certification``
+    is an Adaptix-owned tenant in the real production stack (same auth,
+    isolation, RBAC, APIs, database, events, workers, UI, audit and
+    deployment as a customer) that holds only clearly named certification
+    records and exists to runtime-prove the platform (the Adaptix
+    Certification Fabric). Its records are never real PHI, never reported as
+    patient care, never transmitted to a real external payer, clearinghouse
+    or partner, and never counted in customer aggregates.
+
+    The classification is immutable: converting either way would move real
+    records out of, or certification records into, customer reporting.
+    Adaptix-Core-Service owns it. Its CERT-CORE change (branch
+    ``feat/core-production-certification-tenant``, not yet on Core main when
+    this vocabulary was published) adds the immutable
+    ``core_tenants.tenant_type`` column and the ``tenant_type`` access-token
+    claim with exactly these two values. This enum is the wire vocabulary
+    every other service reads it with.
+    """
+
+    CUSTOMER = "customer"
+    PRODUCTION_CERTIFICATION = "production_certification"
+
+
 class TenantScopedModel(BaseModel):
     """Base contract for any tenant-scoped entity."""
 

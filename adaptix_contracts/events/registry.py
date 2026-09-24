@@ -20,9 +20,19 @@ from __future__ import annotations
 
 from typing import Final
 
+from adaptix_contracts.blood_ops.events import (
+    BLOOD_OPS_EXCURSION_STATE_CHANGED,
+    BLOOD_OPS_UNIT_CUSTODY_RECORDED,
+)
 from adaptix_contracts.epcr.transport_events import (
     EPCR_TRANSPORT_ARRIVED_DESTINATION,
     EPCR_TRANSPORT_DESTINATION_UPDATED,
+)
+from adaptix_contracts.interoperability.delivery import (
+    INTEROPERABILITY_EXCHANGE_DELIVERY_STATE_CHANGED,
+)
+from adaptix_contracts.interoperability.hospital_outcome import (
+    HOSPITAL_OUTCOME_RECEIVED,
 )
 from adaptix_contracts.family_bridge.events import (
     BRIDGE_SMS_DELIVERY_UPDATED,
@@ -474,6 +484,38 @@ EVIDENCE_EDGE_CREATED: Final[str] = "evidence.edge.created"
 EVIDENCE_DECISION_RECEIPT_CREATED: Final[str] = "evidence.decision_receipt.created"
 
 # ---------------------------------------------------------------------------
+# Exchange, hospital outcome and Blood Ops events (FND-001)
+# ---------------------------------------------------------------------------
+# Registered AHEAD of their producers, the precedent set by
+# ``patient.nok.consent.changed`` above: the lanes that build each producer
+# and each consumer pin a released contract, so the name, the producer slug
+# and the typed payload must be published and versioned first. None is
+# emitted today, so none is listed in the live or indirect producer
+# inventories of tests/test_event_producer_registry_drift.py; each producer
+# adds its file:line citation here in the pull request that emits it.
+#
+# ``interoperability.exchange.delivery.state_changed`` (payload
+# ``interoperability.delivery.ExchangeDeliveryStateChangedPayload``). Producer
+# ``core``: the Core interoperability fabric owns the exchange delivery rows
+# (Adaptix-Core-Service ``core_app/interoperability/exchange_models.py``
+# ``ExchangeDelivery``). It is one typed state-change event, not the staged
+# per-fact ``interoperability.exchange.*`` names in
+# ``interoperability/events.py``, which stay unregistered.
+#
+# ``hospital.outcome.received`` (payload
+# ``interoperability.hospital_outcome.HospitalOutcomeReceivedPayload``).
+# Producer ``epcr``: Adaptix-EPCR-Service owns the chart hospital outcome
+# linkage (``epcr_app/api_chart_outcome.py``, NEMSIS eOutcome), so it decides
+# which chart an outcome belongs to. The ``hospital`` prefix names the
+# topic, not the producer, as with ``hospital.cath_lab.activate_recommended``.
+#
+# ``inventory.blood_unit.custody_recorded`` and
+# ``inventory.blood_excursion.state_changed`` (names in
+# ``inventory_events.InventoryEventType``, payloads in
+# ``adaptix_contracts.blood_ops.events``). Producer ``inventory``:
+# Adaptix-Inventory-Service owns agency inventory, including blood units.
+
+# ---------------------------------------------------------------------------
 # Scheduling Events
 # ---------------------------------------------------------------------------
 SCHEDULING_EVENTS = ALL_SCHEDULING_EVENTS
@@ -676,6 +718,17 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
         "version": "1.0",
         "source_service": "audit",
     },
+    # FND-001, registered ahead of the producers (see the block above).
+    INTEROPERABILITY_EXCHANGE_DELIVERY_STATE_CHANGED: {
+        "version": "1.0",
+        "source_service": "core",
+    },
+    HOSPITAL_OUTCOME_RECEIVED: {"version": "1.0", "source_service": "epcr"},
+    BLOOD_OPS_UNIT_CUSTODY_RECORDED: {"version": "1.0", "source_service": "inventory"},
+    BLOOD_OPS_EXCURSION_STATE_CHANGED: {
+        "version": "1.0",
+        "source_service": "inventory",
+    },
 }
 
 for event_name in SCHEDULING_EVENTS:
@@ -788,6 +841,8 @@ __all__ = [
     "BILLING_INVOICE_CREATED",
     "BILLING_INVOICE_PAID",
     "BILLING_PAYMENT_RECEIVED",
+    "BLOOD_OPS_EXCURSION_STATE_CHANGED",
+    "BLOOD_OPS_UNIT_CUSTODY_RECORDED",
     "CAREGRAPH_EDGE_CREATED",
     "CAREGRAPH_EDGE_REMOVED",
     "CAREGRAPH_NODE_AMENDED",
@@ -832,6 +887,8 @@ __all__ = [
     "FLEET_UNIT_STATUS_CHANGED",
     "FLEET_VEHICLE_OUT_OF_SERVICE",
     "HOSPITAL_CATH_LAB_ACTIVATE_RECOMMENDED",
+    "HOSPITAL_OUTCOME_RECEIVED",
+    "INTEROPERABILITY_EXCHANGE_DELIVERY_STATE_CHANGED",
     "LEGACY_SOURCE_SERVICE_ALIASES",
     "NECESSITY_ASSESSED",
     "NERIS_AUDIT_EVENT_CREATED",
