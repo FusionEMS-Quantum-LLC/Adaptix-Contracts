@@ -486,7 +486,7 @@ class EdgeTransportStatus(BaseModel):
     def _disconnected_has_no_devices(self) -> EdgeTransportStatus:
         if (
             self.state is SynapseConnectionState.DISCONNECTED
-            and self.connected_device_count != 0
+            and self.connected_device_count
         ):
             raise ValueError("a DISCONNECTED transport has no connected devices")
         return self
@@ -520,7 +520,7 @@ class EdgeHeartbeat(BaseModel):
 
     @model_validator(mode="after")
     def _spool_is_coherent(self) -> EdgeHeartbeat:
-        if (self.spool_depth == 0) != (self.oldest_spooled_captured_at is None):
+        if (not self.spool_depth) != (self.oldest_spooled_captured_at is None):
             raise ValueError(
                 "oldest_spooled_captured_at is present exactly when spool_depth > 0"
             )

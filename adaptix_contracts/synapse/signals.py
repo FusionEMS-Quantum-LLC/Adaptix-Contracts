@@ -215,7 +215,7 @@ class WaveformCalibration(BaseModel):
     def _usable(self) -> WaveformCalibration:
         if not (math.isfinite(self.scale_factor) and math.isfinite(self.offset)):
             raise ValueError("calibration values must be finite")
-        if self.scale_factor == 0:
+        if not self.scale_factor:
             raise ValueError("scale_factor of zero would erase the waveform")
         return self
 
