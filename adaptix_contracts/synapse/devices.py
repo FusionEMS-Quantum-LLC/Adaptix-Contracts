@@ -121,7 +121,7 @@ class _DeviceDeclaration(SynapseModel):
     """
 
     device_id: SynapseId
-    genome_version: int = Field(ge=1)
+    genome_version: int = Field(ge=1, strict=True)
     device_class: DeviceClass
     transports: list[TransportKind] = Field(min_length=1)
     capabilities: list[SynapseDeviceCapability] = Field(min_length=1)

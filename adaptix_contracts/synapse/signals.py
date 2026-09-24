@@ -19,7 +19,9 @@ holds the samples.
 Time is carried, never overwritten: ``device_observed_at`` is exactly what
 the device reported; any correction lands in ``corrected_observed_at`` with
 the ``clock_offset_ms`` that produced it, and ``time_quality`` says which one
-to trust. Every datetime must be timezone-aware.
+to trust. Every datetime must be timezone-aware, and none is ever inferred
+from a bare epoch number (see
+:class:`~adaptix_contracts.synapse.provenance.SynapseModel`).
 
 ``tenant_id`` on the envelope is a claim the receiver verifies, not an
 authority: the Device service derives the owning tenant from the persisted
@@ -34,7 +36,15 @@ from datetime import timedelta
 from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
-from pydantic import AwareDatetime, Field, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 from adaptix_contracts.synapse.enums import (
     SynapseAlertCondition,
@@ -118,7 +128,7 @@ class SignalQuantity(SynapseModel):
     """A coded numeric quantity with its UCUM unit."""
 
     code: CanonicalCode
-    value: int | float
+    value: StrictInt | StrictFloat
     unit: UcumUnit
 
     @field_validator("value", mode="before")
@@ -130,8 +140,8 @@ class SignalQuantity(SynapseModel):
 class ObservationReferenceRange(SynapseModel):
     """The normal range the device reported for an observation."""
 
-    low: float | None = None
-    high: float | None = None
+    low: float | None = Field(default=None, strict=True)
+    high: float | None = Field(default=None, strict=True)
 
     @model_validator(mode="after")
     def _bounded(self) -> ObservationReferenceRange:
@@ -155,7 +165,7 @@ class ObservationPayload(SynapseModel):
 
     payload_type: Literal["observation"] = "observation"
     code: CanonicalCode
-    value: int | float | ReportedText
+    value: StrictInt | StrictFloat | ReportedText
     unit: UcumUnit | None = None
     reference_range: ObservationReferenceRange | None = None
     device_quality: SynapseMeasurementValidity | None = None
@@ -182,8 +192,8 @@ class WaveformCalibration(SynapseModel):
     """
 
     unit: UcumUnit
-    scale_factor: float
-    offset: float = 0.0
+    scale_factor: float = Field(strict=True)
+    offset: float = Field(default=0.0, strict=True)
 
     @model_validator(mode="after")
     def _usable(self) -> WaveformCalibration:
@@ -204,10 +214,10 @@ class WaveformReferencePayload(SynapseModel):
 
     payload_type: Literal["waveform_reference"] = "waveform_reference"
     channel: CanonicalCode
-    sample_rate_hz: float = Field(gt=0, le=100_000)
+    sample_rate_hz: float = Field(gt=0, le=100_000, strict=True)
     start_at: AwareDatetime
     end_at: AwareDatetime
-    sample_count: int = Field(ge=1)
+    sample_count: int = Field(ge=1, strict=True)
     calibration: WaveformCalibration
     evidence_id: SynapseId
     content_type: MediaType
@@ -270,9 +280,9 @@ class DeviceBatteryState(SynapseModel):
     battery sends no ``battery`` object rather than an empty one.
     """
 
-    level_percent: float | None = Field(default=None, ge=0, le=100)
-    charging: bool | None = None
-    remaining_minutes: int | None = Field(default=None, ge=0)
+    level_percent: float | None = Field(default=None, ge=0, le=100, strict=True)
+    charging: bool | None = Field(default=None, strict=True)
+    remaining_minutes: int | None = Field(default=None, ge=0, strict=True)
 
     @model_validator(mode="after")
     def _reports_something(self) -> DeviceBatteryState:
@@ -300,7 +310,7 @@ class DeviceStatePayload(SynapseModel):
 
     payload_type: Literal["device_state"] = "device_state"
     state_code: CanonicalCode
-    value: bool | int | float | ReportedText | None = None
+    value: StrictBool | StrictInt | StrictFloat | ReportedText | None = None
     unit: UcumUnit | None = None
     battery: DeviceBatteryState | None = None
     connection_state: SynapseConnectionState | None = None
@@ -364,7 +374,7 @@ class ClinicalSignalEnvelope(SynapseModel):
     corrected_observed_at: AwareDatetime | None = None
     time_quality: SynapseTimeQuality
     clock_offset_ms: int | None = Field(
-        default=None, ge=-MAX_CLOCK_OFFSET_MS, le=MAX_CLOCK_OFFSET_MS
+        default=None, ge=-MAX_CLOCK_OFFSET_MS, le=MAX_CLOCK_OFFSET_MS, strict=True
     )
     adapter_key: AdapterKey
     adapter_version: SemanticVersion

@@ -195,7 +195,7 @@ class EdgeProtocolNegotiation(SynapseModel):
     """
 
     edge_instance_id: SynapseId
-    accepted: bool
+    accepted: bool = Field(strict=True)
     selected_protocol_version: EdgeProtocolVersion | None = None
     refusal_reason: EdgeProtocolRefusalReason | None = None
     server_received_at: AwareDatetime
@@ -251,7 +251,7 @@ class EdgeSignalRecord(SynapseModel):
     edge_instance_id: SynapseId
     device_id: SynapseId
     device_session_id: SynapseId
-    local_sequence: int = Field(ge=1)
+    local_sequence: int = Field(ge=1, strict=True)
     source_record_id: ExternalKey
     observed_at: AwareDatetime | None
     captured_at: AwareDatetime
@@ -327,7 +327,7 @@ class EdgeBatch(SynapseModel):
 class EdgeRecordAck(SynapseModel):
     """The cloud's answer for one record of an :class:`EdgeBatch`."""
 
-    local_sequence: int = Field(ge=1)
+    local_sequence: int = Field(ge=1, strict=True)
     idempotency_key: ExternalKey
     outcome: EdgeRecordOutcome
     rejection_reason: EdgeRecordRejectionReason | None = None
@@ -367,7 +367,7 @@ class EdgeBatchAck(SynapseModel):
     results: list[EdgeRecordAck] = Field(
         min_length=1, max_length=EDGE_BATCH_MAX_RECORDS
     )
-    highest_contiguous_acknowledged_sequence: int = Field(ge=0)
+    highest_contiguous_acknowledged_sequence: int = Field(ge=0, strict=True)
     server_received_at: AwareDatetime
     correlation_id: CorrelationId
 
@@ -432,9 +432,9 @@ class EdgeClockMetadata(SynapseModel):
     clock_source: EdgeClockSource
     last_synchronized_at: AwareDatetime | None = None
     estimated_offset_ms: int | None = Field(
-        default=None, ge=-MAX_CLOCK_OFFSET_MS, le=MAX_CLOCK_OFFSET_MS
+        default=None, ge=-MAX_CLOCK_OFFSET_MS, le=MAX_CLOCK_OFFSET_MS, strict=True
     )
-    estimated_uncertainty_ms: int | None = Field(default=None, ge=0)
+    estimated_uncertainty_ms: int | None = Field(default=None, ge=0, strict=True)
 
     @model_validator(mode="after")
     def _uncertainty_needs_offset(self) -> EdgeClockMetadata:
@@ -453,7 +453,7 @@ class EdgeTransportStatus(SynapseModel):
 
     transport: TransportKind
     state: SynapseConnectionState
-    connected_device_count: int = Field(ge=0)
+    connected_device_count: int = Field(ge=0, strict=True)
     last_activity_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
@@ -481,11 +481,11 @@ class EdgeHeartbeat(SynapseModel):
     runtime_version: SemanticVersion
     protocol_version: EdgeProtocolVersion
     health: EdgeRuntimeHealth
-    spool_depth: int = Field(ge=0)
+    spool_depth: int = Field(ge=0, strict=True)
     oldest_spooled_captured_at: AwareDatetime | None = None
-    highest_spooled_sequence: int = Field(ge=0)
-    highest_acknowledged_sequence: int = Field(ge=0)
-    quarantined_record_count: int = Field(ge=0)
+    highest_spooled_sequence: int = Field(ge=0, strict=True)
+    highest_acknowledged_sequence: int = Field(ge=0, strict=True)
+    quarantined_record_count: int = Field(ge=0, strict=True)
     clock: EdgeClockMetadata
     transport_states: list[EdgeTransportStatus] = Field(default_factory=list)
     correlation_id: CorrelationId

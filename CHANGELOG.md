@@ -30,10 +30,26 @@ from the installed package metadata).
     The package root re-exports nothing, so every public name is declared
     exactly once, in its module's `__all__`.
   - `provenance.SynapseModel` is the one base of every Synapse model: unknown
-    fields are refused and instances are immutable. `provenance` also owns
-    the shared value shapes (`SynapseId`, `Sha256Hex`, `AdapterKey`,
+    fields are refused, no field can be reassigned (`frozen`), and no
+    timestamp is ever inferred from a bare epoch number or numeric string
+    (pydantic would otherwise guess its unit, seconds or milliseconds, and
+    its zone, and silently re-interpret a device's own time). `provenance`
+    also owns the shared value shapes (`SynapseId`, `Sha256Hex`, `AdapterKey`,
     `SemanticVersion`, `CanonicalCode`, `MediaType`, `UcumUnit`,
     `ReportedText`, ...).
+  - Strict scalars. Every integer, float and boolean field is strict
+    (`Field(strict=True)`, or `StrictInt` / `StrictFloat` / `StrictBool`
+    inside a union), so `True` is never a sequence number, `"7"` never a
+    count and `"false"` never a boolean; a float field still accepts an
+    integer. Strictness is per field, not model-wide: model-wide
+    `strict=True` would also refuse the ISO 8601 strings and enum values of a
+    JSON-decoded body (the FastAPI path). Tests walk every model's core
+    schema for the scalar rule and every model's published `date-time`
+    fields for the timestamp rule.
+  - `normalize_capability_token` reduces a name to NFKC-normalised,
+    case-folded ASCII letters and digits, so the forbidden control
+    vocabulary is recognised whatever the case, separator (`-`, `_`, `.`,
+    `/`, space, none) or character width.
   - `ClinicalSignalEnvelope`: the one shape of a device signal above the
     driver layer. It has a required `idempotency_key`. Device time is kept as
     it was reported, and corrections go in their own fields

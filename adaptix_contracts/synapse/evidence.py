@@ -152,7 +152,7 @@ class DeviceEvidenceReference(SynapseModel):
     device_session_id: SynapseId | None = None
     rail_id: SynapseId
     sha256: Sha256Hex
-    byte_size: int = Field(ge=1, le=EVIDENCE_MAX_BYTE_SIZE)
+    byte_size: int = Field(ge=1, le=EVIDENCE_MAX_BYTE_SIZE, strict=True)
     media_type: MediaType
     storage_key: StorageKey
     storage_version: Annotated[str, StringConstraints(min_length=1, max_length=1024)]
@@ -162,7 +162,7 @@ class DeviceEvidenceReference(SynapseModel):
     received_at: AwareDatetime
     classification: DataClassification
     retention_class: EvidenceRetentionClass
-    ledger_sequence: int = Field(ge=1)
+    ledger_sequence: int = Field(ge=1, strict=True)
     previous_entry_sha256: Sha256Hex | None = None
     entry_sha256: Sha256Hex
 
@@ -240,7 +240,7 @@ class EvidenceUploadAuthorizationRequest(SynapseModel):
     device_session_id: SynapseId | None = None
     rail_id: SynapseId
     sha256: Sha256Hex
-    byte_size: int = Field(ge=1, le=EVIDENCE_MAX_BYTE_SIZE)
+    byte_size: int = Field(ge=1, le=EVIDENCE_MAX_BYTE_SIZE, strict=True)
     media_type: MediaType
     source_reference: ExternalKey
     adapter_key: AdapterKey
@@ -263,7 +263,7 @@ class EvidenceUploadAuthorizationResponse(SynapseModel):
     """
 
     evidence_id: SynapseId
-    upload_required: bool
+    upload_required: bool = Field(strict=True)
     upload_url: str | None = Field(default=None, repr=False, max_length=8192)
     required_headers: dict[_HeaderName, _HeaderValue] = Field(default_factory=dict)
     expires_at: AwareDatetime | None = None

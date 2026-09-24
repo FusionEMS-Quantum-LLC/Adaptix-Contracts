@@ -8,7 +8,8 @@ This module owns four things every other Synapse module builds on:
    Integrations, ePCR and Edge sides from each inventing a slightly different
    width or pattern.
 2. :class:`SynapseModel` - the one base of every Synapse contract model, so
-   "unknown fields are refused and instances are immutable" is declared once.
+   "unknown fields are refused, fields cannot be reassigned and no timestamp
+   is inferred from a bare epoch number" is declared once.
 3. :class:`SignalProvenance` - the lineage a downstream record (for example an
    ePCR vital imported from a device) carries back to the device signal,
    evidence object, adapter and normalisation version that produced it.
@@ -30,11 +31,31 @@ Alignment with existing authorities
 * ``CorrelationId`` is bounded by
   :data:`adaptix_contracts.events.bus_limits.BUS_CORRELATION_ID_MAX_LENGTH`,
   read from its owner rather than restated.
+
+Strict validation
+-----------------
+* Every integer, float and boolean field is strict (``Field(strict=True)``,
+  or ``StrictInt`` / ``StrictFloat`` / ``StrictBool`` inside a union, where
+  pydantic cannot apply ``strict`` to the whole union): ``True`` is not a
+  sequence number, ``"7"`` is not a count and ``"false"`` is not a boolean.
+  A float field still accepts an integer (``250`` is ``250.0`` Hz).
+* Model-wide ``strict=True`` is deliberately NOT used: in Python-mode
+  validation (the path a FastAPI body takes after JSON decoding) it would
+  also refuse the ISO 8601 strings and enum values every JSON producer sends.
+* :class:`SynapseModel` refuses a bare epoch number, or a string holding only
+  a number, for every datetime field. Pydantic would otherwise read it as a
+  Unix time and GUESS its unit (seconds below ``2e10``, milliseconds above)
+  and its zone (UTC), silently re-interpreting a device's own time. The
+  protocol driver, which knows the device's epoch unit, converts it to an
+  aware datetime before it builds a contract.
 """
 
 from __future__ import annotations
 
-from typing import Annotated
+import re
+from collections.abc import Mapping
+from datetime import datetime
+from typing import Annotated, Any, get_args
 
 from pydantic import (
     AwareDatetime,
@@ -158,16 +179,76 @@ ReportedText = Annotated[
 REPLAY_MAX_EVIDENCE_IDS = 500
 
 
+#: A string holding nothing but a number (optionally signed or fractional).
+_NUMERIC_TEXT = re.compile(r"\s*[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s*")
+
+
+def _is_bare_epoch(value: object) -> bool:
+    """True for a number, or a numeric string, offered as a timestamp."""
+
+    if isinstance(value, (int, float)):
+        return True
+    return isinstance(value, str) and _NUMERIC_TEXT.fullmatch(value) is not None
+
+
+def _is_datetime_annotation(annotation: object) -> bool:
+    return any(
+        arg is AwareDatetime or (isinstance(arg, type) and issubclass(arg, datetime))
+        for arg in (annotation, *get_args(annotation))
+    )
+
+
+#: Datetime field names per model class, filled on first validation. A race
+#: between threads only computes the same immutable value twice.
+_DATETIME_FIELDS: dict[type[BaseModel], frozenset[str]] = {}
+
+
+def _datetime_field_names(model: type[BaseModel]) -> frozenset[str]:
+    """Names of ``model``'s fields that hold a datetime (optional or not)."""
+
+    names = _DATETIME_FIELDS.get(model)
+    if names is None:
+        names = frozenset(
+            name
+            for name, field in model.model_fields.items()
+            if _is_datetime_annotation(field.annotation)
+        )
+        _DATETIME_FIELDS[model] = names
+    return names
+
+
 class SynapseModel(BaseModel):
     """Base of every Synapse contract model.
 
     Unknown fields are refused (``extra="forbid"``), so nothing - a patient
     identifier, a tenant claim, a credential - can ride along on a contract
-    that does not declare it, and instances are immutable (``frozen``), so a
-    validated contract cannot be altered after its validators ran.
+    that does not declare it. Instances are ``frozen``: no field can be
+    reassigned after the validators ran. List-valued fields are ordinary
+    lists, so a consumer must not mutate one in place; build a new instance
+    through ``model_validate`` (``model_copy(update=...)`` does NOT
+    re-validate) when a changed contract is needed.
+
+    No datetime field accepts a bare epoch number or numeric string (see the
+    module docstring, "Strict validation").
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _refuse_bare_epoch_timestamps(cls, data: Any) -> Any:
+        for name in _datetime_field_names(cls):
+            if isinstance(data, Mapping):
+                value = data.get(name)
+            else:
+                value = getattr(data, name, None)
+            if _is_bare_epoch(value):
+                raise ValueError(
+                    f"{name}: a timestamp must be a timezone-aware ISO 8601 "
+                    "date-time, not a bare number: an epoch value has no "
+                    "declared unit or zone"
+                )
+        return data
 
 
 class SignalProvenance(SynapseModel):

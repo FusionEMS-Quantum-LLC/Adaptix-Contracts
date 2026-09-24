@@ -120,7 +120,14 @@ def test_identity_hash_must_match_identity(genome_data) -> None:
 
 
 @pytest.mark.parametrize(
-    "control", ["shock", "Change-Infusion", "administer medication"]
+    "control",
+    [
+        "shock",
+        "Change-Infusion",
+        "administer medication",
+        "ChangeInfusion",
+        "alter.ventilator.therapy",
+    ],
 )
 def test_forbidden_control_capability_is_refused_by_name(
     genome_data, control: str

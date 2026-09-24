@@ -31,6 +31,7 @@ from adaptix_contracts.synapse.enums import (
     SynapseTimeQuality,
     TransportKind,
     is_forbidden_control_capability,
+    normalize_capability_token,
 )
 from adaptix_contracts.synapse.provenance import SynapseModel
 from adaptix_contracts.synapse.signals import (
@@ -178,10 +179,27 @@ def test_forbidden_control_vocabulary_is_present_and_complete() -> None:
         " Change-Infusion ",
         "change infusion",
         "Alter Ventilator Therapy",
+        "ChangeInfusion",
+        "changeInfusion",
+        "change.infusion",
+        "CHANGE__INFUSION",
+        "changeinfusion",
+        "Start-Critical_Treatment",
+        "administer/medication",
+        # Full-width letters (U+FF53 ...): NFKC folds them to "shock".
+        "\uff53\uff48\uff4f\uff43\uff4b",
     ],
 )
 def test_forbidden_control_is_recognised_regardless_of_spelling(spelling: str) -> None:
     assert is_forbidden_control_capability(spelling)
+
+
+def test_capability_token_keeps_only_ascii_letters_and_digits() -> None:
+    assert normalize_capability_token(" Change-Infusion ") == "changeinfusion"
+    assert normalize_capability_token("alter.ventilator.therapy") == (
+        "alterventilatortherapy"
+    )
+    assert normalize_capability_token("pump_telemetry") == "pumptelemetry"
 
 
 def test_no_read_capability_or_signal_kind_is_a_control_action() -> None:

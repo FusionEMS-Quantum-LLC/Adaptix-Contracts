@@ -17,6 +17,8 @@ clinical record.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from collections.abc import Mapping
 from enum import StrEnum
 from types import MappingProxyType
@@ -154,21 +156,36 @@ FORBIDDEN_CONTROL_CAPABILITIES: frozenset[str] = frozenset(
 )
 
 
-def normalize_capability_token(value: str) -> str:
-    """Normalise a declared capability name for vocabulary comparison.
+_NON_TOKEN_CHARACTERS = re.compile(r"[^0-9a-z]+")
 
-    ``"Change-Infusion"``, ``"change infusion"`` and ``"change_infusion"`` all
-    normalise to ``"change_infusion"`` so a declaration cannot slip past the
-    forbidden-vocabulary check by spelling alone.
+
+def normalize_capability_token(value: str) -> str:
+    """Reduce a declared capability name to its comparison token.
+
+    The token is the NFKC-normalised, case-folded name with everything but
+    ASCII letters and digits removed. ``"change_infusion"``,
+    ``"Change-Infusion"``, ``"change infusion"``, ``"ChangeInfusion"``,
+    ``"change.infusion"``, ``"CHANGE__INFUSION"`` and the same name in
+    full-width characters all reduce to ``"changeinfusion"``, so a declaration
+    cannot slip past the forbidden-vocabulary check by case, separator or
+    character width alone.
     """
 
-    return "_".join(value.strip().casefold().replace("-", " ").split())
+    folded = unicodedata.normalize("NFKC", value).casefold()
+    return _NON_TOKEN_CHARACTERS.sub("", folded)
+
+
+#: Comparison tokens of the forbidden control vocabulary.
+_FORBIDDEN_CONTROL_TOKENS: frozenset[str] = frozenset(
+    normalize_capability_token(value) for value in FORBIDDEN_CONTROL_CAPABILITIES
+)
 
 
 def is_forbidden_control_capability(value: str) -> bool:
-    """Return ``True`` when ``value`` names a forbidden therapy/control action."""
+    """Return ``True`` when ``value`` names a forbidden therapy/control action,
+    however it is spelled (see :func:`normalize_capability_token`)."""
 
-    return normalize_capability_token(value) in FORBIDDEN_CONTROL_CAPABILITIES
+    return normalize_capability_token(value) in _FORBIDDEN_CONTROL_TOKENS
 
 
 class TransportKind(StrEnum):
