@@ -42,6 +42,11 @@ class InventoryEventType(str, Enum):
     WASTE_EVENT = "inventory.waste.recorded"
     COST_EVENT = "inventory.cost.recorded"
 
+    # Blood Ops (adaptix_contracts.blood_ops): agency-held blood units. The
+    # payload models live in adaptix_contracts.blood_ops.events.
+    BLOOD_UNIT_CUSTODY_RECORDED = "inventory.blood_unit.custody_recorded"
+    BLOOD_EXCURSION_STATE_CHANGED = "inventory.blood_excursion.state_changed"
+
 
 class InventoryItemEvent(BaseModel):
     """Event published when an inventory item is created/updated/deleted."""

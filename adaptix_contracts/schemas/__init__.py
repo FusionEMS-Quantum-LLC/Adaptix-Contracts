@@ -1158,6 +1158,7 @@ from .medications_contracts import (
 # Tenant
 from .tenant_contracts import (
     TenantStatus,
+    TenantType,
     TenantScopedModel,
     TenantContract,
     TenantCreateRequest,
@@ -2145,6 +2146,7 @@ __all__ = [
     "MedicationExpirationWarningEvent",
     # Tenant
     "TenantStatus",
+    "TenantType",
     "TenantScopedModel",
     "TenantContract",
     "TenantCreateRequest",

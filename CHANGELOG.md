@@ -12,6 +12,94 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.25.0] - 2026-09-24
+
+### Added
+
+- **Exchange gateway, delivery and hospital outcome contracts (FND-001).**
+  Three new modules under `adaptix_contracts.interoperability`, built on the
+  existing exchange model (`PublicSafetyExchangeEnvelope`, `TrustDirection`,
+  `AgencyPeer`, `DataProvenance`, `QhinCredential`). Import each name from the
+  module that defines it; the package `__init__` is unchanged.
+  - `interoperability.gateway`: `ExchangeGatewayDescriptor`, with
+    `ExchangeGatewayKind` (`adaptix_peer`, `hospital_interface`, `fhir_api`,
+    `direct`, `hie`, `qhin`, `regional_exchange`, `state_system`) and
+    `ExchangeGatewayStatus` (`CONFIGURED`, `NOT_CONFIGURED`, `DEGRADED`,
+    `DISABLED`, `WAITING_EXTERNAL_CREDENTIAL`). Only `adaptix_peer` is
+    Adaptix-owned. Every external kind must be `optional=True`, so an outside
+    system is never a core prerequisite, and an Adaptix-owned gateway never
+    waits on an external credential. Only a `qhin` gateway may reference a
+    `QhinCredential`, and a usable one must. Every status other than
+    `CONFIGURED` states its reason. `CONFIGURED` means configured, not proven.
+  - `interoperability.delivery`: `ExchangeDeliveryState` (`DRAFT`, `QUEUED`,
+    `SENDING`, `DELIVERED`, `ACKNOWLEDGED`, `REJECTED`, `RETRYABLE_FAILURE`,
+    `PERMANENT_FAILURE`, `DEAD_LETTER`), the transition table and
+    `validate_exchange_delivery_transition`. A permanent failure is never
+    retried automatically, and a dead letter returns to `QUEUED` only by
+    operator replay. Also the `ExchangeDelivery` record and the
+    `interoperability.exchange.delivery.state_changed` event payload.
+  - `interoperability.hospital_outcome`: `hospital.outcome.received` with
+    `HospitalOutcomeMatchStatus` `MATCHED` / `AMBIGUOUS` / `NO_MATCH`. A
+    `MATCHED` outcome names exactly one chart. An `AMBIGUOUS` one lists at
+    least two candidate charts and links none. A `NO_MATCH` links nothing.
+    Outcome content stays behind `payload_ref`, and no patient field can be
+    attached.
+- **Blood Ops contracts (FND-001).** New subpackage `adaptix_contracts.blood_ops`
+  (`lifecycle`, `models`, `events`). The root re-exports nothing.
+  - `BloodUnitLifecycleState` runs `RECEIVED`, `QUARANTINED`, `AVAILABLE`,
+    `ASSIGNED`, `EXPIRED`, `TRANSFUSED`, `RETURNED`, `DESTROYED`, with
+    `validate_blood_unit_transition`. Only an `ASSIGNED` unit can be
+    transfused.
+  - `ColdChainExcursionState` runs `NORMAL`, `EXCURSION_DETECTED`,
+    `SENSOR_FAILURE`, `QUARANTINED`, `RELEASED`, `DISCARDED`, with
+    `validate_cold_chain_excursion_transition`. `SENSOR_FAILURE` (the
+    temperature is unknown) is distinct from an excursion, and a detection
+    never closes itself.
+  - `BloodUnit`, `BloodUnitCustodyEvent`, `BloodColdChainReading` and
+    `BloodColdChainExcursion`. They reuse the CCT blood-bank vocabulary
+    (`BloodProductType`, `AboGroup`, `RhFactor`) and label field names. An
+    `AVAILABLE` or `ASSIGNED` unit must have a usable cold chain. A
+    transfusion names its chart and a witness who is not the actor. People
+    are identified by user id only. No temperature threshold appears in any
+    contract: a reading carries the service's classification and the storage
+    profile it used.
+  - Events `inventory.blood_unit.custody_recorded` and
+    `inventory.blood_excursion.state_changed`. The names are new members of
+    the existing `inventory_events.InventoryEventType`
+    (`BLOOD_UNIT_CUSTODY_RECORDED`, `BLOOD_EXCURSION_STATE_CHANGED`), in the
+    `inventory.<entity>.<action>` form the Inventory service already emits.
+    `blood_ops.events` reads them from there and binds each to its payload
+    (`BLOOD_OPS_EVENT_PAYLOADS`).
+- **Cortex governed-plan execution boundary (FND-001).**
+  `schemas.cortex_contracts` now declares `ActionTarget`,
+  `DomainPreconditionContract`, `DomainResultType` (including `STALE_PLAN`),
+  `DomainRecordState` and `DomainActionResult`, field for field with
+  Adaptix-Cortex-Service `app/models/governed_plan.py` at `eb4b09fa`.
+  `tests/test_cortex_governed_plan_boundary_drift.py` fails when either side
+  drifts. These are not added to the package-root surface.
+- **Tenant classification vocabulary (FND-001).** `schemas.TenantType`
+  (`customer`, `production_certification`) is the wire vocabulary of the
+  immutable `core_tenants.tenant_type` column and `tenant_type` token claim
+  that Core's CERT-CORE change adds (not yet on Core main). No contract
+  carried it before. Exported from `adaptix_contracts.schemas` and the
+  package root.
+- **Four events registered ahead of their producers**, following the
+  precedent of `patient.nok.consent.changed`:
+  `interoperability.exchange.delivery.state_changed` (`core`),
+  `hospital.outcome.received` (`epcr`),
+  `inventory.blood_unit.custody_recorded` and
+  `inventory.blood_excursion.state_changed` (`inventory`). Each producer adds its
+  file:line citation when it emits the event.
+
+### Downstream impact
+
+- Additive. No existing symbol changed. Consumers adopt these contracts by
+  pinning the `v5.25.0` release commit once it is tagged and approved in
+  adaptix-ops `config/platform-standard.yaml`.
+- Adaptix-Cortex-Service should import the boundary types from
+  `adaptix_contracts.schemas.cortex_contracts` instead of declaring its own.
+  Until it does, the drift test is what keeps the two copies equal.
+
 ## [5.24.0] - 2026-09-24
 
 ### Added
