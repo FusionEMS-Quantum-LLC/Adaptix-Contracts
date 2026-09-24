@@ -12,6 +12,58 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.24.0] - 2026-09-24
+
+### Added
+
+- **Adaptix Synapse Fabric canonical contracts (SYN-001).** New subpackage
+  `adaptix_contracts.synapse` (`enums`, `signals`, `devices`, `sessions`,
+  `evidence`, `provenance`, `edge`). LAW SYN-001: integrate capabilities, not
+  manufacturers. Manufacturer and protocol differences end at the Adaptix
+  driver layer; above it only these versioned contracts exist. No enum member
+  names a manufacturer, and nothing can express a command to a medical device
+  (the command plane is forbidden in v1). The therapy/control vocabulary
+  (`SynapseForbiddenControlCapability`) exists only so certification can
+  refuse it by name.
+  - `ClinicalSignalEnvelope`: the one shape of a device signal above the
+    driver layer. It has a required `idempotency_key`. Device time is kept as
+    it was reported, and corrections go in their own fields
+    (`time_quality` ORIGINAL/ESTIMATED/CORRECTED/UNTRUSTED). The payload is a
+    discriminated union (observation, waveform reference without samples,
+    therapy event, alert, document/image reference, device state with
+    battery and connection state), checked against `signal_kind`.
+  - `DeviceGenome` / `DeviceCapabilityProfile`: capability declarations keyed
+    to the existing Device row. Neither has a patient field or a tenant
+    claim. `compute_physical_identity_hash` is the one identity digest.
+  - `DeviceEvidenceReference`: immutable evidence, hash-chained per device.
+    `compute_evidence_ledger_entry_sha256` is the one definition of a chain
+    link. It comes with an evidence upload authorization request/response
+    pair (the request carries no tenant).
+  - `DeviceSessionReference` (no PHI; optional opaque care-pairing hash),
+    `SignalProvenance`, `ReplayRequest` / `ReplayResult` (replay only appends;
+    partial failure is never reported as success).
+  - Synapse Edge protocol: `EdgeInstanceRegistration` (`DeploymentProfile`
+    WINDOWS_MDT / LINUX_GATEWAY / ANDROID_FIELD), protocol negotiation with
+    clock metadata, `EdgeSignalRecord`, ordered `EdgeBatch`, `EdgeBatchAck`
+    with per-record outcomes and a highest contiguous acknowledged
+    `local_sequence` watermark, and `EdgeHeartbeat`.
+  - Transport (`TransportKind`), protocol (`ProtocolKind`), rail and
+    multi-rail resolution vocabularies. `DriverPackSupport` covers first-party
+    packs and optional `COMPAT-*` compatibility packs.
+    `blocks_core_readiness` is always `False`. A first-party pack can never be
+    in a `WAITING_EXTERNAL_*` status. Only a `CERTIFIED` pack counts as
+    supported.
+
+### Downstream impact
+
+- Additive. No existing symbol changed. No service consumes the package yet:
+  Device, Integrations, ePCR and Web adopt it in their own Synapse lanes by
+  pinning the `v5.24.0` release commit once it is tagged and approved in
+  adaptix-ops `config/platform-standard.yaml`.
+- `adaptix_contracts.synapse` is a separate package from
+  `adaptix_contracts.edge`, which stays the apparatus compute-node registry
+  (Adaptix-Edge-Service). A Synapse Edge instance may run on such a node.
+
 ## [5.23.0] - 2026-09-20
 
 ### Added

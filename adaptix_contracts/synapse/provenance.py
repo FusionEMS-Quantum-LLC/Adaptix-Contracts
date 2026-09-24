@@ -1,0 +1,267 @@
+"""Synapse provenance: shared value shapes, signal lineage and replay contracts.
+
+This module owns three things every other Synapse module builds on:
+
+1. **Value shapes** - the constrained string types for identifiers, SHA-256
+   digests, adapter keys/versions, canonical codes and media types. Declaring
+   them once keeps the Device, Integrations, ePCR and Edge sides from each
+   inventing a slightly different width or pattern.
+2. :class:`SignalProvenance` - the lineage a downstream record (for example an
+   ePCR vital imported from a device) carries back to the device signal,
+   evidence object, adapter and normalisation version that produced it.
+3. :class:`ReplayRequest` / :class:`ReplayResult` - Device asks Integrations
+   to re-normalise stored evidence. Normalisation is append-only: a replay
+   produces NEW envelopes whose provenance names the event they supersede; it
+   never rewrites or deletes the original.
+
+Alignment with existing authorities
+-----------------------------------
+* ``AdapterKey`` / ``AdapterVersion`` use exactly the ``connector_key`` and
+  ``version`` rules of Adaptix-Integrations-Service
+  ``integrations_app/connector_sdk/manifest.py`` (``_KEY_RE``, ``_SEMVER_RE``,
+  length 3-64), because a Synapse adapter IS a connector registered there.
+* ``SynapseId`` fits the ``String(36)`` primary/tenant key columns of
+  Adaptix-Device-Service ``device_app/models.py``.
+* ``CorrelationId`` is bounded by
+  :data:`adaptix_contracts.events.bus_limits.BUS_CORRELATION_ID_MAX_LENGTH`,
+  read from its owner rather than restated.
+"""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
+
+from adaptix_contracts.events.bus_limits import BUS_CORRELATION_ID_MAX_LENGTH
+from adaptix_contracts.synapse.enums import (
+    SynapseReplayFailureReason,
+    SynapseReplayReason,
+    SynapseReplayStatus,
+)
+
+#: Lowercase hex SHA-256 digest. Uppercase is rejected rather than folded so
+#: one object has exactly one digest spelling and equality checks are exact.
+Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+
+#: Adaptix-issued identifier (UUID string or similar); fits ``String(36)``.
+SynapseId = Annotated[
+    str,
+    StringConstraints(
+        min_length=1, max_length=36, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    ),
+]
+
+#: Opaque external key (device record id, idempotency key, vendor reference).
+#: Printable, bounded; control characters are refused so a key can never
+#: smuggle a log-injection or header-splitting payload.
+ExternalKey = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=255, pattern=r"^[^\x00-\x1f\x7f]+$"),
+]
+
+#: Integrations ``connector_key`` rule (connector_sdk/manifest.py ``_KEY_RE``).
+AdapterKey = Annotated[
+    str,
+    StringConstraints(
+        min_length=3, max_length=64, pattern=r"^[a-z][a-z0-9_]*(?:[.-][a-z0-9_]+)*$"
+    ),
+]
+
+#: Semantic version (connector_sdk/manifest.py ``_SEMVER_RE``).
+SemanticVersion = Annotated[
+    str,
+    StringConstraints(
+        max_length=64,
+        pattern=r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$",
+    ),
+]
+
+#: Canonical Adaptix code (signal codes, channels, alert/therapy/state codes).
+#: Lowercase dotted slug; a manufacturer-native code never reaches this layer.
+CanonicalCode = Annotated[
+    str,
+    StringConstraints(
+        min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*$"
+    ),
+]
+
+#: Correlation id, bounded by the event-bus owner of that width.
+CorrelationId = Annotated[
+    str, StringConstraints(min_length=1, max_length=BUS_CORRELATION_ID_MAX_LENGTH)
+]
+
+#: ``type/subtype`` media type, lowercase, without parameters.
+MediaType = Annotated[
+    str,
+    StringConstraints(
+        max_length=127,
+        pattern=r"^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$",
+    ),
+]
+
+#: Upper bound on evidence objects addressed by one replay request.
+REPLAY_MAX_EVIDENCE_IDS = 500
+
+_STRICT = ConfigDict(extra="forbid", frozen=True)
+
+
+class SignalProvenance(BaseModel):
+    """Lineage from a downstream record back to the device signal behind it.
+
+    ``device_event_id`` is the Device-service event that holds the normalised
+    signal. ``supersedes_event_id`` is set only when that event was produced by
+    a re-normalisation replay; the superseded event is retained, never deleted.
+    """
+
+    model_config = _STRICT
+
+    device_event_id: SynapseId
+    device_session_id: SynapseId | None = None
+    evidence_id: SynapseId | None = None
+    evidence_sha256: Sha256Hex | None = None
+    adapter_key: AdapterKey
+    adapter_version: SemanticVersion
+    normalization_version: SemanticVersion
+    supersedes_event_id: SynapseId | None = None
+
+    @model_validator(mode="after")
+    def _evidence_pair_and_supersession(self) -> SignalProvenance:
+        if (self.evidence_id is None) != (self.evidence_sha256 is None):
+            raise ValueError(
+                "evidence_id and evidence_sha256 must be provided together: an "
+                "evidence pointer without its digest cannot be verified"
+            )
+        if self.supersedes_event_id == self.device_event_id:
+            raise ValueError("an event cannot supersede itself")
+        return self
+
+
+class ReplayRequest(BaseModel):
+    """Device -> Integrations: re-normalise stored device evidence.
+
+    ``replay_id`` is the idempotency key: Integrations executes one
+    ``replay_id`` once and answers a re-delivery with the recorded
+    :class:`ReplayResult`. ``tenant_id`` is set by the Device service from the
+    persisted Device row, never from a caller-supplied body.
+    """
+
+    model_config = _STRICT
+
+    replay_id: SynapseId
+    tenant_id: SynapseId
+    device_id: SynapseId
+    adapter_key: AdapterKey
+    evidence_ids: list[SynapseId] = Field(
+        min_length=1, max_length=REPLAY_MAX_EVIDENCE_IDS
+    )
+    target_normalization_version: SemanticVersion
+    reason: SynapseReplayReason
+    requested_at: AwareDatetime
+    correlation_id: CorrelationId
+
+    @model_validator(mode="after")
+    def _evidence_ids_unique(self) -> ReplayRequest:
+        if len(set(self.evidence_ids)) != len(self.evidence_ids):
+            raise ValueError("evidence_ids must not repeat")
+        return self
+
+
+class ReplayEvidenceFailure(BaseModel):
+    """One evidence object a replay could not re-normalise, and why."""
+
+    model_config = _STRICT
+
+    evidence_id: SynapseId
+    reason: SynapseReplayFailureReason
+
+
+class ReplayResult(BaseModel):
+    """Integrations -> Device: the outcome of one :class:`ReplayRequest`.
+
+    ``status`` must agree with what actually happened. ``COMPLETED`` with a
+    failure, or ``FAILED`` with re-normalised evidence, is rejected: a partial
+    replay is reported as ``PARTIALLY_COMPLETED``, never as success.
+    """
+
+    model_config = _STRICT
+
+    replay_id: SynapseId
+    tenant_id: SynapseId
+    device_id: SynapseId
+    status: SynapseReplayStatus
+    normalization_version: SemanticVersion
+    renormalized_evidence_ids: list[SynapseId] = Field(default_factory=list)
+    produced_event_ids: list[SynapseId] = Field(default_factory=list)
+    failures: list[ReplayEvidenceFailure] = Field(default_factory=list)
+    completed_at: AwareDatetime
+    correlation_id: CorrelationId
+
+    @model_validator(mode="after")
+    def _status_matches_outcome(self) -> ReplayResult:
+        done = set(self.renormalized_evidence_ids)
+        failed = [failure.evidence_id for failure in self.failures]
+        if len(done) != len(self.renormalized_evidence_ids):
+            raise ValueError("renormalized_evidence_ids must not repeat")
+        if len(set(failed)) != len(failed):
+            raise ValueError("an evidence id may fail at most once per replay")
+        if done & set(failed):
+            raise ValueError("an evidence id cannot be both re-normalised and failed")
+        if len(set(self.produced_event_ids)) != len(self.produced_event_ids):
+            raise ValueError("produced_event_ids must not repeat")
+        if self.status is SynapseReplayStatus.COMPLETED and (failed or not done):
+            raise ValueError(
+                "COMPLETED requires every evidence id re-normalised and no failures"
+            )
+        if self.status is SynapseReplayStatus.FAILED and (
+            done or self.produced_event_ids or not failed
+        ):
+            raise ValueError(
+                "FAILED requires at least one failure and no re-normalised output"
+            )
+        if self.status is SynapseReplayStatus.PARTIALLY_COMPLETED and not (
+            done and failed
+        ):
+            raise ValueError(
+                "PARTIALLY_COMPLETED requires both re-normalised and failed evidence"
+            )
+        return self
+
+    def unaccounted_evidence_ids(self, request: ReplayRequest) -> frozenset[str]:
+        """Evidence ids the request named that this result neither re-normalised
+        nor reported as failed. Anything returned here was silently dropped."""
+
+        if (request.replay_id, request.tenant_id, request.device_id) != (
+            self.replay_id,
+            self.tenant_id,
+            self.device_id,
+        ):
+            raise ValueError("result does not answer this replay request")
+        accounted = set(self.renormalized_evidence_ids) | {
+            failure.evidence_id for failure in self.failures
+        }
+        return frozenset(set(request.evidence_ids) - accounted)
+
+
+__all__ = [
+    "REPLAY_MAX_EVIDENCE_IDS",
+    "AdapterKey",
+    "CanonicalCode",
+    "CorrelationId",
+    "ExternalKey",
+    "MediaType",
+    "ReplayEvidenceFailure",
+    "ReplayRequest",
+    "ReplayResult",
+    "SemanticVersion",
+    "Sha256Hex",
+    "SignalProvenance",
+    "SynapseId",
+]
