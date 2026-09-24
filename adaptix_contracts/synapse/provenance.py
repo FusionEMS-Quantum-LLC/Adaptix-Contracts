@@ -1,15 +1,18 @@
 """Synapse provenance: shared value shapes, signal lineage and replay contracts.
 
-This module owns three things every other Synapse module builds on:
+This module owns four things every other Synapse module builds on:
 
 1. **Value shapes** - the constrained string types for identifiers, SHA-256
-   digests, adapter keys/versions, canonical codes and media types. Declaring
-   them once keeps the Device, Integrations, ePCR and Edge sides from each
-   inventing a slightly different width or pattern.
-2. :class:`SignalProvenance` - the lineage a downstream record (for example an
+   digests, adapter keys/versions, canonical codes, media types, UCUM units
+   and device-reported text. Declaring them once keeps the Device,
+   Integrations, ePCR and Edge sides from each inventing a slightly different
+   width or pattern.
+2. :class:`SynapseModel` - the one base of every Synapse contract model, so
+   "unknown fields are refused and instances are immutable" is declared once.
+3. :class:`SignalProvenance` - the lineage a downstream record (for example an
    ePCR vital imported from a device) carries back to the device signal,
    evidence object, adapter and normalisation version that produced it.
-3. :class:`ReplayRequest` / :class:`ReplayResult` - Device asks Integrations
+4. :class:`ReplayRequest` / :class:`ReplayResult` - Device asks Integrations
    to re-normalise stored evidence. Normalisation is append-only: a replay
    produces NEW envelopes whose provenance names the event they supersede; it
    never rewrites or deletes the original.
@@ -21,7 +24,9 @@ Alignment with existing authorities
   ``integrations_app/connector_sdk/manifest.py`` (``_KEY_RE``, ``_SEMVER_RE``,
   length 3-64), because a Synapse adapter IS a connector registered there.
 * ``SynapseId`` fits the ``String(36)`` primary/tenant key columns of
-  Adaptix-Device-Service ``device_app/models.py``.
+  Adaptix-Device-Service ``device_app/models.py``; ``DeviceClass`` and
+  ``IdentityText`` fit its ``device_type`` and manufacturer/model/serial
+  columns.
 * ``CorrelationId`` is bounded by
   :data:`adaptix_contracts.events.bus_limits.BUS_CORRELATION_ID_MAX_LENGTH`,
   read from its owner rather than restated.
@@ -107,21 +112,71 @@ MediaType = Annotated[
     ),
 ]
 
+#: Device class slug; fits ``Device.device_type`` (``String(64)``).
+DeviceClass = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]*$"),
+]
+
+#: Manufacturer-reported identity text (manufacturer, model, serial number);
+#: fits the ``String(128)`` identity columns of ``Device``. Control characters
+#: are refused, which is what lets the physical identity digest separate its
+#: parts with the ASCII unit separator.
+IdentityText = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[^\x00-\x1f\x7f]+$",
+    ),
+]
+
+#: Driver pack id: upper-case dash-separated words ending in a three-digit
+#: serial, e.g. ``COMPAT-<NAME>-001``.
+DriverPackId = Annotated[
+    str,
+    StringConstraints(
+        min_length=5, max_length=64, pattern=r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-[0-9]{3}$"
+    ),
+]
+
+#: UCUM unit expression (printable ASCII, no whitespace), e.g. ``/min``,
+#: ``%``, ``mm[Hg]``, ``Cel``.
+UcumUnit = Annotated[
+    str, StringConstraints(min_length=1, max_length=64, pattern=r"^[!-~]+$")
+]
+
+#: A text value a device reported (a rhythm label, a ventilator mode):
+#: bounded and free of control characters.
+ReportedText = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=256, pattern=r"^[^\x00-\x1f\x7f]+$"),
+]
+
 #: Upper bound on evidence objects addressed by one replay request.
 REPLAY_MAX_EVIDENCE_IDS = 500
 
-_STRICT = ConfigDict(extra="forbid", frozen=True)
+
+class SynapseModel(BaseModel):
+    """Base of every Synapse contract model.
+
+    Unknown fields are refused (``extra="forbid"``), so nothing - a patient
+    identifier, a tenant claim, a credential - can ride along on a contract
+    that does not declare it, and instances are immutable (``frozen``), so a
+    validated contract cannot be altered after its validators ran.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-class SignalProvenance(BaseModel):
+class SignalProvenance(SynapseModel):
     """Lineage from a downstream record back to the device signal behind it.
 
     ``device_event_id`` is the Device-service event that holds the normalised
     signal. ``supersedes_event_id`` is set only when that event was produced by
     a re-normalisation replay; the superseded event is retained, never deleted.
     """
-
-    model_config = _STRICT
 
     device_event_id: SynapseId
     device_session_id: SynapseId | None = None
@@ -144,7 +199,7 @@ class SignalProvenance(BaseModel):
         return self
 
 
-class ReplayRequest(BaseModel):
+class ReplayRequest(SynapseModel):
     """Device -> Integrations: re-normalise stored device evidence.
 
     ``replay_id`` is the idempotency key: Integrations executes one
@@ -152,8 +207,6 @@ class ReplayRequest(BaseModel):
     :class:`ReplayResult`. ``tenant_id`` is set by the Device service from the
     persisted Device row, never from a caller-supplied body.
     """
-
-    model_config = _STRICT
 
     replay_id: SynapseId
     tenant_id: SynapseId
@@ -174,24 +227,20 @@ class ReplayRequest(BaseModel):
         return self
 
 
-class ReplayEvidenceFailure(BaseModel):
+class ReplayEvidenceFailure(SynapseModel):
     """One evidence object a replay could not re-normalise, and why."""
-
-    model_config = _STRICT
 
     evidence_id: SynapseId
     reason: SynapseReplayFailureReason
 
 
-class ReplayResult(BaseModel):
+class ReplayResult(SynapseModel):
     """Integrations -> Device: the outcome of one :class:`ReplayRequest`.
 
     ``status`` must agree with what actually happened. ``COMPLETED`` with a
     failure, or ``FAILED`` with re-normalised evidence, is rejected: a partial
     replay is reported as ``PARTIALLY_COMPLETED``, never as success.
     """
-
-    model_config = _STRICT
 
     replay_id: SynapseId
     tenant_id: SynapseId
@@ -255,13 +304,19 @@ __all__ = [
     "AdapterKey",
     "CanonicalCode",
     "CorrelationId",
+    "DeviceClass",
+    "DriverPackId",
     "ExternalKey",
+    "IdentityText",
     "MediaType",
     "ReplayEvidenceFailure",
     "ReplayRequest",
     "ReplayResult",
+    "ReportedText",
     "SemanticVersion",
     "Sha256Hex",
     "SignalProvenance",
     "SynapseId",
+    "SynapseModel",
+    "UcumUnit",
 ]

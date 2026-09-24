@@ -34,15 +34,7 @@ from datetime import timedelta
 from types import MappingProxyType
 from typing import Annotated, Any, Literal
 
-from pydantic import (
-    AwareDatetime,
-    BaseModel,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    field_validator,
-    model_validator,
-)
+from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from adaptix_contracts.synapse.enums import (
     SynapseAlertCondition,
@@ -62,9 +54,12 @@ from adaptix_contracts.synapse.provenance import (
     CorrelationId,
     ExternalKey,
     MediaType,
+    ReportedText,
     SemanticVersion,
     Sha256Hex,
     SynapseId,
+    SynapseModel,
+    UcumUnit,
 )
 
 #: The envelope schema version this package emits and accepts.
@@ -74,19 +69,6 @@ SYNAPSE_SIGNAL_SCHEMA_VERSION: Literal["1.0"] = "1.0"
 #: milliseconds. A device clock further out than that is not "drifted", it is
 #: unset, and its time must be reported as ``UNTRUSTED`` or ``ESTIMATED``.
 MAX_CLOCK_OFFSET_MS = 10 * 366 * 24 * 60 * 60 * 1000
-
-#: UCUM unit expression (printable ASCII, no whitespace), e.g. ``/min``,
-#: ``%``, ``mm[Hg]``, ``Cel``.
-UcumUnit = Annotated[
-    str, StringConstraints(min_length=1, max_length=64, pattern=r"^[!-~]+$")
-]
-
-_TextValue = Annotated[
-    str,
-    StringConstraints(min_length=1, max_length=256, pattern=r"^[^\x00-\x1f\x7f]+$"),
-]
-
-_STRICT = ConfigDict(extra="forbid", frozen=True)
 
 #: Payload ``payload_type`` values each signal kind may carry.
 SIGNAL_KIND_PAYLOAD_TYPES: Mapping[SynapseSignalKind, frozenset[str]] = (
@@ -132,10 +114,8 @@ def _check_unit_matches_value(value: object, unit: str | None) -> None:
         raise ValueError("a text or boolean value must not carry a unit")
 
 
-class SignalQuantity(BaseModel):
+class SignalQuantity(SynapseModel):
     """A coded numeric quantity with its UCUM unit."""
-
-    model_config = _STRICT
 
     code: CanonicalCode
     value: int | float
@@ -147,10 +127,8 @@ class SignalQuantity(BaseModel):
         return _reject_bool_and_non_finite(value)
 
 
-class ObservationReferenceRange(BaseModel):
+class ObservationReferenceRange(SynapseModel):
     """The normal range the device reported for an observation."""
-
-    model_config = _STRICT
 
     low: float | None = None
     high: float | None = None
@@ -167,7 +145,7 @@ class ObservationReferenceRange(BaseModel):
         return self
 
 
-class ObservationPayload(BaseModel):
+class ObservationPayload(SynapseModel):
     """One measured observation (a vital sign, a temperature, a lab-like value).
 
     ``code`` is the canonical Synapse observation code. A numeric ``value``
@@ -175,11 +153,9 @@ class ObservationPayload(BaseModel):
     carries none.
     """
 
-    model_config = _STRICT
-
     payload_type: Literal["observation"] = "observation"
     code: CanonicalCode
-    value: int | float | _TextValue
+    value: int | float | ReportedText
     unit: UcumUnit | None = None
     reference_range: ObservationReferenceRange | None = None
     device_quality: SynapseMeasurementValidity | None = None
@@ -199,13 +175,11 @@ class ObservationPayload(BaseModel):
         return self
 
 
-class WaveformCalibration(BaseModel):
+class WaveformCalibration(SynapseModel):
     """Maps stored sample counts to physical units.
 
     ``physical = offset + scale_factor * sample``.
     """
-
-    model_config = _STRICT
 
     unit: UcumUnit
     scale_factor: float
@@ -220,15 +194,13 @@ class WaveformCalibration(BaseModel):
         return self
 
 
-class WaveformReferencePayload(BaseModel):
+class WaveformReferencePayload(SynapseModel):
     """A pointer to one stored waveform segment. It carries NO samples.
 
     The samples live in the evidence object ``evidence_id``, encoded as
     ``encoding`` with media type ``content_type``. ``sample_count`` may be
     lower than the window allows (dropouts) but never higher.
     """
-
-    model_config = _STRICT
 
     payload_type: Literal["waveform_reference"] = "waveform_reference"
     channel: CanonicalCode
@@ -255,10 +227,8 @@ class WaveformReferencePayload(BaseModel):
         return self
 
 
-class TherapyEventPayload(BaseModel):
+class TherapyEventPayload(SynapseModel):
     """A therapy the device REPORTS it delivered (a record, never a command)."""
-
-    model_config = _STRICT
 
     payload_type: Literal["therapy_event"] = "therapy_event"
     therapy_code: CanonicalCode
@@ -273,10 +243,8 @@ class TherapyEventPayload(BaseModel):
         return self
 
 
-class AlertPayload(BaseModel):
+class AlertPayload(SynapseModel):
     """A device alarm as the device reported it."""
-
-    model_config = _STRICT
 
     payload_type: Literal["alert"] = "alert"
     alert_code: CanonicalCode
@@ -286,10 +254,8 @@ class AlertPayload(BaseModel):
     triggering_value: SignalQuantity | None = None
 
 
-class DocumentReferencePayload(BaseModel):
+class DocumentReferencePayload(SynapseModel):
     """A pointer to a stored device document or image (report, 12-lead, still)."""
-
-    model_config = _STRICT
 
     payload_type: Literal["document_reference"] = "document_reference"
     document_type: CanonicalCode
@@ -297,14 +263,12 @@ class DocumentReferencePayload(BaseModel):
     media_type: MediaType
 
 
-class DeviceBatteryState(BaseModel):
+class DeviceBatteryState(SynapseModel):
     """The device's own battery as it reported it.
 
     At least one field is present; a device that reports nothing about its
     battery sends no ``battery`` object rather than an empty one.
     """
-
-    model_config = _STRICT
 
     level_percent: float | None = Field(default=None, ge=0, le=100)
     charging: bool | None = None
@@ -323,7 +287,7 @@ class DeviceBatteryState(BaseModel):
         return self
 
 
-class DeviceStatePayload(BaseModel):
+class DeviceStatePayload(SynapseModel):
     """Operational state of the device itself (not the patient).
 
     ``state_code`` names what is being reported. ``battery`` and
@@ -334,11 +298,9 @@ class DeviceStatePayload(BaseModel):
     Numeric values require a UCUM unit; boolean and text values carry none.
     """
 
-    model_config = _STRICT
-
     payload_type: Literal["device_state"] = "device_state"
     state_code: CanonicalCode
-    value: bool | int | float | _TextValue | None = None
+    value: bool | int | float | ReportedText | None = None
     unit: UcumUnit | None = None
     battery: DeviceBatteryState | None = None
     connection_state: SynapseConnectionState | None = None
@@ -378,7 +340,7 @@ SynapseSignalPayload = Annotated[
 ]
 
 
-class ClinicalSignalEnvelope(BaseModel):
+class ClinicalSignalEnvelope(SynapseModel):
     """The canonical, manufacturer-neutral envelope for one device signal.
 
     Identity and replay safety: ``event_id`` names this normalised signal;
@@ -388,8 +350,6 @@ class ClinicalSignalEnvelope(BaseModel):
     ``normalization_version`` names the normalisation rules that produced the
     envelope, so a later re-normalisation can supersede it without deleting it.
     """
-
-    model_config = _STRICT
 
     schema_version: Literal["1.0"] = SYNAPSE_SIGNAL_SCHEMA_VERSION
     event_id: SynapseId
@@ -525,7 +485,6 @@ __all__ = [
     "SignalQuantity",
     "SynapseSignalPayload",
     "TherapyEventPayload",
-    "UcumUnit",
     "WaveformCalibration",
     "WaveformReferencePayload",
 ]

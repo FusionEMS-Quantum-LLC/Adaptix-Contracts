@@ -7,16 +7,18 @@ from datetime import datetime, timedelta
 import pytest
 from pydantic import ValidationError
 
-from adaptix_contracts.synapse import (
-    MAX_CLOCK_OFFSET_MS,
+from adaptix_contracts.synapse.enums import (
+    SynapseConnectionState,
+    SynapseSignalKind,
+    SynapseTimeQuality,
+)
+from adaptix_contracts.synapse.signals import (
     AlertPayload,
     ClinicalSignalEnvelope,
     DeviceBatteryState,
     DeviceStatePayload,
+    MAX_CLOCK_OFFSET_MS,
     ObservationPayload,
-    SynapseConnectionState,
-    SynapseSignalKind,
-    SynapseTimeQuality,
     WaveformReferencePayload,
 )
 

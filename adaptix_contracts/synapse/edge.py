@@ -45,14 +45,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Annotated
 
-from pydantic import (
-    AwareDatetime,
-    BaseModel,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    model_validator,
-)
+from pydantic import AwareDatetime, Field, StringConstraints, model_validator
 
 from adaptix_contracts.synapse.enums import (
     RETRYABLE_EDGE_REJECTIONS,
@@ -73,6 +66,7 @@ from adaptix_contracts.synapse.provenance import (
     SemanticVersion,
     Sha256Hex,
     SynapseId,
+    SynapseModel,
 )
 from adaptix_contracts.synapse.signals import (
     MAX_CLOCK_OFFSET_MS,
@@ -93,8 +87,6 @@ SUPPORTED_EDGE_PROTOCOL_VERSIONS: tuple[str, ...] = (SYNAPSE_EDGE_PROTOCOL_VERSI
 
 #: Most records one :class:`EdgeBatch` (and so one :class:`EdgeBatchAck`) holds.
 EDGE_BATCH_MAX_RECORDS = 500
-
-_STRICT = ConfigDict(extra="forbid", frozen=True)
 
 
 def _version_key(version: str) -> tuple[int, int]:
@@ -145,15 +137,13 @@ def advance_contiguous_watermark(
     return watermark
 
 
-class EdgeInstanceRegistration(BaseModel):
+class EdgeInstanceRegistration(SynapseModel):
     """What a Synapse Edge instance declares when it registers.
 
     ``supported_protocol_versions`` are edge WIRE protocol versions;
     ``supported_transports`` and ``supported_protocols`` are the Adaptix
     transport and protocol drivers the runtime hosts.
     """
-
-    model_config = _STRICT
 
     edge_instance_id: SynapseId
     deployment_profile: DeploymentProfile
@@ -175,15 +165,13 @@ class EdgeInstanceRegistration(BaseModel):
         return self
 
 
-class EdgeProtocolOffer(BaseModel):
+class EdgeProtocolOffer(SynapseModel):
     """Edge -> cloud: the protocol versions this instance can speak.
 
     ``edge_sent_at`` is the edge wall clock when the offer left; with the
     answer's ``server_received_at`` / ``server_sent_at`` and the edge's own
     receipt time it gives the edge a round-trip clock-offset estimate.
     """
-
-    model_config = _STRICT
 
     edge_instance_id: SynapseId
     runtime_version: SemanticVersion
@@ -199,14 +187,12 @@ class EdgeProtocolOffer(BaseModel):
         return self
 
 
-class EdgeProtocolNegotiation(BaseModel):
+class EdgeProtocolNegotiation(SynapseModel):
     """Cloud -> edge: the decision on one :class:`EdgeProtocolOffer`.
 
     Accepted: ``selected_protocol_version`` is set and no refusal reason.
     Refused: a ``refusal_reason`` and no selected version.
     """
-
-    model_config = _STRICT
 
     edge_instance_id: SynapseId
     accepted: bool
@@ -245,7 +231,7 @@ class EdgeProtocolNegotiation(BaseModel):
         return True
 
 
-class EdgeSignalRecord(BaseModel):
+class EdgeSignalRecord(SynapseModel):
     """One spooled record: a canonical envelope plus its edge capture facts.
 
     The capture facts are the edge's own record of the capture and must agree
@@ -261,8 +247,6 @@ class EdgeSignalRecord(BaseModel):
       and spooled. When the envelope references stored evidence, that evidence
       IS these bytes, so the digests must match.
     """
-
-    model_config = _STRICT
 
     edge_instance_id: SynapseId
     device_id: SynapseId
@@ -308,7 +292,7 @@ class EdgeSignalRecord(BaseModel):
         return self
 
 
-class EdgeBatch(BaseModel):
+class EdgeBatch(SynapseModel):
     """Edge -> cloud: an ordered slice of the spool.
 
     ``batch_id`` makes the batch itself idempotent: re-sending a batch after a
@@ -316,8 +300,6 @@ class EdgeBatch(BaseModel):
     instance, ascend strictly by ``local_sequence`` and never repeat an
     idempotency key.
     """
-
-    model_config = _STRICT
 
     batch_id: SynapseId
     edge_instance_id: SynapseId
@@ -342,10 +324,8 @@ class EdgeBatch(BaseModel):
         return self
 
 
-class EdgeRecordAck(BaseModel):
+class EdgeRecordAck(SynapseModel):
     """The cloud's answer for one record of an :class:`EdgeBatch`."""
-
-    model_config = _STRICT
 
     local_sequence: int = Field(ge=1)
     idempotency_key: ExternalKey
@@ -373,7 +353,7 @@ class EdgeRecordAck(BaseModel):
         return self.rejection_reason not in RETRYABLE_EDGE_REJECTIONS
 
 
-class EdgeBatchAck(BaseModel):
+class EdgeBatchAck(SynapseModel):
     """Cloud -> edge: the per-record answers for one :class:`EdgeBatch`.
 
     ``highest_contiguous_acknowledged_sequence`` is this instance's watermark
@@ -381,8 +361,6 @@ class EdgeBatchAck(BaseModel):
     :func:`advance_contiguous_watermark`). A record still awaiting a resend
     can never sit at or below it.
     """
-
-    model_config = _STRICT
 
     batch_id: SynapseId
     edge_instance_id: SynapseId
@@ -442,15 +420,13 @@ class EdgeBatchAck(BaseModel):
         return frozenset(r.local_sequence for r in self.results if r.releasable)
 
 
-class EdgeClockMetadata(BaseModel):
+class EdgeClockMetadata(SynapseModel):
     """The edge's account of its own wall clock.
 
     ``estimated_offset_ms`` is edge clock minus the Adaptix reference clock
     (positive: the edge runs ahead). ``estimated_uncertainty_ms`` bounds that
     estimate and is only carried with it.
     """
-
-    model_config = _STRICT
 
     edge_clock_at: AwareDatetime
     clock_source: EdgeClockSource
@@ -472,10 +448,8 @@ class EdgeClockMetadata(BaseModel):
         return self
 
 
-class EdgeTransportStatus(BaseModel):
+class EdgeTransportStatus(SynapseModel):
     """State of one transport driver hosted by the edge instance."""
-
-    model_config = _STRICT
 
     transport: TransportKind
     state: SynapseConnectionState
@@ -492,7 +466,7 @@ class EdgeTransportStatus(BaseModel):
         return self
 
 
-class EdgeHeartbeat(BaseModel):
+class EdgeHeartbeat(SynapseModel):
     """Edge -> cloud: liveness, spool, clock and transport state.
 
     ``spool_depth`` counts records captured and not yet released (including
@@ -502,8 +476,6 @@ class EdgeHeartbeat(BaseModel):
     ``highest_acknowledged_sequence`` is the watermark the edge last received
     and can never exceed it.
     """
-
-    model_config = _STRICT
 
     edge_instance_id: SynapseId
     runtime_version: SemanticVersion

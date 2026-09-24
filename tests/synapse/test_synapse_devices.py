@@ -5,17 +5,19 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from adaptix_contracts.synapse import (
+from adaptix_contracts.synapse.devices import (
     DeviceAdapterRef,
     DeviceCapabilityProfile,
     DeviceGenome,
     DeviceIdentity,
     DriverPackSupport,
+    compute_physical_identity_hash,
+)
+from adaptix_contracts.synapse.enums import (
     DriverPackSupportStatus,
     DriverPackTier,
     SynapseDeviceCapability,
     SynapseSignalKind,
-    compute_physical_identity_hash,
 )
 
 #: Field-name fragments that would indicate patient identity or chart linkage.

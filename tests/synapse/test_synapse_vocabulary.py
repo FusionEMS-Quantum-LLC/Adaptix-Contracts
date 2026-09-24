@@ -7,21 +7,22 @@ here changes what every Synapse producer and consumer may say on the wire.
 from __future__ import annotations
 
 import enum
+import importlib
 import inspect
+from types import ModuleType
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
+import adaptix_contracts.synapse as synapse_package
 from adaptix_contracts.synapse import enums as synapse_enums
-from adaptix_contracts.synapse import (
-    FORBIDDEN_CONTROL_CAPABILITIES,
-    RETRYABLE_EDGE_REJECTIONS,
-    SIGNAL_KIND_PAYLOAD_TYPES,
-    SIGNAL_KIND_REQUIRED_CAPABILITY,
-    ClinicalSignalEnvelope,
+from adaptix_contracts.synapse.enums import (
     DeploymentProfile,
     EdgeRecordRejectionReason,
+    FORBIDDEN_CONTROL_CAPABILITIES,
     ProtocolKind,
+    RETRYABLE_EDGE_REJECTIONS,
+    SIGNAL_KIND_REQUIRED_CAPABILITY,
     SynapseDeviceCapability,
     SynapseForbiddenControlCapability,
     SynapseRailResolution,
@@ -30,6 +31,11 @@ from adaptix_contracts.synapse import (
     SynapseTimeQuality,
     TransportKind,
     is_forbidden_control_capability,
+)
+from adaptix_contracts.synapse.provenance import SynapseModel
+from adaptix_contracts.synapse.signals import (
+    ClinicalSignalEnvelope,
+    SIGNAL_KIND_PAYLOAD_TYPES,
 )
 
 
@@ -243,3 +249,53 @@ def test_unknown_signal_kind_is_rejected(envelope_data, kind: str) -> None:
 def test_unknown_time_quality_is_rejected(envelope_data, quality: str) -> None:
     with pytest.raises(ValidationError):
         ClinicalSignalEnvelope.model_validate(envelope_data(time_quality=quality))
+
+
+def _synapse_modules() -> list[ModuleType]:
+    return [
+        importlib.import_module(f"adaptix_contracts.synapse.{name}")
+        for name in (
+            "devices",
+            "edge",
+            "enums",
+            "evidence",
+            "provenance",
+            "sessions",
+            "signals",
+        )
+    ]
+
+
+def test_every_public_name_has_exactly_one_defining_module() -> None:
+    """Each public name is declared once, in its defining module's ``__all__``;
+    the package root re-lists nothing, so there is no second list to drift."""
+
+    owners: dict[str, str] = {}
+    for module in _synapse_modules():
+        for public in module.__all__:
+            assert hasattr(module, public), (module.__name__, public)
+            assert public not in owners, (public, owners.get(public), module.__name__)
+            owners[public] = module.__name__.rsplit(".", 1)[-1]
+    assert not hasattr(synapse_package, "__all__")
+    assert owners["ClinicalSignalEnvelope"] == "signals"
+    assert owners["DeviceGenome"] == "devices"
+    assert owners["EdgeBatchAck"] == "edge"
+    assert owners["SynapseModel"] == "provenance"
+    assert owners["UcumUnit"] == "provenance"
+
+
+def test_every_contract_model_refuses_unknown_fields_and_is_immutable() -> None:
+    """Strictness is declared once, on ``SynapseModel``; no model may drop it,
+    or a patient identifier or tenant claim could ride along unnoticed."""
+
+    models = {
+        obj
+        for module in _synapse_modules()
+        for _, obj in inspect.getmembers(module, inspect.isclass)
+        if issubclass(obj, BaseModel) and obj.__module__ == module.__name__
+    }
+    assert ClinicalSignalEnvelope in models
+    for model in models:
+        assert issubclass(model, SynapseModel), model
+        assert model.model_config.get("extra") == "forbid", model
+        assert model.model_config.get("frozen") is True, model

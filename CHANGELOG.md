@@ -25,6 +25,15 @@ from the installed package metadata).
   (the command plane is forbidden in v1). The therapy/control vocabulary
   (`SynapseForbiddenControlCapability`) exists only so certification can
   refuse it by name.
+  - Import each name from the module that defines it, for example
+    `from adaptix_contracts.synapse.signals import ClinicalSignalEnvelope`.
+    The package root re-exports nothing, so every public name is declared
+    exactly once, in its module's `__all__`.
+  - `provenance.SynapseModel` is the one base of every Synapse model: unknown
+    fields are refused and instances are immutable. `provenance` also owns
+    the shared value shapes (`SynapseId`, `Sha256Hex`, `AdapterKey`,
+    `SemanticVersion`, `CanonicalCode`, `MediaType`, `UcumUnit`,
+    `ReportedText`, ...).
   - `ClinicalSignalEnvelope`: the one shape of a device signal above the
     driver layer. It has a required `idempotency_key`. Device time is kept as
     it was reported, and corrections go in their own fields

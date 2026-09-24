@@ -8,10 +8,8 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from adaptix_contracts.synapse import (
+from adaptix_contracts.synapse.edge import (
     EDGE_BATCH_MAX_RECORDS,
-    SUPPORTED_EDGE_PROTOCOL_VERSIONS,
-    SYNAPSE_EDGE_PROTOCOL_VERSION,
     EdgeBatch,
     EdgeBatchAck,
     EdgeHeartbeat,
@@ -20,6 +18,8 @@ from adaptix_contracts.synapse import (
     EdgeProtocolOffer,
     EdgeRecordAck,
     EdgeSignalRecord,
+    SUPPORTED_EDGE_PROTOCOL_VERSIONS,
+    SYNAPSE_EDGE_PROTOCOL_VERSION,
     advance_contiguous_watermark,
     select_edge_protocol_version,
 )

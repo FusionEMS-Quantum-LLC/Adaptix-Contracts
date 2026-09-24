@@ -14,9 +14,11 @@ from typing import Any
 
 import pytest
 
-from adaptix_contracts.synapse import (
-    compute_evidence_ledger_entry_sha256,
+from adaptix_contracts.synapse.devices import (
     compute_physical_identity_hash,
+)
+from adaptix_contracts.synapse.evidence import (
+    compute_evidence_ledger_entry_sha256,
 )
 
 T0 = datetime(2026, 9, 24, 14, 0, 0, tzinfo=UTC)

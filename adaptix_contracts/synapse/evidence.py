@@ -42,8 +42,6 @@ from urllib.parse import urlsplit
 
 from pydantic import (
     AwareDatetime,
-    BaseModel,
-    ConfigDict,
     Field,
     StringConstraints,
     field_validator,
@@ -60,6 +58,7 @@ from adaptix_contracts.synapse.provenance import (
     SemanticVersion,
     Sha256Hex,
     SynapseId,
+    SynapseModel,
 )
 
 #: Largest object one presigned PUT can carry (the S3 single-PUT ceiling).
@@ -79,8 +78,6 @@ _HeaderName = Annotated[
 _HeaderValue = Annotated[
     str, StringConstraints(max_length=2048, pattern=r"^[^\x00-\x1f\x7f]*$")
 ]
-
-_STRICT = ConfigDict(extra="forbid", frozen=True)
 
 
 #: Domain-separation tag for the evidence ledger chain digest. A new chain
@@ -138,7 +135,7 @@ def compute_evidence_ledger_entry_sha256(
     return hashlib.sha256(_LEDGER_SEPARATOR.join(parts).encode("utf-8")).hexdigest()
 
 
-class DeviceEvidenceReference(BaseModel):
+class DeviceEvidenceReference(SynapseModel):
     """A stored, immutable device evidence object and its ledger link.
 
     ``storage_version`` pins the exact stored object version so a later write
@@ -148,8 +145,6 @@ class DeviceEvidenceReference(BaseModel):
     (absent only for the first entry); ``entry_sha256`` must equal
     :func:`compute_evidence_ledger_entry_sha256` of this entry.
     """
-
-    model_config = _STRICT
 
     id: SynapseId
     tenant_id: SynapseId
@@ -233,15 +228,13 @@ class DeviceEvidenceReference(BaseModel):
         return value
 
 
-class EvidenceUploadAuthorizationRequest(BaseModel):
+class EvidenceUploadAuthorizationRequest(SynapseModel):
     """Integrations -> Device: authorise one evidence upload.
 
     Idempotent on ``(device_id, sha256)``: asking again for bytes the Device
     service already holds returns the existing ``evidence_id`` with
     ``upload_required`` false, so a retransmission is harmless.
     """
-
-    model_config = _STRICT
 
     device_id: SynapseId
     device_session_id: SynapseId | None = None
@@ -260,7 +253,7 @@ class EvidenceUploadAuthorizationRequest(BaseModel):
         return _reject_url(value)
 
 
-class EvidenceUploadAuthorizationResponse(BaseModel):
+class EvidenceUploadAuthorizationResponse(SynapseModel):
     """Device -> Integrations: where and how to PUT the evidence bytes.
 
     ``upload_url`` is a short-lived presigned HTTPS PUT URL. It is a bearer
@@ -268,8 +261,6 @@ class EvidenceUploadAuthorizationResponse(BaseModel):
     never be logged or persisted. When ``upload_required`` is false the bytes
     are already stored under ``evidence_id`` and there is nothing to upload.
     """
-
-    model_config = _STRICT
 
     evidence_id: SynapseId
     upload_required: bool

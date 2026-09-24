@@ -24,17 +24,9 @@ a first-party Adaptix capability.
 from __future__ import annotations
 
 import hashlib
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
-from pydantic import (
-    AwareDatetime,
-    BaseModel,
-    ConfigDict,
-    Field,
-    StringConstraints,
-    field_validator,
-    model_validator,
-)
+from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from adaptix_contracts.synapse.enums import (
     EXTERNAL_WAIT_DRIVER_PACK_STATUSES,
@@ -48,28 +40,14 @@ from adaptix_contracts.synapse.enums import (
 )
 from adaptix_contracts.synapse.provenance import (
     AdapterKey,
+    DeviceClass,
+    DriverPackId,
+    IdentityText,
     SemanticVersion,
     Sha256Hex,
     SynapseId,
+    SynapseModel,
 )
-
-#: Device class slug; fits ``Device.device_type`` (``String(64)``).
-DeviceClass = Annotated[
-    str,
-    StringConstraints(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]*$"),
-]
-
-_IdentityText = Annotated[
-    str,
-    StringConstraints(
-        strip_whitespace=True,
-        min_length=1,
-        max_length=128,
-        pattern=r"^[^\x00-\x1f\x7f]+$",
-    ),
-]
-
-_STRICT = ConfigDict(extra="forbid", frozen=True)
 
 #: Separator used when hashing identity parts. ASCII unit separator cannot
 #: appear in a validated identity part, so ``("ab", "c")`` and ``("a", "bc")``
@@ -94,7 +72,7 @@ def compute_physical_identity_hash(
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-class DeviceIdentity(BaseModel):
+class DeviceIdentity(SynapseModel):
     """Manufacturer-reported physical identity of one device.
 
     ``manufacturer`` and ``model`` are recorded facts about the hardware, not
@@ -104,11 +82,9 @@ class DeviceIdentity(BaseModel):
     rejected so the digest can never drift from the identity it names.
     """
 
-    model_config = _STRICT
-
-    manufacturer: _IdentityText
-    model: _IdentityText
-    serial_number: _IdentityText
+    manufacturer: IdentityText
+    model: IdentityText
+    serial_number: IdentityText
     physical_identity_hash: Sha256Hex
 
     @model_validator(mode="after")
@@ -124,10 +100,8 @@ class DeviceIdentity(BaseModel):
         return self
 
 
-class DeviceAdapterRef(BaseModel):
+class DeviceAdapterRef(SynapseModel):
     """The Integrations adapter (connector) that decodes this device."""
-
-    model_config = _STRICT
 
     key: AdapterKey
     version: SemanticVersion
@@ -138,15 +112,13 @@ def _check_unique(name: str, values: list[Any]) -> None:
         raise ValueError(f"{name} must not repeat")
 
 
-class _DeviceDeclaration(BaseModel):
+class _DeviceDeclaration(SynapseModel):
     """Fields shared by the genome and the identity-free profile.
 
     Private base: neither public model subclasses the other, so a genome
     (which carries physical identity) can never be passed where an
     identity-free profile is expected.
     """
-
-    model_config = _STRICT
 
     device_id: SynapseId
     genome_version: int = Field(ge=1)
@@ -240,20 +212,11 @@ class DeviceGenome(_DeviceDeclaration):
         )
 
 
-#: Driver pack id: upper-case dash-separated words ending in a three-digit
-#: serial, e.g. ``COMPAT-<NAME>-001``.
-DriverPackId = Annotated[
-    str,
-    StringConstraints(
-        min_length=5, max_length=64, pattern=r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-[0-9]{3}$"
-    ),
-]
-
 #: Prefix every optional manufacturer compatibility pack id carries.
 COMPAT_DRIVER_PACK_PREFIX = "COMPAT-"
 
 
-class DriverPackSupport(BaseModel):
+class DriverPackSupport(SynapseModel):
     """Enablement and certification status of one Synapse driver pack.
 
     Rules this contract enforces:
@@ -269,8 +232,6 @@ class DriverPackSupport(BaseModel):
     * ``CERTIFIED`` requires the exact adapter version that was certified and
       when. Only a ``CERTIFIED`` pack is :attr:`supported`.
     """
-
-    model_config = _STRICT
 
     driver_pack_id: DriverPackId
     tier: DriverPackTier
@@ -318,10 +279,8 @@ __all__ = [
     "COMPAT_DRIVER_PACK_PREFIX",
     "DeviceAdapterRef",
     "DeviceCapabilityProfile",
-    "DeviceClass",
     "DeviceGenome",
     "DeviceIdentity",
-    "DriverPackId",
     "DriverPackSupport",
     "compute_physical_identity_hash",
 ]

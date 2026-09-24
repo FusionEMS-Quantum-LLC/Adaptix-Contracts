@@ -13,13 +13,18 @@ can resolve; the legal chart association itself is owned by the ePCR service.
 
 from __future__ import annotations
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, model_validator
+from pydantic import AwareDatetime, model_validator
 
 from adaptix_contracts.synapse.enums import SynapseSessionState, SynapseSessionType
-from adaptix_contracts.synapse.provenance import ExternalKey, Sha256Hex, SynapseId
+from adaptix_contracts.synapse.provenance import (
+    ExternalKey,
+    Sha256Hex,
+    SynapseId,
+    SynapseModel,
+)
 
 
-class DeviceSessionReference(BaseModel):
+class DeviceSessionReference(SynapseModel):
     """A reference to one device session.
 
     ``external_session_key`` is the device-native session/case key as the
@@ -27,8 +32,6 @@ class DeviceSessionReference(BaseModel):
     resolves to one reference. Timestamps are timezone-aware; an ``OPEN``
     session has no ``ended_at`` and a ``CLOSED`` one must have it.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: SynapseId
     tenant_id: SynapseId

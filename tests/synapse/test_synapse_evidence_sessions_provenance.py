@@ -8,15 +8,19 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from adaptix_contracts.synapse import (
+from adaptix_contracts.synapse.evidence import (
     DeviceEvidenceReference,
-    DeviceSessionReference,
     EvidenceUploadAuthorizationRequest,
     EvidenceUploadAuthorizationResponse,
+    compute_evidence_ledger_entry_sha256,
+)
+from adaptix_contracts.synapse.provenance import (
     ReplayRequest,
     ReplayResult,
     SignalProvenance,
-    compute_evidence_ledger_entry_sha256,
+)
+from adaptix_contracts.synapse.sessions import (
+    DeviceSessionReference,
 )
 
 # --- evidence ledger ---------------------------------------------------------
