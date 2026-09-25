@@ -450,15 +450,6 @@ _NOT_IN_REGISTRY: Final[str] = (
 # record a producer that does not reach the Core operational backbone this
 # registry governs, or stamp a source_service that is not a service-registry
 # slug. Verified 2026-09-21.
-_CREWLINK_OUTBOX_UNRELAYED: Final[str] = (
-    "Adaptix-Crew-Service stages this on a CrewlinkOutboxEvent row "
-    "(crewlink_app/services/service_impl.py -> crewlink_app/outbox.py "
-    "publish_outbox), but nothing drains that outbox to Core: the service "
-    "starts only a RosterPoller and its sole outbound event path is the "
-    "SignalCore SQS queue (intelligence_events.py), so the topic never reaches "
-    "the Core event bus these consumers poll. No producer is recorded until a "
-    "relay to Core exists."
-)
 _CORE_EVENTBUS_NOT_BACKBONE: Final[str] = (
     "Produced by Adaptix-Core-Service (core_app/flow_guard/flow_guard_service.py "
     "-> core_app/events/bus.py EventBus.publish), which is Core's fire-and-forget "
@@ -489,13 +480,15 @@ _WORKFORCE_NO_PRODUCER: Final[str] = (
 #: a topic is registered the tests require its entry here to be removed.
 UNREGISTERED_SUBSCRIBED_TOPICS: Final[Mapping[str, str]] = MappingProxyType(
     {
-        # air.mission.*, cad.case.created, cad.dispatch.billing_handoff_ready and
-        # epcr.chart.patient_identified were registered in events/registry.py once
+        # air.mission.*, cad.case.created, cad.dispatch.billing_handoff_ready,
+        # epcr.chart.patient_identified, crewlink.page.acknowledged and
+        # crewlink.cad.page_escalated were registered in events/registry.py once
         # their outbox-relay-to-Core producers were proven, so they are no longer
         # listed here (the tests require a registered topic's entry to be removed).
+        # The two crewlink topics are produced by Adaptix-Crew-Service
+        # (source_service "crew"): crewlink_app/outbox.py EVENT_ROUTES sends them
+        # to Core through crewlink_app/outbox_relay.py.
         "call.received": _COMMS_WAVE4_IN_PROCESS,
-        "crewlink.cad.page_escalated": _CREWLINK_OUTBOX_UNRELAYED,
-        "crewlink.page.acknowledged": _CREWLINK_OUTBOX_UNRELAYED,
         "epcr.completed": (
             "Not a key of events.registry.ALL_EVENTS, so this contract records no "
             "producer for it. Hospital routes it to the same handler as "

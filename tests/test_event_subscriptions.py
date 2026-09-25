@@ -15,6 +15,7 @@ import pytest
 
 from adaptix_contracts.event_consumers import (
     BILLING_SERVICE_CONSUMER,
+    CAD_SERVICE_CONSUMER,
     HOSPITAL_SERVICE_CONSUMER,
     KNOWN_EVENT_BUS_CONSUMERS,
     TRANSPORT_SERVICE_CONSUMER,
@@ -35,8 +36,21 @@ from adaptix_contracts.event_subscriptions import (
     validate_declarations,
     validate_declared_subscriptions,
 )
-from adaptix_contracts.events.registry import ALL_EVENTS, producer_of
-from adaptix_contracts.schemas.service_registry import ALL_SERVICES, SERVICE_BY_SLUG
+from adaptix_contracts.events.registry import (
+    ALL_EVENTS,
+    CREWLINK_CAD_PAGE_ESCALATED,
+    CREWLINK_PAGE_ACKNOWLEDGED,
+    producer_of,
+)
+from adaptix_contracts.schemas.crewlink_contracts import (
+    CrewPageAcknowledgedEvent,
+    CrewPageEscalatedEvent,
+)
+from adaptix_contracts.schemas.service_registry import (
+    ALL_SERVICES,
+    CREW_SERVICE,
+    SERVICE_BY_SLUG,
+)
 
 _SERVICE_REPOSITORY_NAMES: dict[str, str] = {
     service.slug: service.name for service in ALL_SERVICES
@@ -177,6 +191,8 @@ def test_subscription_edges_carry_the_registered_producer_or_none() -> None:
         SubscriptionEdge(
             "billing", "billing.claim.status_updated", "epcr-service", "epcr"
         ),
+        SubscriptionEdge("crew", "crewlink.page.acknowledged", "cad-service", "cad"),
+        SubscriptionEdge("crew", "crewlink.cad.page_escalated", "cad-service", "cad"),
     }
     assert expected <= set(edges)
     for edge in edges:
@@ -185,6 +201,50 @@ def test_subscription_edges_carry_the_registered_producer_or_none() -> None:
         else:
             assert edge.producer_slug is None
             assert edge.topic in UNREGISTERED_SUBSCRIBED_TOPICS
+
+
+_CREWLINK_PAGE_TOPICS: tuple[str, ...] = (
+    "crewlink.page.acknowledged",
+    "crewlink.cad.page_escalated",
+)
+
+
+@pytest.mark.parametrize("topic", _CREWLINK_PAGE_TOPICS)
+def test_crewlink_page_topic_is_registered_to_crew_and_not_listed_unregistered(
+    topic: str,
+) -> None:
+    """Crew relays both CrewLink page topics to Core's bus, where CAD reads them.
+
+    Adaptix-Crew-Service ``crewlink_app/outbox.py`` ``EVENT_ROUTES`` routes
+    exactly these two to Core, and ``crewlink_app/outbox_relay.py`` publishes
+    them with source_domain "crew". So the contract records Crew as the
+    producer, and the old "nothing relays the Crew outbox" reason is gone.
+    """
+    assert topic in ALL_EVENTS
+    assert ALL_EVENTS[topic]["source_service"] == "crew"
+    assert producer_of(topic) is CREW_SERVICE
+    assert topic not in UNREGISTERED_SUBSCRIBED_TOPICS
+    assert subscribers_of(topic) == {CAD_SERVICE_CONSUMER}
+    edge = SubscriptionEdge("crew", topic, CAD_SERVICE_CONSUMER, "cad")
+    assert edge in subscription_edges()
+
+
+def test_crewlink_registry_constants_are_the_cad_subscribed_strings() -> None:
+    assert (CREWLINK_PAGE_ACKNOWLEDGED, CREWLINK_CAD_PAGE_ESCALATED) == (
+        _CREWLINK_PAGE_TOPICS
+    )
+    assert set(_CREWLINK_PAGE_TOPICS) <= EVENT_BUS_SUBSCRIPTIONS[CAD_SERVICE_CONSUMER]
+
+
+def test_crewlink_payload_schemas_default_to_their_registered_topic() -> None:
+    """CAD validates each payload with these schemas, then refuses any payload
+    whose ``event_type`` is not the topic it subscribed to. A payload that omits
+    ``event_type`` takes the schema default, so the default must be the topic.
+    """
+    acknowledged = CrewPageAcknowledgedEvent.model_fields["event_type"].default
+    escalated = CrewPageEscalatedEvent.model_fields["event_type"].default
+    assert acknowledged == CREWLINK_PAGE_ACKNOWLEDGED
+    assert escalated == CREWLINK_CAD_PAGE_ESCALATED
 
 
 def test_validation_fails_when_a_subscription_names_an_unknown_topic() -> None:

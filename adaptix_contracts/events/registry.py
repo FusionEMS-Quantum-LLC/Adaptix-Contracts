@@ -152,6 +152,35 @@ AIR_MISSION_HOLD: Final[str] = "air.mission.hold"
 AIR_MISSION_COMPLETED: Final[str] = "air.mission.completed"
 
 # ---------------------------------------------------------------------------
+# CrewLink page events (producer: Adaptix-Crew-Service, slug ``crew``)
+# ---------------------------------------------------------------------------
+# Adaptix-CAD-Service polls Core's bus as ``cad-service`` and registers both
+# topics (``cad_app/event_worker_bootstrap.py``; declared in
+# ``event_subscriptions``). Crew stages each on a ``CrewlinkOutboxEvent`` row
+# (``crewlink_app/outbox.py`` ``publish_outbox``); ``EVENT_ROUTES`` routes
+# exactly these two to the ``core_event_bus`` transport, and the relay
+# ``crewlink_app/outbox_relay.py`` (``CrewlinkOutboxRelay``, started in
+# ``crewlink_app/main.py`` lifespan unless CREWLINK_OUTBOX_RELAY_ENABLED is
+# false) POSTs them to Core's ``/api/core/internal/events`` with
+# source_domain="crew" (``SOURCE_DOMAIN``, the ``crew`` service-registry slug).
+# The payload each topic carries is ``schemas.crewlink_contracts``
+# ``CrewPageAcknowledgedEvent`` / ``CrewPageEscalatedEvent``, the schemas CAD
+# validates it against. Producer citations, Adaptix-Crew-Service origin/main
+# ``f21a67e10133bd8a321460afc3f0721b4d872d6d``, verified 2026-09-24:
+#   crewlink_app/services/service_impl.py:802  crewlink.page.acknowledged
+#     (``publish_outbox(session, tenant_id, "crewlink.page.acknowledged", payload)``)
+#   crewlink_app/services/service_impl.py:958  crewlink.cad.page_escalated
+#     (``publish_outbox`` call at service_impl.py:955)
+#   crewlink_app/outbox.py:78-79  EVENT_ROUTES -> TRANSPORT_CORE_EVENT_BUS
+#   crewlink_app/outbox_relay.py:119  SOURCE_DOMAIN = "crew"
+# Core accepts them only once Adaptix-Core-Service grants these two exact
+# types to producer ``crew`` (``core_app/auth/event_publish_authz.py``); that
+# is a Core deploy, not a contract fact, and is not claimed here.
+# See tests/test_event_producer_registry_drift.py ``INDIRECT_ENVELOPE_PRODUCERS``.
+CREWLINK_PAGE_ACKNOWLEDGED: Final[str] = "crewlink.page.acknowledged"
+CREWLINK_CAD_PAGE_ESCALATED: Final[str] = "crewlink.cad.page_escalated"
+
+# ---------------------------------------------------------------------------
 # Billing domain events (producer: Adaptix-Billing-Service, slug ``billing``)
 # ---------------------------------------------------------------------------
 # Every constant below is emitted TODAY through the shared contract envelope
@@ -568,6 +597,10 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     AIR_MISSION_GROUND_FALLBACK: {"version": "1.0", "source_service": "air"},
     AIR_MISSION_HOLD: {"version": "1.0", "source_service": "air"},
     AIR_MISSION_COMPLETED: {"version": "1.0", "source_service": "air"},
+    # crewlink_app/services/service_impl.py:802 and :958 (CrewlinkOutboxEvent
+    # relayed to Core by crewlink_app/outbox_relay.py, source_domain="crew")
+    CREWLINK_PAGE_ACKNOWLEDGED: {"version": "1.0", "source_service": "crew"},
+    CREWLINK_CAD_PAGE_ESCALATED: {"version": "1.0", "source_service": "crew"},
     BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_STATUS_CHANGED: {"version": "1.0", "source_service": "billing"},
@@ -856,6 +889,8 @@ __all__ = [
     "CPAE_FINDING_CREATED",
     "CPAE_FINDING_PROPOSED",
     "CPAE_FINDING_REJECTED",
+    "CREWLINK_CAD_PAGE_ESCALATED",
+    "CREWLINK_PAGE_ACKNOWLEDGED",
     "DENIAL_PREDICTED",
     "EPCR_CHART_AMENDED",
     "EPCR_CHART_BILLING_HANDOFF",

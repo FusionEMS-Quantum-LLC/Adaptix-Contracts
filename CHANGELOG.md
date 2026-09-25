@@ -12,6 +12,25 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Crew is the named producer of the two CrewLink page events CAD reads.**
+  `crewlink.page.acknowledged` and `crewlink.cad.page_escalated` are now in
+  `events.registry.ALL_EVENTS` with `source_service="crew"`, as the new
+  constants `CREWLINK_PAGE_ACKNOWLEDGED` and `CREWLINK_CAD_PAGE_ESCALATED`.
+  They are removed from `event_subscriptions.UNREGISTERED_SUBSCRIBED_TOPICS`.
+  The reason they were listed there ("nothing drains that outbox to Core")
+  stopped being true when Adaptix-Crew-Service added
+  `crewlink_app/outbox_relay.py`, which sends exactly these two to Core's bus
+  with source_domain `crew`. `subscription_edges()` now reports
+  `crew -> cad-service` for both, instead of no producer.
+
+### Downstream impact
+
+- Additive for `ALL_EVENTS`. A consumer that read either topic's reason from
+  `UNREGISTERED_SUBSCRIBED_TOPICS` now finds no entry, because the topic has a
+  registered producer.
+
 ## [5.25.0] - 2026-09-24
 
 ### Added
