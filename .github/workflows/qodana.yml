@@ -26,7 +26,7 @@ permissions:
 jobs:
   qodana:
     name: adaptix/qodana-security
-    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/qodana-reusable.yml@fd58aa7520dcff7aed22dd56d5c17bc3361a5b30
+    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/qodana-reusable.yml@c339417709e4fcba54535e95ab95d03209e61baf
     with:
       linter: qodana-python
       config-path: qodana.yaml
