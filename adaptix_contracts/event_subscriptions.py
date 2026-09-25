@@ -253,9 +253,15 @@ _CAD_DECLARATION: Final[EventBusConsumerDeclaration] = EventBusConsumerDeclarati
         _CAD.cite(_CAD_BOOTSTRAP, 209),
         _CAD.cite("backend/cad_app/main.py", 238),
     ),
+    # crewlink.page.acknowledged and crewlink.cad.page_escalated are NOT
+    # declared. At the audited commit build_cad_event_registry still registered
+    # them for CrewlinkPageEventConsumer (event_worker_bootstrap.py:83 and :88).
+    # CAD is the platform's only paging system, so that listener is retired and
+    # no Core event-bus consumer reads either topic. They are not registered in
+    # ALL_EVENTS and not listed in UNREGISTERED_SUBSCRIBED_TOPICS. Their payload
+    # schemas stay in schemas.crewlink_contracts because Adaptix-Crew-Service
+    # and Adaptix-CAD-Service code still import them.
     subscriptions=(
-        _cad_registered("crewlink.page.acknowledged", 83),
-        _cad_registered("crewlink.cad.page_escalated", 88),
         _cad_registered("workforce.shift.created", 94),
         _cad_registered("workforce.shift.cancelled", 97),
         _cad_registered("workforce.ot.filled", 99),
@@ -450,15 +456,6 @@ _NOT_IN_REGISTRY: Final[str] = (
 # record a producer that does not reach the Core operational backbone this
 # registry governs, or stamp a source_service that is not a service-registry
 # slug. Verified 2026-09-21.
-_CREWLINK_OUTBOX_UNRELAYED: Final[str] = (
-    "Adaptix-Crew-Service stages this on a CrewlinkOutboxEvent row "
-    "(crewlink_app/services/service_impl.py -> crewlink_app/outbox.py "
-    "publish_outbox), but nothing drains that outbox to Core: the service "
-    "starts only a RosterPoller and its sole outbound event path is the "
-    "SignalCore SQS queue (intelligence_events.py), so the topic never reaches "
-    "the Core event bus these consumers poll. No producer is recorded until a "
-    "relay to Core exists."
-)
 _CORE_EVENTBUS_NOT_BACKBONE: Final[str] = (
     "Produced by Adaptix-Core-Service (core_app/flow_guard/flow_guard_service.py "
     "-> core_app/events/bus.py EventBus.publish), which is Core's fire-and-forget "
@@ -493,9 +490,10 @@ UNREGISTERED_SUBSCRIBED_TOPICS: Final[Mapping[str, str]] = MappingProxyType(
         # epcr.chart.patient_identified were registered in events/registry.py once
         # their outbox-relay-to-Core producers were proven, so they are no longer
         # listed here (the tests require a registered topic's entry to be removed).
+        # crewlink.page.acknowledged and crewlink.cad.page_escalated are not
+        # listed either: no declared consumer subscribes to them any more (see
+        # the CAD declaration), and validation rejects an entry nobody reads.
         "call.received": _COMMS_WAVE4_IN_PROCESS,
-        "crewlink.cad.page_escalated": _CREWLINK_OUTBOX_UNRELAYED,
-        "crewlink.page.acknowledged": _CREWLINK_OUTBOX_UNRELAYED,
         "epcr.completed": (
             "Not a key of events.registry.ALL_EVENTS, so this contract records no "
             "producer for it. Hospital routes it to the same handler as "

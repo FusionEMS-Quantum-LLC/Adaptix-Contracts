@@ -12,6 +12,33 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Changed
+
+- **The CrewLink page topics leave the subscription contract. CAD is the only
+  paging system.** `event_subscriptions` no longer declares CAD
+  (`cad-service`) as a subscriber of `crewlink.page.acknowledged` or
+  `crewlink.cad.page_escalated`. `UNREGISTERED_SUBSCRIBED_TOPICS` no longer
+  lists them, and its old reason ("nothing drains that outbox to Core") is
+  gone. CAD retires the listener that registered them
+  (`CrewlinkPageEventConsumer`), so no Core event-bus consumer reads either
+  topic. Neither topic is registered in `events.registry.ALL_EVENTS`. The
+  payload schemas `schemas.crewlink_contracts.CrewPageAcknowledgedEvent` and
+  `CrewPageEscalatedEvent` are unchanged, because Adaptix-Crew-Service
+  (`crewlink_app/domain_events.py`) and Adaptix-CAD-Service still import them.
+
+### Downstream impact
+
+- `EVENT_BUS_SUBSCRIPTIONS["cad-service"]`, `subscribers_of()` and
+  `subscription_edges()` return two fewer CAD pairs.
+  `UNREGISTERED_SUBSCRIBED_TOPICS` has two fewer keys.
+- Release this only after the CAD change that removes the listener is on CAD
+  `main`.
+- Adaptix-Crew-Service `tests/test_outbox_relay.py`
+  `test_core_bus_routes_are_exactly_the_contract_subscriptions` requires
+  Crew's Core-bus routes (`crewlink_app/outbox.py` `EVENT_ROUTES`) to equal
+  the crew and crewlink topics declared here. Crew must drop both routes in
+  the same change that moves its pin to a release containing this entry.
+
 ## [5.25.0] - 2026-09-24
 
 ### Added
