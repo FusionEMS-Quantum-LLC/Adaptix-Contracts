@@ -12,6 +12,15 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.28.0] - 2026-09-25
+
+### Added
+
+- `CadPushRequestedEvent.vehicle_id` (optional): the vehicle TransportLink assigned to the
+  trip. Vehicle identity was dropped at the TransportLink -> CAD hop, so
+  `EncounterLineage.vehicle_id` could not be populated for a transport that originated as a
+  TransportLink trip. Additive; producers that omit it still validate.
+
 ## [5.27.0] - 2026-09-25
 
 ### Added
