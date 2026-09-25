@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 
 class EpcrChartCreatedEvent(BaseModel):
@@ -412,6 +412,18 @@ class EpcrBillingSnapshot(BaseModel):
     # level-of-service policy deterministically. Absent on older events —
     # consumers fall back to their prior behaviour. See the block docstring.
     performed_interventions: Optional[EpcrBillingInterventionsBlock] = None
+    # Date of service (5.26.0, BILL-PRE-001). ``encounter_occurred_at`` is the
+    # authoritative encounter instant the producer takes from NEMSIS eTimes
+    # (eTimes.01 PSAP call, else eTimes.02 dispatch notified, else eTimes.03
+    # unit notified); it must be timezone-aware. ``date_of_service`` is that
+    # instant's calendar date in the agency's local time zone — the date a
+    # claim bills (837P DTP*472, 270 service date, timely filing). Neither is
+    # ever the chart finalization time: a call before local midnight that is
+    # finalized after 00:00Z would otherwise bill the wrong day. ``None``
+    # means the producer had no eTimes to derive it from (or predates 5.26.0);
+    # a consumer must hold the claim rather than substitute another date.
+    date_of_service: Optional[date] = None
+    encounter_occurred_at: Optional[AwareDatetime] = None
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 

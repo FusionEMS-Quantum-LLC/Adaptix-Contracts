@@ -12,6 +12,25 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.26.0] - 2026-09-25
+
+### Added
+
+- **Date of service on the ePCR billing snapshot (BILL-PRE-001).**
+  `EpcrBillingSnapshot` gains two optional fields, carried on
+  `epcr.chart.finalized` inside `billing_snapshot`:
+  - `encounter_occurred_at` (`AwareDatetime | None`): the encounter instant
+    EPCR takes from NEMSIS eTimes (eTimes.01 PSAP call, else eTimes.02
+    dispatch notified, else eTimes.03 unit notified). A naive datetime is
+    rejected.
+  - `date_of_service` (`date | None`): that instant's calendar date in the
+    agency's local time zone, the date a claim bills.
+  Billing used the chart finalization date (UTC) as every ePCR claim's date
+  of service, so a call before local midnight finalized after 00:00Z billed
+  the wrong day. `None` means the producer had no eTimes (or predates this
+  release); a consumer must hold the claim, not substitute another date.
+  Additive: older payloads without the fields still validate.
+
 ## [5.25.0] - 2026-09-24
 
 ### Added
