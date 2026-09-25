@@ -1,0 +1,35 @@
+name: gitleaks-security
+
+# THE THIN GITLEAKS CARRIER (QOD-005), rendered by adaptix-ops
+# scripts/lib/securityBackstop.ts.
+# The Gitleaks secret scan.
+# Event wiring and one call to the canonical reusable workflow at an
+# immutable adaptix-ops commit -- no scanning logic, no rules, no
+# configuration of its own. It publishes the check
+# "adaptix/gitleaks-security / scan".
+
+on:
+  pull_request:
+  # A required check must report on the merge queue's synthetic ref, or the
+  # queue stalls instead of failing.
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a merge-group run: a cancelled required check dequeues it.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: adaptix/gitleaks-security
+    # Exactly what the called job needs, and no more.
+    permissions:
+      contents: read
+    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/gitleaks-reusable.yml@c339417709e4fcba54535e95ab95d03209e61baf
