@@ -514,20 +514,6 @@ INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
         "epcr",
         "Adaptix-EPCR-Service/backend/epcr_app/chart_service.py:376",
     ),
-    # --- Adaptix-Crew-Service, via CrewlinkOutboxEvent ->
-    # crewlink_app/outbox_relay.py (EVENT_ROUTES sends exactly these two to
-    # Core's bus; the relay POSTs them with source_domain="crew"). Verified
-    # 2026-09-24 at Crew origin/main f21a67e10133bd8a321460afc3f0721b4d872d6d. ---
-    (
-        "crewlink.page.acknowledged",
-        "crew",
-        "Adaptix-Crew-Service/backend/crewlink_app/services/service_impl.py:802",
-    ),
-    (
-        "crewlink.cad.page_escalated",
-        "crew",
-        "Adaptix-Crew-Service/backend/crewlink_app/services/service_impl.py:958",
-    ),
 )
 
 _EXPECTED_PRODUCER_SERVICE = {
