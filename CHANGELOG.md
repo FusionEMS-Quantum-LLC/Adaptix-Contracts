@@ -12,6 +12,31 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.27.0] - 2026-09-25
+
+### Added
+
+- **Canonical encounter lineage and tri-state compliance facts.** New package
+  `adaptix_contracts.lineage`:
+  - `lineage.models.EncounterLineage`: `tenant_id` (required) plus optional
+    opaque ids `dispatch_id`, `transport_request_id`, `trip_id`, `epcr_id`,
+    `encounter_id`, `unit_id`, `vehicle_id`, `crew_member_ids` (ordered,
+    deduplicated), `patient_id`, `payer_id`; timezone-aware
+    `service_started_at` / `service_completed_at` (completion may not precede
+    start); `date_of_service`; and the `requested_` / `dispatched_` /
+    `documented_` / `billed_level_of_care` chain on the existing CAD
+    `LevelOfCare` vocabulary. `date_of_service` is not checked against
+    `service_started_at`, because the date of service is the agency-local date
+    (5.26.0). Extra fields are rejected.
+  - `lineage.compliance.ComplianceFactStatus` (`VALID`, `INVALID`, `UNKNOWN`)
+    and `ComplianceFactResult` (`status`, timezone-aware `evaluated_at` and
+    `as_of`, `source_system`, `source_record_id`, `source_version`, PHI-free
+    `reason`). A missing upstream response is `UNKNOWN`, never `INVALID`.
+- `EpcrBillingSnapshot.lineage` (`EncounterLineage | None`), populated by
+  ePCR so Billing can query Fleet, Crew and Workforce for the unit, vehicle
+  and crew actually used. Additive: payloads without it still validate, and
+  `attending_crew` / `date_of_service` are unchanged.
+
 ## [5.26.0] - 2026-09-25
 
 ### Added

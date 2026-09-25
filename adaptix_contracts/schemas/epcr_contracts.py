@@ -7,6 +7,8 @@ from typing import Literal, Optional
 
 from pydantic import AwareDatetime, BaseModel, Field
 
+from adaptix_contracts.lineage.models import EncounterLineage
+
 
 class EpcrChartCreatedEvent(BaseModel):
     """Published when an ePCR chart is created."""
@@ -424,6 +426,14 @@ class EpcrBillingSnapshot(BaseModel):
     # a consumer must hold the claim rather than substitute another date.
     date_of_service: Optional[date] = None
     encounter_occurred_at: Optional[AwareDatetime] = None
+    # Encounter lineage (5.27.0). The canonical chain of opaque identifiers
+    # (dispatch, transport request, trip, unit, vehicle, crew, patient, payer)
+    # plus service start/completion and the requested -> dispatched ->
+    # documented -> billed level-of-care chain, so Billing can query Fleet,
+    # Crew and Workforce for the resources actually used. ePCR populates it;
+    # ``None`` means the producer predates 5.27.0 or had no lineage to carry.
+    # ``attending_crew`` and ``date_of_service`` above are unchanged.
+    lineage: Optional[EncounterLineage] = None
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 
