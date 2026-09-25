@@ -70,7 +70,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, NamedTuple, cast, Annotated
+from typing import Any, NamedTuple, Annotated
 from uuid import UUID
 
 from fastapi import Header, HTTPException, Request, status
@@ -452,7 +452,7 @@ async def get_auth_context(
     # that mounts this dependency (proven by
     # test_get_auth_context_mounts_as_fastapi_dependency). The ``None``
     # default is only for direct callers.
-    request: Request = cast(Request, None),
+    request: Request = None,  # type: ignore[assignment]
 ) -> AuthContext:
     """FastAPI dependency: extract authenticated identity from API Gateway headers.
 
