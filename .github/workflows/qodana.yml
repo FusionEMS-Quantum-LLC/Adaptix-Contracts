@@ -1,0 +1,35 @@
+name: qodana-security
+
+# THE THIN QODANA CARRIER (QOD-003), rendered by adaptix-ops
+# scripts/lib/qodanaCarrier.ts. Event wiring and one call to the canonical
+# reusable workflow at an immutable adaptix-ops commit -- no scanning logic.
+# It publishes the check "adaptix/qodana-security / scan".
+
+on:
+  pull_request:
+  # A required check must report on the merge queue's synthetic ref, or the
+  # queue stalls instead of failing.
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a merge-group run: a cancelled required check dequeues it.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  qodana:
+    name: adaptix/qodana-security
+    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/qodana-reusable.yml@c339417709e4fcba54535e95ab95d03209e61baf
+    with:
+      linter: qodana-python
+      config-path: qodana.yaml
+    # Only this repository's own project token, never `secrets: inherit`.
+    secrets:
+      QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
