@@ -41,7 +41,11 @@ class ComplianceFactResult(BaseModel):
     PHI.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    # Unknown fields are IGNORED, like EpcrBillingSnapshot and its sibling
+    # blocks: this model travels inside cross-service payloads, so a field
+    # added in a later contract version must not make an older consumer
+    # reject the whole snapshot. Display-only names are still never read.
+    model_config = ConfigDict(extra="ignore")
 
     status: ComplianceFactStatus
     evaluated_at: AwareDatetime

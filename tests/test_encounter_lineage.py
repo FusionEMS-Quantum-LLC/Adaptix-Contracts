@@ -75,9 +75,17 @@ def test_empty_identifier_rejected() -> None:
         EncounterLineage(tenant_id="tenant-1", crew_member_ids=["crew-a", ""])
 
 
-def test_extra_fields_forbidden() -> None:
-    with pytest.raises(ValidationError):
-        EncounterLineage(tenant_id="tenant-1", vehicle_name="Medic 7")  # type: ignore[call-arg]
+def test_unknown_fields_are_ignored_for_forward_compatibility() -> None:
+    """A newer producer's extra field must not break an older consumer, and is never kept."""
+    lineage = EncounterLineage.model_validate(
+        {"tenant_id": "tenant-1", "vehicle_name": "Medic 7"}
+    )
+    assert lineage.tenant_id == "tenant-1"
+    assert "vehicle_name" not in lineage.model_dump()
+    snapshot_field = EncounterLineage.model_validate(
+        {"tenant_id": "t", "future_field": 1}
+    ).model_dump()
+    assert "future_field" not in snapshot_field
 
 
 @pytest.mark.parametrize("field", ["service_started_at", "service_completed_at"])
