@@ -1,0 +1,56 @@
+# Qodana configuration for Adaptix-Contracts (QOD-004 carrier shape, fleet rollout).
+#
+# The scan runs only through .github/workflows/qodana.yml, the thin carrier
+# that calls FusionEMS-Quantum-LLC/adaptix-ops qodana-reusable.yml and
+# publishes the check "adaptix/qodana-security / scan". This file holds the
+# analysis settings the reusable workflow reads through its config-path input.
+#
+# linter is the one adaptix-ops config/qodana-fleet.json assigns this
+# repository (repo.yaml runtime.kind python -> qodana-python); the reusable
+# workflow passes the same value as --linter.
+version: "1.0"
+linter: qodana-python
+
+# The directive's required profile (adaptix-ops scripts/lib/qodanaAudit.ts
+# REQUIRED_QODANA_PROFILE). Without it Qodana runs the smaller qodana.starter.
+profile:
+  name: qodana.recommended
+
+# THE INTERPRETER AND ITS PACKAGES. With no interpreter configured, Qodana for
+# Python analyses with no SDK at all, and every PEP 604 union (`str | None`)
+# becomes a High "Invalid type annotation" -- an artefact of the analysis
+# environment, not of the code (measured on the Temporal and QHIN canaries).
+# The SDK is the linter image's own CPython (/opt/miniconda3), and bootstrap
+# installs the locked dependency closure into it, so the framework, ORM and
+# adaptix-contracts types are checked rather than unknown:
+#   - uv.lock is the only lock; it is exported with uv (the fleet's pinned 0.12.7) to a requirements file inside the analysis container and installed from there, so the analysed packages are exactly the locked closure;
+#   - --no-cache-dir because the container user cannot write $HOME
+#     (Adaptix-QHIN-Service run 36076441576 failed on /root/.cache/uv);
+#   - a separate virtualenv is not used as the SDK: it held the QA canary in
+#     "Updating interpreter paths" until the 15-minute ceiling.
+# If the install fails, Qodana exits non-zero and the check fails closed.
+# The project declares requires-python >=3.11; the image's
+# interpreter is the analysis SDK, which sets the language level the
+# inspections assume. This changes what the analysis KNOWS, never what it
+# inspects: no inspection or first-party path is removed.
+bootstrap: /opt/miniconda3/bin/python3 -m pip install --quiet --no-cache-dir --disable-pip-version-check uv==0.12.7 && UV_CACHE_DIR=/tmp/uv-cache /opt/miniconda3/bin/python3 -m uv export --frozen --no-hashes --no-emit-project --extra dev --output-file /tmp/qodana-requirements.txt && /opt/miniconda3/bin/python3 -m pip install --quiet --no-cache-dir --disable-pip-version-check -r /tmp/qodana-requirements.txt
+properties:
+  qodana.python.path: /opt/miniconda3/bin/python3
+
+# Only generated, vendored or cache directories are excluded, none of them
+# tracked in git. Everything first-party is analysed: the service package
+# (including its auth, tenant, PHI and money paths), migrations, scripts,
+# tests and the governance hook.
+exclude:
+  - name: All
+    paths:
+      - .qodana
+      - .venv
+      - venv
+      - build
+      - dist
+      - .eggs
+      - htmlcov
+      - .pytest_cache
+      - .mypy_cache
+      - .ruff_cache
