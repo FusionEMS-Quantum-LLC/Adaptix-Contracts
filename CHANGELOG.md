@@ -12,6 +12,13 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Fixed
+
+- `get_auth_context`: the `request` parameter's `None` default is no longer written as
+  `cast(Request, None)`, which Qodana reports as an invalid cast (PyInvalidCastInspection, High).
+  It is now `None` with a mypy `assignment` ignore. The annotation stays the bare `Request`,
+  so FastAPI still injects the request, and the default is `None` at runtime as before.
+
 ## [5.28.0] - 2026-09-25
 
 ### Added
