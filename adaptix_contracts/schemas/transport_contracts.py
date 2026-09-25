@@ -280,5 +280,10 @@ class CadPushRequestedEvent(BaseModel):
     request_id: str
     tenant_id: str
     unit_id: Optional[str] = None
+    # Added in 5.28.0: the vehicle TransportLink assigned to the trip
+    # (TransportRequest.assigned_vehicle_id). Without it vehicle identity was
+    # lost at the TransportLink -> CAD hop, so the EncounterLineage could never
+    # name the vehicle a billed transport used. Optional: older producers omit it.
+    vehicle_id: Optional[str] = None
     crew_ids: list[str] = Field(default_factory=list)
     pushed_at: datetime
