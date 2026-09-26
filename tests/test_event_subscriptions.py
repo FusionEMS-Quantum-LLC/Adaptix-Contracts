@@ -15,6 +15,7 @@ import pytest
 
 from adaptix_contracts.event_consumers import (
     BILLING_SERVICE_CONSUMER,
+    CAD_SERVICE_CONSUMER,
     HOSPITAL_SERVICE_CONSUMER,
     KNOWN_EVENT_BUS_CONSUMERS,
     TRANSPORT_SERVICE_CONSUMER,
@@ -185,6 +186,40 @@ def test_subscription_edges_carry_the_registered_producer_or_none() -> None:
         else:
             assert edge.producer_slug is None
             assert edge.topic in UNREGISTERED_SUBSCRIBED_TOPICS
+
+
+_RETIRED_CREWLINK_PAGE_TOPICS: tuple[str, ...] = (
+    "crewlink.page.acknowledged",
+    "crewlink.cad.page_escalated",
+)
+
+
+@pytest.mark.parametrize("topic", _RETIRED_CREWLINK_PAGE_TOPICS)
+def test_retired_crewlink_page_topic_is_out_of_the_subscription_contract(
+    topic: str,
+) -> None:
+    """CAD is the only paging system, so its CrewLink page listener is retired.
+
+    Neither topic may stay declared as a CAD subscription, be listed as
+    subscribed-but-unregistered, or be registered with a producer.
+    Adaptix-Crew-Service pins its Core-bus route table to these declarations,
+    so this is what tells Crew to stop routing both topics to Core.
+    """
+    assert topic not in EVENT_BUS_SUBSCRIPTIONS[CAD_SERVICE_CONSUMER]
+    assert subscribers_of(topic) == frozenset()
+    assert topic not in UNREGISTERED_SUBSCRIBED_TOPICS
+    assert topic not in ALL_EVENTS
+    assert all(edge.topic != topic for edge in subscription_edges())
+
+
+def test_no_consumer_subscribes_to_a_crew_or_crewlink_topic() -> None:
+    """Crew's Core-bus route table must equal this set, which is now empty."""
+    assert {
+        topic
+        for topics in EVENT_BUS_SUBSCRIPTIONS.values()
+        for topic in topics
+        if topic.startswith(("crewlink.", "crew."))
+    } == set()
 
 
 def test_validation_fails_when_a_subscription_names_an_unknown_topic() -> None:
