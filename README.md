@@ -330,7 +330,8 @@ python -m build --sdist --wheel
 python -m twine check dist/*
 ```
 
-GitHub Actions in this repo (`CodeQL`, `Codacy Coverage`) are analysis-only.
+GitHub Actions in this repo (`CodeQL` and the `adaptix/*-security` scans:
+Qodana, Semgrep, Gitleaks, Trivy) are analysis-only.
 Authoritative release and publishability validation is owned by CodeBuild
 buildspecs, not GitHub Actions.
 
