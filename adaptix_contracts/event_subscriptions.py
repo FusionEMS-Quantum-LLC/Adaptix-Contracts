@@ -40,7 +40,8 @@ What this declaration claims, and what it does not
   ``schemas.service_registry`` names the consumer's repository.
 
 Audited 2026-09-10 against each repository's ``main`` at the commit recorded in
-every citation. Core's push-delivery registry (``EVENT_BUS_SERVICE_REGISTRY_JSON``
+every citation; CAD was re-audited 2026-09-26 after it retired its CrewLink page
+listener. Core's push-delivery registry (``EVENT_BUS_SERVICE_REGISTRY_JSON``
 in ``core_app/event_bus.py``) is a runtime environment value, not code, so
 nothing is declared from it.
 """
@@ -167,7 +168,7 @@ _BILLING: Final[_AuditedCheckout] = _AuditedCheckout(
 )
 _CAD: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-CAD-Service",
-    "be8db83a3000062a68cc5485e6970bd1a08facb0",
+    "0ede2e32a719b65f1d72e64d74233a37edbc7478",
 )
 _COMMUNICATIONS: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-Communications-Service",
@@ -235,9 +236,9 @@ def _cad_registered(topic: str, line: int) -> EventSubscription:
 
 
 def _cad_air_mission(topic: str, line: int) -> EventSubscription:
-    """An ``AIR_MISSION_EVENT_TYPES`` key, registered by the loop at line 130."""
+    """An ``AIR_MISSION_EVENT_TYPES`` key, registered by the loop at line 134."""
     return _subscription(
-        topic, _CAD.cite(_CAD_AIR, line), _CAD.cite(_CAD_BOOTSTRAP, 130)
+        topic, _CAD.cite(_CAD_AIR, line), _CAD.cite(_CAD_BOOTSTRAP, 134)
     )
 
 
@@ -246,27 +247,32 @@ _CAD_DECLARATION: Final[EventBusConsumerDeclaration] = EventBusConsumerDeclarati
     repository=_CAD.repository,
     service_slug="cad",
     unmapped_reason=None,
-    consumer_name_evidence=_CAD.cite(_CAD_WORKER, 42),
-    dispatch_evidence=_CAD.cite(_CAD_WORKER, 610),
+    consumer_name_evidence=_CAD.cite(_CAD_WORKER, 43),
+    dispatch_evidence=_CAD.cite(_CAD_WORKER, 627),
     worker_start_evidence=(
         _CAD.cite("backend/cad_app/main.py", 234),
-        _CAD.cite(_CAD_BOOTSTRAP, 209),
+        _CAD.cite(_CAD_BOOTSTRAP, 213),
         _CAD.cite("backend/cad_app/main.py", 238),
     ),
+    # crewlink.page.acknowledged and crewlink.cad.page_escalated are not
+    # subscribed. CAD is the platform's only paging system (owner decision,
+    # 2026-09-25): CAD retired CrewlinkPageEventConsumer, and
+    # build_cad_event_registry no longer registers either topic (the comment
+    # at event_worker_bootstrap.py lines 85-94 records the removal). Their
+    # payload schemas stay in schemas.crewlink_contracts because
+    # Adaptix-Crew-Service code still imports them.
     subscriptions=(
-        _cad_registered("crewlink.page.acknowledged", 83),
-        _cad_registered("crewlink.cad.page_escalated", 88),
-        _cad_registered("workforce.shift.created", 94),
-        _cad_registered("workforce.shift.cancelled", 97),
-        _cad_registered("workforce.ot.filled", 99),
-        _cad_registered("workforce.vacancy.created", 101),
-        _cad_registered("workforce.schedule.change", 104),
-        _cad_registered("fleet.unit.status_changed", 110),
-        _cad_registered("fleet.vehicle.out_of_service", 115),
+        _cad_registered("workforce.shift.created", 98),
+        _cad_registered("workforce.shift.cancelled", 101),
+        _cad_registered("workforce.ot.filled", 103),
+        _cad_registered("workforce.vacancy.created", 105),
+        _cad_registered("workforce.schedule.change", 108),
+        _cad_registered("fleet.unit.status_changed", 114),
+        _cad_registered("fleet.vehicle.out_of_service", 119),
         _subscription(
             "flow_guard.incident_created",
             _CAD.cite("backend/cad_app/flow_guard_consumer.py", 40),
-            _CAD.cite(_CAD_BOOTSTRAP, 120),
+            _CAD.cite(_CAD_BOOTSTRAP, 124),
         ),
         _cad_air_mission("air.mission.accepted", 100),
         _cad_air_mission("air.mission.declined", 101),
@@ -277,10 +283,10 @@ _CAD_DECLARATION: Final[EventBusConsumerDeclaration] = EventBusConsumerDeclarati
         _cad_air_mission("air.mission.ground_fallback", 108),
         _cad_air_mission("air.mission.hold", 111),
         _cad_air_mission("air.mission.completed", 113),
-        _cad_registered("hospital.incoming.acknowledged", 136),
-        _cad_registered("hospital.incoming.diverted", 141),
-        _cad_registered("hospital.incoming_patient.arrived", 146),
-        _cad_registered("hospital.incoming_patient.cancelled", 151),
+        _cad_registered("hospital.incoming.acknowledged", 140),
+        _cad_registered("hospital.incoming.diverted", 145),
+        _cad_registered("hospital.incoming_patient.arrived", 150),
+        _cad_registered("hospital.incoming_patient.cancelled", 155),
     ),
 )
 
@@ -450,15 +456,6 @@ _NOT_IN_REGISTRY: Final[str] = (
 # record a producer that does not reach the Core operational backbone this
 # registry governs, or stamp a source_service that is not a service-registry
 # slug. Verified 2026-09-21.
-_CREWLINK_OUTBOX_UNRELAYED: Final[str] = (
-    "Adaptix-Crew-Service stages this on a CrewlinkOutboxEvent row "
-    "(crewlink_app/services/service_impl.py -> crewlink_app/outbox.py "
-    "publish_outbox), but nothing drains that outbox to Core: the service "
-    "starts only a RosterPoller and its sole outbound event path is the "
-    "SignalCore SQS queue (intelligence_events.py), so the topic never reaches "
-    "the Core event bus these consumers poll. No producer is recorded until a "
-    "relay to Core exists."
-)
 _CORE_EVENTBUS_NOT_BACKBONE: Final[str] = (
     "Produced by Adaptix-Core-Service (core_app/flow_guard/flow_guard_service.py "
     "-> core_app/events/bus.py EventBus.publish), which is Core's fire-and-forget "
@@ -493,9 +490,10 @@ UNREGISTERED_SUBSCRIBED_TOPICS: Final[Mapping[str, str]] = MappingProxyType(
         # epcr.chart.patient_identified were registered in events/registry.py once
         # their outbox-relay-to-Core producers were proven, so they are no longer
         # listed here (the tests require a registered topic's entry to be removed).
+        # crewlink.page.acknowledged and crewlink.cad.page_escalated are not
+        # listed: no declared consumer subscribes to them any more (see the CAD
+        # declaration), and validation rejects an entry nobody subscribes to.
         "call.received": _COMMS_WAVE4_IN_PROCESS,
-        "crewlink.cad.page_escalated": _CREWLINK_OUTBOX_UNRELAYED,
-        "crewlink.page.acknowledged": _CREWLINK_OUTBOX_UNRELAYED,
         "epcr.completed": (
             "Not a key of events.registry.ALL_EVENTS, so this contract records no "
             "producer for it. Hospital routes it to the same handler as "

@@ -12,12 +12,43 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.28.1] - 2026-09-26
+
 ### Fixed
 
 - `get_auth_context`: the `request` parameter's `None` default is no longer written as
   `cast(Request, None)`, which Qodana reports as an invalid cast (PyInvalidCastInspection, High).
   It is now `None` with a mypy `assignment` ignore. The annotation stays the bare `Request`,
   so FastAPI still injects the request, and the default is `None` at runtime as before.
+- **The CrewLink page topics leave the subscription contract. CAD is the only
+  paging system.** `event_subscriptions` still declared CAD (`cad-service`) as a
+  subscriber of `crewlink.page.acknowledged` and `crewlink.cad.page_escalated`,
+  and listed both in `UNREGISTERED_SUBSCRIBED_TOPICS` with a stale reason
+  ("nothing drains that outbox to Core"). Both claims were wrong. Adaptix-CAD-Service
+  `main` (`0ede2e32`, CAD #584) retired `CrewlinkPageEventConsumer`, so
+  `build_cad_event_registry` registers neither topic, and Crew's outbox relay
+  (Crew #241) has existed since 2026-09-24. The CAD declaration no longer
+  subscribes to either topic, both `UNREGISTERED_SUBSCRIBED_TOPICS` entries and
+  their reason are gone, and neither topic is registered in
+  `events.registry.ALL_EVENTS`: no consumer reads them, and Core's
+  `event_publish_authz` refuses `crewlink.*` from Crew.
+- The CAD declaration is re-audited at CAD `main` `0ede2e32`. Every CAD citation
+  moves to that commit, with the line numbers it has there. The subscribed topics
+  other than the two above are unchanged.
+
+### Downstream impact
+
+- `EVENT_BUS_SUBSCRIPTIONS["cad-service"]`, `subscribers_of()` and
+  `subscription_edges()` return two fewer CAD pairs.
+  `UNREGISTERED_SUBSCRIBED_TOPICS` has two fewer keys. No public name is removed.
+- The payload schemas `schemas.crewlink_contracts.CrewPageAcknowledgedEvent` and
+  `CrewPageEscalatedEvent` are unchanged, because Adaptix-Crew-Service `main`
+  (`crewlink_app/domain_events.py`) still imports them.
+- Adaptix-Crew-Service `tests/test_outbox_relay.py`
+  `test_core_bus_routes_are_exactly_the_contract_subscriptions` requires Crew's
+  Core-bus routes (`crewlink_app/outbox.py` `EVENT_ROUTES`) to equal the crew and
+  crewlink topics declared here, which is now the empty set. Crew must drop both
+  routes (Crew #244) in the same change that moves its pin to this release.
 
 ## [5.28.0] - 2026-09-25
 
