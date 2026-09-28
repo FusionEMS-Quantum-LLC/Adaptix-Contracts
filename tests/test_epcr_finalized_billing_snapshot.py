@@ -8,6 +8,9 @@ can mint a real claim — while a legacy 6-key event must still validate.
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from adaptix_contracts.schemas import (
     EpcrBillingInterventionsBlock,
     EpcrBillingSnapshot,
@@ -270,3 +273,76 @@ def test_interventions_block_lists_are_tri_state() -> None:
     )
     assert affirmative.procedures == []
     assert affirmative.medication_administrations == []
+
+
+def test_snapshot_without_origin_destination_type_defaults_to_none() -> None:
+    """A pre-5.29.0 producer payload still validates; both tokens read as absent.
+
+    Absent means unknown, never an empty string a consumer could mistake for a
+    documented facility type.
+    """
+    payload = _base()
+    payload["billing_snapshot"] = {
+        "chart_status": "finalized",
+        "transport": {"origin_address": "123 Main St"},
+        "ready_for_billing": True,
+    }
+    snap = EpcrChartFinalizedEvent.model_validate(payload).billing_snapshot
+    assert snap.origin_type is None
+    assert snap.destination_type is None
+    dumped = snap.model_dump()
+    assert dumped["origin_type"] is None
+    assert dumped["destination_type"] is None
+
+
+def test_origin_destination_type_survive_typed_round_trip() -> None:
+    """The ePCR-derived CMS tokens reach Billing through the typed contract.
+
+    Before 5.29.0 the snapshot declared neither key, so ``model_validate``
+    silently dropped them and a typed ``model_dump`` handed Billing's
+    ``claim_builder`` (``handoff.get("origin_type")``) nothing.
+    """
+    payload = _base()
+    payload["billing_snapshot"] = {
+        "origin_type": "RESIDENCE",
+        "destination_type": "HOSPITAL",
+    }
+    event = EpcrChartFinalizedEvent.model_validate(payload)
+    snap = event.billing_snapshot
+    assert snap.origin_type == "RESIDENCE"
+    assert snap.destination_type == "HOSPITAL"
+
+    dumped = snap.model_dump()
+    assert dumped["origin_type"] == "RESIDENCE"
+    assert dumped["destination_type"] == "HOSPITAL"
+    assert EpcrBillingSnapshot.model_validate(dumped) == snap
+
+    event_dump = event.model_dump(mode="json")
+    assert event_dump["billing_snapshot"]["origin_type"] == "RESIDENCE"
+    assert event_dump["billing_snapshot"]["destination_type"] == "HOSPITAL"
+    assert EpcrChartFinalizedEvent.model_validate(event_dump) == event
+
+
+def test_origin_destination_type_are_top_level_not_transport_fields() -> None:
+    """The tokens live on the snapshot itself, not on the transport block."""
+    snap = EpcrBillingSnapshot.model_validate(
+        {
+            "origin_type": "RESIDENCE",
+            "destination_type": "HOSPITAL",
+            "transport": {"origin_address": "123 Main St"},
+        }
+    )
+    transport_dump = snap.transport.model_dump()
+    assert "origin_type" not in transport_dump
+    assert "destination_type" not in transport_dump
+
+
+@pytest.mark.parametrize("field", ["origin_type", "destination_type"])
+@pytest.mark.parametrize("value", [7, 1.5, True, ["HOSPITAL"], {"code": "H"}])
+def test_non_string_origin_destination_type_is_rejected(
+    field: str, value: object
+) -> None:
+    """A non-string token is a producer defect, not something to coerce."""
+    with pytest.raises(ValidationError) as excinfo:
+        EpcrBillingSnapshot.model_validate({field: value})
+    assert excinfo.value.errors()[0]["loc"] == (field,)

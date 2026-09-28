@@ -12,6 +12,37 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.29.0] - 2026-09-28
+
+### Added
+
+- **CMS origin/destination type tokens on the ePCR billing snapshot.**
+  `EpcrBillingSnapshot` gains two optional top-level fields, carried on
+  `epcr.chart.finalized` inside `billing_snapshot`:
+  - `origin_type` (`str | None`): the CMS ambulance origin token ePCR derives
+    from NEMSIS eScene.09 (incident location type).
+  - `destination_type` (`str | None`): the CMS ambulance destination token
+    ePCR derives from NEMSIS eDisposition.21 (type of destination).
+  ePCR maps only codes that name one unambiguous CMS facility type and leaves
+  the field absent otherwise. The values are tokens such as `RESIDENCE` or
+  `HOSPITAL`, not CMS letters: Billing resolves each to its letter through
+  its facility letter table. `None` means unknown, ambiguous, or a producer
+  that predates this release; a consumer must not substitute a guessed letter.
+  Additive: older payloads without the fields still validate, and a
+  non-string value is rejected. `EpcrBillingTransportBlock` is unchanged.
+
+### Downstream impact
+
+- Producer: Adaptix-EPCR-Service emits both keys from
+  `BillingReadinessSnapshot` (`chart_billing_readiness_export.py`). That
+  producer change ships in EPCR and moves its pin to this release; EPCR
+  `main` does not emit them yet.
+- Consumer: Adaptix-Billing-Service `auto_biller/claim_builder.py` already
+  reads `handoff.get("origin_type")` / `handoff.get("destination_type")` into
+  `ClaimDraft.transport_origin_type` / `transport_destination_type`. Until
+  now no contract declared those keys, so a typed
+  `model_validate` -> `model_dump` of the snapshot discarded them.
+
 ## [5.28.1] - 2026-09-26
 
 ### Fixed
