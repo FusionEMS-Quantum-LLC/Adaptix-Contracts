@@ -43,7 +43,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 import adaptix_contracts.auth as auth_pkg
 from adaptix_contracts.auth import service_token as st
@@ -544,3 +544,109 @@ def test_older_receiver_ignores_the_claim(keys: tuple[str, str]) -> None:
     assert old.tenant_id == TENANT
     assert old.actor_sub == ACTOR
     assert "actor_mfa_verified_at" not in old.model_dump()
+
+
+# --------------------------------------------------------------------------
+# require_fresh_actor_mfa_assurance: the bounds themselves must be ints
+# --------------------------------------------------------------------------
+#
+# ``max_age_seconds <= 0`` and ``leeway_seconds < 0`` are both False for
+# float('inf') and float('nan'), and so is every freshness comparison against
+# them, so a float bound switched the check off. ``True`` passed as 1 and a
+# str or None escaped as a raw TypeError. Each is now the documented
+# programming-error ValueError, raised before any claim is judged.
+
+
+@pytest.mark.parametrize(
+    "bad_max_age",
+    [float("inf"), float("nan"), True, 300.0, 300.5, "300", None],
+    ids=["inf", "nan", "true", "integral-float", "float", "str", "none"],
+)
+def test_helper_refuses_non_int_max_age_as_programming_error(
+    bad_max_age: object,
+) -> None:
+    # 10**8 seconds (about three years) old: stale under any int max age.
+    claims = _claims(actor_mfa_verified_at=FIXED_NOW_TS - 10**8)
+    # An untyped caller (for example a max age read straight out of an
+    # environment variable or a JSON config) can hand the helper anything; the
+    # runtime guard must refuse it rather than let the comparison decide.
+    require: Callable[..., int] = st.require_fresh_actor_mfa_assurance
+    with pytest.raises(ValueError, match="max_age_seconds") as excinfo:
+        require(claims, max_age_seconds=bad_max_age, now=FIXED_NOW)
+    # A plain programming error, never mistaken for an authz decision (the
+    # 403 error is itself a ValueError subclass, so this is checked by type).
+    assert not isinstance(excinfo.value, st.ServiceTokenAuthzError)
+
+
+@pytest.mark.parametrize(
+    "bad_leeway",
+    [float("inf"), float("nan"), True, 5.0, "5", None],
+    ids=["inf", "nan", "true", "integral-float", "str", "none"],
+)
+def test_helper_refuses_non_int_leeway_as_programming_error(
+    bad_leeway: object,
+) -> None:
+    # 10**8 seconds in the future: beyond any int leeway.
+    claims = _claims(actor_mfa_verified_at=FIXED_NOW_TS + 10**8)
+    require: Callable[..., int] = st.require_fresh_actor_mfa_assurance
+    with pytest.raises(ValueError, match="leeway_seconds") as excinfo:
+        require(claims, max_age_seconds=300, now=FIXED_NOW, leeway_seconds=bad_leeway)
+    assert not isinstance(excinfo.value, st.ServiceTokenAuthzError)
+
+
+def test_helper_int_bounds_still_decide_exactly() -> None:
+    # The int path is unchanged: the same stale and future claims used above
+    # are refused with their machine-readable reasons, not a ValueError.
+    stale = _claims(actor_mfa_verified_at=FIXED_NOW_TS - 10**8)
+    with pytest.raises(st.ServiceTokenMfaAssuranceError) as excinfo:
+        st.require_fresh_actor_mfa_assurance(stale, max_age_seconds=300, now=FIXED_NOW)
+    assert excinfo.value.reason == "actor_mfa_assurance_stale"
+
+    future = _claims(actor_mfa_verified_at=FIXED_NOW_TS + 10**8)
+    with pytest.raises(st.ServiceTokenMfaAssuranceError) as excinfo:
+        st.require_fresh_actor_mfa_assurance(
+            future, max_age_seconds=300, now=FIXED_NOW, leeway_seconds=5
+        )
+    assert excinfo.value.reason == "actor_mfa_assurance_in_future"
+
+
+# --------------------------------------------------------------------------
+# ServiceTokenClaims.actor_mfa_verified_at is strict
+# --------------------------------------------------------------------------
+
+
+def _claims_payload(actor_mfa_verified_at: object) -> dict[str, object]:
+    return {
+        "iss": ISS,
+        "aud": AUD,
+        "sub": SUB,
+        "tenant_id": TENANT,
+        "scope": SCOPE,
+        "jti": uuid.uuid4().hex,
+        "iat": FIXED_NOW_TS,
+        "exp": FIXED_NOW_TS + 120,
+        "actor_sub": ACTOR,
+        "actor_mfa_verified_at": actor_mfa_verified_at,
+    }
+
+
+def test_claims_model_accepts_int_actor_mfa_verified_at() -> None:
+    # Positive control: the payload below is otherwise valid, so a refusal of
+    # the lax values can only come from the actor_mfa_verified_at field.
+    claims = st.ServiceTokenClaims.model_validate(_claims_payload(1700000000))
+    assert claims.actor_mfa_verified_at == 1700000000
+
+
+@pytest.mark.parametrize(
+    "lax_value",
+    ["1700000000", True, 1700000000.0],
+    ids=["numeric-str", "true", "integral-float"],
+)
+def test_claims_model_refuses_lax_actor_mfa_verified_at(lax_value: object) -> None:
+    # Pydantic's lax int mode would coerce each of these into a positive epoch
+    # second; ``strict=True`` on the field is the only thing refusing them.
+    with pytest.raises(ValidationError) as excinfo:
+        st.ServiceTokenClaims.model_validate(_claims_payload(lax_value))
+    assert [error["loc"] for error in excinfo.value.errors()] == [
+        ("actor_mfa_verified_at",)
+    ]

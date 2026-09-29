@@ -47,9 +47,12 @@ from the installed package metadata).
     - `actor_mfa_assurance_stale`: `now - value > max_age_seconds`. An age of
       exactly `max_age_seconds` passes;
     - `actor_mfa_assurance_in_future`: `value - now > leeway_seconds`.
-    It raises `ValueError` when `max_age_seconds <= 0`, when `leeway_seconds`
-    is negative, or when `now` is naive. So no configuration value can switch
-    the check off.
+    It raises `ValueError` when `max_age_seconds` or `leeway_seconds` is a
+    bool or not an int (a float, including `inf` and `nan`, a str or None is
+    refused before any claim is judged, because `inf` and `nan` would make
+    every freshness comparison false), when `max_age_seconds <= 0`, when
+    `leeway_seconds` is negative, or when `now` is naive. So no configuration
+    value can switch the check off.
   - Exported from `adaptix_contracts.auth`: `require_fresh_actor_mfa_assurance`,
     `ServiceTokenMfaAssuranceError`, `ActorMfaAssuranceReason`.
   - The change is additive. `SERVICE_TOKEN_VERSION` stays `1`, and tokens

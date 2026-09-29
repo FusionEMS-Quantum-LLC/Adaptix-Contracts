@@ -482,11 +482,31 @@ def require_fresh_actor_mfa_assurance(
             future (a ``ServiceTokenAuthzError`` -> HTTP 403); ``reason`` carries
             the machine-readable cause.
         ValueError: programming error in the call itself. ``max_age_seconds``
-            must be positive and ``leeway_seconds`` non-negative, so no
+            and ``leeway_seconds`` must each be an ``int``: a bool or any
+            non-int (a float, including ``inf`` and ``nan``, a str, None) is
+            refused before any claim is judged, because ``inf`` and ``nan``
+            would make every freshness comparison false. ``max_age_seconds``
+            must then be positive and ``leeway_seconds`` non-negative, so no
             configuration value can switch the check off; ``now`` must be
             timezone-aware, because a naive datetime is read as host-local time
             and would shift the decision by the host's UTC offset.
     """
+    # Type before range. ``inf`` and ``nan`` pass both range checks below and
+    # then make every freshness comparison false, which fails open; ``bool`` is
+    # an ``int`` subclass, so True must not read as one second. The isinstance
+    # checks also stand for untyped callers (a bound read from an environment
+    # variable or a JSON config) that the annotations cannot constrain.
+    if isinstance(max_age_seconds, bool) or not isinstance(max_age_seconds, int):
+        raise ValueError(
+            "max_age_seconds must be an int number of seconds, got "
+            f"{type(max_age_seconds).__name__}; the actor MFA freshness check "
+            "cannot be disabled"
+        )
+    if isinstance(leeway_seconds, bool) or not isinstance(leeway_seconds, int):
+        raise ValueError(
+            "leeway_seconds must be an int number of seconds, got "
+            f"{type(leeway_seconds).__name__}"
+        )
     if max_age_seconds <= 0:
         raise ValueError(
             "max_age_seconds must be a positive number of seconds; the actor MFA "
