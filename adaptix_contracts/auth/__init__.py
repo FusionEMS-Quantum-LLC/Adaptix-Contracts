@@ -59,10 +59,13 @@ from adaptix_contracts.auth.platform_token import (
 from adaptix_contracts.auth.service_token import (
     DEFAULT_TTL_SECONDS,
     SERVICE_TOKEN_VERSION,
+    ActorMfaAssuranceReason,
     ServiceTokenAuthzError,
     ServiceTokenClaims,
     ServiceTokenError,
+    ServiceTokenMfaAssuranceError,
     issue_service_token,
+    require_fresh_actor_mfa_assurance,
     verify_service_token,
     verify_service_token_with_keyset,
 )
@@ -113,6 +116,11 @@ __all__ = [
     "ServiceTokenAuthzError",
     "SERVICE_TOKEN_VERSION",
     "DEFAULT_TTL_SECONDS",
+    # Actor MFA assurance on the service token (optional claim
+    # actor_mfa_verified_at) and its one canonical freshness check.
+    "require_fresh_actor_mfa_assurance",
+    "ServiceTokenMfaAssuranceError",
+    "ActorMfaAssuranceReason",
     # Canonical S2S PLATFORM token — genuinely TENANT-LESS calls only (e.g.
     # Core -> Calendar pre-signup marketing email). tenant_id is structurally
     # absent from PlatformServiceTokenClaims; do not use this for a call that

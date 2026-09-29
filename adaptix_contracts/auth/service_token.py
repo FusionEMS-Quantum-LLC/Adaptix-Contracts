@@ -17,20 +17,33 @@ Signing:  RS256 with an RSA private key held only by the issuer (Operations),
           and previous key).
 
 Claims (see ``ServiceTokenClaims``): iss, aud, sub, tenant_id, scope, jti, iat,
-nbf, exp, actor_sub, correlation_id, scene_request_id, ver. No secrets and no
+nbf, exp, actor_sub, correlation_id, scene_request_id, workspace_key,
+delegation_grant_id, tool_call_id, actor_mfa_verified_at, ver. No secrets and no
 patient/clinical data belong in the token.
+
+``actor_mfa_verified_at`` (optional, 5.30.0) is identity assurance only: the
+epoch second at which the issuer itself observed, in a gateway-signed and
+verified request context for the same ``actor_sub``, that the actor held a
+fresh second factor. The gateway context cannot be relayed (it is audience-,
+method- and path-bound, single-use and short-lived), so this signed claim is
+how an issuer such as ePCR carries that fact to a receiver such as Narcotics.
+Receivers decide freshness with the one canonical check,
+``require_fresh_actor_mfa_assurance``.
 
 Verification maps to HTTP results (``ServiceTokenError`` -> 401 authentication,
 ``ServiceTokenAuthzError`` -> 403 authorization) so downstream services enforce:
-missing/invalid/expired/unknown-key/untrusted-issuer -> 401; wrong audience /
-wrong caller service / missing scope / missing-or-mismatched tenant -> 403.
+missing/invalid/expired/unknown-key/untrusted-issuer/malformed
+actor_mfa_verified_at -> 401; wrong audience / wrong caller service / missing
+scope / missing-or-mismatched tenant -> 403. A missing, stale or future actor MFA
+assurance is ``ServiceTokenMfaAssuranceError`` (a ``ServiceTokenAuthzError``,
+so 403) with a machine-readable ``reason``.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import jwt
 from pydantic import BaseModel, Field
@@ -70,6 +83,40 @@ class ServiceTokenAuthzError(ValueError):
     Raised when the token is authentic but not permitted: wrong audience, wrong
     caller service, missing scope, or missing/mismatched tenant.
     """
+
+
+#: Stable machine-readable reasons ``require_fresh_actor_mfa_assurance`` refuses
+#: with. Receivers put the reason in their 403 body; it carries no PHI.
+ActorMfaAssuranceReason = Literal[
+    "actor_mfa_assurance_missing",
+    "actor_mfa_assurance_stale",
+    "actor_mfa_assurance_in_future",
+]
+
+
+class ServiceTokenMfaAssuranceError(ServiceTokenAuthzError):
+    """Actor MFA assurance refused (map to HTTP 403, like its parent).
+
+    A subclass of ``ServiceTokenAuthzError``, so every handler that already maps
+    that class to 403 keeps doing so. ``reason`` is one of
+    ``ActorMfaAssuranceReason``; the message starts with it. ``detail`` is a
+    human-readable explanation with no token or patient data.
+    """
+
+    def __init__(self, reason: ActorMfaAssuranceReason, detail: str) -> None:
+        super().__init__(f"{reason}: {detail}")
+        self.reason: ActorMfaAssuranceReason = reason
+        self.detail = detail
+
+    def __reduce__(
+        self,
+    ) -> tuple[
+        type[ServiceTokenMfaAssuranceError], tuple[ActorMfaAssuranceReason, str]
+    ]:
+        # The default BaseException reduction re-calls the class with
+        # ``self.args`` (the formatted message alone), which does not match
+        # this two-argument constructor; rebuild from the real fields instead.
+        return (type(self), (self.reason, self.detail))
 
 
 class ServiceTokenClaims(BaseModel):
@@ -121,6 +168,29 @@ class ServiceTokenClaims(BaseModel):
     tool_call_id: str | None = Field(
         default=None, description="Correlation id of the originating MCP tool call"
     )
+    # --- Additive actor MFA assurance claim (v1, optional; never required) ---
+    # Added for the ePCR -> Narcotics DEA chart hand-off (defect D6), where the
+    # receiver must enforce its DEA MFA rule for the initiating clinician. This
+    # is identity assurance ONLY: an epoch second, never a factor type, device,
+    # phone number, code, secret, prompt or any patient/clinical data. The
+    # issuer sets it only together with ``actor_sub`` and never later than the
+    # token's own issued-at (plus clock-skew leeway). Freshness is decided by
+    # the receiver with ``require_fresh_actor_mfa_assurance``, not here. Older
+    # tokens without it remain valid, receivers on older Contracts pins ignore
+    # it (the default model config ignores unknown claims), and the required
+    # schema version is unchanged. ``strict`` keeps a JSON bool, float or
+    # string from being coerced into an epoch second.
+    actor_mfa_verified_at: int | None = Field(
+        default=None,
+        strict=True,
+        gt=0,
+        description=(
+            "Epoch seconds at which the ISSUER observed, in a gateway-signed and"
+            " verified request context for this actor_sub, that the actor held a"
+            " fresh second factor. Identity assurance only; set only together"
+            " with actor_sub."
+        ),
+    )
     ver: int = Field(default=SERVICE_TOKEN_VERSION, description="Claims schema version")
 
 
@@ -141,11 +211,20 @@ def issue_service_token(
     tool_call_id: str | None = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
     now: datetime | None = None,
+    actor_mfa_verified_at: int | None = None,
 ) -> str:
     """Mint a signed (RS256) service token. ``private_key_pem`` never leaves the issuer.
 
+    ``actor_mfa_verified_at`` is emitted only when supplied. Supply it only when
+    this issuer has itself verified, in a gateway-signed request context for the
+    same ``actor_sub``, that the actor held a fresh second factor; pass the epoch
+    second of that observation.
+
     Raises:
-        ServiceTokenError: required identity/tenant/scope inputs are missing.
+        ServiceTokenError: required identity/tenant/scope inputs are missing, or
+            ``actor_mfa_verified_at`` is not a positive int epoch second (a bool
+            is refused), is later than issued-at plus ``LEEWAY_SECONDS``, or is
+            given without a non-empty ``actor_sub``.
     """
     for name, value in (
         ("issuer", issuer),
@@ -160,6 +239,31 @@ def issue_service_token(
     issued = now or datetime.now(UTC)
     iat = int(issued.timestamp())
     exp = int((issued + timedelta(seconds=max(1, ttl_seconds))).timestamp())
+
+    if actor_mfa_verified_at is not None:
+        # ``bool`` is an ``int`` subclass: True must never read as epoch second 1.
+        # The isinstance checks also stand for untyped callers handing over a
+        # float or string lifted out of a JSON context.
+        if isinstance(actor_mfa_verified_at, bool) or not isinstance(
+            actor_mfa_verified_at, int
+        ):
+            raise ServiceTokenError(
+                "actor_mfa_verified_at must be an int epoch second, got "
+                f"{type(actor_mfa_verified_at).__name__}"
+            )
+        if actor_mfa_verified_at <= 0:
+            raise ServiceTokenError(
+                "actor_mfa_verified_at must be a positive epoch second"
+            )
+        if not actor_sub or not actor_sub.strip():
+            raise ServiceTokenError(
+                "actor_mfa_verified_at requires the actor_sub it was observed for"
+            )
+        if actor_mfa_verified_at > iat + LEEWAY_SECONDS:
+            raise ServiceTokenError(
+                "actor_mfa_verified_at is later than the token's issued-at"
+            )
+
     payload: dict[str, Any] = {
         "iss": issuer,
         "aud": audience,
@@ -184,6 +288,8 @@ def issue_service_token(
         payload["delegation_grant_id"] = delegation_grant_id
     if tool_call_id:
         payload["tool_call_id"] = tool_call_id
+    if actor_mfa_verified_at is not None:
+        payload["actor_mfa_verified_at"] = actor_mfa_verified_at
 
     headers = {"kid": kid} if kid else None
     return jwt.encode(payload, private_key_pem, algorithm=_ALGORITHM, headers=headers)
@@ -207,6 +313,10 @@ def verify_service_token(
     ``expected_tenant_id`` is supplied (e.g. the request-body tenant) — that the
     signed tenant matches it (403). The caller is still responsible for proving
     the *source scene request* belongs to the signed tenant.
+
+    A present ``actor_mfa_verified_at`` must be a positive int epoch second
+    (401 otherwise). Its freshness is NOT judged here; a receiver that needs
+    actor MFA calls ``require_fresh_actor_mfa_assurance`` on the result.
 
     Raises:
         ServiceTokenError: authentication failure -> HTTP 401.
@@ -254,6 +364,23 @@ def verify_service_token(
     if ver != SERVICE_TOKEN_VERSION:
         raise ServiceTokenError(f"unsupported service token version: {ver!r}")
 
+    # ``actor_mfa_verified_at`` is checked here, before the closing
+    # ``ServiceTokenClaims(**raw)``, for the same reason ``jti`` is required at
+    # decode time: a signed token carrying a bool, float, string, list, object
+    # or non-positive number would otherwise fail inside that model (strict
+    # int, gt=0) and escape as ``pydantic.ValidationError`` instead of a clean
+    # 401. This mirrors the field exactly; JSON null reads as absent, as the
+    # model does.
+    mfa_verified_at = raw.get("actor_mfa_verified_at")
+    if mfa_verified_at is not None and (
+        isinstance(mfa_verified_at, bool)
+        or not isinstance(mfa_verified_at, int)
+        or mfa_verified_at <= 0
+    ):
+        raise ServiceTokenError(
+            "service token actor_mfa_verified_at claim is not a positive int epoch second"
+        )
+
     if raw.get("sub") != expected_subject:
         raise ServiceTokenAuthzError("service token caller subject not authorized")
 
@@ -300,8 +427,9 @@ def verify_service_token_with_keyset(
     - the resolved key then runs full claim verification via ``verify_service_token``.
 
     Raises ``ServiceTokenError`` (-> 401) for missing/unknown key, wrong algorithm,
-    malformed/bad-signature/expired/untrusted-issuer; ``ServiceTokenAuthzError``
-    (-> 403) for audience/subject/scope/tenant failures.
+    malformed/bad-signature/expired/untrusted-issuer, or a malformed
+    ``actor_mfa_verified_at``; ``ServiceTokenAuthzError`` (-> 403) for
+    audience/subject/scope/tenant failures.
     """
     public_key = _resolve_keyset_signing_key(
         token,
@@ -320,3 +448,78 @@ def verify_service_token_with_keyset(
         expected_tenant_id=expected_tenant_id,
         leeway_seconds=leeway_seconds,
     )
+
+
+def require_fresh_actor_mfa_assurance(
+    claims: ServiceTokenClaims,
+    *,
+    max_age_seconds: int,
+    now: datetime | None = None,
+    leeway_seconds: int = LEEWAY_SECONDS,
+) -> int:
+    """Return the verified ``actor_mfa_verified_at`` if it is fresh, else refuse (403).
+
+    The ONE canonical freshness check for the actor MFA assurance claim. Call it
+    on claims returned by ``verify_service_token`` or
+    ``verify_service_token_with_keyset`` wherever a route requires the
+    initiating actor's second factor (for example Narcotics' DEA chart routes).
+
+    With ``now_ts`` the whole epoch second of ``now`` (default: the current UTC
+    time) and ``value`` the claim:
+
+    - refused as ``actor_mfa_assurance_missing`` when the claim is absent (or
+      not an int, which only a caller mutating the model without validation
+      can produce) or ``claims.actor_sub`` is empty: an assurance about nobody
+      is no assurance;
+    - refused as ``actor_mfa_assurance_in_future`` when
+      ``value - now_ts > leeway_seconds``;
+    - refused as ``actor_mfa_assurance_stale`` when
+      ``now_ts - value > max_age_seconds``, so an age of exactly
+      ``max_age_seconds`` passes and one second more does not.
+
+    Raises:
+        ServiceTokenMfaAssuranceError: the assurance is missing, stale or in the
+            future (a ``ServiceTokenAuthzError`` -> HTTP 403); ``reason`` carries
+            the machine-readable cause.
+        ValueError: programming error in the call itself. ``max_age_seconds``
+            must be positive and ``leeway_seconds`` non-negative, so no
+            configuration value can switch the check off; ``now`` must be
+            timezone-aware, because a naive datetime is read as host-local time
+            and would shift the decision by the host's UTC offset.
+    """
+    if max_age_seconds <= 0:
+        raise ValueError(
+            "max_age_seconds must be a positive number of seconds; the actor MFA "
+            "freshness check cannot be disabled"
+        )
+    if leeway_seconds < 0:
+        raise ValueError("leeway_seconds must not be negative")
+    if now is not None and now.utcoffset() is None:
+        raise ValueError("now must be a timezone-aware datetime")
+
+    verified_at = claims.actor_mfa_verified_at
+    actor_sub = claims.actor_sub
+    if (
+        verified_at is None
+        or isinstance(verified_at, bool)
+        or not isinstance(verified_at, int)
+        or not actor_sub
+        or not actor_sub.strip()
+    ):
+        raise ServiceTokenMfaAssuranceError(
+            "actor_mfa_assurance_missing",
+            "the service token carries no actor MFA assurance for an identified actor",
+        )
+
+    now_ts = int((now or datetime.now(UTC)).timestamp())
+    if verified_at - now_ts > leeway_seconds:
+        raise ServiceTokenMfaAssuranceError(
+            "actor_mfa_assurance_in_future",
+            "the actor MFA assurance is later than the current time plus leeway",
+        )
+    if now_ts - verified_at > max_age_seconds:
+        raise ServiceTokenMfaAssuranceError(
+            "actor_mfa_assurance_stale",
+            f"the actor MFA assurance is older than {max_age_seconds} seconds",
+        )
+    return verified_at
