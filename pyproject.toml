@@ -26,7 +26,11 @@ dependencies = [
     "email-validator>=2.0.0",
     "PyJWT>=2.8.0",
     "cryptography>=50.0.0",
-    "SQLAlchemy",
+    # The asyncio extra is what installs greenlet. SQLAlchemy 2.1 no longer pulls
+    # greenlet in by default, and the shared async clients here (the audit client
+    # among them) run on the asyncio layer; without the extra the first
+    # AsyncSession fails with "No module named greenlet".
+    "SQLAlchemy[asyncio]",
 ]
 
 # NOT base dependencies:
