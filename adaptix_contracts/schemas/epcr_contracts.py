@@ -434,6 +434,29 @@ class EpcrBillingSnapshot(BaseModel):
     # ``None`` means the producer predates 5.27.0 or had no lineage to carry.
     # ``attending_crew`` and ``date_of_service`` above are unchanged.
     lineage: Optional[EncounterLineage] = None
+    # CMS ambulance origin/destination TYPE tokens (5.29.0). ePCR derives them
+    # from eScene.09 (incident location type) and eDisposition.21 (type of
+    # destination), mapping only codes with one unambiguous CMS facility type;
+    # Billing's ``auto_biller/claim_builder.py`` reads them as
+    # ``origin_type`` / ``destination_type`` and resolves each to a CMS letter
+    # through its facility letter table. ``None`` means unknown, ambiguous or a
+    # producer that predates 5.29.0; a consumer must not substitute a guessed
+    # letter. The raw location facts stay on ``transport``.
+    origin_type: Optional[str] = Field(
+        default=None,
+        description=(
+            "CMS ambulance origin token derived by ePCR from eScene.09 "
+            "(unambiguous codes only); absent when unknown. Billing resolves "
+            "it through its facility letter table."
+        ),
+    )
+    destination_type: Optional[str] = Field(
+        default=None,
+        description=(
+            "CMS ambulance destination token derived by ePCR from "
+            "eDisposition.21 (unambiguous codes only); absent when unknown."
+        ),
+    )
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 
