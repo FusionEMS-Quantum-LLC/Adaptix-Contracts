@@ -12,6 +12,36 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.30.0] - 2026-09-29
+
+### Added
+
+- **Fire reporting event types in the Analytics KPI source-event catalog.**
+  `adaptix_contracts.analytics_events` gains five constants, each with a
+  `PAYLOAD_CONTRACTS` entry, so `AnalyticsPublisher` accepts them:
+  - `FIRE_INCIDENT_CLOSED` = `fire.incident_closed`, value field
+    `duration_minutes` (alarm to clear, minutes; `null` when either time was
+    not recorded, the key is always present).
+  - `FIRE_HOSE_TEST` = `fire.hose_test`, value field `result`
+    (`passed` / `failed` / `condemned`; `passed` counts toward the rate).
+  - `FIRE_HYDRANT_FLOW_TEST` = `fire.hydrant_flow_test`, value field
+    `observed_flow_gpm` (NFPA 291 observed flow, gpm).
+  - `FIRE_PREPLAN_REVIEW` = `fire.preplan_review`, value field `status`
+    (`draft` / `active` / `archived`; `active` counts toward the rate).
+  - `FIRE_PUMP_TEST` = `fire.pump_test`, value field `result`
+    (`passed` / `failed`; `passed` counts toward the rate).
+  Additive: no existing constant or contract changed.
+
+### Downstream impact
+
+- Producer: Adaptix-Fire-Service publishes the incident, hose, hydrant flow
+  and pre-plan events from its analytics projector and moves its pin to this
+  release. `fire.pump_test` is reserved for the apparatus pump test record
+  (equipment work); nothing publishes it yet.
+- Consumer: Adaptix-Analytics-Service reads them for the fire incident heat
+  maps and the ISO PPC evidence pack. Analytics does not import this module,
+  so it needs no pin change for these types.
+
 ## [5.29.0] - 2026-09-28
 
 ### Added

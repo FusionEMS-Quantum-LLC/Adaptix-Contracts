@@ -43,6 +43,13 @@ FIRE_FIRST_UNIT_ON_SCENE: Final[str] = "fire.first_unit_on_scene"
 FIRE_ERF_TIME: Final[str] = "fire.erf_time"
 FIRE_FIRE_LOSS: Final[str] = "fire.fire_loss"
 NERIS_SUBMISSION_OUTCOME: Final[str] = "neris.submission_outcome"
+# Fire records published for reporting (5.30.0): incident volume and location,
+# and the ISO PPC evidence streams (hose, hydrant flow, pre-plan, pump tests).
+FIRE_INCIDENT_CLOSED: Final[str] = "fire.incident_closed"
+FIRE_HOSE_TEST: Final[str] = "fire.hose_test"
+FIRE_HYDRANT_FLOW_TEST: Final[str] = "fire.hydrant_flow_test"
+FIRE_PREPLAN_REVIEW: Final[str] = "fire.preplan_review"
+FIRE_PUMP_TEST: Final[str] = "fire.pump_test"
 
 # Law enforcement (dispatched from CAD)
 LAW_DISPATCH_TO_ARREST: Final[str] = "law.dispatch_to_arrest"
@@ -124,6 +131,27 @@ PAYLOAD_CONTRACTS: Final[dict[str, EventPayloadContract]] = {
     FIRE_FIRE_LOSS: EventPayloadContract(FIRE_FIRE_LOSS, "usd", "USD"),
     NERIS_SUBMISSION_OUTCOME: EventPayloadContract(
         NERIS_SUBMISSION_OUTCOME, "outcome", "category", "accepted"
+    ),
+    # One per closed fire incident. duration_minutes is alarm -> clear, null
+    # when either time was not recorded (the key is always present).
+    FIRE_INCIDENT_CLOSED: EventPayloadContract(
+        FIRE_INCIDENT_CLOSED, "duration_minutes", "minutes"
+    ),
+    # NFPA 1962 service test result, Fire vocabulary: passed / failed / condemned.
+    FIRE_HOSE_TEST: EventPayloadContract(
+        FIRE_HOSE_TEST, "result", "category", "passed"
+    ),
+    # NFPA 291 flow test: observed flow in US gallons per minute.
+    FIRE_HYDRANT_FLOW_TEST: EventPayloadContract(
+        FIRE_HYDRANT_FLOW_TEST, "observed_flow_gpm", "gpm"
+    ),
+    # Pre-plan lifecycle state at review, Fire vocabulary: draft / active / archived.
+    FIRE_PREPLAN_REVIEW: EventPayloadContract(
+        FIRE_PREPLAN_REVIEW, "status", "category", "active"
+    ),
+    # Apparatus pump service test result (NFPA 1911 / 1910): passed / failed.
+    FIRE_PUMP_TEST: EventPayloadContract(
+        FIRE_PUMP_TEST, "result", "category", "passed"
     ),
     LAW_DISPATCH_TO_ARREST: EventPayloadContract(
         LAW_DISPATCH_TO_ARREST, "minutes", "minutes"
@@ -208,6 +236,11 @@ __all__ = [
     "FIRE_ERF_TIME",
     "FIRE_FIRE_LOSS",
     "NERIS_SUBMISSION_OUTCOME",
+    "FIRE_INCIDENT_CLOSED",
+    "FIRE_HOSE_TEST",
+    "FIRE_HYDRANT_FLOW_TEST",
+    "FIRE_PREPLAN_REVIEW",
+    "FIRE_PUMP_TEST",
     "LAW_DISPATCH_TO_ARREST",
     "LAW_CASE_OUTCOME",
     "CAD_CALL_PROCESSING_TIME",
