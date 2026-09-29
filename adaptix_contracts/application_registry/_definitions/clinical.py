@@ -98,9 +98,11 @@ CLINICAL_APPLICATIONS: tuple[ApplicationDefinition, ...] = (
         source=(
             f"{_WEB} (app/quality reads /api/v1/quality x17 and /api/v1/epcr x12; "
             "routes registry gates /quality on the epcr entitlement — there is no "
-            f"'quality' module id); {_GW} /api/v1/quality AND /api/v1/qa -> "
-            "adaptix-epcr. Adaptix-QA-Service (adaptix-qa) consumes finalized-"
-            "chart events; it is not the surface's routed backend."
+            f"'quality' module id); {_GW} /api/v1/quality -> adaptix-epcr; "
+            "Gateway main d78db30e backend/app/config/route_table.json position 424 "
+            "/api/v1/qa -> adaptix-qa. Adaptix-QA-Service (adaptix-qa) owns "
+            "/api/v1/qa and consumes finalized-chart events; the /quality "
+            "surface's routed backend is adaptix-epcr via /api/v1/quality."
         ),
     ),
     _app(
