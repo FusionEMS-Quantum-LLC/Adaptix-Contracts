@@ -51,6 +51,8 @@ def _patient_signature(**overrides: object) -> dict:
         "signature_id": "5f0a1c9e-1111-4222-8333-444455556666",
         "signature_class": "patient",
         "signature_method": "electronic",
+        "signer_role": "patient",
+        "signature_obtained": True,
         "signer_type_code": "4512015",
         "signature_reason_codes": ["4513005"],
         "signature_status_code": "4515031",
@@ -158,7 +160,9 @@ def test_a_signature_fact_defaults_every_flag_to_not_documented() -> None:
     fact = EpcrBillingSignatureFact.model_validate({"signature_id": "s-1"})
 
     assert fact.patient_capable_to_sign is None
+    assert fact.signer_role is None
     for flag in (
+        "signature_obtained",
         "signer_identity_documented",
         "incapacity_reason_documented",
         "signature_graphic_captured",
@@ -179,6 +183,7 @@ def test_a_signature_fact_defaults_every_flag_to_not_documented() -> None:
         ("signer_type_code", "4515031"),  # a status code in the signer slot
         ("representative_type_code", "4512017"),
         ("signature_status_code", "signed"),
+        ("signer_role", "crew"),  # not one of EPCR's signer roles
         ("signature_reason_codes", ["billing"]),
         ("signed_at", "2026-04-02T17:40:00"),  # no UTC offset
         ("transfer_of_care_time", "2026-04-02 17:55"),
@@ -250,3 +255,30 @@ def test_the_certification_block_carries_the_medical_necessity_elements() -> Non
     )
     assert older.response_urgency_code is None
     assert older.als_assessment_performed_warranted_code is None
+
+
+def test_a_finalized_event_names_why_its_snapshot_is_absent() -> None:
+    event = EpcrChartFinalizedEvent.model_validate(
+        {
+            "chart_id": "c7a1d2e3-0000-4000-8000-00000000c4a7",
+            "tenant_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "call_number": "SYN-0001",
+            "finalized_at": "2026-04-02T18:00:00+00:00",
+            "billing_snapshot": None,
+            "billing_snapshot_error": "OperationalError",
+        }
+    )
+
+    assert event.billing_snapshot is None
+    assert event.billing_snapshot_error == "OperationalError"
+    assert _event({"primary_impression_icd10": "R07.9"}).billing_snapshot_error is None
+    with pytest.raises(ValidationError):
+        EpcrChartFinalizedEvent.model_validate(
+            {
+                "chart_id": "c",
+                "tenant_id": "t",
+                "call_number": "n",
+                "finalized_at": "2026-04-02T18:00:00+00:00",
+                "billing_snapshot_error": "x" * 121,
+            }
+        )

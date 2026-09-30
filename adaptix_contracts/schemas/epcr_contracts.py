@@ -157,6 +157,16 @@ class EpcrChartFinalizedEvent(BaseModel):
     # must never be blocked by an incomplete billing fact set.
     billing_snapshot: Optional["EpcrBillingSnapshot"] = None
 
+    # Why ``billing_snapshot`` is absent (5.31.0). Finalizing a chart is a
+    # clinical and legal act and is never blocked by a billing fact set that
+    # could not be built, so the event still ships; this names the failure
+    # (an exception class name, never a message) instead of shipping ``None``
+    # as though the chart simply had no facts. A consumer must hold the
+    # encounter for the producer's re-emitted handoff rather than bill from
+    # placeholders. ``None`` with a snapshot present is the normal case;
+    # ``None`` with no snapshot is a producer that predates 5.31.0.
+    billing_snapshot_error: Optional[str] = Field(default=None, max_length=120)
+
 
 class EpcrNemsisSubmitSucceededEvent(BaseModel):  # pylint: disable=too-few-public-methods
     """Published when EPCR successfully submits a chart to NEMSIS.
@@ -486,6 +496,25 @@ class EpcrBillingSignatureFact(BaseModel):  # pylint: disable=too-few-public-met
     signature_id: str = Field(..., min_length=1)
     signature_class: Optional[str] = None
     signature_method: Optional[str] = None
+    # Who signed, as EPCR classifies its own ``signature_class`` vocabulary.
+    # ``None`` means a class EPCR does not recognise; a consumer must not
+    # count such a signature toward any requirement.
+    signer_role: Optional[
+        Literal[
+            "patient",
+            "patient_representative",
+            "ems_crew",
+            "receiving_facility",
+            "witness",
+            "medical_control",
+            "medical_director",
+            "other",
+        ]
+    ] = None
+    # True when EPCR holds evidence the person signed: a captured graphic, a
+    # completed TrustSign attestation, or a documented signature on file. False
+    # for a documented not-signed reason (eOther.15 "Not Signed - ...").
+    signature_obtained: bool = False
     signer_type_code: Optional[str] = Field(
         default=None, pattern=r"^4512\d{3}$"
     )  # eOther.12

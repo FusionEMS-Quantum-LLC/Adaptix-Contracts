@@ -22,7 +22,8 @@ from the installed package metadata).
   top-level fields:
   - `signatures` (`list[EpcrBillingSignatureFact] | None`): every signature the
     crew captured and every documented not-signed reason, as NEMSIS 3.5.1
-    eOther.12-.15 codes plus the 42 CFR 424.36 facts: whether the patient was
+    eOther.12-.15 codes, EPCR's own `signer_role` and `signature_obtained`
+    determination, plus the 42 CFR 424.36 facts: whether the patient was
     capable of signing, whether a representative signed and in what capacity,
     the ambulance-employee exception, the receiving facility, the transfer-of-care
     time and the receiving-facility verification status. Signer names, the
@@ -39,6 +40,11 @@ from the installed package metadata).
   - `attachments` (`list[EpcrBillingAttachmentRef] | None`): pointers to the
     files attached to the chart (id, content type, size, SHA-256, upload time).
     No bytes, storage location or file name.
+- `EpcrChartFinalizedEvent.billing_snapshot_error` (`str | None`, at most 120
+  characters): the exception class name when EPCR could not build the
+  snapshot. The event still ships, because a finalize is never blocked by
+  billing facts, but it no longer ships `billing_snapshot: null` as though the
+  chart had none. A consumer holds the encounter for the re-emitted handoff.
 - `EpcrBillingCertificationBlock` gains the medical-necessity elements NEMSIS
   keeps beside the PCS: `response_urgency_code` (ePayment.40),
   `patient_transport_assessment_code` (.41),
