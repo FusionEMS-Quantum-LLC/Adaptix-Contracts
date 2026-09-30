@@ -204,6 +204,47 @@ GATEWAY_CLOCK_SKEW_SECONDS = 5
 _MAX_CONTEXT_LIFETIME_SECONDS = 300
 
 
+def _require_int_seconds(value: object, name: str, *, positive: bool = False) -> None:
+    """Refuse a time bound that is not a whole, in-range number of seconds.
+
+    The ONE rule for every verifier time bound in this package: the gateway
+    context clock skew here, the legacy identity clock skew in
+    :mod:`adaptix_contracts.gateway_identity`, the S2S token leeway in
+    :mod:`adaptix_contracts.auth.service_token` and
+    :mod:`adaptix_contracts.auth.platform_token`, the Cognito bearer clock skew
+    in :mod:`adaptix_contracts.auth.module_entitlement_gate`, and the actor MFA
+    freshness bounds. Each verifier calls it before any decode or comparison.
+
+    Type before range. ``inf`` and ``nan`` pass every range check and then make
+    every expiry comparison false, so an expired token or context would verify;
+    ``bool`` is an ``int`` subclass, so ``True`` must not read as one second.
+    The isinstance checks also stand for untyped callers (a bound read from an
+    environment variable or a JSON config) that the annotations cannot
+    constrain.
+
+    Args:
+        value: The bound as the caller passed it.
+        name: The parameter name, quoted in the error.
+        positive: Require ``value > 0`` instead of ``value >= 0``.
+
+    Raises:
+        ValueError: ``value`` is a bool or not an int, or is negative (or, with
+            ``positive``, not above zero). A programming or configuration
+            error, never an authentication failure, so it is a plain
+            ``ValueError`` and not any verifier's own error class.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(
+            f"{name} must be an int number of seconds, got "
+            f"{type(value).__name__}; a non-int bound could switch the time "
+            "check off"
+        )
+    if positive and value <= 0:
+        raise ValueError(f"{name} must be a positive number of seconds")
+    if value < 0:
+        raise ValueError(f"{name} must not be negative")
+
+
 class GatewaySignatureError(ValueError):
     """Raised when a present gateway signature cannot be verified.
 
@@ -930,7 +971,11 @@ def verify_gateway_signature(
         GatewaySignatureError: on any verification failure.
         GatewayVerifierConfigurationError: when this service's own verifier
             configuration prevents the check from being made.
+        ValueError: ``clock_skew_seconds`` is a bool, not an int (``inf`` and
+            ``nan`` included), or negative. Raised before anything is decoded
+            or compared: a programming error, not a verification failure.
     """
+    _require_int_seconds(clock_skew_seconds, "clock_skew_seconds")
     ctx = (context_b64 or "").strip()
     sig = (signature_hex or "").strip()
     if not ctx or not sig:
@@ -1063,7 +1108,12 @@ def verify_gateway_signature_for_request(
     test invoking the dependency directly -- this performs the full verification
     directly, identical to calling :func:`verify_gateway_signature`, because
     there is no request boundary to fold a second verification into.
+
+    ``clock_skew_seconds`` is checked first, as :func:`verify_gateway_signature`
+    checks it, so a bad bound raises ``ValueError`` even when this request
+    already holds a verified principal for the same assertion.
     """
+    _require_int_seconds(clock_skew_seconds, "clock_skew_seconds")
     method, path, state = _request_scope(request)
 
     def _verify() -> dict[str, Any]:

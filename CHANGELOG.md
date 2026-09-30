@@ -60,6 +60,41 @@ from the installed package metadata).
     ignores the claim, because the default model config ignores unknown
     claims.
 
+### Fixed
+
+- **No leeway or clock-skew value can switch expiry off any more.** Every
+  verifier that takes a time tolerance compared it straight against the clock:
+  `verify_service_token`, `verify_service_token_with_keyset`,
+  `verify_platform_service_token` and
+  `verify_platform_service_token_with_keyset` (`leeway_seconds`, handed to
+  PyJWT), `verify_gateway_signature` and
+  `verify_gateway_signature_for_request` (`clock_skew_seconds`),
+  `gateway_identity.verify_legacy_identity` (`clock_skew_seconds`), and the
+  module entitlement gate's Cognito direct-bearer check
+  (`AdaptixCognitoConfig.clock_skew_seconds`, handed to PyJWT). With `inf` or
+  `nan` those comparisons are false, so a token or context that expired ten
+  years ago verified. `True` read as one second, and a str or None escaped as
+  a raw `TypeError`.
+  - Each now raises a plain `ValueError` naming the parameter when the bound
+    is a bool, is not an int (a float, including `inf`, `nan` and an integral
+    float such as `5.0`, a str, None), or is negative. It is raised before
+    anything is decoded or compared, including before key resolution and
+    before a request-cached gateway principal is reused.
+  - This is a programming or configuration error, not an authentication
+    failure, so it is deliberately not `ServiceTokenError`,
+    `PlatformServiceTokenError`, `GatewaySignatureError`,
+    `GatewayIdentityError` or any other verifier error class. In the
+    entitlement gate it surfaces as a 500, never as a trusted bearer.
+  - One private rule, `gateway_signature._require_int_seconds`, owns the
+    check. `require_fresh_actor_mfa_assurance` now uses it too and refuses
+    the same inputs with `ValueError`, as before.
+  - Int bounds behave exactly as before, including `0` and every default.
+    Every existing error mapping is unchanged.
+  - The flaw was latent: every caller in the fleet passes an int. Crew-Service
+    passes `60` to `verify_legacy_identity`, ePCR passes its int default `5`
+    to `verify_gateway_signature_for_request`, and every other caller uses the
+    defaults. No consumer has to change.
+
 ### Downstream impact
 
 - Issuer: Adaptix-EPCR-Service passes `actor_mfa_verified_at` (with

@@ -52,6 +52,7 @@ from adaptix_contracts.auth._s2s_keyset import ALGORITHM as _SHARED_ALGORITHM
 from adaptix_contracts.auth._s2s_keyset import (
     resolve_keyset_signing_key as _resolve_keyset_signing_key,
 )
+from adaptix_contracts.gateway_signature import _require_int_seconds
 
 # Current claims schema version. Verifiers reject unknown major versions.
 SERVICE_TOKEN_VERSION = 1
@@ -321,7 +322,13 @@ def verify_service_token(
     Raises:
         ServiceTokenError: authentication failure -> HTTP 401.
         ServiceTokenAuthzError: authorization failure -> HTTP 403.
+        ValueError: ``leeway_seconds`` is a bool, not an int (``inf`` and
+            ``nan`` included), or negative. Raised before the token is decoded:
+            a programming error, not an authentication failure. PyJWT compares
+            ``exp`` against the current time minus the leeway, so an ``inf``
+            or ``nan`` leeway would accept a token that expired at any time.
     """
+    _require_int_seconds(leeway_seconds, "leeway_seconds")
     if not token or not token.strip():
         raise ServiceTokenError("missing service token")
 
@@ -429,8 +436,11 @@ def verify_service_token_with_keyset(
     Raises ``ServiceTokenError`` (-> 401) for missing/unknown key, wrong algorithm,
     malformed/bad-signature/expired/untrusted-issuer, or a malformed
     ``actor_mfa_verified_at``; ``ServiceTokenAuthzError`` (-> 403) for
-    audience/subject/scope/tenant failures.
+    audience/subject/scope/tenant failures; ``ValueError`` for a
+    ``leeway_seconds`` that is a bool, not an int or negative, before the key
+    is resolved (see ``verify_service_token``).
     """
+    _require_int_seconds(leeway_seconds, "leeway_seconds")
     public_key = _resolve_keyset_signing_key(
         token,
         trusted_keys=trusted_keys,
@@ -491,29 +501,11 @@ def require_fresh_actor_mfa_assurance(
             timezone-aware, because a naive datetime is read as host-local time
             and would shift the decision by the host's UTC offset.
     """
-    # Type before range. ``inf`` and ``nan`` pass both range checks below and
-    # then make every freshness comparison false, which fails open; ``bool`` is
-    # an ``int`` subclass, so True must not read as one second. The isinstance
-    # checks also stand for untyped callers (a bound read from an environment
-    # variable or a JSON config) that the annotations cannot constrain.
-    if isinstance(max_age_seconds, bool) or not isinstance(max_age_seconds, int):
-        raise ValueError(
-            "max_age_seconds must be an int number of seconds, got "
-            f"{type(max_age_seconds).__name__}; the actor MFA freshness check "
-            "cannot be disabled"
-        )
-    if isinstance(leeway_seconds, bool) or not isinstance(leeway_seconds, int):
-        raise ValueError(
-            "leeway_seconds must be an int number of seconds, got "
-            f"{type(leeway_seconds).__name__}"
-        )
-    if max_age_seconds <= 0:
-        raise ValueError(
-            "max_age_seconds must be a positive number of seconds; the actor MFA "
-            "freshness check cannot be disabled"
-        )
-    if leeway_seconds < 0:
-        raise ValueError("leeway_seconds must not be negative")
+    # The one shared bound rule (type before range; see _require_int_seconds):
+    # ``inf`` and ``nan`` would make every freshness comparison false, which
+    # fails open, and True must not read as one second.
+    _require_int_seconds(max_age_seconds, "max_age_seconds", positive=True)
+    _require_int_seconds(leeway_seconds, "leeway_seconds")
     if now is not None and now.utcoffset() is None:
         raise ValueError("now must be a timezone-aware datetime")
 
