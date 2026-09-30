@@ -12,7 +12,7 @@ from the installed package metadata).
 
 ## [Unreleased]
 
-## [5.30.0] - 2026-09-29
+## [5.32.0] - 2026-09-29
 
 ### Added
 
@@ -109,6 +109,68 @@ from the installed package metadata).
   strictly enumerates `ServiceTokenClaims` outside this package.
 - `application_catalog.json` and `commercial_catalog.json` are regenerated
   for the version. Only `contracts_version` changes.
+
+## [5.31.0] - 2026-09-29
+
+### Added
+
+- **The chart facts a claim needs that the ePCR billing snapshot never carried.**
+  `EpcrBillingSnapshot` (carried on `epcr.chart.finalized` as `billing_snapshot`
+  and on `epcr.chart.billing_handoff` as `snapshot`) gains seven optional
+  top-level fields:
+  - `signatures` (`list[EpcrBillingSignatureFact] | None`): every signature the
+    crew captured and every documented not-signed reason, as NEMSIS 3.5.1
+    eOther.12-.15 codes, EPCR's own `signer_role` and `signature_obtained`
+    determination, plus the 42 CFR 424.36 facts: whether the patient was
+    capable of signing, whether a representative signed and in what capacity,
+    the ambulance-employee exception, the receiving facility, the transfer-of-care
+    time and the receiving-facility verification status. Signer names, the
+    incapacity narrative, the signature graphic and the signature-on-file
+    reference are NOT carried; the fact states only that each is documented.
+    `compliance_decision`, `billing_readiness_effect` and `missing_requirements`
+    are EPCR's own server-side evaluation, never a capture client's assertion.
+  - `secondary_impression_icd10_codes` (`list[str] | None`): eSituation.12 in
+    the crew's ranked order. `primary_impression_icd10` is unchanged.
+  - `primary_method_of_payment_code` (ePayment.01) and
+    `patient_resides_in_service_area_code` (ePayment.08).
+  - `guarantor` (`EpcrBillingGuarantorBlock`, ePayment.23-.32) and `employer`
+    (`EpcrBillingEmployerBlock`, ePayment.33-.39).
+  - `attachments` (`list[EpcrBillingAttachmentRef] | None`): pointers to the
+    files attached to the chart (id, content type, size, SHA-256, upload time).
+    No bytes, storage location or file name.
+- `EpcrChartFinalizedEvent.billing_snapshot_error` (`str | None`, at most 120
+  characters): the exception class name when EPCR could not build the
+  snapshot. The event still ships, because a finalize is never blocked by
+  billing facts, but it no longer ships `billing_snapshot: null` as though the
+  chart had none. A consumer holds the encounter for the re-emitted handoff.
+- `EpcrBillingCertificationBlock` gains the medical-necessity elements NEMSIS
+  keeps beside the PCS: `response_urgency_code` (ePayment.40),
+  `patient_transport_assessment_code` (.41),
+  `specialty_care_transport_provider_code` (.42),
+  `round_trip_purpose_description` (.45), `stretcher_purpose_description` (.46)
+  and `als_assessment_performed_warranted_code` (.49).
+
+  Lists and blocks are tri-state: `None` means the producer predates 5.31.0 or
+  could not read that source, an empty list is the producer's statement that
+  the chart holds none. Additive: a pre-5.31.0 payload still validates. A code
+  outside its NEMSIS range, a timestamp without a UTC offset, a negative size
+  or a non-hex digest is refused.
+
+  5.30.0 is not used by this release: two open pull requests (#357, #359) each
+  claim it.
+
+### Downstream impact
+
+- Producer: Adaptix-EPCR-Service `chart_billing_readiness_export.py` builds the
+  new fields and `chart_finalization_service.py` puts them on the finalized
+  event. They are plain JSON keys, so the producer can emit them while pinned to
+  5.29.0 (typed validation there ignores keys it does not declare); EPCR repins
+  once this release is tagged.
+- Consumer: Adaptix-Billing-Service reads the snapshot as a raw mapping
+  (`event_consumers.py`, `auto_biller/claim_builder.py`), so its forms gate and
+  claim builder can consume the new keys before it repins. Its typed
+  `EpcrChartFinalizedEvent.billing_snapshot` carries them only after the repin.
+- Adaptix-CAD-Service does not consume this snapshot.
 
 ## [5.29.0] - 2026-09-28
 

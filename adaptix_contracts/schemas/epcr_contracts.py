@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints
 
 from adaptix_contracts.lineage.models import EncounterLineage
 
@@ -156,6 +156,16 @@ class EpcrChartFinalizedEvent(BaseModel):
     # Every field is optional — a finalized chart is a clinical/legal act and
     # must never be blocked by an incomplete billing fact set.
     billing_snapshot: Optional["EpcrBillingSnapshot"] = None
+
+    # Why ``billing_snapshot`` is absent (5.31.0). Finalizing a chart is a
+    # clinical and legal act and is never blocked by a billing fact set that
+    # could not be built, so the event still ships; this names the failure
+    # (an exception class name, never a message) instead of shipping ``None``
+    # as though the chart simply had no facts. A consumer must hold the
+    # encounter for the producer's re-emitted handoff rather than bill from
+    # placeholders. ``None`` with a snapshot present is the normal case;
+    # ``None`` with no snapshot is a producer that predates 5.31.0.
+    billing_snapshot_error: Optional[str] = Field(default=None, max_length=120)
 
 
 class EpcrNemsisSubmitSucceededEvent(BaseModel):  # pylint: disable=too-few-public-methods
@@ -313,6 +323,16 @@ class EpcrBillingCertificationBlock(BaseModel):
     cms_transportation_indicator_codes: Optional[list[str]] = None  # ePayment.52
     transport_authorization_code: Optional[str] = None  # ePayment.53
     prior_authorization_code_payer: Optional[str] = None  # ePayment.54
+    # Medical-necessity facts (5.31.0). The crew's coded statement of urgency
+    # and of why the patient could not travel another way, plus the two
+    # narratives NEMSIS keeps beside them. A PCS "does not alone demonstrate"
+    # necessity (42 CFR 410.40(e)(2)); these are what the record says.
+    response_urgency_code: Optional[str] = None  # ePayment.40
+    patient_transport_assessment_code: Optional[str] = None  # ePayment.41
+    specialty_care_transport_provider_code: Optional[str] = None  # ePayment.42
+    round_trip_purpose_description: Optional[str] = None  # ePayment.45
+    stretcher_purpose_description: Optional[str] = None  # ePayment.46
+    als_assessment_performed_warranted_code: Optional[str] = None  # ePayment.49
 
 
 class EpcrBillingProcedureItem(BaseModel):  # pylint: disable=too-few-public-methods
@@ -380,6 +400,156 @@ class EpcrBillingInterventionsBlock(BaseModel):  # pylint: disable=too-few-publi
     ] = None
     procedure_total: Optional[int] = None
     medication_administration_total: Optional[int] = None
+
+
+class EpcrBillingGuarantorBlock(BaseModel):  # pylint: disable=too-few-public-methods
+    """Closest relative / guardian facts (NEMSIS ePayment.23-.32) for billing.
+
+    The person a patient statement or a guarantor-billed claim is addressed to
+    when the patient is a minor or cannot be billed directly. Raw stored values
+    from EPCR's ``epcr_chart_payment`` row; nothing is inferred. ``None`` on a
+    field means the crew did not document it. The block itself is ``None`` when
+    the chart has no ePayment row or documents none of these elements.
+    """
+
+    last_name: Optional[str] = None  # ePayment.23
+    first_name: Optional[str] = None  # ePayment.24
+    middle_name: Optional[str] = None  # ePayment.25
+    street_address: Optional[str] = None  # ePayment.26
+    city: Optional[str] = None  # ePayment.27 (CityGnisCode, not a display name)
+    state: Optional[str] = None  # ePayment.28 (ANSIStateCode)
+    zip: Optional[str] = None  # ePayment.29
+    country: Optional[str] = None  # ePayment.30
+    phone: Optional[str] = None  # ePayment.31
+    relationship_code: Optional[str] = None  # ePayment.32
+
+
+class EpcrBillingEmployerBlock(BaseModel):  # pylint: disable=too-few-public-methods
+    """Patient employer facts (NEMSIS ePayment.33-.39) for billing.
+
+    What a workers' compensation claim needs to name the employer. Raw stored
+    values; ``None`` means undocumented. The block is ``None`` when the chart
+    documents none of these elements. Its presence is NOT evidence the
+    encounter is work related: that is ``primary_method_of_payment_code``
+    (ePayment.01) and the payer, which Billing evaluates.
+    """
+
+    name: Optional[str] = None  # ePayment.33
+    address: Optional[str] = None  # ePayment.34
+    city: Optional[str] = None  # ePayment.35
+    state: Optional[str] = None  # ePayment.36
+    zip: Optional[str] = None  # ePayment.37
+    country: Optional[str] = None  # ePayment.38
+    phone: Optional[str] = None  # ePayment.39
+
+
+class EpcrBillingAttachmentRef(BaseModel):  # pylint: disable=too-few-public-methods
+    """A reference to one file attached to the chart (face sheet, PCS scan, card).
+
+    A pointer, never the file: no bytes, no storage location and no file name
+    (crews name files after patients). Billing fetches the document through
+    EPCR's authorized attachment read path using ``attachment_id`` and can prove
+    it received the same bytes with ``sha256``.
+    """
+
+    attachment_id: str = Field(..., min_length=1)
+    content_type: Optional[str] = None
+    size_bytes: Optional[int] = Field(default=None, ge=0)
+    sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    uploaded_at: Optional[AwareDatetime] = None
+
+
+class EpcrBillingSignatureFact(BaseModel):  # pylint: disable=too-few-public-methods
+    """One signature the crew captured, or a documented reason none was obtained.
+
+    These are the facts 42 CFR 424.36 turns on. EPCR states what was captured;
+    it does not decide whether a claim may be filed. Billing applies the
+    regulation to the whole set:
+
+    * 424.36(a): the beneficiary signed (``signer_type_code`` 4512015 with a
+      signed ``signature_status_code``).
+    * 424.36(b)(1)-(5): the beneficiary was incapable
+      (``patient_capable_to_sign`` is ``False``) and a representative signed
+      (``signer_type_code`` 4512017, ``representative_type_code`` eOther.14).
+    * 424.36(b)(6), the ambulance exception: nobody in (b)(1)-(4) was available
+      or willing, and the record holds (A) a crew member's contemporaneous
+      statement (``ambulance_employee_exception`` on a crew signature),
+      (B) the date and time of transport and the receiving facility's name
+      (``transfer_of_care_time``, ``receiving_facility_name``), and (C) a signed
+      statement from a receiving-facility representative (a healthcare-provider
+      signature, ``signer_type_code`` 4512005) or a secondary verification
+      (``receiving_facility_verification_status``).
+
+    PHI is kept to what Billing must evaluate: signer names, the incapacity
+    narrative, the signature graphic and the signature-on-file reference stay
+    in EPCR, which retains the record; this fact says only that each is
+    documented. Codes are NEMSIS 3.5.1 eOther.12-.15 values as EPCR derives
+    them for its state export; ``None`` means EPCR could not derive one without
+    guessing.
+
+    ``compliance_decision``, ``billing_readiness_effect`` and
+    ``missing_requirements`` are EPCR's own evaluation of the stored fields,
+    recomputed by the server when the snapshot is built. A value a capture
+    client asserted is never forwarded.
+    """
+
+    signature_id: str = Field(..., min_length=1)
+    signature_class: Optional[str] = None
+    signature_method: Optional[str] = None
+    # Who signed, as EPCR classifies its own ``signature_class`` vocabulary.
+    # ``None`` means a class EPCR does not recognise; a consumer must not
+    # count such a signature toward any requirement.
+    signer_role: Optional[
+        Literal[
+            "patient",
+            "patient_representative",
+            "ems_crew",
+            "receiving_facility",
+            "witness",
+            "medical_control",
+            "medical_director",
+            "other",
+        ]
+    ] = None
+    # True when EPCR holds evidence the person signed: a captured graphic, a
+    # completed TrustSign attestation, or a documented signature on file. False
+    # for a documented not-signed reason (eOther.15 "Not Signed - ...").
+    signature_obtained: bool = False
+    signer_type_code: Optional[str] = Field(
+        default=None, pattern=r"^4512\d{3}$"
+    )  # eOther.12
+    signature_reason_codes: list[
+        Annotated[str, StringConstraints(pattern=r"^4513\d{3}$")]
+    ] = Field(default_factory=list)  # eOther.13 (0:M)
+    representative_type_code: Optional[str] = Field(
+        default=None, pattern=r"^4514\d{3}$"
+    )  # eOther.14
+    signature_status_code: Optional[str] = Field(
+        default=None, pattern=r"^4515\d{3}$"
+    )  # eOther.15
+    signed_at: Optional[AwareDatetime] = None  # eOther.19
+    signer_identity_documented: bool = False
+    signer_relationship: Optional[str] = None
+    signer_authority_basis: Optional[str] = None
+    patient_capable_to_sign: Optional[bool] = None
+    incapacity_reason_documented: bool = False
+    signature_graphic_captured: bool = False
+    signature_on_file_documented: bool = False
+    ambulance_employee_exception: bool = False
+    receiving_facility_name: Optional[str] = None
+    receiving_clinician_documented: bool = False
+    receiving_role_title: Optional[str] = None
+    transfer_of_care_time: Optional[AwareDatetime] = None
+    transfer_exception_reason_code: Optional[str] = None
+    receiving_facility_verification_status: Optional[str] = None
+    compliance_decision: Optional[str] = None
+    billing_readiness_effect: Optional[str] = None
+    missing_requirements: list[str] = Field(default_factory=list)
+    # True when an amendment changed the chart content after this signature
+    # attested to it. The signature is real history, but it no longer attests
+    # to the chart being billed.
+    content_invalidated: bool = False
+    trustsign_verification_id: Optional[str] = None
 
 
 class EpcrBillingSnapshot(BaseModel):
@@ -457,6 +627,26 @@ class EpcrBillingSnapshot(BaseModel):
             "eDisposition.21 (unambiguous codes only); absent when unknown."
         ),
     )
+    # Chart facts a claim needs that the snapshot never carried (5.31.0).
+    # Every one is tri-state where it is a list or a block: ``None`` means the
+    # producer predates 5.31.0 (or could not read that source), an empty list
+    # is the producer's statement that the chart holds none.
+    #
+    # eSituation.12 Provider's Secondary Impressions, ICD-10-CM codes in the
+    # order the crew ranked them. ``primary_impression_icd10`` above is
+    # unchanged and is never repeated here.
+    secondary_impression_icd10_codes: Optional[list[str]] = None
+    # ePayment.01 Primary Method of Payment (National, Required) and
+    # ePayment.08 Patient Resides in Service Area, raw NEMSIS codes.
+    primary_method_of_payment_code: Optional[str] = None
+    patient_resides_in_service_area_code: Optional[str] = None
+    guarantor: Optional[EpcrBillingGuarantorBlock] = None
+    employer: Optional[EpcrBillingEmployerBlock] = None
+    # Signatures and documented not-signed reasons (eOther.12-.21). See
+    # ``EpcrBillingSignatureFact`` for how Billing reads them under 424.36.
+    signatures: Optional[list[EpcrBillingSignatureFact]] = None
+    # References to the files attached to the chart. Pointers only.
+    attachments: Optional[list[EpcrBillingAttachmentRef]] = None
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 
