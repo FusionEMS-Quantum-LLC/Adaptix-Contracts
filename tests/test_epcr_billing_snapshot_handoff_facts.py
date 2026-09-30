@@ -31,6 +31,7 @@ NEW_SNAPSHOT_FIELDS = (
     "employer",
     "signatures",
     "attachments",
+    "built_at",
 )
 
 
@@ -282,3 +283,12 @@ def test_a_finalized_event_names_why_its_snapshot_is_absent() -> None:
                 "billing_snapshot_error": "x" * 121,
             }
         )
+
+
+def test_a_snapshot_states_when_it_was_built() -> None:
+    snapshot = _event({"built_at": "2026-04-02T18:00:05+00:00"}).billing_snapshot
+
+    assert snapshot is not None and snapshot.built_at is not None
+    assert snapshot.built_at.isoformat() == "2026-04-02T18:00:05+00:00"
+    with pytest.raises(ValidationError):
+        _event({"built_at": "2026-04-02T18:00:05"})

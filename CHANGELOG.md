@@ -40,6 +40,9 @@ from the installed package metadata).
   - `attachments` (`list[EpcrBillingAttachmentRef] | None`): pointers to the
     files attached to the chart (id, content type, size, SHA-256, upload time).
     No bytes, storage location or file name.
+- `EpcrBillingSnapshot.built_at` (`AwareDatetime | None`): when the producer
+  assembled the snapshot. The bus delivers at least once and a chart can be
+  handed off again, so a consumer keeps the snapshot with the later `built_at`.
 - `EpcrChartFinalizedEvent.billing_snapshot_error` (`str | None`, at most 120
   characters): the exception class name when EPCR could not build the
   snapshot. The event still ships, because a finalize is never blocked by

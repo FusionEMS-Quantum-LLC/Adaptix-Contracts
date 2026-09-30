@@ -647,6 +647,13 @@ class EpcrBillingSnapshot(BaseModel):
     signatures: Optional[list[EpcrBillingSignatureFact]] = None
     # References to the files attached to the chart. Pointers only.
     attachments: Optional[list[EpcrBillingAttachmentRef]] = None
+    # When the producer assembled this snapshot (5.31.0). A chart can be handed
+    # off again after it is finalized (a signature obtained later, a corrected
+    # pickup ZIP), and the bus delivers at least once, so deliveries can arrive
+    # out of order. A consumer that already holds facts for the chart keeps the
+    # snapshot with the later ``built_at``; ``finalized_at`` cannot order them
+    # because it does not move when the chart is handed off again.
+    built_at: Optional[AwareDatetime] = None
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 
