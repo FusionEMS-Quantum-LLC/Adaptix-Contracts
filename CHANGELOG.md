@@ -12,6 +12,31 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.32.0] - 2026-09-29
+
+### Added
+
+- `EpcrBillingSnapshot.built_at` (`AwareDatetime | None`): when the producer
+  assembled the snapshot. A chart can be handed off again after it is finalized
+  (a signature obtained later, a corrected pickup ZIP) and the bus delivers at
+  least once, so deliveries can arrive out of order. A consumer that already
+  holds facts for the chart keeps the snapshot with the later `built_at`;
+  `finalized_at` cannot order them because it does not move when the chart is
+  handed off again. Additive: a payload without it still validates, and a
+  timestamp without a UTC offset is refused.
+
+  This field is not part of 5.31.0: it was written for that release but reached
+  the branch after pull request #360 had merged.
+
+### Downstream impact
+
+- Producer: Adaptix-EPCR-Service `chart_billing_readiness_export.py` states
+  `built_at` on every snapshot it builds. It is a plain JSON key, so the
+  producer can emit it on an earlier pin.
+- Consumer: Adaptix-Billing-Service `services/epcr_handoff_store.py` orders
+  redelivered handoffs by it and falls back to `finalized_at` for a producer
+  that does not state it.
+
 ## [5.31.0] - 2026-09-29
 
 ### Added
@@ -40,9 +65,6 @@ from the installed package metadata).
   - `attachments` (`list[EpcrBillingAttachmentRef] | None`): pointers to the
     files attached to the chart (id, content type, size, SHA-256, upload time).
     No bytes, storage location or file name.
-- `EpcrBillingSnapshot.built_at` (`AwareDatetime | None`): when the producer
-  assembled the snapshot. The bus delivers at least once and a chart can be
-  handed off again, so a consumer keeps the snapshot with the later `built_at`.
 - `EpcrChartFinalizedEvent.billing_snapshot_error` (`str | None`, at most 120
   characters): the exception class name when EPCR could not build the
   snapshot. The event still ships, because a finalize is never blocked by
