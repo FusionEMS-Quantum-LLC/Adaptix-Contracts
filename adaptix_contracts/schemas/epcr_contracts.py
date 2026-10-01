@@ -647,7 +647,7 @@ class EpcrBillingSnapshot(BaseModel):
     signatures: Optional[list[EpcrBillingSignatureFact]] = None
     # References to the files attached to the chart. Pointers only.
     attachments: Optional[list[EpcrBillingAttachmentRef]] = None
-    # When the producer assembled this snapshot (5.32.0). A chart can be handed
+    # When the producer assembled this snapshot (5.33.0). A chart can be handed
     # off again after it is finalized (a signature obtained later, a corrected
     # pickup ZIP), and the bus delivers at least once, so deliveries can arrive
     # out of order. A consumer that already holds facts for the chart keeps the

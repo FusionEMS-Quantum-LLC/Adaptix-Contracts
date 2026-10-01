@@ -1,3 +1,5 @@
-# Ownership for review routing. Code-owner review is not a required merge gate
-# (solo founder; GitHub requires the real validate check instead).
-* @FusionEMS-Quantum-LLC/adaptix-platform
+# Automatic reviewer routing intentionally disabled.
+#
+# AdaptixCore is operated without required or automatically requested code-owner
+# reviewers. Required CI, validation, security, and merge protections remain
+# enforced by GitHub rulesets. Add reviewers manually when wanted.
