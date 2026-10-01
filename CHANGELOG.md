@@ -12,6 +12,34 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.33.0] - 2026-10-01
+
+### Added
+
+- `EpcrBillingSnapshot.built_at` (`AwareDatetime | None`): when the producer
+  assembled the snapshot. A chart can be handed off again after it is finalized
+  (a signature obtained later, a corrected pickup ZIP) and the bus delivers at
+  least once, so deliveries can arrive out of order. A consumer that already
+  holds facts for the chart keeps the snapshot with the later `built_at`;
+  `finalized_at` cannot order them because it does not move when the chart is
+  handed off again. Additive: a payload without it still validates, and a
+  timestamp without a UTC offset is refused.
+
+  This field is not part of 5.31.0 or 5.32.0: it was written for 5.31.0 but
+  reached the branch after pull request #360 had merged, and 5.32.0 (pull
+  request #359, signed actor MFA assurance) was released before it.
+
+### Downstream impact
+
+- Producer: Adaptix-EPCR-Service `chart_billing_readiness_export.py` states
+  `built_at` on every snapshot it builds. It is a plain JSON key, so the
+  producer can emit it on an earlier pin.
+- Consumer: Adaptix-Billing-Service `services/epcr_handoff_store.py` orders
+  redelivered handoffs by it and falls back to `finalized_at` for a producer
+  that does not state it.
+- `application_catalog.json` and `commercial_catalog.json` are regenerated
+  for the version. Only `contracts_version` changes.
+
 ## [5.32.0] - 2026-09-29
 
 ### Added
