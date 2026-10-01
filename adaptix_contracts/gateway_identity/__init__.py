@@ -35,6 +35,7 @@ from adaptix_contracts.gateway_signature import (
     GATEWAY_SHARED_SECRET_ENV,
     GatewaySignatureError,
     GatewayVerifierConfigurationError,
+    _require_int_seconds,
     has_gateway_signature,
     verify_gateway_signature,
 )
@@ -197,7 +198,13 @@ def verify_legacy_identity(
         GatewayIdentityExpired: timestamp outside ``clock_skew_seconds``.
         GatewayIdentityMismatch: HMAC does not match.
         GatewayIdentitySecretMissing: secret is blank.
+        ValueError: ``clock_skew_seconds`` is a bool, not an int (``inf`` and
+            ``nan`` included), or negative. Raised before anything is compared:
+            a programming error, not a ``GatewayIdentityError``.
     """
+    # ``abs(now - issued_at) > inf`` and ``> nan`` are both False, so a float
+    # tolerance would accept a timestamp of any age.
+    _require_int_seconds(clock_skew_seconds, "clock_skew_seconds")
     secret = _require_secret(shared_secret)
     if not timestamp or not signature:
         raise GatewayIdentityMissing("request did not come through the Adaptix gateway")

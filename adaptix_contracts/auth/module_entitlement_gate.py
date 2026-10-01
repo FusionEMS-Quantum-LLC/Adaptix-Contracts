@@ -51,6 +51,7 @@ from adaptix_contracts.environment import is_production as _is_production
 from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
+    _require_int_seconds,
     gateway_shared_secret,
     has_gateway_signature,
     verify_gateway_signature_for_request,
@@ -313,8 +314,22 @@ def _verify_direct_bearer_claims(token: str) -> dict:
     founder-bypass / entitlement decision. This closes the prior hole where the
     gate decoded the bearer with ``verify_signature=False`` and would trust a
     forged ``is_founder`` / ``module_entitlements`` on any direct-service call.
+
+    ``config.clock_skew_seconds`` becomes the JWT leeway, so it is checked
+    before anything else: a bool, a non-int (``inf`` and ``nan`` included) or a
+    negative value raises ``ValueError``, a configuration error surfaced as a
+    500 and never a trusted bearer. PyJWT compares ``exp`` against the current
+    time minus the leeway, so an ``inf`` or ``nan`` skew would accept a bearer
+    that expired at any time.
     """
     config = AdaptixCognitoConfig.from_env()
+    # Checked here, where the value is consumed, rather than only where the
+    # config is built: the dataclass is mutable, so a check at construction
+    # would not cover a value assigned afterwards, and this is the one place in
+    # the package that turns it into a leeway.
+    _require_int_seconds(
+        config.clock_skew_seconds, "AdaptixCognitoConfig.clock_skew_seconds"
+    )
     if not config.is_configured:
         logger.error(
             "module_entitlement_gate: a direct (non-gateway) bearer was presented "

@@ -12,6 +12,104 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.32.0] - 2026-09-29
+
+### Added
+
+- **Signed actor MFA assurance on the canonical S2S service token (defect D6).**
+  ePCR knows at request time that the clinician's gateway-signed context
+  carries a verified second factor, but the service token it sends to
+  Narcotics had no claim for that fact. The gateway context cannot be relayed
+  (it is audience-pinned to adaptix-epcr, bound to method and path, single-use
+  by jti, and expires after 60 seconds). So Narcotics' DEA chart routes refused
+  every call with 403 `mfa_required` while `DEA_MFA_ENFORCEMENT_ENABLED=true`.
+  - `ServiceTokenClaims.actor_mfa_verified_at` (`int | None`, strict, `> 0`):
+    the epoch second at which the issuer observed, in a gateway-signed and
+    verified request context for this `actor_sub`, that the actor held a
+    fresh second factor. Identity assurance only. It carries no factor type,
+    device, code or patient data.
+  - `issue_service_token(..., actor_mfa_verified_at=None)`: keyword-only and
+    emitted only when supplied. The issuer raises `ServiceTokenError` for a
+    bool, a non-int, a value `<= 0`, a value later than issued-at plus
+    `LEEWAY_SECONDS`, or any value without a non-empty `actor_sub`.
+  - `verify_service_token` / `verify_service_token_with_keyset`: a signed
+    token whose claim is a bool, float, string, list, object or non-positive
+    number raises `ServiceTokenError` (401). It never escapes as
+    `pydantic.ValidationError`. JSON `null` reads as absent. Freshness is not
+    judged by the verifiers.
+  - `require_fresh_actor_mfa_assurance(claims, *, max_age_seconds, now=None,
+    leeway_seconds=LEEWAY_SECONDS) -> int`: the one canonical freshness check.
+    It returns the verified value, or raises `ServiceTokenMfaAssuranceError`,
+    a `ServiceTokenAuthzError` subclass (403), whose `reason`
+    (`ActorMfaAssuranceReason`) is one of:
+    - `actor_mfa_assurance_missing`: the claim is absent, or `actor_sub` is
+      empty;
+    - `actor_mfa_assurance_stale`: `now - value > max_age_seconds`. An age of
+      exactly `max_age_seconds` passes;
+    - `actor_mfa_assurance_in_future`: `value - now > leeway_seconds`.
+    It raises `ValueError` when `max_age_seconds` or `leeway_seconds` is a
+    bool or not an int (a float, including `inf` and `nan`, a str or None is
+    refused before any claim is judged, because `inf` and `nan` would make
+    every freshness comparison false), when `max_age_seconds <= 0`, when
+    `leeway_seconds` is negative, or when `now` is naive. So no configuration
+    value can switch the check off.
+  - Exported from `adaptix_contracts.auth`: `require_fresh_actor_mfa_assurance`,
+    `ServiceTokenMfaAssuranceError`, `ActorMfaAssuranceReason`.
+  - The change is additive. `SERVICE_TOKEN_VERSION` stays `1`, and tokens
+    without the claim verify unchanged. A receiver on an older Contracts pin
+    ignores the claim, because the default model config ignores unknown
+    claims.
+
+### Fixed
+
+- **No leeway or clock-skew value can switch expiry off any more.** Every
+  verifier that takes a time tolerance compared it straight against the clock:
+  `verify_service_token`, `verify_service_token_with_keyset`,
+  `verify_platform_service_token` and
+  `verify_platform_service_token_with_keyset` (`leeway_seconds`, handed to
+  PyJWT), `verify_gateway_signature` and
+  `verify_gateway_signature_for_request` (`clock_skew_seconds`),
+  `gateway_identity.verify_legacy_identity` (`clock_skew_seconds`), and the
+  module entitlement gate's Cognito direct-bearer check
+  (`AdaptixCognitoConfig.clock_skew_seconds`, handed to PyJWT). With `inf` or
+  `nan` those comparisons are false, so a token or context that expired ten
+  years ago verified. `True` read as one second, and a str or None escaped as
+  a raw `TypeError`.
+  - Each now raises a plain `ValueError` naming the parameter when the bound
+    is a bool, is not an int (a float, including `inf`, `nan` and an integral
+    float such as `5.0`, a str, None), or is negative. It is raised before
+    anything is decoded or compared, including before key resolution and
+    before a request-cached gateway principal is reused.
+  - This is a programming or configuration error, not an authentication
+    failure, so it is deliberately not `ServiceTokenError`,
+    `PlatformServiceTokenError`, `GatewaySignatureError`,
+    `GatewayIdentityError` or any other verifier error class. In the
+    entitlement gate it surfaces as a 500, never as a trusted bearer.
+  - One private rule, `gateway_signature._require_int_seconds`, owns the
+    check. `require_fresh_actor_mfa_assurance` now uses it too and refuses
+    the same inputs with `ValueError`, as before.
+  - Int bounds behave exactly as before, including `0` and every default.
+    Every existing error mapping is unchanged.
+  - The flaw was latent: every caller in the fleet passes an int. Crew-Service
+    passes `60` to `verify_legacy_identity`, ePCR passes its int default `5`
+    to `verify_gateway_signature_for_request`, and every other caller uses the
+    defaults. No consumer has to change.
+
+### Downstream impact
+
+- Issuer: Adaptix-EPCR-Service passes `actor_mfa_verified_at` (with
+  `actor_sub`) when it mints the Narcotics chart hand-off token, and only from
+  its own gateway-verified `mfa_verified` context. That change ships in EPCR
+  and moves its pin to this release.
+- Receiver: Adaptix-Narcotics-Service calls
+  `require_fresh_actor_mfa_assurance` on the verified claims of its DEA chart
+  routes in place of the unconditional 403. That change ships in Narcotics
+  and moves its pin to this release.
+- No other consumer is affected. No repository constructs, subclasses or
+  strictly enumerates `ServiceTokenClaims` outside this package.
+- `application_catalog.json` and `commercial_catalog.json` are regenerated
+  for the version. Only `contracts_version` changes.
+
 ## [5.31.0] - 2026-09-29
 
 ### Added
