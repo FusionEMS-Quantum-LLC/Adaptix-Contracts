@@ -288,12 +288,45 @@ _DEFINITIONS: tuple[ModuleDefinition, ...] = (
         source="adaptix-crr",
     ),
     # ── Air medical ──────────────────────────────────────────────────────
+    # ``air`` implies ``air-pilot`` (DEF-031): Air-Pilot is its own upstream
+    # service with its own audience (below), reached through the Air SKU —
+    # Core expands ``implies`` and then maps every id through
+    # ``audience_map()``, so an Air-entitled tenant is minted BOTH
+    # ``adaptix-air`` and ``adaptix-air-pilot``. Air's own audience is unchanged
+    # (Core's ``_MODULE_TO_AUDIENCE_FLOOR`` pins ``air -> adaptix-air``).
     _m(
         "air",
         "Air Medical",
+        implies=("air-pilot",),
         purchasable=True,
         audience="adaptix-air",
         source="Core MODULE_CATALOG; Core _MODULE_TO_AUDIENCE; Air-Service gate",
+    ),
+    # Adaptix-Air-Service-Pilot is a distinct ECS service
+    # (adaptix-production-air-pilot) behind the gateway prefix
+    # /api/v1/air-pilot, but it shared Air's audience: the gateway signed
+    # aud=adaptix-air for its routes and its task definition pinned
+    # ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-air. Once the gateway records a
+    # distinct Service Power Manager identity for it (service_name
+    # "adaptix-air-pilot"), the gateway's invariant that two distinct services
+    # never share one audience requires an audience of its own; the gateway
+    # refuses an audience outside KNOWN_SERVICE_AUDIENCES and the downstream
+    # verifier refuses an unknown pin, so this registry moves first. The id is
+    # the gateway path segment (``/api/v1/air-pilot``), the spelling the
+    # gateway's entitlement middleware derives from the path — same shape as
+    # ``ai-infrastructure`` / ``command-intelligence`` above.
+    # purchasable=False: no signup wizard, pricing catalog or Stripe product
+    # sells it; it is granted through ``air`` (same shape as ``nemsis`` /
+    # ``neris`` through ``nemsis_neris``), so no tenant's entitlement changes.
+    _m(
+        "air-pilot",
+        "Air Pilot",
+        audience="adaptix-air-pilot",
+        source=(
+            "Gateway ROUTE_TABLE /api/v1/air-pilot -> air_pilot_service_url; "
+            "ECS adaptix-production-air-pilot; Core service_registry "
+            "adaptix-air-pilot; service_audiences.KNOWN_SERVICE_AUDIENCES"
+        ),
     ),
     # ``hems_ops`` and ``cct_transport_ops`` are BUNDLE MARKER ids, not
     # standalone products: no ``/api/v1/hems`` or ``/api/v1/cct`` RouteEntry

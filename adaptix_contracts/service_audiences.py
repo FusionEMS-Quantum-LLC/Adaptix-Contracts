@@ -61,6 +61,7 @@ KNOWN_SERVICE_AUDIENCES: frozenset[str] = frozenset(
     {
         "adaptix-ai",
         "adaptix-air",
+        "adaptix-air-pilot",
         "adaptix-audit",
         "adaptix-analytics",
         "adaptix-app-management",

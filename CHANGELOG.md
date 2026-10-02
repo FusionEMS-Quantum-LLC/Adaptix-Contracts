@@ -12,6 +12,57 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.34.0] - 2026-10-02
+
+### Added
+
+- `service_audiences.KNOWN_SERVICE_AUDIENCES` gains `adaptix-air-pilot`
+  (DEF-031). Adaptix-Air-Service-Pilot is its own ECS service
+  (`adaptix-production-air-pilot`) behind the gateway prefix
+  `/api/v1/air-pilot`, but it has always shared Air's audience `adaptix-air`:
+  the gateway signed `aud=adaptix-air` for its routes and its task definition
+  pinned `ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-air`. The gateway now gives
+  Air-Pilot a distinct Service Power Manager identity, and its invariant that
+  two distinct services never share one audience requires an audience of its
+  own. The gateway refuses a route audience outside this set and
+  `gateway_signature._expected_audience` refuses an unknown pin, so this
+  registry moves first.
+- `module_registry`: a new non-purchasable module `air-pilot` (display "Air
+  Pilot", `audience="adaptix-air-pilot"`), and `air` now `implies`
+  `air-pilot`. Core expands `implies` and maps every id through
+  `audience_map()`, so an Air-entitled tenant is minted both `adaptix-air` and
+  `adaptix-air-pilot`; `audience_map()["air"]` is still `adaptix-air` (Core's
+  `_MODULE_TO_AUDIENCE_FLOOR`). No signup wizard, pricing catalog or Stripe
+  product sells `air-pilot`; it is reached through the Air SKU like `nemsis` /
+  `neris` through `nemsis_neris`, so no tenant's entitlement changes.
+  Implication is directional: `air-pilot` grants nothing else.
+- `tests/test_air_pilot_service_audience.py` pins the contract: the audience
+  is known, the module maps to it, `air` implies `air-pilot`, `air` keeps its
+  audience, the implication is one-way, the module is not purchasable, and
+  every declared module audience stays inside `KNOWN_SERVICE_AUDIENCES`.
+
+### Downstream impact (lockstep audience split, in this order)
+
+1. Adaptix-Core-Service repins to 5.34.0 and deploys: its derived
+   `_MODULE_TO_AUDIENCE` gains `air-pilot -> adaptix-air-pilot` and
+   `_session_audiences` mints the new audience for Air tenants. Until then no
+   tenant token carries `adaptix-air-pilot`, so nothing downstream may require
+   it.
+2. Adaptix-Air-Service-Pilot repins to 5.34.0 and Adaptix-Infra sets
+   `ADAPTIX_GATEWAY_EXPECTED_AUDIENCE=adaptix-air-pilot` on
+   `task_definitions/production/air-pilot.json`; the Gateway repins and moves
+   both `/api/v1/air-pilot` route entries (and
+   `audience_policy.SERVICE_AUDIENCES["air-pilot"]`) to
+   `audience="adaptix-air-pilot"`. The verifier pins ONE audience
+   (`_check_audience_pin` is exact for a string `aud`), so the Air-Pilot deploy
+   and the Gateway deploy are back-to-back.
+3. Adaptix-Air-Service repins and its Air<->Air-Pilot S2S scope
+   (`air_service_s2s.AIR_PILOT_AUDIENCE`) follows.
+4. adaptix-ops regenerates `config/gateway-routes.json` (`knownAudiences`) from
+   Gateway main.
+- `application_catalog.json` and `commercial_catalog.json` are regenerated
+  for the version. Only `contracts_version` changes.
+
 ## [5.33.0] - 2026-10-01
 
 ### Added
