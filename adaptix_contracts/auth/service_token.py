@@ -37,11 +37,21 @@ actor_mfa_verified_at -> 401; wrong audience / wrong caller service / missing
 scope / missing-or-mismatched tenant -> 403. A missing, stale or future actor MFA
 assurance is ``ServiceTokenMfaAssuranceError`` (a ``ServiceTokenAuthzError``,
 so 403) with a machine-readable ``reason``.
+
+A verifier names the audience(s) it accepts as ``expected_audience``: one
+string, or (5.35.0) a non-empty sequence of strings for a receiver whose
+audience is being renamed. During such a cutover the receiver accepts both its
+new audience and the legacy one, so the issuer can switch in its own deploy
+with no window in which every token is refused; the receiver drops the legacy
+value once the issuer has moved. An empty sequence is a programming error and
+is refused (``ValueError``) before any token is decoded: it must never read as
+"accept nothing" at runtime, and even less as "accept anything".
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
@@ -67,6 +77,55 @@ LEEWAY_SECONDS = 5
 # value, "RS256") so every existing reference to `_ALGORITHM` below is
 # unchanged — this is a source-of-definition move, not a behavior change.
 _ALGORITHM = _SHARED_ALGORITHM
+
+
+def _require_accepted_audiences(expected_audience: object) -> tuple[str, ...]:
+    """Normalise ``expected_audience`` to the non-empty tuple PyJWT compares against.
+
+    Called by both verifiers before the token is decoded, in the same place and
+    the same spirit as ``_require_int_seconds``: a bad bound is a programming
+    error in the verifier, not an authentication failure of the token, so it is
+    ``ValueError`` and never a 401/403.
+
+    ``str`` is checked first because a ``str`` is itself a ``Sequence[str]`` of
+    its characters: ``"adaptix-cad"`` must mean the one audience
+    ``adaptix-cad``, never the twelve one-letter audiences PyJWT would otherwise
+    accept. PyJWT (``>=2.8``; locked 2.15.0) accepts ``str | Iterable[str]`` for
+    ``audience`` and, in its default non-strict mode, passes a token whose
+    ``aud`` claim is any member of the iterable; an empty iterable makes it
+    refuse every token (``all(...)`` over nothing), which is fail-closed but
+    silent, so it is refused here, loudly, before decoding.
+
+    Args:
+        expected_audience: One audience string, or a non-empty sequence of
+            them (a cutover receiver accepting its new and its legacy audience).
+
+    Raises:
+        ValueError: ``expected_audience`` is empty or blank, is neither a
+            ``str`` nor a sequence (a set, a generator, bytes, None, an int),
+            or contains an element that is not a non-blank ``str``.
+    """
+    if isinstance(expected_audience, str):
+        if not expected_audience.strip():
+            raise ValueError("expected_audience must not be blank")
+        return (expected_audience,)
+    if isinstance(expected_audience, (bytes, bytearray)) or not isinstance(
+        expected_audience, Sequence
+    ):
+        raise ValueError(
+            "expected_audience must be a str or a sequence of str, got "
+            f"{type(expected_audience).__name__}"
+        )
+    accepted = tuple(expected_audience)
+    if not accepted:
+        raise ValueError("expected_audience must name at least one audience")
+    for audience in accepted:
+        if not isinstance(audience, str) or not audience.strip():
+            raise ValueError(
+                "every expected_audience entry must be a non-blank str, got "
+                f"{audience!r}"
+            )
+    return accepted
 
 
 class ServiceTokenError(ValueError):
@@ -301,7 +360,7 @@ def verify_service_token(
     *,
     public_key_pem: str,
     expected_issuer: str,
-    expected_audience: str,
+    expected_audience: str | Sequence[str],
     expected_subject: str,
     required_scope: str,
     expected_tenant_id: str | None = None,
@@ -315,6 +374,12 @@ def verify_service_token(
     signed tenant matches it (403). The caller is still responsible for proving
     the *source scene request* belongs to the signed tenant.
 
+    ``expected_audience`` is the one audience this receiver is, or (5.35.0) a
+    non-empty sequence of audiences it accepts while its audience is being
+    renamed: the token's ``aud`` must equal one of them, else 403. Keep the
+    sequence to the new value plus the legacy one, and drop the legacy value
+    once every issuer has moved.
+
     A present ``actor_mfa_verified_at`` must be a positive int epoch second
     (401 otherwise). Its freshness is NOT judged here; a receiver that needs
     actor MFA calls ``require_fresh_actor_mfa_assurance`` on the result.
@@ -323,12 +388,16 @@ def verify_service_token(
         ServiceTokenError: authentication failure -> HTTP 401.
         ServiceTokenAuthzError: authorization failure -> HTTP 403.
         ValueError: ``leeway_seconds`` is a bool, not an int (``inf`` and
-            ``nan`` included), or negative. Raised before the token is decoded:
-            a programming error, not an authentication failure. PyJWT compares
+            ``nan`` included), or negative; or ``expected_audience`` is blank,
+            an empty sequence, not a ``str``/sequence of ``str``, or holds a
+            blank or non-``str`` entry. Raised before the token is decoded: a
+            programming error, not an authentication failure. PyJWT compares
             ``exp`` against the current time minus the leeway, so an ``inf``
-            or ``nan`` leeway would accept a token that expired at any time.
+            or ``nan`` leeway would accept a token that expired at any time;
+            an empty audience sequence would silently refuse every token.
     """
     _require_int_seconds(leeway_seconds, "leeway_seconds")
+    accepted_audiences = _require_accepted_audiences(expected_audience)
     if not token or not token.strip():
         raise ServiceTokenError("missing service token")
 
@@ -349,7 +418,7 @@ def verify_service_token(
             token,
             public_key_pem,
             algorithms=[_ALGORITHM],
-            audience=expected_audience,
+            audience=accepted_audiences,
             issuer=expected_issuer,
             leeway=leeway_seconds,
             options={"require": ["exp", "iat", "aud", "iss", "sub", "jti"]},
@@ -413,7 +482,7 @@ def verify_service_token_with_keyset(
     *,
     trusted_keys: dict[str, str],
     expected_issuer: str,
-    expected_audience: str,
+    expected_audience: str | Sequence[str],
     expected_subject: str,
     required_scope: str,
     expected_tenant_id: str | None = None,
@@ -433,14 +502,19 @@ def verify_service_token_with_keyset(
       jku/x5u/JWKS-by-URL) — SSRF-safe by construction;
     - the resolved key then runs full claim verification via ``verify_service_token``.
 
+    ``expected_audience`` is one audience string or (5.35.0) a non-empty
+    sequence of accepted audiences, exactly as for ``verify_service_token``.
+
     Raises ``ServiceTokenError`` (-> 401) for missing/unknown key, wrong algorithm,
     malformed/bad-signature/expired/untrusted-issuer, or a malformed
     ``actor_mfa_verified_at``; ``ServiceTokenAuthzError`` (-> 403) for
     audience/subject/scope/tenant failures; ``ValueError`` for a
-    ``leeway_seconds`` that is a bool, not an int or negative, before the key
-    is resolved (see ``verify_service_token``).
+    ``leeway_seconds`` that is a bool, not an int or negative, or an
+    ``expected_audience`` that is blank, empty or not made of ``str``, before
+    the key is resolved (see ``verify_service_token``).
     """
     _require_int_seconds(leeway_seconds, "leeway_seconds")
+    _require_accepted_audiences(expected_audience)
     public_key = _resolve_keyset_signing_key(
         token,
         trusted_keys=trusted_keys,

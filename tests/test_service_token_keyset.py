@@ -193,3 +193,60 @@ def test_wrong_audience_is_authz_403():
     token = _issue(priv, "k1", tenant, audience="adaptix-air")  # wrong for CAD
     with pytest.raises(ServiceTokenAuthzError):
         _verify(token, {"k1": pub}, tenant)
+
+
+# ---------------------------------------------------------------------------
+# 5.35.0: the keyset entry point takes the same ``str | Sequence[str]`` audience
+# (DEF-031: Air-Pilot verifies Air's tokens for adaptix-air-pilot AND adaptix-air
+# through this entry point during its audience cutover).
+# ---------------------------------------------------------------------------
+
+_CUTOVER = ("adaptix-air-pilot", "adaptix-air")
+
+
+def _verify_cutover(token: str, keys: dict[str, str], tenant: str, audiences):
+    return verify_service_token_with_keyset(
+        token,
+        trusted_keys=keys,
+        expected_issuer=_ISS,
+        expected_audience=audiences,
+        expected_subject=_SUB,
+        required_scope=_SCOPE,
+        expected_tenant_id=tenant,
+    )
+
+
+@pytest.mark.parametrize("audience", _CUTOVER)
+def test_keyset_entry_point_accepts_each_audience_in_the_sequence(audience):
+    priv, pub = _keypair()
+    tenant = str(uuid.uuid4())
+    token = _issue(priv, "k1", tenant, audience=audience)
+    claims = _verify_cutover(token, {"k1": pub}, tenant, _CUTOVER)
+    assert claims.aud == audience
+    assert claims.tenant_id == tenant
+
+
+def test_keyset_entry_point_refuses_an_audience_outside_the_sequence():
+    priv, pub = _keypair()
+    tenant = str(uuid.uuid4())
+    token = _issue(priv, "k1", tenant, audience=_AUD)  # adaptix-cad: not in the pair
+    with pytest.raises(ServiceTokenAuthzError):
+        _verify_cutover(token, {"k1": pub}, tenant, _CUTOVER)
+
+
+@pytest.mark.parametrize("empty", [(), []])
+def test_keyset_entry_point_refuses_an_empty_sequence_before_resolving_the_key(
+    empty,
+):
+    """ValueError, not 401: the configuration is wrong, not the token.
+
+    The token carries no ``kid`` and the keyset is empty, either of which would
+    be ServiceTokenError (401) if the key were resolved first.
+    """
+    priv, _ = _keypair()
+    tenant = str(uuid.uuid4())
+    token = _issue(priv, "", tenant)  # no kid header
+    with pytest.raises(ValueError) as excinfo:
+        _verify_cutover(token, {}, tenant, empty)
+    assert not isinstance(excinfo.value, ServiceTokenError)
+    assert not isinstance(excinfo.value, ServiceTokenAuthzError)
