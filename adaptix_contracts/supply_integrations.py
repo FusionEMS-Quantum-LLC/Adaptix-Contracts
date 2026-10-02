@@ -118,11 +118,22 @@ class NotificationClient:
     Best-effort delivery with retries.
     """
 
-    _BASE_URL = os.environ.get(
-        "NOTIFICATIONS_SERVICE_URL", "http://notifications:8000"
-    ).rstrip("/")
-    _TOKEN = os.environ.get("NOTIFICATIONS_SERVICE_TOKEN", "")
-    _TIMEOUT = float(os.environ.get("NOTIFICATIONS_TIMEOUT_SECONDS", "5"))
+    # Resolved per call, never at import (see the audit-rail note above): a
+    # value set on a running task takes effect, and the default is the Cloud
+    # Map address, not a compose name that resolves nowhere in the VPC.
+    @staticmethod
+    def _base_url() -> str:
+        return os.environ.get(
+            "NOTIFICATIONS_SERVICE_URL", "http://notifications.adaptix.internal:8000"
+        ).rstrip("/")
+
+    @staticmethod
+    def _token() -> str:
+        return os.environ.get("NOTIFICATIONS_SERVICE_TOKEN", "")
+
+    @staticmethod
+    def _timeout() -> float:
+        return float(os.environ.get("NOTIFICATIONS_TIMEOUT_SECONDS", "5"))
 
     @classmethod
     async def send_low_stock_alert(
@@ -254,19 +265,20 @@ class NotificationClient:
     @classmethod
     async def _post_notification(cls, payload: dict[str, Any]) -> bool:
         """POST notification to Notifications Service."""
-        if not cls._BASE_URL:
+        base_url = cls._base_url()
+        if not base_url:
             logger.warning("Notifications Service not configured")
             return False
 
         headers = {
-            "Authorization": f"Bearer {cls._TOKEN}",
+            "Authorization": f"Bearer {cls._token()}",
             "Content-Type": "application/json",
         }
 
         try:
-            async with httpx.AsyncClient(timeout=cls._TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=cls._timeout()) as client:
                 resp = await client.post(
-                    f"{cls._BASE_URL}/api/v1/notifications/send",
+                    f"{base_url}/api/v1/notifications/send",
                     json=payload,
                     headers=headers,
                 )
@@ -281,11 +293,20 @@ class NotificationClient:
 class AnalyticsClient:
     """Client for publishing analytics events to the Analytics Service."""
 
-    _BASE_URL = os.environ.get("ANALYTICS_SERVICE_URL", "http://analytics:8000").rstrip(
-        "/"
-    )
-    _TOKEN = os.environ.get("ANALYTICS_SERVICE_TOKEN", "")
-    _TIMEOUT = float(os.environ.get("ANALYTICS_TIMEOUT_SECONDS", "5"))
+    # Resolved per call, never at import, for the same reason as above.
+    @staticmethod
+    def _base_url() -> str:
+        return os.environ.get(
+            "ANALYTICS_SERVICE_URL", "http://analytics.adaptix.internal:8022"
+        ).rstrip("/")
+
+    @staticmethod
+    def _token() -> str:
+        return os.environ.get("ANALYTICS_SERVICE_TOKEN", "")
+
+    @staticmethod
+    def _timeout() -> float:
+        return float(os.environ.get("ANALYTICS_TIMEOUT_SECONDS", "5"))
 
     @classmethod
     async def publish_usage_event(
@@ -368,19 +389,20 @@ class AnalyticsClient:
     @classmethod
     async def _post_event(cls, payload: dict[str, Any]) -> bool:
         """POST event to Analytics Service."""
-        if not cls._BASE_URL:
+        base_url = cls._base_url()
+        if not base_url:
             logger.warning("Analytics Service not configured")
             return False
 
         headers = {
-            "Authorization": f"Bearer {cls._TOKEN}",
+            "Authorization": f"Bearer {cls._token()}",
             "Content-Type": "application/json",
         }
 
         try:
-            async with httpx.AsyncClient(timeout=cls._TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=cls._timeout()) as client:
                 resp = await client.post(
-                    f"{cls._BASE_URL}/api/v1/analytics/events",
+                    f"{base_url}/api/v1/analytics/events",
                     json=payload,
                     headers=headers,
                 )
