@@ -12,6 +12,40 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.35.0] - 2026-10-02
+
+### Added
+
+- `auth.service_token.verify_service_token` and
+  `verify_service_token_with_keyset` accept `expected_audience: str |
+  Sequence[str]` (DEF-031). A receiver whose audience is being renamed names
+  both its new audience and the legacy one, so the issuer can switch in its
+  own deploy with no window in which every S2S token is refused; it drops the
+  legacy value once every issuer has moved. The token's `aud` must equal one
+  entry, else `ServiceTokenAuthzError` (403) exactly as before. PyJWT
+  (`>=2.8`, locked 2.15.0) compares a `str | Iterable[str]` natively; the
+  verifier normalises the input to a tuple and never iterates a `str` into
+  its characters.
+- The audience bound is checked before any decode, in the same place and
+  spirit as the time bounds (`_require_int_seconds`): an empty or blank
+  `expected_audience`, a non-`str` entry, or a set / generator / bytes /
+  `None` is a `ValueError`, never a 401 or 403. An empty sequence would
+  otherwise make PyJWT refuse every token silently.
+- One-string callers are unchanged: `expected_audience="adaptix-cad"` still
+  matches exactly one audience.
+- `application_catalog.json` and `commercial_catalog.json` are regenerated
+  for the version. Only `contracts_version` changes.
+
+### Downstream impact (DEF-031 audience split, step 3)
+
+- Adaptix-Air-Service-Pilot repins to 5.35.0 and its Air->Air-Pilot verifier
+  (`air_pilot_app/auth/air_service_s2s.py`) passes
+  `("adaptix-air-pilot", "adaptix-air")`, so Air's later switch of
+  `air_app/air_pilot_service_token.py` from `adaptix-air` to
+  `adaptix-air-pilot` (step 5) has no 403 window. After Air has moved and
+  deployed, Air-Pilot drops `adaptix-air` from the pair.
+- Every other verifier keeps passing one string; no consumer must change.
+
 ## [5.34.0] - 2026-10-02
 
 ### Added

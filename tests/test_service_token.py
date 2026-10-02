@@ -241,3 +241,110 @@ def test_issue_requires_identity_inputs(keys):
             tenant_id="",
             scope=_SCOPE,
         )
+
+
+# ---------------------------------------------------------------------------
+# 5.35.0: a receiver may accept a sequence of audiences during a rename cutover
+# (DEF-031: Air-Pilot moves from adaptix-air to adaptix-air-pilot).
+# ---------------------------------------------------------------------------
+
+_NEW_AUD = "adaptix-air-pilot"
+_LEGACY_AUD = "adaptix-air"
+_CUTOVER = (_NEW_AUD, _LEGACY_AUD)
+
+
+def test_token_for_the_new_audience_is_accepted_during_cutover(keys):
+    priv, pub = keys
+    token = _issue(priv, audience=_NEW_AUD)
+    claims = _verify(token, pub, expected_audience=_CUTOVER)
+    assert claims.aud == _NEW_AUD
+
+
+def test_token_for_the_legacy_audience_is_accepted_during_cutover(keys):
+    priv, pub = keys
+    token = _issue(priv, audience=_LEGACY_AUD)
+    claims = _verify(token, pub, expected_audience=_CUTOVER)
+    assert claims.aud == _LEGACY_AUD
+
+
+def test_accepted_audiences_may_be_a_list(keys):
+    priv, pub = keys
+    token = _issue(priv, audience=_LEGACY_AUD)
+    assert _verify(token, pub, expected_audience=list(_CUTOVER)).aud == _LEGACY_AUD
+
+
+def test_token_for_an_audience_outside_the_sequence_is_403(keys):
+    priv, pub = keys
+    token = _issue(priv, audience="adaptix-cad")
+    with pytest.raises(ServiceTokenAuthzError):
+        _verify(token, pub, expected_audience=_CUTOVER)
+
+
+def test_single_string_audience_still_matches_exactly(keys):
+    """The pre-5.35.0 call shape is unchanged: one str, exact match."""
+    priv, pub = keys
+    assert _verify(_issue(priv), pub, expected_audience=_AUD).aud == _AUD
+    with pytest.raises(ServiceTokenAuthzError):
+        _verify(_issue(priv, audience=_NEW_AUD), pub, expected_audience=_AUD)
+
+
+def test_one_element_sequence_behaves_like_the_string(keys):
+    priv, pub = keys
+    assert _verify(_issue(priv), pub, expected_audience=(_AUD,)).aud == _AUD
+    with pytest.raises(ServiceTokenAuthzError):
+        _verify(_issue(priv, audience=_NEW_AUD), pub, expected_audience=[_AUD])
+
+
+@pytest.mark.parametrize("empty", [(), []])
+def test_empty_audience_sequence_is_a_valueerror_before_decoding(keys, empty):
+    """An empty sequence must never read as "accept nothing" at runtime.
+
+    PyJWT would refuse every token for an empty iterable (fail-closed but
+    silent); the verifier refuses the configuration itself. The token here is
+    not even well-formed, which proves the check runs before decoding: a
+    decode would have raised ServiceTokenError, not ValueError.
+    """
+    _, pub = keys
+    with pytest.raises(ValueError) as excinfo:
+        _verify("not-a-token", pub, expected_audience=empty)
+    assert not isinstance(excinfo.value, ServiceTokenError)
+    assert not isinstance(excinfo.value, ServiceTokenAuthzError)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        "   ",
+        ("adaptix-air-pilot", ""),
+        ("adaptix-air-pilot", "  "),
+        ("adaptix-air-pilot", None),
+        ("adaptix-air-pilot", 7),
+        None,
+        7,
+        b"adaptix-air-pilot",
+        frozenset({"adaptix-air-pilot"}),
+        {"adaptix-air-pilot"},
+        (a for a in ("adaptix-air-pilot",)),
+    ],
+)
+def test_malformed_expected_audience_is_a_valueerror_before_decoding(keys, bad):
+    """Blank, non-str, set, generator or bytes audiences are refused as config errors.
+
+    A set or generator would work in PyJWT by accident (it only iterates), but
+    the contract is ``str | Sequence[str]``; bytes is a Sequence of ints and
+    a str of one audience must never be iterated into its characters.
+    """
+    _, pub = keys
+    with pytest.raises(ValueError) as excinfo:
+        _verify("not-a-token", pub, expected_audience=bad)
+    assert not isinstance(excinfo.value, ServiceTokenError)
+    assert not isinstance(excinfo.value, ServiceTokenAuthzError)
+
+
+def test_a_string_audience_is_never_iterated_into_its_characters(keys):
+    """``"adaptix-cad"`` means one audience, not eleven one-letter audiences."""
+    priv, pub = keys
+    token = _issue(priv, audience="a")
+    with pytest.raises(ServiceTokenAuthzError):
+        _verify(token, pub, expected_audience=_AUD)
