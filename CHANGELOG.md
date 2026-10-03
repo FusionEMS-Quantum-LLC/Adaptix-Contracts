@@ -10,10 +10,26 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
-## [Unreleased]
+## [5.37.0] - 2026-10-03
 
 ### Added
 
+- **`EpcrBillingTransportBlock.transport_method_code`** (NEMSIS eDisposition.16
+  "EMS Transport Method", raw string, `None` when the chart carries none).
+  Adaptix-EPCR-Service exports it on the billing snapshot's transport block
+  (#924). This model had no such field, so pydantic's default
+  `extra="ignore"` dropped the key and Adaptix-Billing-Service never saw it.
+  It is the one charted fact that separates a fixed-wing from a rotary-wing
+  transport, which an air claim needs to choose HCPCS A0430/A0435 or
+  A0431/A0436 (Air vendor gap register 2026-10-03, defect 12; Josh,
+  2026-10-03).
+- **`adaptix_contracts.epcr.transport_method`**, the one shared list of the
+  eDisposition.16 codes. It holds the nine `EMSTransportMethod` values with
+  the labels the NEMSIS 3.5.1 schema documents (`4216001` Air Medical-Fixed
+  Wing, `4216003` Air Medical-Rotor Craft, `4216005` Ground-Ambulance and so
+  on), `AIR_TRANSPORT_METHOD_CODES`, and `air_airframe_category(code)`,
+  which answers `"fixed_wing"` or `"rotor_craft"` for the two air codes and
+  `None` for anything else. It carries no HCPCS code and no billing rule.
 - **`AgencyRole.DIRECTOR_OF_OPERATIONS` and `AgencyRole.CHIEF_PILOT`** (and the
   matching `AdaptixRole` values). They are the certificate holder's aviation
   operational-control positions. Adaptix-Core-Service #2534 makes them
@@ -24,6 +40,13 @@ from the installed package metadata).
 
 ### Fixed
 
+- **`EpcrBillingTransportBlock` cited the wrong NEMSIS elements.** Its
+  docstring said `transport_distance_miles <- eDisposition.17`, which is
+  "Transport Mode from Scene", a coded value. NEMSIS 3.5.1 has no
+  transport-distance element: the producer derives loaded miles from the
+  odometers (eResponse.21 minus eResponse.20). The origin and destination
+  name elements were also stale (eScene.13 and eDisposition.01 are the
+  producer's). Documentation only; no field or value changes.
 - **`build_gateway_signed_headers` now carries the identity headers its own
   verifier requires.** `auth_contracts.get_auth_context` refuses a signed
   context unless `X-User-Id` / `X-Tenant-Id` are present and equal to the

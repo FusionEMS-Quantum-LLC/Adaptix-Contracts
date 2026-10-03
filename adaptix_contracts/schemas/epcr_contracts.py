@@ -223,12 +223,35 @@ class EpcrBillingTransportBlock(BaseModel):
     Without these facts a ground transport claim cannot be priced or
     modifier-coded (origin/destination point-of-service modifiers, loaded miles).
 
-    Values are the raw NEMSIS element strings exactly as documented by the crew
-    (``origin_* <- eScene.21/.15/.11/.12``, ``destination_* <- eDisposition.02/.03``,
-    ``transport_distance_miles <- eDisposition.17``, ``service_type_code <-
-    eResponse.05``, ``unit_role_code <- eResponse.07``). The producer performs no
-    parsing or unit coercion — ``transport_distance_miles`` is a string, not a
-    number, and consumers must treat an unparseable value as absent, never guess.
+    Values are the raw NEMSIS element strings exactly as documented by the crew.
+    The element numbers are the producer's own map
+    (``TRANSPORT_NEMSIS_ELEMENTS`` in ``chart_billing_readiness_export.py``):
+    ``origin_name <- eScene.13``, ``origin_address <- eScene.15``,
+    ``origin_latitude/longitude <- eScene.11/.12``, ``destination_name <-
+    eDisposition.01``, ``destination_address <- eDisposition.03``,
+    ``service_type_code <- eResponse.05``, ``unit_role_code <- eResponse.07``,
+    ``transport_method_code <- eDisposition.16``. The producer performs no
+    parsing or unit coercion on them.
+
+    ``transport_distance_miles`` is the one derived value. NEMSIS 3.5.1 has no
+    transport-distance element (eDisposition.17 is "Transport Mode from Scene",
+    a coded value, and this docstring used to cite it by mistake). The producer
+    derives loaded miles as destination odometer (eResponse.21) minus on-scene
+    odometer (eResponse.20), to the tenth of a mile, and sends ``None`` when
+    either reading is missing or the pair does not increase. It is a string,
+    not a number, and consumers must treat an unparseable value as absent,
+    never guess. An aircraft has no such odometer pair, so an air transport's
+    loaded statute miles do not arrive in this field.
+
+    ``transport_method_code`` is NEMSIS eDisposition.16 "EMS Transport Method",
+    passed through verbatim: ``4216001`` Air Medical-Fixed Wing, ``4216003``
+    Air Medical-Rotor Craft, ``4216005`` Ground-Ambulance, and the rest of the
+    list in :mod:`adaptix_contracts.epcr.transport_method`, which is the one
+    place the codes are declared. It is the charted fact that separates a
+    fixed-wing from a rotary-wing transport, which an air claim needs to choose
+    HCPCS A0430/A0435 or A0431/A0436. It is ``None`` when the chart carries no
+    eDisposition.16. Before 5.37.0 this model had no such field, so pydantic
+    dropped the key the producer sent and Billing never saw it.
 
     The block carried only flat street strings, so a consumer could not populate
     the point-of-pickup ZIP that CMS requires on every ambulance claim (CMS-1500
@@ -267,6 +290,7 @@ class EpcrBillingTransportBlock(BaseModel):
     transport_distance_miles: Optional[str] = None
     service_type_code: Optional[str] = None
     unit_role_code: Optional[str] = None
+    transport_method_code: Optional[str] = None  # eDisposition.16
 
 
 class EpcrBillingInsuranceBlock(BaseModel):
