@@ -44,6 +44,8 @@ class AdaptixRole(str, Enum):
     MEDICAL_DIRECTOR = "medical_director"
     ASSISTANT_MEDICAL_DIRECTOR = "assistant_medical_director"
     QA_REVIEWER = "qa_reviewer"
+    DIRECTOR_OF_OPERATIONS = "director_of_operations"
+    CHIEF_PILOT = "chief_pilot"
     VIEWER = "viewer"
     SERVICE_ACCOUNT = "service_account"
     # Occupation / domain titles — parseable, not agency-assignable.
