@@ -12,6 +12,24 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`build_gateway_signed_headers` now carries the identity headers its own
+  verifier requires.** `auth_contracts.get_auth_context` refuses a signed
+  context unless `X-User-Id` / `X-Tenant-Id` are present and equal to the
+  signed `user_id` / `tenant_id`. The builder emitted only the
+  `X-Adaptix-Auth-*` headers, so a service-to-service caller using it alone
+  got 401 "Missing gateway identity headers" from every service that resolves
+  callers through the contracts verifier.
+  - In production this silently blocked AI-Service's Cortex registry from
+    Communications, Documents, Finance and Media (fixed caller-side in
+    AI-Service #319).
+  - 13 more callers across the fleet send neither header (issue #369).
+  - Both schemes (v1 and v2) now add `X-User-Id` / `X-Tenant-Id` from the
+    signed claims, exported as `HEADER_USER_ID` / `HEADER_TENANT_ID`.
+  - A caller that already sets them keeps identical values, because the
+    verifier requires equality.
+
 ## [5.36.0] - 2026-10-02
 
 ### Added

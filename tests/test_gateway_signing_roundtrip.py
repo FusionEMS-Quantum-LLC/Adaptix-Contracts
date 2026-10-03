@@ -21,6 +21,8 @@ from adaptix_contracts.gateway_signing import (
     HEADER_AUTH_CONTEXT,
     HEADER_AUTH_PATH,
     HEADER_AUTH_SIGNATURE,
+    HEADER_TENANT_ID,
+    HEADER_USER_ID,
     build_gateway_signed_headers,
     sign_gateway_context,
 )
@@ -73,6 +75,8 @@ def test_headers_helper_roundtrip() -> None:
         HEADER_AUTH_CONTEXT,
         HEADER_AUTH_SIGNATURE,
         HEADER_AUTH_PATH,
+        HEADER_USER_ID,
+        HEADER_TENANT_ID,
     }
     assert headers[HEADER_AUTH_PATH] == "gateway-v1"
     p = verify_gateway_signature(
@@ -82,6 +86,9 @@ def test_headers_helper_roundtrip() -> None:
         auth_path=headers[HEADER_AUTH_PATH],
     )
     assert p["user_id"] == "u"
+    # The identity headers name exactly what was signed.
+    assert headers[HEADER_USER_ID] == p["user_id"] == "u"
+    assert headers[HEADER_TENANT_ID] == p["tenant_id"] == "t"
 
 
 def test_wrong_secret_is_rejected() -> None:

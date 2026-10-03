@@ -87,6 +87,13 @@ HEADER_AUTH_CONTEXT = "X-Adaptix-Auth-Context"
 HEADER_AUTH_SIGNATURE = "X-Adaptix-Auth-Signature"
 HEADER_AUTH_PATH = "X-Adaptix-Auth-Path"
 HEADER_AUTH_KEY_ID = "X-Adaptix-Auth-Key-Id"
+#: The identity headers ``auth_contracts.get_auth_context`` requires beside a
+#: signed context: it answers 401 "Missing gateway identity headers" without
+#: them, and 401 again unless they name the principal and tenant the context
+#: signs. They carry no authority of their own; the signed claims stay
+#: authoritative.
+HEADER_USER_ID = "X-User-Id"
+HEADER_TENANT_ID = "X-Tenant-Id"
 
 # Default context lifetime. Small on purpose — the context is a per-request
 # bearer of identity and the verifier applies only a 5s clock-skew tolerance on
@@ -491,6 +498,11 @@ def build_gateway_signed_headers(
     ``shared_secret`` moved from required to optional keyword when v2 landed;
     existing v1 callers that pass it keep working unchanged.
 
+    Both schemes also carry ``X-User-Id`` / ``X-Tenant-Id`` set to the signed
+    ``user_id`` / ``tenant_id``, because ``auth_contracts.get_auth_context``
+    refuses a signed context without them. A caller that sets them itself
+    afterwards keeps the same values, since the verifier requires equality.
+
     Raises:
         GatewaySignatureError: on missing required identity fields, or when
             neither signing scheme is configured.
@@ -509,8 +521,12 @@ def build_gateway_signed_headers(
         now=now,
     )
     if has_signing_material():
-        return _v2_headers(claims)
-    return _v1_headers(claims, shared_secret)
+        headers = _v2_headers(claims)
+    else:
+        headers = _v1_headers(claims, shared_secret)
+    headers[HEADER_USER_ID] = claims.user_id
+    headers[HEADER_TENANT_ID] = claims.tenant_id
+    return headers
 
 
 def gateway_secret_env_name() -> str:
@@ -527,6 +543,8 @@ __all__ = [
     "HEADER_AUTH_KEY_ID",
     "HEADER_AUTH_PATH",
     "HEADER_AUTH_SIGNATURE",
+    "HEADER_TENANT_ID",
+    "HEADER_USER_ID",
     "GatewayClaims",
     "build_gateway_signed_headers",
     "gateway_secret_env_name",
