@@ -12,9 +12,16 @@ REMOTES_PREFIX = "refs/remotes/"
 
 
 def run(*args: str) -> tuple[int, str, str]:
+    command = list(args)
+    if command[:1] == ["git"]:
+        # Every probe here only reads. `--no-optional-locks` stops
+        # `git status` from refreshing the index under .git/index.lock:
+        # a probe the time bound kills mid-refresh would leave that lock
+        # behind, and every later write in the checkout would fail on it.
+        command.insert(1, "--no-optional-locks")
     try:
         proc = subprocess.run(
-            list(args),
+            command,
             cwd=ROOT,
             capture_output=True,
             text=True,
