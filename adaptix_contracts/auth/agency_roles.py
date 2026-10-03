@@ -33,6 +33,11 @@ class AgencyRole(str, Enum):
     MEDICAL_DIRECTOR = "medical_director"
     ASSISTANT_MEDICAL_DIRECTOR = "assistant_medical_director"
     QA_REVIEWER = "qa_reviewer"
+    #: The certificate holder's aviation operational-control positions. The only
+    #: roles Adaptix-Air-Service accepts to approve an above-threshold FRAT
+    #: (14 CFR 135.617(a)(5); Josh, 2026-10-03).
+    DIRECTOR_OF_OPERATIONS = "director_of_operations"
+    CHIEF_PILOT = "chief_pilot"
     VIEWER = "viewer"
 
 

@@ -84,6 +84,15 @@ def test_occupation_titles_are_not_agency_assignable() -> None:
         assert AdaptixRole(occupation).value == occupation
 
 
+def test_aviation_management_roles_are_agency_vocabulary() -> None:
+    """Core #2534 makes them assignable; Air #415 approves a high-risk FRAT only for them."""
+    for role in ("director_of_operations", "chief_pilot"):
+        assert is_agency_role(role) is True
+        assert is_platform_only(role) is False
+        assert AdaptixRole(role).value == role
+    assert "pilot" not in AGENCY_ROLE_VALUES
+
+
 def test_qa_clinical_roles_are_agency_vocabulary() -> None:
     assert is_agency_role("qa_reviewer") is True
     assert is_agency_role("assistant_medical_director") is True

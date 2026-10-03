@@ -12,6 +12,16 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **`AgencyRole.DIRECTOR_OF_OPERATIONS` and `AgencyRole.CHIEF_PILOT`** (and the
+  matching `AdaptixRole` values). They are the certificate holder's aviation
+  operational-control positions. Adaptix-Core-Service #2534 makes them
+  assignable, and Adaptix-Air-Service #415 accepts only these two to approve a
+  FRAT above the operator's threshold (14 CFR 135.617(a)(5); Josh,
+  2026-10-03). The occupation title `pilot` stays parseable and not
+  assignable.
+
 ### Fixed
 
 - **`build_gateway_signed_headers` now carries the identity headers its own
