@@ -32,4 +32,4 @@ jobs:
     # Exactly what the called job needs, and no more.
     permissions:
       contents: read
-    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/gitleaks-reusable.yml@c339417709e4fcba54535e95ab95d03209e61baf
+    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/gitleaks-reusable.yml@131797d91033cd44458823826b60f6e4612c6687
