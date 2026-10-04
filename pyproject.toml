@@ -127,8 +127,6 @@ namespaces = false
 
 plugins = ["pydantic.mypy"]
 
-ignore_missing_imports = true
-
 # Type-check library/source only. Test files intentionally construct models via
 
 # camelCase aliases (validated at runtime by populate_by_name) which the pydantic
@@ -138,6 +136,21 @@ ignore_missing_imports = true
 # strict typing to shipped code without hiding any source/production error.
 
 exclude = "(^|/)(tests|build|dist)/"
+
+# Third-party packages that ship no type information (no stubs, no py.typed).
+# They are named one by one so that any other import mypy cannot resolve
+# is an error, instead of every unresolved import silently becoming Any.
+# Both are imported only by tools/bedrock_ops.py; the shipped
+# `adaptix_contracts` package imports neither, which is why
+# mypy-consumer-view.ini names no package at all.
+[[tool.mypy.overrides]]
+module = [
+    "boto3",
+    "boto3.*",
+    "yaml",
+    "yaml.*",
+]
+ignore_missing_imports = true
 
 
 [tool.ruff]
