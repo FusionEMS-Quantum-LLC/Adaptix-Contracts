@@ -10,6 +10,58 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [5.38.0] - 2026-10-04
+
+### Added
+
+- **`billing.eligibility.result.v1`**, the event Billing publishes each time a
+  270/271 eligibility check resolves (owner directive 2026-10-05, P6).
+  Billing owns payer eligibility and the whole 270/271 lifecycle; this is the
+  read-only write-back ePCR projects onto a chart.
+  - `adaptix_contracts.schemas.billing_eligibility_result_contracts` holds the
+    name (`BILLING_ELIGIBILITY_RESULT_V1`), the producer slug, the schema
+    version (`1.0`) and the payload `BillingEligibilityResultPayload`.
+  - The payload is the minimum summary: `schema_version`, `tenant_id`,
+    `eligibility_check_id`, `chart_id` / `patient_identity_id` / `claim_id`
+    (each null when Billing does not know it), `clearinghouse_eligibility_id`,
+    `payer_id`, `trading_partner_service_id`, `response_payer_id`,
+    `coverage_status`, `coverage_effective_from` / `coverage_effective_through`,
+    `checked_at`, `source`, `correlation_id`, `trace_number`.
+  - `EligibilityCoverageStatus` is the closed set `active`, `inactive`,
+    `non_covered`, `unknown`, `error`. `EligibilityResultSource` is
+    `stedi_271`, `stedi_270` (a 270 that produced no 271; its status can only
+    be `error`) and `office_ally_271` (the retired clearinghouse's inbound
+    tail).
+  - `extra="forbid"`: the raw 271, benefit lines, AAA rejection detail, the
+    plan and payer names, the member id, a patient name and a date of birth
+    are refused at the publish site and at the consumer. They stay in Billing.
+  - Registered in `events.registry.ALL_EVENTS` with producer `billing` and
+    version `1.0`, ahead of its producer (the `patient.nok.consent.changed` /
+    FND-001 precedent). The symbols are exported from
+    `adaptix_contracts.schemas` and the package root.
+- `application_catalog.json` and `commercial_catalog.json` are regenerated for
+  the version. Only `contracts_version` changes.
+
+### Downstream impact
+
+- Producer: Adaptix-Billing-Service writes one `BillingOutboxEvent` row per
+  resolved check, in the transaction that records the result, and its outbox
+  publisher relays it to Core's event bus. It moves its pin to this release
+  first: the producer imports the payload model to build what it publishes.
+- Consumer: Adaptix-EPCR-Service validates each delivery with the same model
+  and keeps one projection row per check and schema version. It moves its pin
+  to this release before it is deployed.
+- Core authorizes the type already: producer `billing` may publish `billing.*`
+  (`core_app/auth/event_publish_authz.py`).
+- Additive: no existing constant, model or registry entry changed. The older
+  `EligibilityCheckedEvent` (`billing.eligibility.checked`,
+  `schemas/billing_eligibility_contracts.py`) is unchanged; nothing publishes
+  or consumes it.
+- Follow-up in this repository once both services are on main: the producer's
+  file:line citation in `events/registry.py` and
+  `tests/test_event_producer_registry_drift.py`, and the ePCR subscription in
+  `event_subscriptions.py` (its citations need the merged commits).
+
 ## [5.37.0] - 2026-10-03
 
 ### Added

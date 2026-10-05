@@ -56,6 +56,11 @@ from adaptix_contracts.cad.events import (
 from adaptix_contracts.scheduling.events import (
     ALL_SCHEDULING_EVENTS,
 )
+from adaptix_contracts.schemas.billing_eligibility_result_contracts import (
+    BILLING_ELIGIBILITY_RESULT_SCHEMA_VERSION,
+    BILLING_ELIGIBILITY_RESULT_SOURCE_SERVICE,
+    BILLING_ELIGIBILITY_RESULT_V1,
+)
 from adaptix_contracts.schemas.service_registry import (
     SERVICE_BY_SLUG,
     ServiceDefinition,
@@ -197,6 +202,28 @@ BILLING_CALL_CONTEXT_ASSEMBLED: Final[str] = "billing.call_context.assembled"
 # 961. ePCR consumes it (Adaptix-EPCR-Service ``epcr_app/main.py:349``). The
 # typed payload is ``schemas.billing_contracts.ClaimStatusUpdatedEvent``.
 BILLING_CLAIM_STATUS_UPDATED: Final[str] = "billing.claim.status_updated"
+
+# ``billing.eligibility.result.v1`` is imported from
+# ``adaptix_contracts.schemas.billing_eligibility_result_contracts`` (typed,
+# ``extra="forbid"`` payload ``BillingEligibilityResultPayload``). Billing owns
+# payer eligibility and the 270/271 lifecycle; this event publishes the minimum
+# summary of one resolved check (identifiers, coverage status, the coverage
+# dates the payer stated, when it was checked and where the answer came from)
+# and never the raw 271, the benefit detail or any subscriber identity.
+#
+# Registered AHEAD of its producer, the precedent set by
+# ``patient.nok.consent.changed`` and FND-001 below: the producer and the
+# consumer both pin a released contract, so the name, the producer slug and the
+# payload are published first. It takes the same transport as
+# ``billing.claim.status_updated``: a ``BillingOutboxEvent`` row written in the
+# transaction that records the result, relayed with the row's own
+# ``event_type`` to Core's event bus (``source_domain="billing"``) by
+# ``billing_app/workers/outbox_publisher.py``, and offered to ePCR's poll
+# worker (consumer ``epcr-service``). It is not listed in the producer
+# inventories of tests/test_event_producer_registry_drift.py, and no
+# subscription is declared in ``event_subscriptions.py``, until the emitting
+# and the subscribing lines exist on those repositories' main branches; each
+# adds its file:line citation here in the pull request that follows its merge.
 
 # Cross-domain: the TrustSign signature completion event is published BY
 # Adaptix-Billing-Service (it owns the TrustSign request tables) so ePCR and the
@@ -578,6 +605,11 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     BILLING_INVOICE_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_INVOICE_PAID: {"version": "1.0", "source_service": "billing"},
     BILLING_CALL_CONTEXT_ASSEMBLED: {"version": "1.0", "source_service": "billing"},
+    # Registered ahead of its producer (see the block above the constant).
+    BILLING_ELIGIBILITY_RESULT_V1: {
+        "version": BILLING_ELIGIBILITY_RESULT_SCHEMA_VERSION,
+        "source_service": BILLING_ELIGIBILITY_RESULT_SOURCE_SERVICE,
+    },
     TRUSTSIGN_DOCUMENT_SIGNED: {"version": "1.0", "source_service": "billing"},
     EPCR_CHART_UPDATED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_CREATED: {"version": "1.0", "source_service": "epcr"},
@@ -838,6 +870,7 @@ __all__ = [
     "BILLING_CLAIM_STATUS_CHANGED",
     "BILLING_CLAIM_STATUS_UPDATED",
     "BILLING_CLAIM_UPDATED",
+    "BILLING_ELIGIBILITY_RESULT_V1",
     "BILLING_INVOICE_CREATED",
     "BILLING_INVOICE_PAID",
     "BILLING_PAYMENT_RECEIVED",
