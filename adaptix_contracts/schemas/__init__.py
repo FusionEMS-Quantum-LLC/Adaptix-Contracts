@@ -215,6 +215,15 @@ from .billing_eligibility_contracts import (
     AuthorizationStatusUpdatedEvent,
 )
 
+# Billing eligibility result (billing.eligibility.result.v1)
+from .billing_eligibility_result_contracts import (
+    BILLING_ELIGIBILITY_RESULT_SCHEMA_VERSION,
+    BILLING_ELIGIBILITY_RESULT_V1,
+    BillingEligibilityResultPayload,
+    EligibilityCoverageStatus,
+    EligibilityResultSource,
+)
+
 # Billing Portal
 from .billing_portal_contracts import (
     SurfaceAvailability,
@@ -1561,6 +1570,12 @@ __all__ = [
     "EligibilityResponse",
     "EligibilityCheckedEvent",
     "AuthorizationStatusUpdatedEvent",
+    # Billing eligibility result (billing.eligibility.result.v1)
+    "BILLING_ELIGIBILITY_RESULT_SCHEMA_VERSION",
+    "BILLING_ELIGIBILITY_RESULT_V1",
+    "BillingEligibilityResultPayload",
+    "EligibilityCoverageStatus",
+    "EligibilityResultSource",
     # Billing Portal
     "SurfaceAvailability",
     "UrgencyLevel",
