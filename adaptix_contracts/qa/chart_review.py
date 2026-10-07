@@ -113,11 +113,18 @@ class FindingOutcome(StrEnum):
     * ``met`` - a requirement was explicitly met (positive finding).
     * ``unable_to_evaluate`` - the rule applied but could not be evaluated;
       the evidence state says why.
+    * ``signal`` - the chart documents a clinical condition or event the
+      review program routes on (STEMI criteria met, hypoxia charted, a
+      controlled substance given). It is NOT a defect: a signal says what
+      the patient presented with, never that the crew did something wrong.
+      Its ``severity`` is the routing priority the engine assigned, and it
+      must be ``documented`` with the charted evidence it was read from.
     """
 
     DEVIATION = "deviation"
     MET = "met"
     UNABLE_TO_EVALUATE = "unable_to_evaluate"
+    SIGNAL = "signal"
 
 
 class ChartEvidenceReference(BaseModel):
@@ -260,6 +267,18 @@ class ChartReviewFinding(BaseModel):
             and self.severity is not FindingSeverity.INFORMATIONAL
         ):
             raise ValueError("a met requirement is informational, never a defect")
+        return self
+
+    @model_validator(mode="after")
+    def _signal_is_documented(self) -> ChartReviewFinding:
+        if (
+            self.outcome is FindingOutcome.SIGNAL
+            and self.evidence_state is not EvidenceState.DOCUMENTED
+        ):
+            raise ValueError(
+                "a signal reports a charted condition: its evidence_state must be "
+                "documented"
+            )
         return self
 
 

@@ -168,6 +168,30 @@ class TestFindingEvidenceStates:
         )
         assert finding.outcome is FindingOutcome.MET
 
+    def test_signal_reports_a_documented_condition(self) -> None:
+        finding = _finding(
+            outcome=FindingOutcome.SIGNAL,
+            severity=FindingSeverity.CRITICAL,
+            engine_severity="critical",
+        )
+        assert finding.outcome is FindingOutcome.SIGNAL
+        assert finding.severity is FindingSeverity.CRITICAL
+
+    @pytest.mark.parametrize(
+        "state",
+        [
+            EvidenceState.NOT_DOCUMENTED,
+            EvidenceState.UNKNOWN,
+        ],
+    )
+    def test_signal_must_be_documented(self, state: EvidenceState) -> None:
+        with pytest.raises(ValidationError, match="must be documented"):
+            _finding(outcome=FindingOutcome.SIGNAL, evidence_state=state)
+
+    def test_signal_without_evidence_is_refused(self) -> None:
+        with pytest.raises(ValidationError, match="documented finding must reference"):
+            _finding(outcome=FindingOutcome.SIGNAL, evidence=())
+
     def test_unknown_fields_are_refused(self) -> None:
         with pytest.raises(ValidationError):
             ChartReviewFinding.model_validate(

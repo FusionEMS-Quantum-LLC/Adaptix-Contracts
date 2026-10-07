@@ -10,6 +10,27 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [5.40.0] - 2026-10-07
+
+### Added
+
+- **`FindingOutcome.SIGNAL`** (`adaptix_contracts.qa.chart_review`). The
+  chart documents a clinical condition or event the review program routes
+  on, such as STEMI criteria met, hypoxia charted, or a controlled substance
+  given. It is not a defect: a signal says what the patient presented with,
+  never that the crew did something wrong.
+  - Its `severity` is the routing priority the engine assigned.
+  - It must be `documented`, with the charted evidence it was read from.
+    `ChartReviewFinding` refuses a signal in any other evidence state.
+  - **Why:** ePCR's clinical rules engine raises both deviations ("advanced
+    airway with no ETCO2") and indications ("qSOFA positive", "SBP below the
+    PALS limit"). With only `deviation`, `met` and `unable_to_evaluate`
+    available, an indication could only be carried as a deviation, which
+    would record a defect the crew never made.
+  - `CHART_REVIEW_BUNDLE_VERSION` stays `1.0`: no consumer of the 5.39.0
+    bundle exists yet. Adaptix-QA-Service consumes the bundle from this
+    release on.
+
 ## [5.39.0] - 2026-10-07
 
 ### Added
