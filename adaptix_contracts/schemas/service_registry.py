@@ -455,6 +455,17 @@ QHIN_SERVICE = ServiceDefinition(
     ),
 )
 
+QA_SERVICE = ServiceDefinition(
+    name="Adaptix-QA-Service",
+    slug="qa",
+    route_prefix="/api/v1/qa",
+    port=8049,
+    description=(
+        "Clinical QA/QI program: every-chart review runs, findings, sampling, "
+        "blinded dual review, deviations, peer review"
+    ),
+)
+
 
 # ============================================================================
 # ALL SERVICES REGISTRY
@@ -513,6 +524,7 @@ ALL_SERVICES: list[ServiceDefinition] = [
     NERIS_SERVICE,
     AUDIT_SERVICE,
     QHIN_SERVICE,
+    QA_SERVICE,
 ]
 
 # Lookup by slug

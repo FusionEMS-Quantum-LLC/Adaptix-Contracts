@@ -11,6 +11,34 @@ Import from the subpackage root, not the leaf modules::
     from adaptix_contracts.qa import ChartReview, QA_REVIEW_COMPLETED
 """
 
+from adaptix_contracts.qa.chart_review import (
+    CHART_REVIEW_BUNDLE_VERSION,
+    ChartEvidenceReference,
+    ChartReviewBundle,
+    ChartReviewFinding,
+    CortexReviewProvenance,
+    EvidenceState,
+    FindingOrigin,
+    FindingOutcome,
+    ProtocolCitation,
+    ReviewEngineResult,
+    ReviewEngineStatus,
+    ReviewRunState,
+    SealedChartRevision,
+)
+from adaptix_contracts.qa.chart_review_events import (
+    QA_CHART_REVIEW_COMPLETED,
+    QA_CHART_REVIEW_EVENTS,
+    QA_CHART_REVIEW_FAILED,
+    QA_CHART_REVIEW_RECONCILED,
+    QA_CHART_REVIEW_REQUESTED,
+    QA_CHART_REVIEW_SCHEMA_VERSION,
+    QA_CHART_REVIEW_STARTED,
+    QA_CHART_REVIEW_SUPERSEDED,
+    QA_SERVICE_SLUG,
+    QaChartReviewLifecyclePayload,
+    build_qa_chart_review_event,
+)
 from adaptix_contracts.qa.enums import (
     FindingSeverity,
     ReviewOutcome,
@@ -56,8 +84,32 @@ from adaptix_contracts.qa.models import (
 )
 
 __all__ = [
+    "CHART_REVIEW_BUNDLE_VERSION",
+    "ChartEvidenceReference",
     "ChartReview",
+    "ChartReviewBundle",
+    "ChartReviewFinding",
+    "CortexReviewProvenance",
     "CqiMetric",
+    "EvidenceState",
+    "FindingOrigin",
+    "FindingOutcome",
+    "ProtocolCitation",
+    "QA_CHART_REVIEW_COMPLETED",
+    "QA_CHART_REVIEW_EVENTS",
+    "QA_CHART_REVIEW_FAILED",
+    "QA_CHART_REVIEW_RECONCILED",
+    "QA_CHART_REVIEW_REQUESTED",
+    "QA_CHART_REVIEW_SCHEMA_VERSION",
+    "QA_CHART_REVIEW_STARTED",
+    "QA_CHART_REVIEW_SUPERSEDED",
+    "QA_SERVICE_SLUG",
+    "QaChartReviewLifecyclePayload",
+    "ReviewEngineResult",
+    "ReviewEngineStatus",
+    "ReviewRunState",
+    "SealedChartRevision",
+    "build_qa_chart_review_event",
     "FindingSeverity",
     "QA_CQI_METRIC_COMPUTED",
     "QA_EVENTS",

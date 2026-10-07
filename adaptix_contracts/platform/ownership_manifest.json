@@ -474,5 +474,24 @@
     "owned_events": ["qhin.transaction.started", "qhin.transaction.completed", "qhin.bundle.received", "qhin.bundle.published", "qhin.acknowledgment.received"],
     "status": "declared_not_deployed",
     "notes": "TEFCA/QHIN participant management, patient discovery, document exchange, consent, subscriptions, and reciprocal FHIR orchestration (service_registry.QHIN_SERVICE, slug qhin, port 8048). canonical_repo is the CURRENT org path proven by Adaptix-QHIN-Service/repo.yaml (repository: FusionEMS-Quantum-LLC/Adaptix-QHIN-Service); it deliberately does NOT carry the pre-rename joshuawendorf21310/ prefix the older entries in this file use, because that is not the repository identity this repo declares for itself. service_name adaptix-qhin is the gateway audience proven present in adaptix_contracts.service_audiences.KNOWN_SERVICE_AUDIENCES. owned_events mirrors adaptix_contracts.qhin.events.QHIN_EVENTS, whose QHIN_SOURCE_SERVICE is the registry slug qhin. NOT DEPLOYED (verified 2026-08-28 from repo.yaml on main): portfolioClassification deferred, runtime.kind none, deployment.deployable false, deployment.authority none, health.live/ready/version all null - so ecr_repo, ecs_service and health_endpoint are null rather than guessed from the adaptix-<slug>-service convention. has_migrations is true on TREE evidence that contradicts that same repo.yaml: root alembic.ini plus backend/migrations/env.py and backend/migrations/versions/001_qhin_foundation.py exist, while repo.yaml declares database.engine none and database.migrations none. The tree is the stronger evidence and is recorded here; the stale repo.yaml database/migrations block is the QHIN repo owner to correct. database_schema stays null because no inspected source names the schema and guessing it would encode drift."
+  },
+  "qa": {
+    "canonical_repo": "FusionEMS-Quantum-LLC/Adaptix-QA-Service",
+    "service_name": "adaptix-qa",
+    "package_name": "adaptix-qa-service",
+    "backend_path": "backend",
+    "database_schema": null,
+    "api_prefixes": ["/api/v1/qa"],
+    "frontend_routes": [],
+    "health_endpoint": "/healthz",
+    "readyz_endpoint": "/readyz",
+    "ecr_repo": "adaptix-qa",
+    "ecs_service": "adaptix-production-qa",
+    "has_migrations": true,
+    "alembic_ini": "backend/alembic.ini",
+    "dockerfile": "backend/Dockerfile",
+    "owned_events": ["qa.chart_review.requested", "qa.chart_review.started", "qa.chart_review.completed", "qa.chart_review.failed", "qa.chart_review.superseded", "qa.chart_review.reconciled"],
+    "status": "active",
+    "notes": "Clinical QA/QI program service (service_registry.QA_SERVICE, slug qa, port 8049). canonical_repo is the org path Adaptix-QA-Service/repo.yaml declares; package_name is backend/pyproject.toml [project].name. service_name adaptix-qa is present in adaptix_contracts.service_audiences.KNOWN_SERVICE_AUDIENCES and is the gateway upstream for /api/v1/qa (Adaptix-Gateway backend/app/config/qa_route.py). ecr_repo adaptix-qa is the repository Adaptix-Infra terraform/environments/prod/iam_fleet_deploy.tf grants the fleet deploy role. ecs_service adaptix-production-qa on cluster adaptix-production, a dedicated RDS instance adaptix-prod-qa-db, were read from AWS by a prior session and recorded in Adaptix-QA-Service/README.md (2026-09-05); not re-read when this entry was written (2026-10-07), so status active rests on that dated read. health/readyz are qa_app/api/health.py. database_schema stays null: the service owns its own database and neither migrations/env.py nor qa_app/db.py names a schema. owned_events mirrors adaptix_contracts.qa.chart_review_events.QA_CHART_REVIEW_EVENTS (registered ahead of the producer, owner directive 2026-10-07)."
   }
 }
