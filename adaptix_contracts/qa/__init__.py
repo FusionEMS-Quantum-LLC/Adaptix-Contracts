@@ -82,6 +82,15 @@ from adaptix_contracts.qa.models import (
     ReviewFinding,
     ReviewerAssignment,
 )
+from adaptix_contracts.qa.sealed_revisions import (
+    QA_SEALED_REVISIONS_READ_SCOPE,
+    SEALED_REVISION_PAGE_MAX,
+    SEALED_REVISION_PAGE_VERSION,
+    SEALED_REVISIONS_PATH,
+    SealedRevisionExclusions,
+    SealedRevisionPage,
+    SealedRevisionRef,
+)
 
 __all__ = [
     "CHART_REVIEW_BUNDLE_VERSION",
@@ -109,6 +118,13 @@ __all__ = [
     "ReviewEngineStatus",
     "ReviewRunState",
     "SealedChartRevision",
+    "QA_SEALED_REVISIONS_READ_SCOPE",
+    "SEALED_REVISIONS_PATH",
+    "SEALED_REVISION_PAGE_MAX",
+    "SEALED_REVISION_PAGE_VERSION",
+    "SealedRevisionExclusions",
+    "SealedRevisionPage",
+    "SealedRevisionRef",
     "build_qa_chart_review_event",
     "FindingSeverity",
     "QA_CQI_METRIC_COMPUTED",
