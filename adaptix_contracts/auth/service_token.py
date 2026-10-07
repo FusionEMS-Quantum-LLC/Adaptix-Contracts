@@ -53,16 +53,17 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 import jwt
 from pydantic import BaseModel, Field
 
+from adaptix_contracts._json_narrowing import is_object_sequence
 from adaptix_contracts.auth._s2s_keyset import ALGORITHM as _SHARED_ALGORITHM
 from adaptix_contracts.auth._s2s_keyset import (
     resolve_keyset_signing_key as _resolve_keyset_signing_key,
 )
-from adaptix_contracts.gateway_signature import _require_int_seconds
+from adaptix_contracts.gateway_signature import require_int_seconds
 
 # Current claims schema version. Verifiers reject unknown major versions.
 SERVICE_TOKEN_VERSION = 1
@@ -79,11 +80,22 @@ LEEWAY_SECONDS = 5
 _ALGORITHM = _SHARED_ALGORITHM
 
 
+def _is_epoch_second(value: object) -> TypeGuard[int]:
+    """True for an ``int`` that is not a ``bool``: ``True`` is never epoch second 1.
+
+    Over ``object`` so it also holds for what the annotations cannot constrain:
+    a claim read out of a decoded token, an untyped caller, or a claims model
+    built with ``model_construct`` (which skips validation). The one rule for
+    every ``actor_mfa_verified_at`` check in this module.
+    """
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def _require_accepted_audiences(expected_audience: object) -> tuple[str, ...]:
     """Normalise ``expected_audience`` to the non-empty tuple PyJWT compares against.
 
     Called by both verifiers before the token is decoded, in the same place and
-    the same spirit as ``_require_int_seconds``: a bad bound is a programming
+    the same spirit as ``require_int_seconds``: a bad bound is a programming
     error in the verifier, not an authentication failure of the token, so it is
     ``ValueError`` and never a 401/403.
 
@@ -109,23 +121,25 @@ def _require_accepted_audiences(expected_audience: object) -> tuple[str, ...]:
         if not expected_audience.strip():
             raise ValueError("expected_audience must not be blank")
         return (expected_audience,)
-    if isinstance(expected_audience, (bytes, bytearray)) or not isinstance(
-        expected_audience, Sequence
+    if isinstance(expected_audience, (bytes, bytearray)) or not is_object_sequence(
+        expected_audience
     ):
         raise ValueError(
             "expected_audience must be a str or a sequence of str, got "
             f"{type(expected_audience).__name__}"
         )
-    accepted = tuple(expected_audience)
-    if not accepted:
+    entries = tuple(expected_audience)
+    if not entries:
         raise ValueError("expected_audience must name at least one audience")
-    for audience in accepted:
+    accepted: list[str] = []
+    for audience in entries:
         if not isinstance(audience, str) or not audience.strip():
             raise ValueError(
                 "every expected_audience entry must be a non-blank str, got "
                 f"{audience!r}"
             )
-    return accepted
+        accepted.append(audience)
+    return tuple(accepted)
 
 
 class ServiceTokenError(ValueError):
@@ -304,9 +318,7 @@ def issue_service_token(
         # ``bool`` is an ``int`` subclass: True must never read as epoch second 1.
         # The isinstance checks also stand for untyped callers handing over a
         # float or string lifted out of a JSON context.
-        if isinstance(actor_mfa_verified_at, bool) or not isinstance(
-            actor_mfa_verified_at, int
-        ):
+        if not _is_epoch_second(actor_mfa_verified_at):
             raise ServiceTokenError(
                 "actor_mfa_verified_at must be an int epoch second, got "
                 f"{type(actor_mfa_verified_at).__name__}"
@@ -396,7 +408,7 @@ def verify_service_token(
             or ``nan`` leeway would accept a token that expired at any time;
             an empty audience sequence would silently refuse every token.
     """
-    _require_int_seconds(leeway_seconds, "leeway_seconds")
+    require_int_seconds(leeway_seconds, "leeway_seconds")
     accepted_audiences = _require_accepted_audiences(expected_audience)
     if not token or not token.strip():
         raise ServiceTokenError("missing service token")
@@ -449,9 +461,7 @@ def verify_service_token(
     # model does.
     mfa_verified_at = raw.get("actor_mfa_verified_at")
     if mfa_verified_at is not None and (
-        isinstance(mfa_verified_at, bool)
-        or not isinstance(mfa_verified_at, int)
-        or mfa_verified_at <= 0
+        not _is_epoch_second(mfa_verified_at) or mfa_verified_at <= 0
     ):
         raise ServiceTokenError(
             "service token actor_mfa_verified_at claim is not a positive int epoch second"
@@ -513,7 +523,7 @@ def verify_service_token_with_keyset(
     ``expected_audience`` that is blank, empty or not made of ``str``, before
     the key is resolved (see ``verify_service_token``).
     """
-    _require_int_seconds(leeway_seconds, "leeway_seconds")
+    require_int_seconds(leeway_seconds, "leeway_seconds")
     _require_accepted_audiences(expected_audience)
     public_key = _resolve_keyset_signing_key(
         token,
@@ -575,11 +585,11 @@ def require_fresh_actor_mfa_assurance(
             timezone-aware, because a naive datetime is read as host-local time
             and would shift the decision by the host's UTC offset.
     """
-    # The one shared bound rule (type before range; see _require_int_seconds):
+    # The one shared bound rule (type before range; see require_int_seconds):
     # ``inf`` and ``nan`` would make every freshness comparison false, which
     # fails open, and True must not read as one second.
-    _require_int_seconds(max_age_seconds, "max_age_seconds", positive=True)
-    _require_int_seconds(leeway_seconds, "leeway_seconds")
+    require_int_seconds(max_age_seconds, "max_age_seconds", positive=True)
+    require_int_seconds(leeway_seconds, "leeway_seconds")
     if now is not None and now.utcoffset() is None:
         raise ValueError("now must be a timezone-aware datetime")
 
@@ -587,8 +597,7 @@ def require_fresh_actor_mfa_assurance(
     actor_sub = claims.actor_sub
     if (
         verified_at is None
-        or isinstance(verified_at, bool)
-        or not isinstance(verified_at, int)
+        or not _is_epoch_second(verified_at)
         or not actor_sub
         or not actor_sub.strip()
     ):

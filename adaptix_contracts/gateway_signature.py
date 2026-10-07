@@ -135,6 +135,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from adaptix_contracts._json_narrowing import is_json_list, is_json_object
 from adaptix_contracts.environment import ENVIRONMENT_ENV, is_production
 from adaptix_contracts.gateway_keys import (
     GATEWAY_PUBLIC_KEYS_ENV,
@@ -204,7 +205,7 @@ GATEWAY_CLOCK_SKEW_SECONDS = 5
 _MAX_CONTEXT_LIFETIME_SECONDS = 300
 
 
-def _require_int_seconds(value: object, name: str, *, positive: bool = False) -> None:
+def require_int_seconds(value: object, name: str, *, positive: bool = False) -> None:
     """Refuse a time bound that is not a whole, in-range number of seconds.
 
     The ONE rule for every verifier time bound in this package: the gateway
@@ -443,7 +444,7 @@ def _audience_names_a_live_service(aud: Any) -> bool:
     """
     if isinstance(aud, str):
         return is_known_service_audience(aud)
-    if isinstance(aud, list):
+    if is_json_list(aud):
         return any(isinstance(a, str) and is_known_service_audience(a) for a in aud)
     return False
 
@@ -627,7 +628,7 @@ def _decoded_payload(context_b64: str) -> dict[str, Any]:
         GatewaySignatureError: when the payload is not a JSON object.
     """
     try:
-        payload: Any = json.loads(
+        payload: object = json.loads(
             b64url_decode(context_b64).decode("utf-8"),
             # Python's decoder accepts Infinity/-Infinity/NaN, which RFC 8259
             # does not define and no Adaptix producer emits. Left enabled they
@@ -639,7 +640,7 @@ def _decoded_payload(context_b64: str) -> dict[str, Any]:
         )
     except (ValueError, UnicodeDecodeError) as exc:
         raise GatewaySignatureError(f"payload decode failed: {exc}") from exc
-    if not isinstance(payload, dict):
+    if not is_json_object(payload):
         raise GatewaySignatureError("payload is not a JSON object")
     return payload
 
@@ -975,7 +976,7 @@ def verify_gateway_signature(
             ``nan`` included), or negative. Raised before anything is decoded
             or compared: a programming error, not a verification failure.
     """
-    _require_int_seconds(clock_skew_seconds, "clock_skew_seconds")
+    require_int_seconds(clock_skew_seconds, "clock_skew_seconds")
     ctx = (context_b64 or "").strip()
     sig = (signature_hex or "").strip()
     if not ctx or not sig:
@@ -1036,8 +1037,15 @@ def _request_scope(request: Any) -> tuple[str | None, str | None, Any]:
     return method, path, state
 
 
+class _VerifiedAssertions(dict[tuple[object, ...], dict[str, Any]]):
+    """The assertions verified within one request, keyed by what was verified.
+
+    Only :func:`_verified_once_in_scope` creates one, on ``request.state``.
+    """
+
+
 def _verified_once_in_scope(
-    state: Any, key: tuple[Any, ...], verify: Callable[[], dict[str, Any]]
+    state: Any, key: tuple[object, ...], verify: Callable[[], dict[str, Any]]
 ) -> dict[str, Any]:
     """Return the assertion verified once within this request scope.
 
@@ -1048,9 +1056,11 @@ def _verified_once_in_scope(
     cached: ``verify`` raising ``GatewaySignatureError`` propagates and records
     nothing, so a later check re-attempts and is rejected identically.
     """
-    cache = getattr(state, _REQUEST_VERIFIED_ATTR, None)
-    if cache is None:
-        cache = {}
+    stored: object = getattr(state, _REQUEST_VERIFIED_ATTR, None)
+    if isinstance(stored, _VerifiedAssertions):
+        cache = stored
+    else:
+        cache = _VerifiedAssertions()
         setattr(state, _REQUEST_VERIFIED_ATTR, cache)
     cached = cache.get(key)
     if cached is not None:
@@ -1113,7 +1123,7 @@ def verify_gateway_signature_for_request(
     checks it, so a bad bound raises ``ValueError`` even when this request
     already holds a verified principal for the same assertion.
     """
-    _require_int_seconds(clock_skew_seconds, "clock_skew_seconds")
+    require_int_seconds(clock_skew_seconds, "clock_skew_seconds")
     method, path, state = _request_scope(request)
 
     def _verify() -> dict[str, Any]:
@@ -1227,6 +1237,7 @@ __all__ = [
     "gateway_trust_mode",
     "has_gateway_signature",
     "is_production",
+    "require_int_seconds",
     "reset_gateway_replay_cache_for_tests",
     "verify_gateway_signature",
     "verify_gateway_signature_for_request",

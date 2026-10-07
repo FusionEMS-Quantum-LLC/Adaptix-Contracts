@@ -38,20 +38,21 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
+from collections.abc import Awaitable, Mapping
 from functools import lru_cache
-from typing import Annotated, Optional
-from collections.abc import Callable
+from typing import Annotated, Optional, Protocol, TypeAlias
 
 import jwt as pyjwt
 from fastapi import Header, HTTPException, Request, status
 
+from adaptix_contracts._json_narrowing import is_json_list
 from adaptix_contracts.auth.capability_registry import module_for_capability
 from adaptix_contracts.auth.cognito import AdaptixCognitoConfig
 from adaptix_contracts.environment import is_production as _is_production
 from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
-    _require_int_seconds,
+    require_int_seconds,
     gateway_shared_secret,
     has_gateway_signature,
     verify_gateway_signature_for_request,
@@ -95,8 +96,27 @@ _SYSTEM_PRINCIPAL_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 # ``system`` is the default attribution role minted for worker tokens.
 _PLATFORM_BYPASS_ROLES = frozenset({"founder", "system"})
 
+#: A verified identity's claims: a Cognito JWT payload or a verified gateway
+#: context. The values are decoded JSON; every reader narrows what it uses.
+_Claims: TypeAlias = Mapping[str, object]
 
-def _gateway_context_claims(request: Request) -> Optional[dict]:
+
+class EntitlementGate(Protocol):
+    """The FastAPI dependency the ``require_*_entitlement`` factories return.
+
+    FastAPI calls it with the request and the ``Authorization`` header, which
+    the gate declares with ``Header(alias="Authorization")``. ``__name__``
+    names the gate in OpenAPI and in logs; each factory sets it.
+    """
+
+    __name__: str
+
+    def __call__(
+        self, request: Request, authorization: str | None = None
+    ) -> Awaitable[None]: ...
+
+
+def _gateway_context_claims(request: Request) -> dict[str, object] | None:
     """Return verified gateway-context claims, or ``None`` when absent.
 
     Reads the gateway's signed ``X-Adaptix-Auth-Context`` headers. When both
@@ -172,7 +192,7 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
     )
     # Normalise the verified payload into the claims shape the gate's
     # founder/entitlement helpers already understand.
-    return {
+    claims: dict[str, object] = {
         "sub": payload.get("sub") or payload.get("user_id"),
         "tenant_id": payload.get("tenant_id"),
         "tid": payload.get("tenant_id"),
@@ -180,9 +200,10 @@ def _gateway_context_claims(request: Request) -> Optional[dict]:
         "is_founder": payload.get("is_founder", False),
         "module_entitlements": payload.get("module_entitlements", []),
     }
+    return claims
 
 
-def _is_platform_principal(claims: dict) -> bool:
+def _is_platform_principal(claims: _Claims) -> bool:
     """True when the verified gateway claims represent platform-level authority.
 
     Platform principals (the system worker tenant, or any context carrying a
@@ -195,7 +216,7 @@ def _is_platform_principal(claims: dict) -> bool:
         return True
     roles_claim = claims.get("roles")
     role_values: set[str] = set()
-    if isinstance(roles_claim, list):
+    if is_json_list(roles_claim):
         role_values = {str(r).strip().lower() for r in roles_claim if str(r).strip()}
     elif isinstance(roles_claim, str):
         role_values = {p.strip().lower() for p in roles_claim.split(",") if p.strip()}
@@ -206,7 +227,7 @@ def _normalize_slug(value: str) -> str:
     return (value or "").strip().lower()
 
 
-def _claims_carry_founder(claims: dict) -> bool:
+def _claims_carry_founder(claims: _Claims) -> bool:
     raw = claims.get("is_founder")
     if isinstance(raw, bool) and raw:
         return True
@@ -218,14 +239,14 @@ def _claims_carry_founder(claims: dict) -> bool:
         or claims.get("cognito:groups")
     )
     role_values: list[str] = []
-    if isinstance(roles_claim, list):
+    if is_json_list(roles_claim):
         role_values = [str(r).strip().lower() for r in roles_claim if str(r).strip()]
     elif isinstance(roles_claim, str):
         s = roles_claim.strip()
         if s.startswith("[") and s.endswith("]"):
             try:
-                parsed = _json.loads(s)
-                if isinstance(parsed, list):
+                parsed: object = _json.loads(s)
+                if is_json_list(parsed):
                     role_values = [
                         str(r).strip().lower() for r in parsed if str(r).strip()
                     ]
@@ -236,20 +257,20 @@ def _claims_carry_founder(claims: dict) -> bool:
     return "founder" in set(role_values)
 
 
-def _claims_module_entitlements(claims: dict) -> list[str]:
+def _claims_module_entitlements(claims: _Claims) -> list[str]:
     raw = claims.get("module_entitlements") or claims.get(
         "custom:adaptix_module_entitlements"
     )
     if not raw:
         return []
-    if isinstance(raw, list):
+    if is_json_list(raw):
         return [_normalize_slug(str(m)) for m in raw if str(m).strip()]
     if isinstance(raw, str):
         s = raw.strip()
         if s.startswith("[") and s.endswith("]"):
             try:
-                parsed = _json.loads(s)
-                if isinstance(parsed, list):
+                parsed: object = _json.loads(s)
+                if is_json_list(parsed):
                     return [_normalize_slug(str(m)) for m in parsed if str(m).strip()]
             except _json.JSONDecodeError:
                 pass
@@ -295,7 +316,17 @@ def _cognito_signing_key(token: str, config: AdaptixCognitoConfig):
     return _jwks_client(config.jwks_url).get_signing_key_from_jwt(token).key
 
 
-def _verify_direct_bearer_claims(token: str) -> dict:
+def _id_token_audiences(aud: object) -> set[str]:
+    """The non-empty strings an id token's ``aud`` names (RFC 7519 allows one
+    string or a list)."""
+    if isinstance(aud, str):
+        return {aud} if aud else set()
+    if is_json_list(aud):
+        return {item for item in aud if isinstance(item, str) and item}
+    return set()
+
+
+def _verify_direct_bearer_claims(token: str) -> dict[str, object]:
     """Return VERIFIED claims for a direct (non-gateway) bearer, or fail closed.
 
     The direct-service path (a caller that did not arrive through the gateway,
@@ -327,7 +358,7 @@ def _verify_direct_bearer_claims(token: str) -> dict:
     # config is built: the dataclass is mutable, so a check at construction
     # would not cover a value assigned afterwards, and this is the one place in
     # the package that turns it into a leeway.
-    _require_int_seconds(
+    require_int_seconds(
         config.clock_skew_seconds, "AdaptixCognitoConfig.clock_skew_seconds"
     )
     if not config.is_configured:
@@ -346,7 +377,7 @@ def _verify_direct_bearer_claims(token: str) -> dict:
 
     try:
         signing_key = _cognito_signing_key(token, config)
-        claims = pyjwt.decode(
+        claims: dict[str, object] = pyjwt.decode(
             token,
             signing_key,
             algorithms=list(_COGNITO_ALGORITHMS),
@@ -391,14 +422,14 @@ def _verify_direct_bearer_claims(token: str) -> dict:
     # the same pool.
     allowed_clients = {a for a in config.allowed_audiences if a}
     if allowed_clients:
+        presented_values: set[str] = set()
         if token_use == "id":
-            presented = claims.get("aud")
-            presented_values = (
-                set(presented) if isinstance(presented, list) else {presented}
-            )
-        else:  # access token
-            presented_values = {claims.get("client_id")}
-        if not (allowed_clients & {p for p in presented_values if p}):
+            presented_values = _id_token_audiences(claims.get("aud"))
+        else:  # access token: Cognito's client_id is one string
+            client_id = claims.get("client_id")
+            if isinstance(client_id, str) and client_id:
+                presented_values = {client_id}
+        if not (allowed_clients & presented_values):
             logger.warning(
                 "module_entitlement_gate: rejecting bearer whose audience/client "
                 "does not match the configured Cognito app client."
@@ -423,7 +454,7 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
 
 def _resolve_gate_claims(
     request: Request, authorization: Optional[str]
-) -> tuple[dict, bool]:
+) -> tuple[_Claims, bool]:
     """Resolve the claims the gate decides on, gateway-context-first.
 
     Resolution order (non-breaking):
@@ -479,7 +510,33 @@ def _resolve_gate_claims(
     return _verify_direct_bearer_claims(token), False
 
 
-def require_module_entitlement(module_slug: str) -> Callable:
+def _resolved_entitlements(request: Request, claims: _Claims) -> list[str]:
+    """The tenant's module entitlements, normalised.
+
+    From the claims when they carry any. Otherwise from
+    ``request.state.module_entitlements``, which Core's auth dependency fills
+    from the tenant row for Cognito tokens (whose custom attributes are too
+    small to carry the list).
+    """
+    entitlements = _claims_module_entitlements(claims)
+    if entitlements:
+        return entitlements
+    state_entitlements: object = getattr(request.state, "module_entitlements", None)
+    if is_json_list(state_entitlements):
+        return [_normalize_slug(str(m)) for m in state_entitlements if str(m).strip()]
+    return entitlements
+
+
+def _claims_tenant(claims: _Claims) -> object:
+    """The tenant the claims name, for the denial log line."""
+    return (
+        claims.get("tid")
+        or claims.get("tenant_id")
+        or claims.get("custom:adaptix_tenant_id")
+    )
+
+
+def require_module_entitlement(module_slug: str) -> EntitlementGate:
     """Return a FastAPI dependency that gates a route on ``module_slug``.
 
     Usage::
@@ -514,18 +571,7 @@ def require_module_entitlement(module_slug: str) -> Callable:
         if is_platform or _claims_carry_founder(claims):
             return
 
-        entitlements = _claims_module_entitlements(claims)
-        # Fallback for Cognito tokens: the upstream auth dep populates
-        # ``request.state.module_entitlements`` from the tenant row.
-        if not entitlements:
-            state_entitlements = getattr(request.state, "module_entitlements", None)
-            if isinstance(state_entitlements, list):
-                entitlements = [
-                    _normalize_slug(str(m))
-                    for m in state_entitlements
-                    if str(m).strip()
-                ]
-
+        entitlements = _resolved_entitlements(request, claims)
         if required in set(entitlements):
             return
 
@@ -533,9 +579,7 @@ def require_module_entitlement(module_slug: str) -> Callable:
             "module_entitlement_gate: denied module=%s current=%s tenant=%s",
             required,
             entitlements,
-            claims.get("tid")
-            or claims.get("tenant_id")
-            or claims.get("custom:adaptix_tenant_id"),
+            _claims_tenant(claims),
         )
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
@@ -556,7 +600,7 @@ def require_module_entitlement(module_slug: str) -> Callable:
     return _gate
 
 
-def require_any_module_entitlement(*module_slugs: str) -> Callable:
+def require_any_module_entitlement(*module_slugs: str) -> EntitlementGate:
     """Return a FastAPI dependency that gates a route on ANY of the slugs.
 
     Use when a single route legitimately serves multiple modules — e.g.
@@ -588,24 +632,14 @@ def require_any_module_entitlement(*module_slugs: str) -> Callable:
         claims, is_platform = _resolve_gate_claims(request, authorization)
         if is_platform or _claims_carry_founder(claims):
             return
-        entitlements = _claims_module_entitlements(claims)
-        if not entitlements:
-            state_entitlements = getattr(request.state, "module_entitlements", None)
-            if isinstance(state_entitlements, list):
-                entitlements = [
-                    _normalize_slug(str(m))
-                    for m in state_entitlements
-                    if str(m).strip()
-                ]
+        entitlements = _resolved_entitlements(request, claims)
         if required_set & set(entitlements):
             return
         logger.info(
             "module_entitlement_gate: denied any-of=%s current=%s tenant=%s",
             label,
             entitlements,
-            claims.get("tid")
-            or claims.get("tenant_id")
-            or claims.get("custom:adaptix_tenant_id"),
+            _claims_tenant(claims),
         )
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
@@ -627,14 +661,7 @@ def require_any_module_entitlement(*module_slugs: str) -> Callable:
     return _gate
 
 
-__all__ = [
-    "require_module_entitlement",
-    "require_any_module_entitlement",
-    "AUDIT_ACTION",
-]
-
-
-def require_capability_entitlement(capability_code: str) -> Callable:
+def require_capability_entitlement(capability_code: str) -> EntitlementGate:
     """Return a FastAPI dependency that gates a route on a capability code.
 
     Shared platform primitive I. A capability is one shipped feature
@@ -671,3 +698,12 @@ def require_capability_entitlement(capability_code: str) -> Callable:
         ".", "_"
     ).replace("-", "_")
     return gate
+
+
+__all__ = [
+    "AUDIT_ACTION",
+    "EntitlementGate",
+    "require_any_module_entitlement",
+    "require_capability_entitlement",
+    "require_module_entitlement",
+]

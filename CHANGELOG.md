@@ -10,6 +10,67 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [5.42.0] - 2026-10-07
+
+### Added
+
+- **`EntitlementGate`** (`adaptix_contracts.auth.module_entitlement_gate`) is
+  the type every `require_*_entitlement` factory now returns, instead of a
+  bare `Callable`.
+  - It states the call FastAPI makes: the request and the `Authorization`
+    header, returning an awaitable of `None`. It also states the `__name__`
+    each factory sets.
+  - **Why:** a bare `Callable` made every consumer's
+    `Depends(require_module_entitlement(...))` an unknown type under strict
+    checking. ePCR's `main.py` registered two such errors as debt (ePCR #965).
+- **`require_int_seconds`** (`adaptix_contracts.gateway_signature`) is the
+  shared time-bound check, now public under that name and listed in
+  `__all__`.
+  - Five modules of this package call it: the gateway context and legacy
+    identity clock skews, the S2S and platform token leeways, the Cognito
+    bearer clock skew, and the MFA freshness bounds.
+  - Four of them imported it as the private `_require_int_seconds`. No other
+    repository did.
+
+### Fixed
+
+- **A list-valued `client_id` is refused 401, not answered 500.**
+  - The entitlement gate's direct-bearer path built
+    `{claims.get("client_id")}`.
+  - A pool-signed access token whose `client_id` was a list raised
+    `TypeError: cannot use 'list' as a set element`, which a service answers
+    500. Reproduced against 5.41.0 (1f0b4c3b).
+  - The claim is now read only as one string. Cognito always issues one
+    string; anything else matches no app client and is refused
+    `invalid_bearer_token`.
+  - An id token's `aud` is read as one string or a list (RFC 7519 section
+    4.1.3) and binds the configured client either way.
+- **`require_capability_entitlement` is exported.**
+  - It was defined after `__all__` and missing from it.
+  - `__all__` now sits at the end of the module, sorted, and also names
+    `EntitlementGate`.
+
+### Changed
+
+- **Strict typing, with no behaviour change beyond the fix above.**
+  `module_entitlement_gate`, `gateway_signature`, `auth.service_token`,
+  `auth.platform_token` and `gateway_identity` pass Pyright strict (1.1.414)
+  with 0 errors, from 87 before.
+  - **Claims:** the gate reads verified claims as `Mapping[str, object]` and
+    narrows each value where it uses it.
+  - **Lists:** decoded JSON lists are narrowed with the package-internal
+    `adaptix_contracts._json_narrowing` guards.
+  - **`actor_mfa_verified_at`:** each check is one truthful guard over
+    `object` (an `int` that is not a `bool`). That keeps the runtime refusal of
+    untyped callers and of claims models built with `model_construct`.
+  - **Verification cache:** the per-request cache of verified gateway
+    assertions is a typed class. It is still created only by
+    `_verified_once_in_scope` on `request.state`.
+- **One entitlement lookup.** Both gates resolve a tenant's entitlements
+  through one helper: the claims first, then `request.state.module_entitlements`,
+  which Core's auth dependency fills from the tenant row. That fallback had no
+  test until `tests/test_module_entitlement_gate_claim_shapes.py`.
+
 ## [5.41.0] - 2026-10-07
 
 ### Added
