@@ -56,6 +56,16 @@ from adaptix_contracts.cad.events import (
 from adaptix_contracts.scheduling.events import (
     ALL_SCHEDULING_EVENTS,
 )
+from adaptix_contracts.qa.chart_review_events import (
+    QA_CHART_REVIEW_COMPLETED,
+    QA_CHART_REVIEW_FAILED,
+    QA_CHART_REVIEW_RECONCILED,
+    QA_CHART_REVIEW_REQUESTED,
+    QA_CHART_REVIEW_SCHEMA_VERSION,
+    QA_CHART_REVIEW_STARTED,
+    QA_CHART_REVIEW_SUPERSEDED,
+    QA_SERVICE_SLUG,
+)
 from adaptix_contracts.schemas.billing_eligibility_result_contracts import (
     BILLING_ELIGIBILITY_RESULT_SCHEMA_VERSION,
     BILLING_ELIGIBILITY_RESULT_SOURCE_SERVICE,
@@ -611,6 +621,36 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
         "source_service": BILLING_ELIGIBILITY_RESULT_SOURCE_SERVICE,
     },
     TRUSTSIGN_DOCUMENT_SIGNED: {"version": "1.0", "source_service": "billing"},
+    # Every-chart review lifecycle (producer: Adaptix-QA-Service, slug ``qa``).
+    # Registered ahead of its producer, the BILLING_ELIGIBILITY_RESULT_V1 /
+    # FND-001 precedent: QA's outbox relay publishes these from the review
+    # orchestrator that consumes epcr.chart.finalized / epcr.chart.amended
+    # (owner directive 2026-10-07). Payload: adaptix_contracts.qa
+    # .chart_review_events.QaChartReviewLifecyclePayload.
+    QA_CHART_REVIEW_REQUESTED: {
+        "version": QA_CHART_REVIEW_SCHEMA_VERSION,
+        "source_service": QA_SERVICE_SLUG,
+    },
+    QA_CHART_REVIEW_STARTED: {
+        "version": QA_CHART_REVIEW_SCHEMA_VERSION,
+        "source_service": QA_SERVICE_SLUG,
+    },
+    QA_CHART_REVIEW_COMPLETED: {
+        "version": QA_CHART_REVIEW_SCHEMA_VERSION,
+        "source_service": QA_SERVICE_SLUG,
+    },
+    QA_CHART_REVIEW_FAILED: {
+        "version": QA_CHART_REVIEW_SCHEMA_VERSION,
+        "source_service": QA_SERVICE_SLUG,
+    },
+    QA_CHART_REVIEW_SUPERSEDED: {
+        "version": QA_CHART_REVIEW_SCHEMA_VERSION,
+        "source_service": QA_SERVICE_SLUG,
+    },
+    QA_CHART_REVIEW_RECONCILED: {
+        "version": QA_CHART_REVIEW_SCHEMA_VERSION,
+        "source_service": QA_SERVICE_SLUG,
+    },
     EPCR_CHART_UPDATED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_CREATED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_FINALIZED: {"version": "1.0", "source_service": "epcr"},
@@ -805,7 +845,7 @@ def is_registered(event_type: str) -> bool:
     return event_type in ALL_EVENTS
 
 
-def get_all_events() -> list:
+def get_all_events() -> list[str]:
     """Return all registered event types."""
     return list(ALL_REGISTERED_EVENTS)
 
@@ -931,6 +971,12 @@ __all__ = [
     "PATIENT_IDENTITY_MERGED",
     "PATIENT_NOK_CONSENT_CHANGED",
     "PRODUCER_SOURCE_SERVICE_ALIASES",
+    "QA_CHART_REVIEW_COMPLETED",
+    "QA_CHART_REVIEW_FAILED",
+    "QA_CHART_REVIEW_RECONCILED",
+    "QA_CHART_REVIEW_REQUESTED",
+    "QA_CHART_REVIEW_STARTED",
+    "QA_CHART_REVIEW_SUPERSEDED",
     "TRUSTSIGN_DOCUMENT_SIGNED",
     "VAS_OVERLAY_ACCEPTED",
     "VAS_OVERLAY_AMENDED",

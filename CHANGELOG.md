@@ -10,6 +10,61 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [5.39.0] - 2026-10-07
+
+### Added
+
+- **Every-chart review contracts** (owner directive 2026-10-07, Phase 1:
+  "Every-Chart Cortex QA"). Adaptix-QA-Service reviews every finalized ePCR
+  chart. ePCR computes the deterministic findings for one sealed chart
+  revision; QA persists them as the canonical review record.
+  `adaptix_contracts.qa.chart_review` is the one shared shape for this:
+  - `ChartReviewBundle`: the sealed revision (`SealedChartRevision`: signed
+    version id and number, content hash, snapshot algorithm, sealed time,
+    amendment flag) plus one `ReviewEngineResult` per deterministic engine.
+    It refuses evidence read under any other seal, and it refuses an engine
+    that answers twice.
+  - `review_engine_version()`: a deterministic identity of the engine set
+    (`crb1:` + 32 hex). A review run keyed on tenant, chart, sealed revision
+    and this value is replay-safe, and a new engine version produces a new
+    run instead of an overwrite.
+  - `ReviewEngineResult`: `completed`, `not_applicable`, `unavailable` or
+    `failed`. Only `completed` may carry findings, and every other status
+    must state its reason, so "the check did not run" can never read as "the
+    chart passed".
+  - `ChartReviewFinding`: an engine, a rule id and a canonical `severity`
+    (the existing `FindingSeverity`), with the engine's own label kept as
+    `engine_severity`. It also carries an `outcome` (`deviation`, `met` or
+    `unable_to_evaluate`), an `evidence_state`, an `origin` (`deterministic`
+    or `cortex`), evidence and counter-evidence references, an optional
+    `ProtocolCitation`, a guideline `reference`, and a `suggested_action`.
+  - `EvidenceState`: `documented`, `not_documented`, `contradictory`,
+    `unknown`, `ai_inference`. A Cortex finding must be `ai_inference`, and
+    a deterministic one may not be. Confidence exists only on Cortex
+    findings. A `documented` finding must reference the charted fact, and a
+    `contradictory` one must reference both sides. A `met` finding is
+    informational.
+  - `ChartEvidenceReference` is a pointer, never a copy: source service,
+    record type and id, NEMSIS element, chart section, recorded time and the
+    sealed content hash it was read under. `CortexReviewProvenance` records
+    capability, model, request id, prompt version and discarded items.
+- **`qa.chart_review.{requested,started,completed,failed,superseded,reconciled}`**
+  (`adaptix_contracts.qa.chart_review_events`), schema `1.0`. The payload,
+  `QaChartReviewLifecyclePayload`, carries identifiers and counts only. A
+  `failed` run must name its `failure_class`, and only a `completed` run
+  reports finding counts. `build_qa_chart_review_event` refuses a payload
+  whose state contradicts the event type. All six are registered in
+  `events.registry.ALL_EVENTS` with producer `qa`, ahead of their producer
+  (the `BILLING_ELIGIBILITY_RESULT_V1` / FND-001 precedent).
+- **`service_registry.QA_SERVICE`** (slug `qa`, `/api/v1/qa`, port 8049) and
+  its `platform/ownership_manifest.json` entry. Adaptix-QA-Service had no
+  registry identity, so no QA event could name a producer.
+
+### Fixed
+
+- `events.registry.get_all_events()` returned a bare `list`, which strict
+  Pyright reported as `list[Unknown]`. It now returns `list[str]`.
+
 ## [5.38.0] - 2026-10-04
 
 ### Added
