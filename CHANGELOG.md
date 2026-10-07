@@ -10,6 +10,32 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [5.41.0] - 2026-10-07
+
+### Added
+
+- **Eligible sealed revisions** (`adaptix_contracts.qa.sealed_revisions`) are
+  the list every-chart review has to account for.
+  - **Producer:** Adaptix-EPCR-Service answers `SealedRevisionPage` at
+    `SEALED_REVISIONS_PATH` under the pinned scope
+    `QA_SEALED_REVISIONS_READ_SCOPE` (`qa-sealed-revisions:read`).
+  - **Consumer:** Adaptix-QA-Service reconciles the list against its review
+    ledger and reports coverage.
+  - **Eligible** means sealed by signature inside `[sealed_from, sealed_to)`,
+    on a production chart that is not deleted.
+  - **Exclusions are counted, never dropped.** `SealedRevisionExclusions`
+    counts legacy backfill seals, synthetic WARDS Lab charts and deleted
+    charts for the same window. `eligible_total` counts eligible revisions
+    across every page, so a reader can prove it received the whole list.
+  - **Paging** is keyset on `(sealed_at, signed_version_id)`. A page is
+    refused if it is out of order, repeats a revision, or holds one sealed
+    outside the window.
+  - All timestamps must carry an offset (`AwareDatetime`).
+  - The page holds identifiers, version numbers, timestamps and counts only.
+  - **Why:** without this list nothing could detect a finalized chart whose
+    event was lost or dead-lettered, and "every chart reviewed" could not be
+    measured (directive 2026-10-07, items 6 and 7).
+
 ## [5.40.0] - 2026-10-07
 
 ### Added
