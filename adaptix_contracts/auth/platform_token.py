@@ -74,7 +74,7 @@ from adaptix_contracts.auth._s2s_keyset import ALGORITHM as _SHARED_ALGORITHM
 from adaptix_contracts.auth._s2s_keyset import (
     resolve_keyset_signing_key as _resolve_keyset_signing_key,
 )
-from adaptix_contracts.gateway_signature import _require_int_seconds
+from adaptix_contracts.gateway_signature import require_int_seconds
 
 # Current claims schema version. Independent of SERVICE_TOKEN_VERSION — these
 # are two separate claims schemas that evolve on their own timelines.
@@ -276,7 +276,7 @@ def verify_platform_service_token(
             ``exp`` against the current time minus the leeway, so an ``inf``
             or ``nan`` leeway would accept a token that expired at any time.
     """
-    _require_int_seconds(leeway_seconds, "leeway_seconds")
+    require_int_seconds(leeway_seconds, "leeway_seconds")
     if not token or not token.strip():
         raise PlatformServiceTokenError("missing platform service token")
 
@@ -449,7 +449,7 @@ def verify_platform_service_token_with_keyset(
     that is a bool, not an int or negative, before the key is resolved (see
     ``verify_platform_service_token``).
     """
-    _require_int_seconds(leeway_seconds, "leeway_seconds")
+    require_int_seconds(leeway_seconds, "leeway_seconds")
     public_key = _resolve_keyset_signing_key(
         token,
         trusted_keys=trusted_keys,
