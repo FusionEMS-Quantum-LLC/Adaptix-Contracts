@@ -72,3 +72,36 @@ description = "Golden-vector codec test key (commit-pinned, not path-wide)"
 commits = [
   "304b099fd63052e5e93437fc8862fd0a3213e815",
 ]
+
+# ---------------------------------------------------------------------------
+# Public GitHub Action commit pins in the native Gitleaks workflow.
+#
+# .github/workflows/gitleaks.yml is the Gitleaks gate itself, rendered by
+# adaptix-ops from its reusable workflow. Two of its lines pin a public GitHub
+# Action to its public 40-hex commit SHA (actions/checkout v7.0.1,
+# actions/upload-artifact v7.0.1). The sourcegraph-access-token rule matches
+# any bare 40-hex string once its keyword "sourcegraph" is in the file, and
+# that file lists every default rule id, sourcegraph-access-token included, to
+# enforce them. adaptix-ops carries the same reviewed exception for the same
+# two lines of its own copy.
+#
+# Measured on pull request #384 (run 38079717075): 535 commits scanned, these
+# two findings and no other.
+#
+# Attached to the one default rule that raised them and AND-scoped to that file
+# and those two exact lines, so another SHA, action, file or line is reported.
+# No detection is changed. regexTarget = "line" with (?m)^...$ anchors, because
+# gitleaks 8.30.1 hands a line allowlist the finding's raw fragment including
+# its surrounding newlines.
+[[rules]]
+id = "sourcegraph-access-token"
+
+[[rules.allowlists]]
+description = ".github/workflows/gitleaks.yml: public action commit pins, reviewed, not a secret"
+condition = "AND"
+paths = ['''^\.github/workflows/gitleaks\.yml$''']
+regexTarget = "line"
+regexes = [
+    '''(?m)^        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\.0\.1$''',
+    '''(?m)^        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7\.0\.1$''',
+]
