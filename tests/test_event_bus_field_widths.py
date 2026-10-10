@@ -20,6 +20,7 @@ These tests pin the two properties that make that ownership real:
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import pytest
@@ -143,12 +144,13 @@ def _operational_kwargs(correlation_id: str) -> dict[str, str]:
     ids=["AdaptixEventEnvelope", "OperationalEventEnvelope"],
 )
 def test_an_envelope_accepts_a_correlation_id_at_exactly_the_ceiling(
-    model: type, kwargs: object
+    model: type[AdaptixEventEnvelope] | type[OperationalEventEnvelope],
+    kwargs: Callable[[str], dict[str, str]],
 ) -> None:
     """The ceiling is inclusive: 300 is allowed, because 300 is the contract."""
 
     at_the_limit = "c" * BUS_CORRELATION_ID_MAX_LENGTH
-    built = model(**kwargs(at_the_limit))  # type: ignore[operator]
+    built = model.model_validate(kwargs(at_the_limit))
     assert built.correlation_id == at_the_limit
 
 
@@ -161,13 +163,14 @@ def test_an_envelope_accepts_a_correlation_id_at_exactly_the_ceiling(
     ids=["AdaptixEventEnvelope", "OperationalEventEnvelope"],
 )
 def test_an_envelope_refuses_a_correlation_id_one_character_over(
-    model: type, kwargs: object
+    model: type[AdaptixEventEnvelope] | type[OperationalEventEnvelope],
+    kwargs: Callable[[str], dict[str, str]],
 ) -> None:
     """Refused at publish, not silently dropped at the narrowest consumer."""
 
     too_long = "c" * (BUS_CORRELATION_ID_MAX_LENGTH + 1)
     with pytest.raises(ValidationError) as caught:
-        model(**kwargs(too_long))  # type: ignore[operator]
+        model.model_validate(kwargs(too_long))
     assert "correlation_id" in str(caught.value)
 
 
@@ -180,7 +183,8 @@ def test_a_real_producer_key_still_passes_the_envelope(event_type: str) -> None:
     """The bound must not reject what the widest producer actually emits."""
 
     key = labor_correlation_id(event_type)
-    assert AdaptixEventEnvelope(**_envelope_kwargs(key)).correlation_id == key
+    built = AdaptixEventEnvelope.model_validate(_envelope_kwargs(key))
+    assert built.correlation_id == key
 
 
 def test_the_envelope_bound_is_read_from_the_owner_not_a_literal() -> None:

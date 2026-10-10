@@ -9,6 +9,7 @@ GeoClient consumer helper.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -395,7 +396,7 @@ def _facility_merged_event() -> FacilityMergedEvent:
     )
 
 
-NEW_SURFACE_FACTORIES = [
+NEW_SURFACE_FACTORIES: list[tuple[Callable[[], BaseModel], type[BaseModel]]] = [
     (_audit_ingest_request, AuditIngestRequest),
     (_audit_ingest_response, AuditIngestResponse),
     (_audit_search_response, AuditSearchResponse),
@@ -442,7 +443,9 @@ NEW_SURFACE_FACTORIES = [
 
 
 @pytest.mark.parametrize(("factory", "expected_type"), NEW_SURFACE_FACTORIES)
-def test_new_surface_round_trip(factory, expected_type) -> None:
+def test_new_surface_round_trip(
+    factory: Callable[[], BaseModel], expected_type: type[BaseModel]
+) -> None:
     """Every new shared-service DTO/event survives a JSON round trip."""
 
     contract = factory()
