@@ -1,11 +1,13 @@
 name: semgrep-security
 
-# THE THIN SEMGREP CARRIER (QOD-005), rendered by adaptix-ops
-# scripts/lib/securityBackstop.ts.
-# The Semgrep security gate, the required SAST backstop beside Qodana.
-# Event wiring and one call to the canonical reusable workflow at an
-# immutable adaptix-ops commit -- no scanning logic, no rules, no
-# configuration of its own. It publishes the check
+# THE NATIVE SEMGREP GATE (QOD-005), rendered by adaptix-ops
+# scripts/lib/securityBackstopNative.ts. Do not edit it by hand: render it again.
+# A public repository cannot call a reusable workflow kept in a private
+# repository, so this repository carries the gate's one job itself. The job
+# below is the scan job of that reusable workflow, unchanged, at the commit
+# named here:
+# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/semgrep-reusable.yml@0baf90c27e46f83a2d18ff02bce7c77ad403570e
+# It publishes the check
 # "adaptix/semgrep-security / scan".
 
 on:
@@ -27,11 +29,1942 @@ permissions:
   contents: read
 
 jobs:
-  semgrep:
-    name: adaptix/semgrep-security
-    # Exactly what the called job needs, and no more.
+  scan:
+    name: adaptix/semgrep-security / scan
+    runs-on: ubuntu-latest
+    # The required-path ceiling (config/platform-standard.yaml
+    # requiredCriticalPathTimeoutMinutes); npm test keeps this at or below it.
+    timeout-minutes: 15
     permissions:
-      actions: read
       contents: read
       security-events: write
-    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/semgrep-reusable.yml@c339417709e4fcba54535e95ab95d03209e61baf
+      actions: read
+    env:
+      SEMGREP_VERSION: "1.177.0"
+      SEMGREP_SEND_METRICS: "off"
+      SEMGREP_ENABLE_VERSION_CHECK: "0"
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - name: Refuse an untrusted trigger or a fork
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          case "${EVENT}" in
+            pull_request|merge_group|push|workflow_dispatch) ;;
+            *)
+              echo "::error title=adaptix/semgrep-security::event ${EVENT} is refused; only pull_request, merge_group, push and workflow_dispatch may run the Semgrep gate (never pull_request_target)."
+              exit 1
+              ;;
+          esac
+          if [ "${EVENT}" = "pull_request" ] && [ "${HEAD_REPOSITORY}" != "${REPOSITORY}" ]; then
+            echo "::error title=adaptix/semgrep-security::pull request from fork ${HEAD_REPOSITORY} is refused: its read-only token cannot publish this gate's evidence, so it is never reported as scanned."
+            exit 1
+          fi
+
+      - name: Check out the revision under analysis
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # github.sha: the merge commit a pull request would produce, the merge
+          # group's commit, or the pushed/dispatched commit. The SARIF is
+          # uploaded against the same commit.
+          persist-credentials: false
+
+      - name: Set up the pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the pinned Semgrep from hash-locked wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          venv="${RUNNER_TEMP}/semgrep-venv"
+          lock="${RUNNER_TEMP}/semgrep-requirements.txt"
+          cat > "${lock}" <<'ADAPTIX_SEMGREP_LOCK'
+          annotated-types==0.8.0 --hash=sha256:f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0
+          anyio==4.15.1 --hash=sha256:6152fdbbf9a77fdec97731721bebf7c4c44f7c29b424b0065826173efc7ed101
+          attrs==26.1.0 --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309
+          boltons==21.0.0 --hash=sha256:b9bb7b58b2b420bbe11a6025fdef6d3e5edc9f76a42fb467afe7ca212ef9948b
+          bracex==3.0.1 --hash=sha256:6523ad83aeb5098a4ee597cff0f964442ff74e460bd3fafaffab6a013ff2288c
+          certifi==2026.7.22 --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775
+          cffi==2.1.1 --hash=sha256:c1453022f490d2459a11819d83ad1d586e9ff65a12ac3e705ffebd46d3685dcf
+          charset-normalizer==3.5.1 --hash=sha256:b9af956078716df40d985fb0dfeb2c2120c5ca92ba4ff4b388acfd01cdc14d08 --hash=sha256:a6dac12ff6b846103483683f60c5f8fee205121adc58ffd87e90a90a3af69e99 --hash=sha256:6df0ec430f9a831772c23ca5a224cba36517a58a84bb32c32bb59a9fa67c47f6
+          click==8.4.2 --hash=sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76
+          click-option-group==0.5.9 --hash=sha256:ad2599248bd373e2e19bec5407967c3eec1d0d4fc4a5e77b08a0481e75991080
+          colorama==0.4.6 --hash=sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6
+          cryptography==50.0.1 --hash=sha256:ff838d62ec1bfce4f9ba7fa16f4a7b554cd8d0c299e6be37502161a660c84eef --hash=sha256:51593d180cf6d179bde5c5d065bed81386b1f381656ae7d042b7ffc87a9895ad --hash=sha256:51afcfceb15597cf2635068e4ac9a56b2abde622edde17f37d85fd7b5306497a --hash=sha256:e22dfed744bd4002e909464cb23d2f0b05c6f3113a79ef2e9864a53db737c733 --hash=sha256:407fe2b6db00939c05c0e945e9914238f2f0a430974839429dafc82b1ee6bee5 --hash=sha256:9dde0a357190eb3b1da1bb9ab750e9c85cba82ca5977aa0836cbb94e92611239
+          exceptiongroup==1.2.2 --hash=sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b
+          face==26.0.1 --hash=sha256:ab0a83c37c9789dce658a67a9a80eafaa113c9ec37c5a9d950ff5480542a062d
+          glom==25.12.0 --hash=sha256:b9f21e77f71a6576a43864e85066b8cc3f0f778d0d50961563f8981377a6dcb1
+          googleapis-common-protos==1.75.4 --hash=sha256:e8eb9cffa9a9f3423090cc7a086012004196abab388a0561690e81887fd79cc1
+          h11==0.16.0 --hash=sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86
+          httpcore==1.0.9 --hash=sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55
+          httpx==0.28.1 --hash=sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad
+          httpx-sse==0.4.3 --hash=sha256:0ac1c9fe3c0afad2e0ebb25a934a59f4c7823b60792691f779fad2c5568830fc
+          idna==3.20 --hash=sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c
+          importlib-metadata==8.7.1 --hash=sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151
+          jsonschema==4.25.1 --hash=sha256:3fba0169e345c7175110351d456342c364814cfcf3b964ba4587f22915230a63
+          jsonschema-specifications==2025.9.1 --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe
+          markdown-it-py==4.2.0 --hash=sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a
+          mcp==1.29.0 --hash=sha256:f5a075bb611f23d6f4d080c6a1699fa62772eebc562ba9e66b306ddde1c755f7
+          mdurl==0.1.2 --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8
+          opentelemetry-api==1.37.0 --hash=sha256:accf2024d3e89faec14302213bc39550ec0f4095d1cf5ca688e1bfb1c8612f47
+          opentelemetry-exporter-otlp-proto-common==1.37.0 --hash=sha256:53038428449c559b0c564b8d718df3314da387109c4d36bd1b94c9a641b0292e
+          opentelemetry-exporter-otlp-proto-http==1.37.0 --hash=sha256:54c42b39945a6cc9d9a2a33decb876eabb9547e0dcb49df090122773447f1aef
+          opentelemetry-instrumentation==0.58b0 --hash=sha256:50f97ac03100676c9f7fc28197f8240c7290ca1baa12da8bfbb9a1de4f34cc45
+          opentelemetry-instrumentation-requests==0.58b0 --hash=sha256:672a0be0bb5b52bea0c11820b35e27edcf4cd22d34abe4afc59a92a80519f8a8
+          opentelemetry-instrumentation-threading==0.58b0 --hash=sha256:eacc072881006aceb5b9b6831bcdce718c67ef6f31ac0b32bd6a23a94d979b4a
+          opentelemetry-proto==1.37.0 --hash=sha256:8ed8c066ae8828bbf0c39229979bdf583a126981142378a9cbe9d6fd5701c6e2
+          opentelemetry-sdk==1.37.0 --hash=sha256:8f3c3c22063e52475c5dbced7209495c2c16723d016d39287dfc215d1771257c
+          opentelemetry-semantic-conventions==0.58b0 --hash=sha256:5564905ab1458b96684db1340232729fce3b5375a06e140e8904c78e4f815b28
+          opentelemetry-util-http==0.58b0 --hash=sha256:6c6b86762ed43025fbd593dc5f700ba0aa3e09711aedc36fd48a13b23d8cb1e7
+          packaging==26.3 --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+          peewee==3.19.0 --hash=sha256:de220b94766e6008c466e00ce4ba5299b9a832117d9eb36d45d0062f3cfd7417
+          protobuf==6.33.6 --hash=sha256:e9db7e292e0ab79dd108d7f1a94fe31601ce1ee3f7b79e0692043423020b0593 --hash=sha256:77179e006c476e69bf8e8ce866640091ec42e1beb80b213c3900006ecfba6901
+          pycparser==3.0 --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
+          pydantic==2.13.5 --hash=sha256:346a034f080da3755d8e9cb5e00e8b07de1d39e4f6e2c87d8ab7cafa0b269a73
+          pydantic-core==2.46.5 --hash=sha256:0fc5be0abd4a407e200d844b404e33639a554e7bd0d448e7b9ae181be4789ac2
+          pydantic-settings==2.15.0 --hash=sha256:0ba092c291c94baceb5eff768aa0d56400a457585bc0175925a5a5510303da42
+          pygments==2.21.0 --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9
+          pyjwt==2.13.0 --hash=sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728
+          python-dotenv==1.2.3 --hash=sha256:904552145e8bfed22162c09dab1c2b9b54fefa7b23ba780f4f26ca0316b0f0d9
+          python-multipart==0.0.32 --hash=sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23
+          referencing==0.37.0 --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231
+          requests==2.34.2 --hash=sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0
+          rich==15.0.0 --hash=sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb
+          rpds-py==2026.6.3 --hash=sha256:ecabd69db66de867690f9797f2f8fa27ba501bbc24540cbdbdc649cd15888ba6
+          ruamel-yaml==0.19.1 --hash=sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93
+          ruamel-yaml-clib==0.2.15 --hash=sha256:11e5499db1ccbc7f4b41f0565e4f799d863ea720e01d3e99fa0b7b5fcd7802c9
+          semantic-version==2.10.0 --hash=sha256:de78a3b8e0feda74cabc54aab2da702113e33ac9d9eb9d2389bcf1f58b7d9177
+          semgrep==1.177.0 --hash=sha256:32d92d0cd2e18a1495b32abfef926be0ed3c972d8cd169bffe6cbb8418e3bb5e
+          sse-starlette==3.4.11 --hash=sha256:c7b2244bdff016fe7f64e10075e89a3e6bbf899649cc89b0fe884b5545042453
+          starlette==1.7.0 --hash=sha256:67f8e99895493dd2911a03f11314af6ceebeae4e704bb9f43dfc6a9db151c93e
+          tomli==2.4.1 --hash=sha256:136443dbd7e1dee43c68ac2694fde36b2849865fa258d39bf822c10e8068eac5 --hash=sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe
+          typing-extensions==4.16.0 --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8
+          typing-inspection==0.4.4 --hash=sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147
+          urllib3==2.8.0 --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3
+          uvicorn==0.53.0 --hash=sha256:e8dca71ec86dce5f04e333f0d56cdedf942446e6643b9cea1af0d6d3a02cb03e
+          wcmatch==8.5.2 --hash=sha256:17d3ad3758f9d0b5b4dedc770b65420d4dac62e680229c287bf24c9db856a478
+          wrapt==1.17.3 --hash=sha256:042ec3bb8f319c147b1301f2393bc19dba6e176b7da446853406d041c36c7828 --hash=sha256:7171ae35d2c33d326ac19dd8facb1e82e5fd04ef8c6c0e394d7af55a55051c22
+          zipp==4.1.0 --hash=sha256:25ad4e16390cd314347dd8f1de67a2ac538ae658ed4ab9db16029c07c188e97f
+          ADAPTIX_SEMGREP_LOCK
+          python -m venv "${venv}"
+          "${venv}/bin/python" -m pip install --disable-pip-version-check --no-input --no-deps --only-binary=:all: --require-hashes -r "${lock}"
+          "${venv}/bin/python" -m pip check
+          installed="$("${venv}/bin/semgrep" --version)"
+          if [ "${installed}" != "${SEMGREP_VERSION}" ]; then
+            echo "::error title=adaptix/semgrep-security::the installed Semgrep reports ${installed}, not the pinned ${SEMGREP_VERSION}."
+            exit 1
+          fi
+          echo "${venv}/bin" >> "${GITHUB_PATH}"
+          echo "Semgrep ${installed} installed from $(wc -l < "${lock}") hash-locked distributions."
+
+      - name: Write the pinned Adaptix ruleset and its self-test fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/semgrep"
+          mkdir -p "${root}/fixtures/positive" "${root}/fixtures/negative/tests" "${root}/out"
+
+          # The pinned ruleset. Its sha256 is printed below and archived with the results.
+          cat > "${root}/adaptix-python.yml" <<'ADAPTIX_SEMGREP_RULES'
+          rules:
+            # ======================================================================
+            # Request data reaching a dangerous sink (intraprocedural taint).
+            # Sources: the parameters of an HTTP route handler (FastAPI / Starlette /
+            # Flask decorators), minus parameters the framework has already coerced to
+            # a non-injectable type and minus dependency-injected parameters, plus the
+            # raw request accessors.
+            # ======================================================================
+            - id: adaptix.python.sqli.request-data-in-sql
+              languages: [python]
+              severity: ERROR
+              message: >-
+                Request data is formatted into SQL text that is then executed. Pass the
+                value as a bound parameter (text("... :name"), {"name": value}) instead.
+              metadata:
+                category: security
+                subcategory: sql-injection
+                cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+                owasp: "A03:2021 - Injection"
+                confidence: MEDIUM
+              mode: taint
+              # Taint follows data, not helpers. It flows natively through attribute
+              # and item access, string building and calls -- except a call to a helper
+              # that is neither a data accessor, nor a string, URL or path builder, nor
+              # a callee these rules name as a sink (the two helper sanitizers below):
+              # such a helper may validate, rebuild or replace what it is given, so its
+              # result is not the request. Nor is a value looked up BY a request key in
+              # a server-side table (taint_assume_safe_indexes). Native propagation
+              # rather than custom propagators: on a 9,275-line route module it measured
+              # about three times faster, and it never taints a receiver by side effect.
+              options: &taint_options
+                taint_assume_safe_indexes: true
+              pattern-sources: &request_sources
+                # A typed handler parameter, unless its type already rules injection out
+                # (numbers, UUIDs, dates, Literal choices) or it is a framework object or
+                # a dependency (Depends / Security), which the server computes.
+                - &typed_handler_parameters
+                  patterns:
+                    - pattern-either:
+                        - pattern-inside: |
+                            @$ROUTER.$VERB(...)
+                            def $HANDLER(..., $PARAM: $TYPE, ...):
+                              ...
+                        - pattern-inside: |
+                            @$ROUTER.$VERB(...)
+                            async def $HANDLER(..., $PARAM: $TYPE, ...):
+                              ...
+                    - metavariable-regex:
+                        metavariable: $VERB
+                        regex: ^(get|post|put|patch|delete|head|options|api_route|route|websocket)$
+                    - metavariable-regex:
+                        metavariable: $TYPE
+                        regex: ^(?!(Optional\[|Annotated\[|Literal\[)|.*(Depends|Security)\(|\s*(int|float|bool|UUID|uuid\.UUID|datetime|date|time|timedelta|Decimal|Request|WebSocket|Response|BackgroundTasks|AsyncSession|Session|HTTPConnection|SecurityScopes)\s*(\||$)).*
+                    - pattern-not-inside: |
+                        def $HANDLER(..., $PARAM: $TYPE = Depends(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        async def $HANDLER(..., $PARAM: $TYPE = Depends(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        def $HANDLER(..., $PARAM: $TYPE = Security(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        async def $HANDLER(..., $PARAM: $TYPE = Security(...), ...):
+                          ...
+                    - pattern: $PARAM
+                # Optional[...] / Annotated[...] wrappers: tainted unless they wrap a safe
+                # type or carry a dependency.
+                - &wrapped_handler_parameters
+                  patterns:
+                    - pattern-either:
+                        - pattern-inside: |
+                            @$ROUTER.$VERB(...)
+                            def $HANDLER(..., $PARAM: $TYPE, ...):
+                              ...
+                        - pattern-inside: |
+                            @$ROUTER.$VERB(...)
+                            async def $HANDLER(..., $PARAM: $TYPE, ...):
+                              ...
+                    - metavariable-regex:
+                        metavariable: $VERB
+                        regex: ^(get|post|put|patch|delete|head|options|api_route|route|websocket)$
+                    - metavariable-regex:
+                        metavariable: $TYPE
+                        regex: ^(Optional|Annotated)\[(?!\s*(int|float|bool|UUID|uuid\.UUID|datetime|date|time|timedelta|Decimal|Literal\[)\s*[\],|])(?!.*(Depends|Security)\().*
+                    - pattern-not-inside: |
+                        def $HANDLER(..., $PARAM: $TYPE = Depends(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        async def $HANDLER(..., $PARAM: $TYPE = Depends(...), ...):
+                          ...
+                    - pattern: $PARAM
+                # An untyped handler parameter (FastAPI reads it as a query string),
+                # unless it is a dependency.
+                - &untyped_handler_parameters
+                  patterns:
+                    - pattern-either:
+                        - pattern-inside: |
+                            @$ROUTER.$VERB(...)
+                            def $HANDLER(..., $PARAM, ...):
+                              ...
+                        - pattern-inside: |
+                            @$ROUTER.$VERB(...)
+                            async def $HANDLER(..., $PARAM, ...):
+                              ...
+                    - metavariable-regex:
+                        metavariable: $VERB
+                        regex: ^(get|post|put|patch|delete|head|options|api_route|route|websocket)$
+                    - pattern-not-inside: |
+                        def $HANDLER(..., $PARAM: $ANY, ...):
+                          ...
+                    - pattern-not-inside: |
+                        async def $HANDLER(..., $PARAM: $ANY, ...):
+                          ...
+                    - pattern-not-inside: |
+                        def $HANDLER(..., $PARAM = Depends(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        async def $HANDLER(..., $PARAM = Depends(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        def $HANDLER(..., $PARAM = Security(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        async def $HANDLER(..., $PARAM = Security(...), ...):
+                          ...
+                    - pattern-not-inside: |
+                        def $HANDLER(self, ...):
+                          ...
+                    - pattern: $PARAM
+                # The raw request accessors (Starlette / FastAPI Request, Flask request).
+                - &raw_request_accessors
+                  patterns:
+                    - pattern-either:
+                        - pattern: $REQUEST.query_params
+                        - pattern: $REQUEST.path_params
+                        - pattern: $REQUEST.headers
+                        - pattern: $REQUEST.cookies
+                        - pattern: $REQUEST.url
+                        - pattern: await $REQUEST.json()
+                        - pattern: await $REQUEST.form()
+                        - pattern: await $REQUEST.body()
+                    - metavariable-regex:
+                        metavariable: $REQUEST
+                        regex: ^(request|req|websocket|http_request)$
+                - &flask_request
+                  pattern-either:
+                    - pattern: flask.request.args
+                    - pattern: flask.request.form
+                    - pattern: flask.request.values
+                    - pattern: flask.request.json
+                    - pattern: flask.request.get_json(...)
+                    - pattern: flask.request.headers
+                    - pattern: flask.request.cookies
+                    - pattern: flask.request.files
+                    - pattern: flask.request.data
+              pattern-sanitizers: &data_sanitizers
+                - &type_coercions
+                  pattern-either:
+                    - pattern: int(...)
+                    - pattern: float(...)
+                    - pattern: bool(...)
+                    - pattern: uuid.UUID(...)
+                    - pattern: len(...)
+                - &helper_function_calls
+                  patterns:
+                    - pattern: $FUNC(...)
+                    - pattern-not: $OBJ.$METHOD(...)
+                    - metavariable-regex:
+                        metavariable: $FUNC
+                        regex: ^(?!(str|bytes|repr|format|dict|list|tuple|set|frozenset|sorted|reversed|Path|PurePath|PurePosixPath|urljoin|unquote|unquote_plus|quote|quote_plus|urlparse|urlsplit|urlunparse|urlunsplit|text|open|FileResponse|send_file|urlopen|Request|system|popen|getoutput|getstatusoutput|create_subprocess_shell|run|call|check_call|check_output|Popen)$)(?!(?i:_*(is_|ensure_|validate_|verify_|check_|assert_|require_)[a-z0-9_]*(trusted|allowed|allowlist|allowlisted|permitted|safe)[a-z0-9_]*$)).*
+                - &helper_method_calls
+                  patterns:
+                    - pattern: $OBJ.$METHOD(...)
+                    - metavariable-regex:
+                        metavariable: $METHOD
+                        regex: ^(?!(get|getlist|pop|setdefault|items|values|keys|copy|strip|lstrip|rstrip|lower|upper|casefold|title|replace|format|format_map|split|rsplit|splitlines|partition|rpartition|removeprefix|removesuffix|encode|decode|join|expandtabs|zfill|ljust|rjust|center|translate|json|dict|model_dump|to_dict|urljoin|unquote|unquote_plus|quote|quote_plus|Path|PurePath|PurePosixPath|normpath|abspath|realpath|expanduser|loads|b64decode|urlsafe_b64decode|parse_qs|parse_qsl|urlparse|urlsplit|urlunparse|urlunsplit|geturl|execute|executemany|executescript|exec_driver_sql|fetch|fetchrow|fetchval|raw|text|system|popen|create_subprocess_shell|run|call|check_call|check_output|Popen|getoutput|getstatusoutput|post|put|patch|delete|head|options|request|stream|urlopen|Request|open|read_text|read_bytes|write_text|write_bytes|unlink|remove|rmdir|rmtree|copyfile|move|FileResponse|send_file)$)(?!(?i:_*(is_|ensure_|validate_|verify_|check_|assert_|require_)[a-z0-9_]*(trusted|allowed|allowlist|allowlisted|permitted|safe)[a-z0-9_]*$)).*
+                # A value looked up BY a request key in a constant server-side table is
+                # not request data: TABLE.get(key) as much as TABLE[key].
+                - &constant_table_lookups
+                  patterns:
+                    - pattern: $TABLE.get(...)
+                    - metavariable-regex:
+                        metavariable: $TABLE
+                        regex: ^_?[A-Z][A-Z0-9_]*$
+                # An explicit allow-list or trust check on a value (is_trusted_host(url),
+                # ensure_allowed_path(p), ...) vouches for it from that point on. The
+                # helper sanitizers above exclude such check calls by name, because a
+                # sanitizer on the enclosing call would override this one. A handler
+                # PARAMETER is request data at every use, so a check on the parameter
+                # itself is not seen: check a local copy, or suppress the finding by
+                # rule id with the reason.
+                - &allow_list_checks
+                  by-side-effect: true
+                  patterns:
+                    - pattern: $CHECK($VALUE, ...)
+                    - metavariable-regex:
+                        metavariable: $CHECK
+                        regex: (?i)^([A-Za-z_][A-Za-z0-9_]*\.)*_*(is_|ensure_|validate_|verify_|check_|assert_|require_)[a-z0-9_]*(trusted|allowed|allowlist|allowlisted|permitted|safe)[a-z0-9_]*$
+                    - focus-metavariable: $VALUE
+              pattern-sinks:
+                # SQL text. sqlalchemy.text() and exec_driver_sql() only ever take SQL, so
+                # any tainted argument is the finding. execute()/fetch*() also take ORM
+                # statements, which bind their values, so there only a string being built
+                # in the call itself is SQL text.
+                - patterns:
+                    - pattern-either:
+                        - pattern: sqlalchemy.text($SQL, ...)
+                        - pattern: sqlalchemy.sql.text($SQL, ...)
+                        - pattern: $DB.exec_driver_sql($SQL, ...)
+                    - focus-metavariable: $SQL
+                - patterns:
+                    - pattern-either:
+                        - pattern: $DB.execute($SQL, ...)
+                        - pattern: $DB.executemany($SQL, ...)
+                        - pattern: $DB.executescript($SQL, ...)
+                        - pattern: $DB.fetch($SQL, ...)
+                        - pattern: $DB.fetchrow($SQL, ...)
+                        - pattern: $DB.fetchval($SQL, ...)
+                        - pattern: $DB.raw($SQL, ...)
+                    - metavariable-regex:
+                        metavariable: $SQL
+                        regex: (?s)^\s*([rRbB]?[fF][rR]?["']|[rRbB]?["'].*["']\s*(%|\.format\(|\+)|.*\+\s*[rRbB]?[fF]?[rR]?["'])
+                    - focus-metavariable: $SQL
+
+            - id: adaptix.python.injection.request-data-in-shell-command
+              languages: [python]
+              severity: ERROR
+              message: >-
+                Request data reaches a command that a shell interprets. Pass an argument
+                list to subprocess without shell=True, and never let request data choose
+                the executable.
+              metadata:
+                category: security
+                subcategory: command-injection
+                cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+                owasp: "A03:2021 - Injection"
+                confidence: MEDIUM
+              mode: taint
+              options: *taint_options
+              pattern-sources: *request_sources
+              pattern-sanitizers:
+                - *type_coercions
+                - *helper_function_calls
+                - *helper_method_calls
+                - *constant_table_lookups
+                - *allow_list_checks
+                - pattern: shlex.quote(...)
+              pattern-sinks:
+                - patterns:
+                    - pattern-either:
+                        - pattern: subprocess.$FN($CMD, ..., shell=True, ...)
+                        - pattern: os.system($CMD)
+                        - pattern: os.popen($CMD, ...)
+                        - pattern: asyncio.create_subprocess_shell($CMD, ...)
+                        - pattern: subprocess.getoutput($CMD)
+                        - pattern: subprocess.getstatusoutput($CMD)
+                    - focus-metavariable: $CMD
+
+            - id: adaptix.python.ssrf.request-data-controls-url
+              languages: [python]
+              severity: ERROR
+              message: >-
+                Request data is the whole URL of an outbound HTTP request (server-side
+                request forgery). Resolve the destination from configuration or an
+                allow-list, never from the request.
+              metadata:
+                category: security
+                subcategory: ssrf
+                cwe: "CWE-918: Server-Side Request Forgery (SSRF)"
+                owasp: "A10:2021 - Server-Side Request Forgery (SSRF)"
+                confidence: MEDIUM
+              mode: taint
+              options: *taint_options
+              pattern-sources: *request_sources
+              pattern-sanitizers:
+                - *type_coercions
+                - *helper_function_calls
+                - *helper_method_calls
+                - *constant_table_lookups
+                - *allow_list_checks
+                # A URL built by formatting or concatenation takes its scheme and host
+                # from its leading component, which the next rule judges. Here only
+                # request data that IS the URL is reported.
+                - pattern: f"..."
+                - pattern: $LEFT + $RIGHT
+                - pattern: '"...".format(...)'
+                - pattern: '"..." % $ARGS'
+              pattern-sinks:
+                - patterns:
+                    - pattern-either: &outbound_http_calls
+                        - patterns:
+                            - pattern-either:
+                                - pattern: requests.$FN($URL, ...)
+                                - pattern: httpx.$FN($URL, ...)
+                                - pattern: requests.$FN(..., url=$URL, ...)
+                                - pattern: httpx.$FN(..., url=$URL, ...)
+                            - metavariable-regex:
+                                metavariable: $FN
+                                regex: ^(get|post|put|patch|delete|head|options)$
+                        - pattern: requests.request($METHOD, $URL, ...)
+                        - pattern: httpx.request($METHOD, $URL, ...)
+                        - pattern: httpx.stream($METHOD, $URL, ...)
+                        - pattern: urllib.request.urlopen($URL, ...)
+                        - pattern: urllib.request.Request($URL, ...)
+                        - patterns:
+                            - pattern-either:
+                                - pattern-inside: |
+                                    async with httpx.AsyncClient(...) as $CLIENT:
+                                      ...
+                                - pattern-inside: |
+                                    with httpx.Client(...) as $CLIENT:
+                                      ...
+                                - pattern-inside: |
+                                    async with aiohttp.ClientSession(...) as $CLIENT:
+                                      ...
+                                - pattern-inside: |
+                                    with requests.Session() as $CLIENT:
+                                      ...
+                            - pattern-either:
+                                - patterns:
+                                    - pattern-either:
+                                        - pattern: $CLIENT.$FN($URL, ...)
+                                        - pattern: $CLIENT.$FN(..., url=$URL, ...)
+                                    - metavariable-regex:
+                                        metavariable: $FN
+                                        regex: ^(get|post|put|patch|delete|head|options)$
+                                - pattern: $CLIENT.request($METHOD, $URL, ...)
+                                - pattern: $CLIENT.stream($METHOD, $URL, ...)
+                    - focus-metavariable: $URL
+
+            - id: adaptix.python.ssrf.request-data-leads-built-url
+              languages: [python]
+              severity: ERROR
+              message: >-
+                Request data is the leading component of an outbound URL built by
+                formatting or concatenation, so it decides the scheme and host
+                (server-side request forgery). Start the URL from a configured base; the
+                request may only choose a path after it.
+              metadata:
+                category: security
+                subcategory: ssrf
+                cwe: "CWE-918: Server-Side Request Forgery (SSRF)"
+                owasp: "A10:2021 - Server-Side Request Forgery (SSRF)"
+                confidence: MEDIUM
+              mode: taint
+              options: *taint_options
+              # Taint labels: request data carries the default label; request data that
+              # stands at the head of a built URL -- f"{value}...", f"https://{value}...",
+              # value + "..." -- also gains HOST, which flows with the built string into
+              # a variable and on into the call. Only HOST reaches the sink, so a request
+              # value after a fixed base is never this finding.
+              pattern-sources:
+                - *typed_handler_parameters
+                - *wrapped_handler_parameters
+                - *untyped_handler_parameters
+                - *raw_request_accessors
+                - *flask_request
+                - label: HOST
+                  requires: __SOURCE__
+                  patterns:
+                    - pattern-either:
+                        - pattern: f"{$HEAD}..."
+                        - pattern: f"http://{$HEAD}..."
+                        - pattern: f"https://{$HEAD}..."
+                        - pattern: $HEAD + $TAIL
+                    - focus-metavariable: $HEAD
+              pattern-sanitizers: *data_sanitizers
+              pattern-sinks:
+                - requires: HOST
+                  patterns:
+                    - pattern-either: *outbound_http_calls
+                    - focus-metavariable: $URL
+
+            - id: adaptix.python.path-traversal.request-data-in-file-path
+              languages: [python]
+              severity: ERROR
+              message: >-
+                Request data becomes part of a filesystem path that is opened, served,
+                written or deleted. Reduce it to a bare file name (os.path.basename or
+                werkzeug.utils.secure_filename) or map it to a server-chosen path.
+              metadata:
+                category: security
+                subcategory: path-traversal
+                cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')"
+                owasp: "A01:2021 - Broken Access Control"
+                confidence: MEDIUM
+              mode: taint
+              options: *taint_options
+              pattern-sources: *request_sources
+              pattern-sanitizers:
+                - *type_coercions
+                - *helper_function_calls
+                - *helper_method_calls
+                - *constant_table_lookups
+                - *allow_list_checks
+                - pattern: os.path.basename(...)
+                - pattern: werkzeug.utils.secure_filename(...)
+                - pattern: pathlib.Path(...).name
+              pattern-sinks:
+                - patterns:
+                    - pattern-either:
+                        - pattern: open($PATH, ...)
+                        - pattern: io.open($PATH, ...)
+                        - pattern: aiofiles.open($PATH, ...)
+                        - pattern: os.remove($PATH, ...)
+                        - pattern: os.unlink($PATH, ...)
+                        - pattern: os.rmdir($PATH, ...)
+                        - pattern: shutil.rmtree($PATH, ...)
+                        - pattern: shutil.copy($PATH, ...)
+                        - pattern: shutil.copyfile($PATH, ...)
+                        - pattern: shutil.move($PATH, ...)
+                        - pattern: pathlib.Path($PATH, ...).open(...)
+                        - pattern: pathlib.Path($PATH, ...).read_text(...)
+                        - pattern: pathlib.Path($PATH, ...).read_bytes(...)
+                        - pattern: pathlib.Path($PATH, ...).write_text(...)
+                        - pattern: pathlib.Path($PATH, ...).write_bytes(...)
+                        - pattern: pathlib.Path($PATH, ...).unlink(...)
+                        - pattern: fastapi.responses.FileResponse($PATH, ...)
+                        - pattern: starlette.responses.FileResponse($PATH, ...)
+                        - pattern: flask.send_file($PATH, ...)
+                    - focus-metavariable: $PATH
+
+            # ======================================================================
+            # Dangerous APIs, judged on their own.
+            # ======================================================================
+            - id: adaptix.python.injection.shell-command-built-from-data
+              languages: [python]
+              severity: ERROR
+              message: >-
+                A shell interprets a command string that is not a literal. Pass an argument
+                list to subprocess without shell=True (or shlex.quote every value).
+              metadata:
+                category: security
+                subcategory: command-injection
+                cwe: "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+                owasp: "A03:2021 - Injection"
+                confidence: HIGH
+              patterns:
+                - pattern-either:
+                    - pattern: subprocess.$FN($CMD, ..., shell=True, ...)
+                    - pattern: os.system($CMD)
+                    - pattern: os.popen($CMD, ...)
+                    - pattern: asyncio.create_subprocess_shell($CMD, ...)
+                    - pattern: subprocess.getoutput($CMD)
+                    - pattern: subprocess.getstatusoutput($CMD)
+                - metavariable-pattern:
+                    metavariable: $CMD
+                    patterns:
+                      - pattern-not: '"..."'
+
+            - id: adaptix.python.injection.code-evaluated-from-data
+              languages: [python]
+              severity: ERROR
+              message: >-
+                eval/exec runs a string that is not a literal. Parse the data
+                (json.loads, ast.literal_eval) instead of executing it.
+              metadata:
+                category: security
+                subcategory: code-injection
+                cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+                owasp: "A03:2021 - Injection"
+                confidence: HIGH
+              paths:
+                exclude: &test_paths
+                  - "tests/"
+                  - "test/"
+                  - "test_*.py"
+                  - "*_test.py"
+                  - "conftest.py"
+              patterns:
+                - pattern-either:
+                    - pattern: eval($CODE, ...)
+                    - pattern: exec($CODE, ...)
+                - metavariable-pattern:
+                    metavariable: $CODE
+                    patterns:
+                      - pattern-not: '"..."'
+
+            - id: adaptix.python.deserialization.pickle-family
+              languages: [python]
+              severity: ERROR
+              message: >-
+                pickle-family deserialisation executes code chosen by whoever wrote the
+                bytes. Use JSON (or another data-only format) for anything that crosses a
+                trust boundary.
+              metadata:
+                category: security
+                subcategory: insecure-deserialization
+                cwe: "CWE-502: Deserialization of Untrusted Data"
+                owasp: "A08:2021 - Software and Data Integrity Failures"
+                confidence: HIGH
+              patterns:
+                - pattern-either:
+                    - pattern: pickle.loads(...)
+                    - pattern: pickle.load(...)
+                    - pattern: pickle.Unpickler(...)
+                    - pattern: _pickle.loads(...)
+                    - pattern: cPickle.loads(...)
+                    - pattern: cPickle.load(...)
+                    - pattern: dill.loads(...)
+                    - pattern: dill.load(...)
+                    - pattern: marshal.loads(...)
+                    - pattern: marshal.load(...)
+                    - pattern: jsonpickle.decode(...)
+                    - pattern: shelve.open(...)
+                    - pattern: pandas.read_pickle(...)
+                - pattern-not: pickle.loads(pickle.dumps(...))
+
+            - id: adaptix.python.deserialization.unsafe-yaml-load
+              languages: [python]
+              severity: ERROR
+              message: >-
+                This YAML loader can construct arbitrary Python objects. Use
+                yaml.safe_load (or Loader=yaml.SafeLoader).
+              metadata:
+                category: security
+                subcategory: insecure-deserialization
+                cwe: "CWE-502: Deserialization of Untrusted Data"
+                owasp: "A08:2021 - Software and Data Integrity Failures"
+                confidence: HIGH
+              pattern-either:
+                - pattern: yaml.unsafe_load(...)
+                - pattern: yaml.unsafe_load_all(...)
+                - pattern: yaml.full_load(...)
+                - pattern: yaml.full_load_all(...)
+                - patterns:
+                    - pattern-either:
+                        - pattern: yaml.load(..., Loader=$LOADER, ...)
+                        - pattern: yaml.load_all(..., Loader=$LOADER, ...)
+                    - metavariable-regex:
+                        metavariable: $LOADER
+                        regex: ^(yaml\.)?(Loader|UnsafeLoader|FullLoader|CLoader|CUnsafeLoader|CFullLoader)$
+
+            - id: adaptix.python.crypto.broken-cipher-or-mode
+              languages: [python]
+              severity: ERROR
+              message: >-
+                A broken cipher or ECB mode is in use. Use AES-GCM or ChaCha20-Poly1305
+                (cryptography.hazmat.primitives.ciphers.aead).
+              metadata:
+                category: security
+                subcategory: weak-crypto
+                cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+                owasp: "A02:2021 - Cryptographic Failures"
+                confidence: HIGH
+              pattern-either:
+                - pattern: cryptography.hazmat.primitives.ciphers.algorithms.TripleDES(...)
+                - pattern: cryptography.hazmat.primitives.ciphers.algorithms.ARC4(...)
+                - pattern: cryptography.hazmat.primitives.ciphers.algorithms.Blowfish(...)
+                - pattern: cryptography.hazmat.primitives.ciphers.algorithms.CAST5(...)
+                - pattern: cryptography.hazmat.primitives.ciphers.algorithms.IDEA(...)
+                - pattern: cryptography.hazmat.primitives.ciphers.algorithms.SEED(...)
+                - pattern: cryptography.hazmat.decrepit.ciphers.algorithms.$ALG(...)
+                - pattern: cryptography.hazmat.primitives.ciphers.modes.ECB(...)
+                - pattern: Crypto.Cipher.DES.new(...)
+                - pattern: Crypto.Cipher.DES3.new(...)
+                - pattern: Crypto.Cipher.ARC2.new(...)
+                - pattern: Crypto.Cipher.ARC4.new(...)
+                - pattern: Crypto.Cipher.Blowfish.new(...)
+                - pattern: Crypto.Cipher.CAST.new(...)
+                - pattern: Crypto.Cipher.$ANY.new($KEY, Crypto.Cipher.$MOD.MODE_ECB, ...)
+                - pattern: Cryptodome.Cipher.DES.new(...)
+                - pattern: Cryptodome.Cipher.DES3.new(...)
+                - pattern: Cryptodome.Cipher.ARC4.new(...)
+                - pattern: Cryptodome.Cipher.Blowfish.new(...)
+                - pattern: Cryptodome.Cipher.$ANY.new($KEY, Cryptodome.Cipher.$MOD.MODE_ECB, ...)
+
+            - id: adaptix.python.crypto.short-asymmetric-key
+              languages: [python]
+              severity: ERROR
+              message: >-
+                An RSA or DSA key shorter than 2048 bits can be factored or forged. Use at
+                least 2048 bits (3072 for keys that must outlive 2030).
+              metadata:
+                category: security
+                subcategory: weak-crypto
+                cwe: "CWE-326: Inadequate Encryption Strength"
+                owasp: "A02:2021 - Cryptographic Failures"
+                confidence: HIGH
+              patterns:
+                - pattern-either:
+                    - pattern: cryptography.hazmat.primitives.asymmetric.rsa.generate_private_key(..., key_size=$SIZE, ...)
+                    - pattern: cryptography.hazmat.primitives.asymmetric.dsa.generate_private_key(key_size=$SIZE, ...)
+                    - pattern: cryptography.hazmat.primitives.asymmetric.dsa.generate_private_key($SIZE, ...)
+                    - pattern: Crypto.PublicKey.RSA.generate($SIZE, ...)
+                    - pattern: Cryptodome.PublicKey.RSA.generate($SIZE, ...)
+                - metavariable-comparison:
+                    metavariable: $SIZE
+                    comparison: $SIZE < 2048
+
+            - id: adaptix.python.crypto.tls-verification-disabled
+              languages: [python]
+              severity: ERROR
+              message: >-
+                TLS certificate or hostname verification is switched off, so any
+                man-in-the-middle is trusted. Keep verification on; pin a CA bundle with
+                verify="/path/ca.pem" when a private CA is needed.
+              metadata:
+                category: security
+                subcategory: weak-crypto
+                cwe: "CWE-295: Improper Certificate Validation"
+                owasp: "A07:2021 - Identification and Authentication Failures"
+                confidence: HIGH
+              pattern-either:
+                - pattern: requests.$FN(..., verify=False, ...)
+                - pattern: requests.Session(...).$FN(..., verify=False, ...)
+                - pattern: httpx.$FN(..., verify=False, ...)
+                - pattern: aiohttp.TCPConnector(..., ssl=False, ...)
+                - pattern: aiohttp.TCPConnector(..., verify_ssl=False, ...)
+                - patterns:
+                    - pattern-either:
+                        - pattern-inside: |
+                            async with aiohttp.ClientSession(...) as $SESSION:
+                              ...
+                        - pattern-inside: |
+                            $SESSION = aiohttp.ClientSession(...)
+                            ...
+                    - pattern: $SESSION.$FN(..., ssl=False, ...)
+                - pattern: ssl._create_unverified_context(...)
+                - pattern: ssl._create_default_https_context = ssl._create_unverified_context
+
+            - id: adaptix.python.crypto.insecure-random-for-secret
+              languages: [python]
+              severity: ERROR
+              message: >-
+                The random module is predictable and must not produce tokens, passwords,
+                one-time codes, salts or nonces. Use the secrets module.
+              metadata:
+                category: security
+                subcategory: weak-crypto
+                cwe: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)"
+                owasp: "A02:2021 - Cryptographic Failures"
+                confidence: HIGH
+              patterns:
+                - pattern-either:
+                    - pattern: $VAR = <... random.$FN(...) ...>
+                    - pattern: $OBJ.$VAR = <... random.$FN(...) ...>
+                - metavariable-regex:
+                    metavariable: $FN
+                    regex: ^(random|randint|randrange|choice|choices|sample|getrandbits|shuffle|uniform|randbytes)$
+                - metavariable-regex:
+                    metavariable: $VAR
+                    regex: (?i)^_*(token|secret|password|passwd|passcode|otp|one_time_code|nonce|salt|api_key|apikey|session_key|session_id|csrf|reset_code|verification_code)(_[a-z0-9]+)?$
+
+            - id: adaptix.python.jwt.signature-not-verified
+              languages: [python]
+              severity: ERROR
+              message: >-
+                A JWT is decoded without verifying its signature, so every claim in it is
+                attacker-chosen. Verify with the issuer's key and an explicit algorithms
+                list; to read the key id before verifying, use jwt.get_unverified_header.
+              metadata:
+                category: security
+                subcategory: jwt
+                cwe: "CWE-347: Improper Verification of Cryptographic Signature"
+                owasp: "A02:2021 - Cryptographic Failures"
+                confidence: HIGH
+              paths:
+                exclude: *test_paths
+              pattern-either:
+                - pattern: 'jwt.decode(..., options={..., "verify_signature": False, ...}, ...)'
+                - pattern: jwt.decode(..., verify=False, ...)
+                - pattern: jose.jwt.get_unverified_claims(...)
+                - pattern: jwt.get_unverified_claims(...)
+                - pattern: 'jose.jwt.decode(..., options={..., "verify_signature": False, ...}, ...)'
+                - pattern: 'authlib.jose.jwt.decode(..., options={..., "verify_signature": False, ...}, ...)'
+
+            - id: adaptix.python.jwt.none-algorithm
+              languages: [python]
+              severity: ERROR
+              message: >-
+                The "none" JWT algorithm means "no signature". Never accept or issue it.
+              metadata:
+                category: security
+                subcategory: jwt
+                cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+                owasp: "A02:2021 - Cryptographic Failures"
+                confidence: HIGH
+              paths:
+                exclude: *test_paths
+              patterns:
+                - pattern-either:
+                    - pattern: jwt.decode(..., algorithms=[..., $ALG, ...], ...)
+                    - pattern: jwt.encode(..., algorithm=$ALG, ...)
+                    - pattern: jose.jwt.decode(..., algorithms=[..., $ALG, ...], ...)
+                    - pattern: jose.jwt.encode(..., algorithm=$ALG, ...)
+                - metavariable-regex:
+                    metavariable: $ALG
+                    regex: (?i)^["']none["']$
+
+            - id: adaptix.python.jwt.hardcoded-signing-key
+              languages: [python]
+              severity: ERROR
+              message: >-
+                A JWT is signed or verified with a key written into the source. Load the
+                key from the secret store at run time.
+              metadata:
+                category: security
+                subcategory: jwt
+                cwe: "CWE-798: Use of Hard-coded Credentials"
+                owasp: "A07:2021 - Identification and Authentication Failures"
+                confidence: HIGH
+              paths:
+                exclude: *test_paths
+              pattern-either:
+                - pattern: jwt.encode($CLAIMS, "...", ...)
+                - pattern: jwt.decode($TOKEN, "...", ...)
+                - pattern: jwt.encode($CLAIMS, key="...", ...)
+                - pattern: jwt.decode($TOKEN, key="...", ...)
+                - pattern: jose.jwt.encode($CLAIMS, "...", ...)
+                - pattern: jose.jwt.decode($TOKEN, "...", ...)
+
+            - id: adaptix.python.logging.secret-or-pii-logged
+              languages: [python]
+              severity: ERROR
+              message: >-
+                A credential or a direct personal identifier is written to a log (or to
+                standard output, which the platform ships to the same log store). Log a
+                redacted form or an opaque reference instead.
+              metadata:
+                category: security
+                subcategory: sensitive-data-exposure
+                cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+                owasp: "A09:2021 - Security Logging and Monitoring Failures"
+                confidence: MEDIUM
+              paths:
+                exclude: *test_paths
+              patterns:
+                - pattern-either:
+                    - pattern: $LOG.$LEVEL(..., $VALUE, ...)
+                    - pattern: $LOG.$LEVEL(..., $KEY=$VALUE, ...)
+                    - pattern: $LOG.$LEVEL(..., f"...{$VALUE}...", ...)
+                    - pattern: $LOG.$LEVEL(..., "..." % $VALUE, ...)
+                    - pattern: '$LOG.$LEVEL(..., "..." % (..., $VALUE, ...), ...)'
+                    - pattern: $LOG.$LEVEL(..., "...".format(..., $VALUE, ...), ...)
+                    - pattern: $LOG.$LEVEL(..., "...".format(..., $KEY=$VALUE, ...), ...)
+                    - pattern: '$LOG.$LEVEL(..., extra={..., $KEY: $VALUE, ...}, ...)'
+                    - pattern: print(..., $VALUE, ...)
+                    - pattern: print(..., f"...{$VALUE}...", ...)
+                - metavariable-regex:
+                    metavariable: $LEVEL
+                    regex: ^(debug|info|warning|warn|error|exception|critical|fatal|log|msg)$
+                - metavariable-regex:
+                    metavariable: $VALUE
+                    regex: (?i)^([A-Za-z_][A-Za-z0-9_]*\.)*_*(password|passwd|client_secret|secret_value|api_key|apikey|access_token|refresh_token|id_token|bearer_token|auth_token|session_token|private_key|signing_key|authorization|ssn|social_security_number|date_of_birth)$
+
+            - id: adaptix.python.logging.auth-header-logged
+              languages: [python]
+              severity: ERROR
+              message: >-
+                Request headers or cookies are written to a log; they carry bearer tokens
+                and session cookies. Log only the specific, non-secret headers you need.
+              metadata:
+                category: security
+                subcategory: sensitive-data-exposure
+                cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+                owasp: "A09:2021 - Security Logging and Monitoring Failures"
+                confidence: HIGH
+              patterns:
+                - pattern-either:
+                    - pattern: $LOG.$LEVEL(..., $REQUEST.headers, ...)
+                    - pattern: $LOG.$LEVEL(..., $REQUEST.cookies, ...)
+                    - pattern: $LOG.$LEVEL(..., dict($REQUEST.headers), ...)
+                    - pattern: $LOG.$LEVEL(..., dict($REQUEST.cookies), ...)
+                    - pattern: $LOG.$LEVEL(..., f"...{$REQUEST.headers}...", ...)
+                    - pattern: $LOG.$LEVEL(..., f"...{$REQUEST.cookies}...", ...)
+                    - pattern: $LOG.$LEVEL(..., f"...{dict($REQUEST.headers)}...", ...)
+                    - pattern: $LOG.$LEVEL(..., $KEY=$REQUEST.headers, ...)
+                    - pattern: $LOG.$LEVEL(..., $KEY=dict($REQUEST.headers), ...)
+                    - pattern: '$LOG.$LEVEL(..., extra={..., $KEY: $REQUEST.headers, ...}, ...)'
+                    - pattern: '$LOG.$LEVEL(..., extra={..., $KEY: dict($REQUEST.headers), ...}, ...)'
+                - metavariable-regex:
+                    metavariable: $REQUEST
+                    regex: ^(request|req|http_request|websocket|flask\.request)$
+                - metavariable-regex:
+                    metavariable: $LEVEL
+                    regex: ^(debug|info|warning|warn|error|exception|critical|fatal|log|msg)$
+
+            - id: adaptix.python.logging.authorization-header-value-logged
+              languages: [python]
+              severity: ERROR
+              message: >-
+                The Authorization header or a session cookie value is written to a log.
+              metadata:
+                category: security
+                subcategory: sensitive-data-exposure
+                cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+                owasp: "A09:2021 - Security Logging and Monitoring Failures"
+                confidence: HIGH
+              patterns:
+                - pattern-either:
+                    - pattern: $LOG.$LEVEL(..., <... $REQUEST.headers.get($NAME, ...) ...>, ...)
+                    - pattern: $LOG.$LEVEL(..., <... $REQUEST.headers[$NAME] ...>, ...)
+                - metavariable-regex:
+                    metavariable: $LEVEL
+                    regex: ^(debug|info|warning|warn|error|exception|critical|fatal|log|msg)$
+                - metavariable-regex:
+                    metavariable: $NAME
+                    regex: (?i)^["'](authorization|cookie|x-api-key|x-auth-token|proxy-authorization)["']$
+
+            - id: adaptix.python.path-traversal.tar-extract-without-filter
+              languages: [python]
+              severity: ERROR
+              message: >-
+                tarfile extraction without a filter lets a crafted archive write outside
+                the target directory ("tar slip"). Pass filter="data".
+              metadata:
+                category: security
+                subcategory: path-traversal
+                cwe: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')"
+                owasp: "A01:2021 - Broken Access Control"
+                confidence: HIGH
+              patterns:
+                - pattern-either:
+                    - pattern-inside: |
+                        with tarfile.open(...) as $TAR:
+                          ...
+                    - pattern-inside: |
+                        $TAR = tarfile.open(...)
+                        ...
+                    - pattern-inside: |
+                        with tarfile.TarFile(...) as $TAR:
+                          ...
+                - pattern-either:
+                    - pattern: $TAR.extractall(...)
+                    - pattern: $TAR.extract(...)
+                - pattern-not: $TAR.extractall(..., filter=$FILTER, ...)
+                - pattern-not: $TAR.extract(..., filter=$FILTER, ...)
+
+            - id: adaptix.python.cors.wildcard-origin-with-credentials
+              languages: [python]
+              severity: ERROR
+              message: >-
+                CORS allows credentials from every origin, so any web page can make
+                authenticated calls as the visitor. List the allowed origins explicitly.
+              metadata:
+                category: security
+                subcategory: cors
+                cwe: "CWE-942: Permissive Cross-domain Policy with Untrusted Domains"
+                owasp: "A05:2021 - Security Misconfiguration"
+                confidence: HIGH
+              pattern-either:
+                - pattern: $APP.add_middleware($MW, ..., allow_origins=["*"], ..., allow_credentials=True, ...)
+                - pattern: $APP.add_middleware($MW, ..., allow_credentials=True, ..., allow_origins=["*"], ...)
+                - pattern: $APP.add_middleware($MW, ..., allow_origin_regex=".*", ..., allow_credentials=True, ...)
+                - pattern: $APP.add_middleware($MW, ..., allow_credentials=True, ..., allow_origin_regex=".*", ...)
+
+            - id: adaptix.python.xml.external-entities-enabled
+              languages: [python]
+              severity: ERROR
+              message: >-
+                This XML parser resolves external entities or loads DTDs from the network
+                (XXE). Use defusedxml, or keep resolve_entities=False and no_network=True.
+              metadata:
+                category: security
+                subcategory: xxe
+                cwe: "CWE-611: Improper Restriction of XML External Entity Reference"
+                owasp: "A05:2021 - Security Misconfiguration"
+                confidence: HIGH
+              pattern-either:
+                - pattern: lxml.etree.XMLParser(..., resolve_entities=True, ...)
+                - pattern: lxml.etree.XMLParser(..., no_network=False, ...)
+                - pattern: lxml.etree.XMLParser(..., load_dtd=True, ...)
+                - pattern: $PARSER.setFeature(xml.sax.handler.feature_external_ges, True)
+
+            # ======================================================================
+            # Non-blocking (WARNING): reported and archived, never a failure.
+            # ======================================================================
+            - id: adaptix.python.jwt.expiry-or-audience-not-verified
+              languages: [python]
+              severity: WARNING
+              message: >-
+                JWT expiry or audience verification is switched off. If the check is made
+                elsewhere, say where; otherwise keep verify_exp and verify_aud on.
+              metadata:
+                category: security
+                subcategory: jwt
+                cwe: "CWE-613: Insufficient Session Expiration"
+                owasp: "A07:2021 - Identification and Authentication Failures"
+                confidence: MEDIUM
+              paths:
+                exclude: *test_paths
+              pattern-either:
+                - pattern: 'jwt.decode(..., options={..., "verify_exp": False, ...}, ...)'
+                - pattern: 'jwt.decode(..., options={..., "verify_aud": False, ...}, ...)'
+                - pattern: 'jose.jwt.decode(..., options={..., "verify_exp": False, ...}, ...)'
+                - pattern: 'jose.jwt.decode(..., options={..., "verify_aud": False, ...}, ...)'
+
+            - id: adaptix.python.crypto.weak-hash
+              languages: [python]
+              severity: WARNING
+              message: >-
+                MD5 and SHA-1 are broken for security use. Use SHA-256 or better; for a
+                non-security digest (a cache key, an ETag) say so with
+                usedforsecurity=False.
+              metadata:
+                category: security
+                subcategory: weak-crypto
+                cwe: "CWE-328: Use of Weak Hash"
+                owasp: "A02:2021 - Cryptographic Failures"
+                confidence: MEDIUM
+              paths:
+                exclude: *test_paths
+              patterns:
+                - pattern-either:
+                    - pattern: hashlib.md5(...)
+                    - pattern: hashlib.sha1(...)
+                    - pattern: hashlib.new("md5", ...)
+                    - pattern: hashlib.new("sha1", ...)
+                    - pattern: hashlib.new("MD5", ...)
+                    - pattern: hashlib.new("SHA1", ...)
+                - pattern-not: hashlib.$FN(..., usedforsecurity=False, ...)
+
+            - id: adaptix.python.xml.stdlib-parser-on-data
+              languages: [python]
+              severity: WARNING
+              message: >-
+                The standard-library XML parsers are not hardened against malicious XML
+                (entity expansion). Parse untrusted XML with defusedxml.
+              metadata:
+                category: security
+                subcategory: xxe
+                cwe: "CWE-776: Improper Restriction of Recursive Entity References in DTDs ('XML Entity Expansion')"
+                owasp: "A05:2021 - Security Misconfiguration"
+                confidence: LOW
+              paths:
+                exclude: *test_paths
+              pattern-either:
+                - pattern: xml.etree.ElementTree.fromstring(...)
+                - pattern: xml.etree.ElementTree.parse(...)
+                - pattern: xml.etree.ElementTree.XMLParser(...)
+                - pattern: xml.dom.minidom.parseString(...)
+                - pattern: xml.dom.minidom.parse(...)
+                - pattern: xml.sax.parseString(...)
+                - pattern: xml.sax.parse(...)
+          ADAPTIX_SEMGREP_RULES
+
+          # Self-test fixtures. Every rule has at least one `# ruleid:` line here, and the
+          # negative files hold the safe forms that must stay silent.
+          cat > "${root}/fixtures/positive/request_taint.py" <<'ADAPTIX_SEMGREP_FIXTURE'
+          import os
+          import subprocess
+
+          import httpx
+          import requests
+          from fastapi import APIRouter, Depends, Request
+          from fastapi.responses import FileResponse
+          from sqlalchemy import text
+
+          router = APIRouter()
+
+
+          @router.get("/reports")
+          async def report(name: str, session=Depends(object)):
+              # ruleid: adaptix.python.sqli.request-data-in-sql
+              return await session.execute(text(f"SELECT * FROM reports WHERE name = '{name}'"))
+
+
+          @router.post("/exec")
+          def run(cmd: str):
+              # ruleid: adaptix.python.injection.request-data-in-shell-command, adaptix.python.injection.shell-command-built-from-data
+              subprocess.run(f"convert {cmd}", shell=True)
+
+
+          @router.get("/fetch")
+          def fetch(url: str):
+              # ruleid: adaptix.python.ssrf.request-data-controls-url
+              return requests.get(url, timeout=5)
+
+
+          @router.get("/proxy")
+          async def proxy(target: str):
+              async with httpx.AsyncClient() as client:
+                  # ruleid: adaptix.python.ssrf.request-data-leads-built-url
+                  return await client.get(f"{target}/status")
+
+
+          @router.get("/files/{name}")
+          def download(name: str):
+              # ruleid: adaptix.python.path-traversal.request-data-in-file-path
+              return FileResponse(os.path.join("/srv/files", name))
+
+
+          @router.post("/raw")
+          async def raw(request: Request):
+              body = await request.json()
+              # ruleid: adaptix.python.path-traversal.request-data-in-file-path
+              with open("/srv/uploads/" + body["path"], "rb") as handle:
+                  return handle.read()
+
+
+          @router.post("/webhook")
+          async def webhook(payload: dict):
+              media_url = payload.get("media_url")
+              async with httpx.AsyncClient() as client:
+                  # ruleid: adaptix.python.ssrf.request-data-controls-url
+                  return await client.get(media_url)
+
+
+          @router.post("/relay")
+          async def relay(destination: str):
+              async with httpx.AsyncClient() as client:
+                  # ruleid: adaptix.python.ssrf.request-data-controls-url
+                  return await client.request("POST", destination)
+
+
+          @router.post("/callback")
+          async def callback(callback_base: str):
+              hook = f"{callback_base}/hooks/adaptix"
+              async with httpx.AsyncClient() as client:
+                  # ruleid: adaptix.python.ssrf.request-data-leads-built-url
+                  return await client.post(hook, json={})
+          ADAPTIX_SEMGREP_FIXTURE
+          cat > "${root}/fixtures/positive/dangerous_apis.py" <<'ADAPTIX_SEMGREP_FIXTURE'
+          import logging
+          import os
+          import pickle
+          import random
+          import ssl
+          import subprocess
+          import tarfile
+
+          import jwt
+          import requests
+          import yaml
+          from cryptography.hazmat.primitives.asymmetric import rsa
+          from cryptography.hazmat.primitives.ciphers import algorithms, modes
+          from fastapi.middleware.cors import CORSMiddleware
+          from lxml import etree
+
+          logger = logging.getLogger(__name__)
+
+
+          def shell(host):
+              # ruleid: adaptix.python.injection.shell-command-built-from-data
+              os.system("ping -c 1 " + host)
+              # ruleid: adaptix.python.injection.shell-command-built-from-data
+              subprocess.check_output(f"dig {host}", shell=True)
+
+
+          def evaluate(expression):
+              # ruleid: adaptix.python.injection.code-evaluated-from-data
+              return eval(expression)
+
+
+          def restore(blob):
+              # ruleid: adaptix.python.deserialization.pickle-family
+              return pickle.loads(blob)
+
+
+          def settings(stream):
+              # ruleid: adaptix.python.deserialization.unsafe-yaml-load
+              return yaml.load(stream, Loader=yaml.Loader)
+
+
+          def cipher(key):
+              # ruleid: adaptix.python.crypto.broken-cipher-or-mode
+              return algorithms.TripleDES(key)
+
+
+          def mode():
+              # ruleid: adaptix.python.crypto.broken-cipher-or-mode
+              return modes.ECB()
+
+
+          def keypair():
+              # ruleid: adaptix.python.crypto.short-asymmetric-key
+              return rsa.generate_private_key(public_exponent=65537, key_size=1024)
+
+
+          def fetch(url):
+              # ruleid: adaptix.python.crypto.tls-verification-disabled
+              return requests.get(url, verify=False, timeout=5)
+
+
+          def context():
+              # ruleid: adaptix.python.crypto.tls-verification-disabled
+              return ssl._create_unverified_context()
+
+
+          def new_reset_code():
+              # ruleid: adaptix.python.crypto.insecure-random-for-secret
+              reset_code = "".join(random.choice("0123456789") for _ in range(6))
+              return reset_code
+
+
+          def claims(token):
+              # ruleid: adaptix.python.jwt.signature-not-verified
+              return jwt.decode(token, options={"verify_signature": False})
+
+
+          def accept_unsigned(token, key):
+              # ruleid: adaptix.python.jwt.none-algorithm
+              return jwt.decode(token, key, algorithms=["none"])
+
+
+          def issue(claims):
+              # ruleid: adaptix.python.jwt.hardcoded-signing-key
+              return jwt.encode(claims, "change-me-signing-key", algorithm="HS256")
+
+
+          def login(username, password, patient):
+              # ruleid: adaptix.python.logging.secret-or-pii-logged
+              logger.info("login attempt user=%s password=%s", username, password)
+              # ruleid: adaptix.python.logging.secret-or-pii-logged
+              logger.debug(f"patient ssn {patient.ssn}")
+
+
+          def trace(request):
+              # ruleid: adaptix.python.logging.auth-header-logged
+              logger.info("incoming headers %s", dict(request.headers))
+              # ruleid: adaptix.python.logging.authorization-header-value-logged
+              logger.debug("auth=%s", request.headers.get("Authorization"))
+
+
+          def unpack(archive_path, target):
+              with tarfile.open(archive_path) as archive:
+                  # ruleid: adaptix.python.path-traversal.tar-extract-without-filter
+                  archive.extractall(target)
+
+
+          def cors(app):
+              # ruleid: adaptix.python.cors.wildcard-origin-with-credentials
+              app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True)
+
+
+          def parser():
+              # ruleid: adaptix.python.xml.external-entities-enabled
+              return etree.XMLParser(resolve_entities=True)
+
+
+          def lenient(token, key):
+              # ruleid: adaptix.python.jwt.expiry-or-audience-not-verified
+              return jwt.decode(token, key, algorithms=["RS256"], options={"verify_exp": False})
+
+
+          def etag(data):
+              import hashlib
+
+              # ruleid: adaptix.python.crypto.weak-hash
+              return hashlib.md5(data).hexdigest()
+
+
+          def parse(xml_text):
+              import xml.etree.ElementTree as ET
+
+              # ruleid: adaptix.python.xml.stdlib-parser-on-data
+              return ET.fromstring(xml_text)
+          ADAPTIX_SEMGREP_FIXTURE
+          cat > "${root}/fixtures/negative/safe.py" <<'ADAPTIX_SEMGREP_FIXTURE'
+          import hashlib
+          import logging
+          import os
+          import secrets
+          import subprocess
+          import tarfile
+          import uuid
+
+          import httpx
+          import jwt
+          import requests
+          import yaml
+          from cryptography.hazmat.primitives.asymmetric import rsa
+          from fastapi import APIRouter, Depends, Request
+          from fastapi.middleware.cors import CORSMiddleware
+          from fastapi.responses import FileResponse
+          from sqlalchemy import text
+
+          router = APIRouter()
+          logger = logging.getLogger(__name__)
+          BASE_URL = "https://reports.internal.example"
+          TABLE = "reports"
+
+
+          def tenant_context():
+              return None
+
+
+          @router.get("/reports")
+          async def report(name: str, session=Depends(object)):
+              # a bound parameter is not an injection
+              return await session.execute(text("SELECT * FROM reports WHERE name = :name"), {"name": name})
+
+
+          @router.get("/reports/{report_id}")
+          async def report_by_id(report_id: int, session=Depends(object)):
+              return await session.execute(text(f"SELECT * FROM {TABLE} WHERE id = {int(report_id)}"))
+
+
+          @router.get("/tenant")
+          async def tenant(ctx=Depends(tenant_context), session=Depends(object)):
+              return await session.execute(text(f"SET LOCAL app.tenant_id = '{ctx.tenant_id}'"))
+
+
+          @router.post("/exec")
+          def run(name: str):
+              subprocess.run(["convert", name], check=True)
+
+
+          @router.get("/fetch/{item}")
+          def fetch(item: str):
+              # the host is fixed; the request only picks a path on it
+              return requests.get(f"{BASE_URL}/items/{item}", timeout=5)
+
+
+          @router.get("/proxy/{item}")
+          async def proxy(item: str):
+              async with httpx.AsyncClient() as client:
+                  return await client.get(BASE_URL + "/items/" + item)
+
+
+          @router.get("/files/{name}")
+          def download(name: str):
+              return FileResponse(os.path.join("/srv/files", os.path.basename(name)))
+
+
+          @router.post("/raw")
+          async def raw(request: Request):
+              return {"length": len(await request.body())}
+
+
+          def shell():
+              os.system("sync")
+              subprocess.run("ls -la /tmp", shell=True, check=True)
+
+
+          def evaluate():
+              return eval("1 + 1")
+
+
+          def settings(stream):
+              return yaml.safe_load(stream), yaml.load(stream, Loader=yaml.SafeLoader)
+
+
+          def keypair():
+              return rsa.generate_private_key(public_exponent=65537, key_size=3072)
+
+
+          def fetch_pinned(url):
+              return requests.get(url, verify="/etc/ssl/private-ca.pem", timeout=5)
+
+
+          def new_reset_code():
+              reset_code = "".join(secrets.choice("0123456789") for _ in range(6))
+              backoff_jitter = __import__("random").uniform(0, 1)
+              return reset_code, backoff_jitter
+
+
+          def claims(token, key):
+              header = jwt.get_unverified_header(token)
+              return header, jwt.decode(token, key, algorithms=["RS256"])
+
+
+          def issue(claims):
+              return jwt.encode(claims, os.environ["SIGNING_KEY"], algorithm="HS256")
+
+
+          def login(username, password, max_tokens, token_generation):
+              logger.info("login attempt user=%s", username)
+              logger.info("budget max_tokens=%d generation=%s", max_tokens, token_generation)
+              logger.info("password reset requested for %s", username)
+              logger.warning("%s is not configured", "API_KEY")
+              logger.info("has password: %s", password is not None)
+
+
+          def trace(request):
+              logger.info("request id %s", request.headers.get("x-request-id"))
+              logger.info("has auth header: %s", "authorization" in request.headers)
+
+
+          def unpack(archive_path, target):
+              with tarfile.open(archive_path) as archive:
+                  archive.extractall(target, filter="data")
+
+
+          def cors(app):
+              app.add_middleware(CORSMiddleware, allow_origins=["https://app.example"], allow_credentials=True)
+
+
+          def etag(data):
+              return hashlib.md5(data, usedforsecurity=False).hexdigest(), hashlib.sha256(data).hexdigest()
+
+
+          def identifier():
+              return uuid.uuid4()
+
+
+          DESTINATIONS = {"billing": "https://billing.internal.example", "cad": "https://cad.internal.example"}
+
+
+          def pinned(url):
+              return None
+
+
+          @router.post("/notify/{service}")
+          async def notify(service: str, payload: dict):
+              # a server-side table looked up BY a request key is not request data
+              base = DESTINATIONS[service]
+              # a helper's result is not the request: it may validate or rebuild the URL
+              callback = pinned(payload.get("callback"))
+              async with httpx.AsyncClient() as client:
+                  await client.post(base, json={})
+                  return await client.get(callback)
+
+
+          @router.api_route("/os/{path:path}", methods=["GET", "POST"])
+          async def forward(request: Request, path: str):
+              # reading the body does not make the request object, or its method, a URL
+              body = await request.body()
+              async with httpx.AsyncClient() as client:
+                  return await client.request(request.method, f"{BASE_URL}/os/{path}", content=body)
+
+
+          @router.post("/patients/{patient_id}/letters")
+          async def letters(patient_id: str):
+              # a URL built on a fixed base and passed on in a variable picks a path, not a host
+              url = f"{BASE_URL}/patients/{patient_id}/letters"
+              async with httpx.AsyncClient() as client:
+                  return await client.post(url)
+
+
+          @router.get("/status/{item}")
+          async def status_of(item: str):
+              # a literal scheme and host, with the request value only in the path
+              url = f"https://status.example.com/items/{item}"
+              async with httpx.AsyncClient() as client:
+                  return await client.get(url)
+
+
+          PLATFORM_TOKEN_URLS = {"a": "https://a.example/token", "b": "https://b.example/token"}
+
+
+          def is_trusted_media_host(url):
+              return str(url).startswith("https://media.example/")
+
+
+          @router.post("/oauth/{platform}")
+          async def oauth_token(platform: str):
+              # a constant table looked up by a request key
+              token_url = PLATFORM_TOKEN_URLS.get(platform)
+              async with httpx.AsyncClient() as client:
+                  return await client.post(token_url)
+
+
+          @router.post("/media")
+          async def media(payload: dict):
+              # an explicit allow-list check vouches for the value from here on
+              media_url = payload.get("media_url")
+              if not is_trusted_media_host(media_url):
+                  return None
+              async with httpx.AsyncClient() as client:
+                  return await client.get(media_url)
+          ADAPTIX_SEMGREP_FIXTURE
+          cat > "${root}/fixtures/negative/tests/test_tokens.py" <<'ADAPTIX_SEMGREP_FIXTURE'
+          import jwt
+
+
+          def test_unverified_read_is_allowed_in_tests():
+              token = jwt.encode({"sub": "x"}, "test-only-key", algorithm="HS256")
+              assert jwt.decode(token, options={"verify_signature": False})["sub"] == "x"
+          ADAPTIX_SEMGREP_FIXTURE
+
+          cp "${root}/adaptix-python.yml" "${root}/out/adaptix-python.yml"
+          echo "ruleset sha256: $(sha256sum "${root}/adaptix-python.yml" | cut -d " " -f 1)"
+
+      - name: Run the ruleset over its fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/semgrep"
+          cd "${root}/fixtures"
+          # An explicit, empty ignore file: Semgrep's built-in defaults would
+          # skip tests/, and the negative fixtures there must be analysed.
+          echo "# Adaptix self-test: nothing is ignored." > .semgrepignore
+          # The findings on the fixtures are expected by construction; only the JSON
+          # report is read, so the text listing is not printed.
+          semgrep scan --config "${root}/adaptix-python.yml" --metrics=off --disable-version-check --disable-nosem --no-rewrite-rule-ids --strict --quiet --json-output="${root}/out/self-test.json" . > /dev/null
+
+      - name: Require every rule to fire exactly where its fixtures say
+        shell: node {0}
+        env:
+          SEMGREP_ROOT: ${{ runner.temp }}/semgrep
+        run: |
+          const fs = require("fs");
+          const path = require("path");
+          const root = process.env.SEMGREP_ROOT;
+          const fixtures = path.join(root, "fixtures");
+          const norm = (file) => String(file).replace(/\\/gu, "/").replace(/^\.\//u, "");
+          const errors = [];
+          let report = null;
+          try {
+            report = JSON.parse(fs.readFileSync(path.join(root, "out", "self-test.json"), "utf8"));
+          } catch (error) {
+            errors.push(`no readable self-test report (${error.message})`);
+          }
+          const ruleIds = [...fs.readFileSync(path.join(root, "adaptix-python.yml"), "utf8").matchAll(/^ {2}- id: (\S+)$/gmu)].map((match) => match[1]);
+          if (ruleIds.length === 0) errors.push("the ruleset declares no rule");
+          const expected = new Map();
+          const files = [];
+          const walk = (dir) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else if (entry.name.endsWith(".py")) files.push(full);
+            }
+          };
+          walk(fixtures);
+          for (const file of files) {
+            const relative = norm(path.relative(fixtures, file));
+            fs.readFileSync(file, "utf8").split(/\r?\n/u).forEach((line, index) => {
+              const match = /#\s*ruleid:\s*(.+)$/u.exec(line);
+              if (match === null) return;
+              const key = `${relative}:${index + 2}`;
+              const ids = expected.get(key) ?? new Set();
+              for (const id of match[1].split(",")) ids.add(id.trim());
+              expected.set(key, ids);
+            });
+          }
+          const found = new Map();
+          if (report !== null) {
+            if (report.version !== process.env.SEMGREP_VERSION) errors.push(`self-test ran Semgrep ${report.version}, not ${process.env.SEMGREP_VERSION}`);
+            for (const error of report.errors ?? []) errors.push(`Semgrep error on its own fixtures: ${JSON.stringify(error.type)} ${String(error.message ?? "").split("\n")[0]}`);
+            for (const rule of report.skipped_rules ?? []) errors.push(`rule ${rule.rule_id ?? JSON.stringify(rule)} was skipped`);
+            const scanned = new Set((report.paths?.scanned ?? []).map(norm));
+            for (const file of files) if (!scanned.has(norm(path.relative(fixtures, file)))) errors.push(`fixture ${norm(path.relative(fixtures, file))} was not analysed`);
+            for (const result of report.results ?? []) {
+              const key = `${norm(result.path)}:${result.start?.line}`;
+              const ids = found.get(key) ?? new Set();
+              ids.add(result.check_id);
+              found.set(key, ids);
+            }
+          }
+          for (const [key, ids] of expected) for (const id of ids) if (!(found.get(key) ?? new Set()).has(id)) errors.push(`${id} did not fire at ${key}`);
+          for (const [key, ids] of found) for (const id of ids) if (!(expected.get(key) ?? new Set()).has(id)) errors.push(`${id} fired at ${key}, where no fixture expects it`);
+          const covered = new Set([...expected.values()].flatMap((ids) => [...ids]));
+          for (const id of ruleIds) if (!covered.has(id)) errors.push(`rule ${id} has no fixture that proves it fires`);
+          for (const id of covered) if (!ruleIds.includes(id)) errors.push(`a fixture names ${id}, which is not in the ruleset`);
+          const pairs = [...expected.values()].reduce((total, ids) => total + ids.size, 0);
+          console.log(`self-test: ${ruleIds.length} rule(s), ${pairs} expected finding(s) over ${files.length} fixture file(s).`);
+          for (const message of errors) console.log(`::error title=adaptix/semgrep-security::ruleset self-test: ${message}`);
+          process.exitCode = errors.length === 0 ? 0 : 1;
+
+      - name: Fix the analysis scope centrally
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Repository .semgrepignore files are not honoured; this is the whole
+          # scope. The floor re-derives it from `git ls-files`, so keep the two
+          # lists equal (npm test checks).
+          find . -path ./.git -prune -o -name .semgrepignore -type f -print -exec rm -f {} +
+          cat > .semgrepignore <<'ADAPTIX_SEMGREP_SCOPE'
+          .git/
+          node_modules/
+          .venv/
+          venv/
+          .tox/
+          .nox/
+          __pypackages__/
+          site-packages/
+          ADAPTIX_SEMGREP_SCOPE
+
+      - name: Scan with the pinned ruleset
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/semgrep"
+          # No --error: findings are judged by severity in the next step. Any
+          # other failure is Semgrep's own non-zero exit, which fails here.
+          semgrep scan --config "${root}/adaptix-python.yml" --metrics=off --disable-version-check --disable-nosem --no-rewrite-rule-ids --timeout 30 --json-output="${root}/out/semgrep.json" --sarif-output="${root}/out/semgrep.sarif" .
+
+      - name: Enforce the platform floor
+        shell: node {0}
+        env:
+          SEMGREP_JSON: ${{ runner.temp }}/semgrep/out/semgrep.json
+          SEMGREP_SARIF: ${{ runner.temp }}/semgrep/out/semgrep.sarif
+          SEMGREP_CODE_SCANNING_SARIF: ${{ runner.temp }}/semgrep/out/semgrep.code-scanning.sarif
+          SEMGREP_VERDICT: ${{ runner.temp }}/semgrep/out/verdict.json
+        run: |
+          const fs = require("fs");
+          const { execFileSync } = require("child_process");
+          const SEVERITIES = ["ERROR", "WARNING", "INFO"];
+          // Partial parsing: Semgrep analysed the file with error recovery. Every
+          // other error type (rule errors, timeouts, files it could not parse)
+          // means part of the ruleset did not run somewhere, which fails.
+          const BENIGN_ERROR_TYPES = new Set(["PartialParsing"]);
+          // The central .semgrepignore, by path segment. npm test holds the two equal.
+          const EXCLUDED_SEGMENTS = [".git", "node_modules", ".venv", "venv", ".tox", ".nox", "__pypackages__", "site-packages"];
+          const MAX_TARGET_BYTES = 1000000;
+          // `nosemgrep: <rule ids>` anywhere in the line's comment, so a
+          // justification may stand before or after the ids.
+          const SUPPRESSION = /#.*?\bnosem(?:grep)?\s*:\s*([A-Za-z0-9_.,\s-]+)/u;
+          const BARE = /#.*?\bnosem(?:grep)?\b(?!\s*:)/u;
+          const norm = (path) => String(path).replace(/\\/gu, "/").replace(/^\.\//u, "");
+          const errors = [];
+          const notes = [];
+          let report = null;
+          try {
+            report = JSON.parse(fs.readFileSync(process.env.SEMGREP_JSON, "utf8"));
+          } catch (error) {
+            errors.push(`no readable Semgrep JSON report at ${process.env.SEMGREP_JSON} (${error.message}); a scan without a report is not a pass`);
+          }
+          if (report !== null) {
+            if (report.version !== process.env.SEMGREP_VERSION) errors.push(`the report was written by Semgrep ${report.version}, not the pinned ${process.env.SEMGREP_VERSION}`);
+            if (!Array.isArray(report.results) || !Array.isArray(report.errors) || !Array.isArray(report.paths?.scanned)) errors.push("the report carries no results, errors or paths.scanned array");
+            for (const rule of report.skipped_rules ?? []) errors.push(`rule ${rule.rule_id ?? JSON.stringify(rule)} was skipped, so part of the ruleset never ran`);
+          }
+          const results = Array.isArray(report?.results) ? report.results : [];
+          const scanned = new Set((Array.isArray(report?.paths?.scanned) ? report.paths.scanned : []).map(norm));
+          if (report !== null && scanned.size === 0) errors.push("Semgrep analysed no file; a scan of nothing is not a pass");
+          const partial = [];
+          for (const error of Array.isArray(report?.errors) ? report.errors : []) {
+            const type = Array.isArray(error.type) ? error.type[0] : error.type;
+            const where = norm(error.path ?? error.spans?.[0]?.file ?? "");
+            if (BENIGN_ERROR_TYPES.has(type) && error.level === "warn") {
+              partial.push(where);
+              continue;
+            }
+            const rule = error.rule_id ? ` (rule ${error.rule_id})` : "";
+            errors.push(`Semgrep ${error.level ?? "unlevelled"} error ${type}${where ? ` in ${where}` : ""}${rule}: ${String(error.message ?? "").split("\n")[0]}`);
+          }
+
+          // Coverage: every tracked Python file in scope must have been analysed.
+          const oversized = [];
+          const missed = [];
+          if (report !== null) {
+            const tracked = execFileSync("git", ["ls-files", "-z", "--", "*.py", "*.pyi"], { encoding: "utf8" }).split("\0").filter(Boolean);
+            for (const file of tracked) {
+              if (file.split("/").some((segment) => EXCLUDED_SEGMENTS.includes(segment))) continue;
+              if (scanned.has(file)) continue;
+              let stat = null;
+              try {
+                stat = fs.lstatSync(file);
+              } catch {
+                stat = null;
+              }
+              if (stat !== null && stat.isSymbolicLink()) continue;
+              if (stat !== null && stat.size > MAX_TARGET_BYTES) {
+                oversized.push(file);
+                continue;
+              }
+              missed.push(file);
+            }
+          }
+          if (missed.length > 0) errors.push(`${missed.length} tracked Python file(s) in scope were not analysed: ${missed.slice(0, 20).join(", ")}`);
+
+          // Findings, with rule-scoped in-source suppression only.
+          const sources = new Map();
+          const linesOf = (file) => {
+            if (!sources.has(file)) {
+              let text = "";
+              try {
+                text = fs.readFileSync(file, "utf8");
+              } catch {
+                text = "";
+              }
+              sources.set(file, text.split(/\r?\n/u));
+            }
+            return sources.get(file);
+          };
+          const suppressionFor = (finding) => {
+            const lines = linesOf(norm(finding.path));
+            const start = Number(finding.start?.line ?? 0);
+            const candidates = [start];
+            if (/^\s*#/u.test(lines[start - 2] ?? "")) candidates.push(start - 1);
+            for (const number of candidates) {
+              const match = SUPPRESSION.exec(lines[number - 1] ?? "");
+              if (match !== null && match[1].split(/[\s,]+/u).filter(Boolean).includes(finding.check_id)) return `nosemgrep: ${finding.check_id} (line ${number})`;
+            }
+            if (candidates.some((number) => BARE.test(lines[number - 1] ?? ""))) notes.push(`${norm(finding.path)}:${start} carries a bare nosemgrep, which names no rule and suppresses nothing`);
+            return null;
+          };
+          const perRule = new Map();
+          const blocking = [];
+          const suppressed = new Map();
+          let unrecognised = 0;
+          for (const finding of results) {
+            const severity = finding.extra?.severity;
+            if (!SEVERITIES.includes(severity)) {
+              unrecognised += 1;
+              continue;
+            }
+            const row = perRule.get(finding.check_id) ?? { severity, findings: 0, suppressed: 0 };
+            row.findings += 1;
+            const location = `${norm(finding.path)}:${finding.start?.line}`;
+            const suppression = severity === "ERROR" ? suppressionFor(finding) : null;
+            if (suppression !== null) {
+              row.suppressed += 1;
+              suppressed.set(`${finding.check_id}|${norm(finding.path)}|${finding.start?.line}`, suppression);
+            } else if (severity === "ERROR") {
+              blocking.push(`${finding.check_id} at ${location}`);
+            }
+            perRule.set(finding.check_id, row);
+          }
+          if (unrecognised > 0) errors.push(`${unrecognised} finding(s) carry no ERROR, WARNING or INFO severity, so they cannot be proven below High`);
+          if (blocking.length > 0) errors.push(`${blocking.length} ERROR (High) finding(s): ${blocking.slice(0, 20).join("; ")}`);
+
+          // The SARIF for code scanning: the same results, High/Medium/Low
+          // security severities, rule-scoped suppressions marked, and the
+          // login-gated "requires login" fingerprint values Semgrep writes
+          // without an account removed (every result would share one value).
+          let sarif = null;
+          try {
+            sarif = JSON.parse(fs.readFileSync(process.env.SEMGREP_SARIF, "utf8"));
+          } catch (error) {
+            errors.push(`no readable SARIF report at ${process.env.SEMGREP_SARIF} (${error.message})`);
+          }
+          if (sarif !== null) {
+            const runs = Array.isArray(sarif.runs) ? sarif.runs : [];
+            const sarifResults = runs.reduce((total, run) => total + (Array.isArray(run.results) ? run.results.length : 0), 0);
+            if (runs.length === 0) errors.push("the SARIF report holds no run");
+            if (sarifResults !== results.length) errors.push(`the SARIF holds ${sarifResults} result(s) and the JSON ${results.length}; the two reports disagree`);
+            for (const run of runs) {
+              for (const rule of run.tool?.driver?.rules ?? []) {
+                const level = rule.defaultConfiguration?.level;
+                rule.properties = { ...(rule.properties ?? {}), "security-severity": level === "error" ? "8.0" : level === "warning" ? "5.0" : "2.0" };
+              }
+              for (const result of Array.isArray(run.results) ? run.results : []) {
+                if (result.fingerprints && Object.values(result.fingerprints).every((value) => value === "requires login")) delete result.fingerprints;
+                const location = result.locations?.[0]?.physicalLocation;
+                const key = `${result.ruleId}|${norm(location?.artifactLocation?.uri ?? "")}|${location?.region?.startLine}`;
+                // Only this floor's own acceptances leave marked as suppressed.
+                // Semgrep marks every match a nosem comment covers as an
+                // inSource suppression -- a bare `# nosemgrep`, a rule id it
+                // matches by suffix, a WARNING or INFO finding -- although the
+                // floor accepted none of them (see SUPPRESSION IS RULE-SCOPED);
+                // left in, the uploaded SARIF would call them accepted.
+                if (suppressed.has(key)) result.suppressions = [{ kind: "inSource", justification: suppressed.get(key) }];
+                else delete result.suppressions;
+              }
+            }
+            fs.writeFileSync(process.env.SEMGREP_CODE_SCANNING_SARIF, JSON.stringify(sarif));
+          }
+
+          const rows = [...perRule.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([rule, row]) => `| ${rule} | ${row.severity} | ${row.findings} | ${row.suppressed} |`);
+          const status = errors.length === 0 ? "PASS" : "FAIL";
+          const summary = [
+            "### adaptix/semgrep-security",
+            "",
+            `Semgrep ${report?.version ?? "unknown"}; ${scanned.size} file(s) analysed; ${results.length} finding(s).`,
+            "",
+            "| Rule | Severity | Findings | Suppressed (rule-scoped) |",
+            "| --- | --- | --- | --- |",
+            ...(rows.length > 0 ? rows : ["| (none) | | 0 | 0 |"]),
+            "",
+            ...(partial.length > 0 ? [`Partially parsed (analysed with error recovery): ${partial.join(", ")}`, ""] : []),
+            ...(oversized.length > 0 ? [`Not analysed, over the 1 MB target limit: ${oversized.join(", ")}`, ""] : []),
+            ...notes.map((note) => `Note: ${note}`),
+            "",
+            status === "PASS" ? "Platform floor: PASS (no unsuppressed ERROR finding, no tool error)." : `Platform floor: FAIL -- ${errors.join("; ")}.`,
+            "",
+          ].join("\n");
+          fs.writeFileSync(process.env.SEMGREP_VERDICT, JSON.stringify({ status, errors, blocking, suppressed: [...suppressed.values()], partial, oversized, missed, notes }, null, 2));
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          console.log(summary);
+          for (const message of errors) console.log(`::error title=adaptix/semgrep-security::${message}`);
+          process.exitCode = errors.length === 0 ? 0 : 1;
+
+      - name: Archive the Semgrep evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: adaptix-semgrep-security-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/semgrep/out/
+          if-no-files-found: error
+          # Kept for the repository's own artifact retention (the organisation
+          # maximum); code scanning keeps the SARIF beyond it.
+
+      # Never from a merge group: see NO CODE-SCANNING UPLOAD FROM A MERGE GROUP.
+      - name: Publish the SARIF evidence to code scanning
+        if: ${{ !cancelled() && true && github.event_name != 'merge_group' }}
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: ${{ runner.temp }}/semgrep/out/semgrep.code-scanning.sarif
+          category: semgrep
+
+      # ACCEPTED IN SOURCE IS DISMISSED IN CODE SCANNING (adaptix-ops #1533).
+      # Code scanning stores a SARIF result's `suppressions` but never changes
+      # an alert's state from it, so a finding accepted with a rule-scoped
+      # `nosemgrep: <rule id>` stayed an OPEN alert for ever, and the fleet
+      # governance lane check:security counts open alerts as blocking:
+      # Adaptix-Crew-Service analysis 1871820966 (main d6396c61) holds the
+      # suppressed stream_ticket.py:98 result while alert #1 is still open.
+      # On a push to the default branch -- the ref check:security reads -- this
+      # dismisses, as "won't fix" with the recorded justification, each open
+      # Semgrep alert whose finding this run accepted in source, and reopens
+      # each alert this step once dismissed whose finding is reported again
+      # WITHOUT an accepted suppression. Nothing else is touched: an alert
+      # dismissed by a person is left alone (a reopen needs this step's words
+      # AND github-actions[bot] as the dismisser), and an unsuppressed finding
+      # is never dismissed. Accepted means accepted by the floor: a suppression
+      # Semgrep itself wrote (a bare nosemgrep, a WARNING finding) is removed
+      # by the floor and does not count here. Every API error fails the step.
+      - name: Dismiss the code-scanning alerts of findings accepted in source
+        if: ${{ !cancelled() && true && github.event_name == 'push' }}
+        shell: node {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          API_URL: ${{ github.api_url }}
+          REPOSITORY: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          SEMGREP_CODE_SCANNING_SARIF: ${{ runner.temp }}/semgrep/out/semgrep.code-scanning.sarif
+        run: |
+          const fs = require("fs");
+          const PREFIX = "adaptix/semgrep-security: accepted in source";
+          const TOOL = "Semgrep OSS";
+          const MAX_PAGES = 20;
+          // The identity behind github.token, as the REST API reports a user:
+          // this step's own dismissals carry it, a person's never do.
+          const STEP_ACTOR = { login: "github-actions[bot]", type: "Bot" };
+          // The floor's path form, so a SARIF uri of "./app/x.py" meets the
+          // alert's "app/x.py".
+          const norm = (path) => String(path).replace(/\\/gu, "/").replace(/^\.\//u, "");
+          const { API_URL, REPOSITORY, REF, DEFAULT_BRANCH, GH_TOKEN, SEMGREP_CODE_SCANNING_SARIF } = process.env;
+          const main = async () => {
+            if (!DEFAULT_BRANCH || REF !== `refs/heads/${DEFAULT_BRANCH}`) {
+              console.log(`Not the default branch (${REF}); alert states are reconciled on the default branch only.`);
+              return;
+            }
+            if (!GH_TOKEN || !API_URL || !REPOSITORY) throw new Error("GH_TOKEN, API_URL and REPOSITORY are required");
+            const sarif = JSON.parse(fs.readFileSync(SEMGREP_CODE_SCANNING_SARIF, "utf8"));
+            const accepted = new Map();
+            const reported = new Set();
+            for (const run of Array.isArray(sarif.runs) ? sarif.runs : []) {
+              for (const result of Array.isArray(run.results) ? run.results : []) {
+                const location = result.locations?.[0]?.physicalLocation;
+                const key = `${result.ruleId}|${norm(location?.artifactLocation?.uri ?? "")}|${location?.region?.startLine}`;
+                reported.add(key);
+                // Accepted only in the floor's own words for this rule, the
+                // whole justification "nosemgrep: <rule id> (line N)" and
+                // nothing else. The floor removes every other suppression.
+                const suppression = (result.suppressions ?? []).find((entry) => {
+                  if (entry?.kind !== "inSource" || (entry.status !== undefined && entry.status !== "accepted")) return false;
+                  const words = typeof entry.justification === "string" ? /^nosemgrep: (\S+) \(line \d+\)$/u.exec(entry.justification) : null;
+                  return words !== null && words[1] === result.ruleId;
+                });
+                if (suppression !== undefined) accepted.set(key, suppression.justification);
+              }
+            }
+            const call = async (method, path, body) => {
+              const response = await fetch(`${API_URL}${path}`, {
+                method,
+                headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${GH_TOKEN}`, "X-GitHub-Api-Version": "2022-11-28", ...(body ? { "Content-Type": "application/json" } : {}) },
+                body: body ? JSON.stringify(body) : undefined,
+              });
+              const text = await response.text();
+              if (!response.ok) throw new Error(`${method} ${path} answered ${response.status}: ${text.slice(0, 300)}`);
+              return text ? JSON.parse(text) : null;
+            };
+            // Only the alerts this step can act on, listed by state, so a long
+            // history of fixed alerts cannot use up the page limit.
+            const alerts = [];
+            for (const state of ["open", "dismissed"]) {
+              for (let page = 1; ; page += 1) {
+                if (page > MAX_PAGES) throw new Error(`more than ${MAX_PAGES * 100} ${state} ${TOOL} alerts; refusing to act on a partial list`);
+                const batch = await call("GET", `/repos/${REPOSITORY}/code-scanning/alerts?tool_name=${encodeURIComponent(TOOL)}&ref=${encodeURIComponent(REF)}&state=${state}&per_page=100&page=${page}`);
+                if (!Array.isArray(batch)) throw new Error("the alert list is not an array");
+                alerts.push(...batch);
+                if (batch.length < 100) break;
+              }
+            }
+            const keyOf = (alert) => `${alert.rule?.id}|${alert.most_recent_instance?.location?.path ?? ""}|${alert.most_recent_instance?.location?.start_line}`;
+            let dismissed = 0;
+            let reopened = 0;
+            for (const alert of alerts) {
+              const key = keyOf(alert);
+              if (alert.state === "open" && accepted.has(key)) {
+                const comment = `${PREFIX} (${accepted.get(key)})`.slice(0, 280);
+                await call("PATCH", `/repos/${REPOSITORY}/code-scanning/alerts/${alert.number}`, { state: "dismissed", dismissed_reason: "won't fix", dismissed_comment: comment });
+                console.log(`dismissed #${alert.number} ${key}`);
+                dismissed += 1;
+              } else if (
+                alert.state === "dismissed" &&
+                // This step's own dismissal: its words AND its identity. A
+                // person whose comment happens to start the same way is left
+                // alone.
+                String(alert.dismissed_comment ?? "").startsWith(PREFIX) &&
+                alert.dismissed_by?.login === STEP_ACTOR.login &&
+                alert.dismissed_by?.type === STEP_ACTOR.type &&
+                reported.has(key) &&
+                !accepted.has(key)
+              ) {
+                await call("PATCH", `/repos/${REPOSITORY}/code-scanning/alerts/${alert.number}`, { state: "open" });
+                console.log(`reopened #${alert.number} ${key}: reported again without an accepted suppression`);
+                reopened += 1;
+              }
+            }
+            const summary = `Code-scanning reconciliation: ${alerts.length} ${TOOL} alert(s) read, ${accepted.size} finding(s) accepted in source, ${dismissed} dismissed, ${reopened} reopened.`;
+            console.log(summary);
+            if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n${summary}\n`);
+          };
+          main().catch((error) => {
+            console.log(`::error title=adaptix/semgrep-security::${error.message}`);
+            process.exitCode = 1;
+          });
