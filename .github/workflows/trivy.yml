@@ -1,11 +1,13 @@
 name: trivy-security
 
-# THE THIN TRIVY CARRIER (QOD-005), rendered by adaptix-ops
-# scripts/lib/securityBackstop.ts.
-# The Trivy scan of dependencies, IaC and Dockerfiles.
-# Event wiring and one call to the canonical reusable workflow at an
-# immutable adaptix-ops commit -- no scanning logic, no rules, no
-# configuration of its own. It publishes the check
+# THE NATIVE TRIVY GATE (QOD-005), rendered by adaptix-ops
+# scripts/lib/securityBackstopNative.ts. Do not edit it by hand: render it again.
+# A public repository cannot call a reusable workflow kept in a private
+# repository, so this repository carries the gate's one job itself. The job
+# below is the scan job of that reusable workflow, unchanged, at the commit
+# named here:
+# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/trivy-reusable.yml@131797d91033cd44458823826b60f6e4612c6687
+# It publishes the check
 # "adaptix/trivy-security / scan".
 
 on:
@@ -27,11 +29,202 @@ permissions:
   contents: read
 
 jobs:
-  trivy:
-    name: adaptix/trivy-security
-    # Exactly what the called job needs, and no more.
+  scan:
+    name: adaptix/trivy-security / scan
+    runs-on: ubuntu-latest
+    # The required-path ceiling (config/platform-standard.yaml
+    # requiredCriticalPathTimeoutMinutes); npm test keeps this at or below it.
+    timeout-minutes: 15
     permissions:
-      actions: read
       contents: read
       security-events: write
-    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/trivy-reusable.yml@131797d91033cd44458823826b60f6e4612c6687
+      actions: read
+    env:
+      TRIVY_VERSION: "0.74.0"
+      TRIVY_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+    steps:
+      - name: Refuse an untrusted trigger or a fork
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          case "${EVENT}" in
+            pull_request|merge_group|push|workflow_dispatch) ;;
+            *)
+              echo "::error title=adaptix/trivy-security::event ${EVENT} is refused; only pull_request, merge_group, push and workflow_dispatch may run the Trivy gate (never pull_request_target)."
+              exit 1
+              ;;
+          esac
+          if [ "${EVENT}" = "pull_request" ] && [ "${HEAD_REPOSITORY}" != "${REPOSITORY}" ]; then
+            echo "::error title=adaptix/trivy-security::pull request from fork ${HEAD_REPOSITORY} is refused: its read-only token cannot publish this gate's evidence, so it is never reported as scanned."
+            exit 1
+          fi
+
+      - name: Check out the revision under analysis
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # github.sha: the merge commit a pull request would produce, the merge
+          # group's commit, or the pushed/dispatched commit. The SARIF is
+          # uploaded against the same commit.
+          persist-credentials: false
+
+      - name: Install the pinned, checksum-verified Trivy
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="${RUNNER_TEMP}/trivy"
+          mkdir -p "${dir}/bin" "${dir}/out" "${dir}/cache" "${dir}/central"
+          # A release-server 5xx burst can outlast curl's default retry window:
+          # --retry 3 backs off 1, 2 and 4 seconds, about eight seconds in all.
+          # On 2026-10-02 github.com answered 500 four times inside that window
+          # for the Gitleaks carrier (Adaptix-AI-Service run 37043654229) and the
+          # repository's main went red with no finding; this download has the
+          # same shape. Retry with the same backoff for up to 150 s, then fail
+          # closed exactly as before: no download, no scan, no pass.
+          curl --fail --silent --show-error --location \
+            --connect-timeout 20 --retry 7 --retry-max-time 150 \
+            --output "${dir}/trivy.tar.gz" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  ${dir}/trivy.tar.gz" | sha256sum --check --strict -
+          tar -xzf "${dir}/trivy.tar.gz" -C "${dir}/bin" trivy
+          installed="$("${dir}/bin/trivy" version --format json | python3 -c 'import json, sys; print(json.load(sys.stdin)["Version"])')"
+          if [ "${installed}" != "${TRIVY_VERSION}" ]; then
+            echo "::error title=adaptix/trivy-security::the installed Trivy reports ${installed}, not the pinned ${TRIVY_VERSION}."
+            exit 1
+          fi
+          # The central configuration: empty on purpose, so neither the
+          # repository's trivy.yaml nor its .trivyignore is ever read.
+          echo "{}" > "${dir}/central/trivy.yaml"
+          : > "${dir}/central/trivyignore"
+          echo "${dir}/bin" >> "${GITHUB_PATH}"
+
+      - name: Scan dependencies and configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="${RUNNER_TEMP}/trivy"
+          # No --exit-code and no --ignore-unfixed: the report keeps every
+          # finding and the next step applies the floor. A failure to scan, or
+          # to fetch the vulnerability database, is Trivy's own non-zero exit.
+          trivy fs \
+            --config "${dir}/central/trivy.yaml" \
+            --ignorefile "${dir}/central/trivyignore" \
+            --cache-dir "${dir}/cache" \
+            --scanners vuln,misconfig \
+            --skip-check-update \
+            --disable-telemetry \
+            --skip-version-check \
+            --no-progress \
+            --timeout 10m \
+            --format json \
+            --output "${dir}/out/trivy.json" \
+            .
+          trivy convert --format sarif --output "${dir}/out/trivy.sarif" "${dir}/out/trivy.json"
+          trivy version --cache-dir "${dir}/cache" --format json > "${dir}/out/trivy-version.json"
+
+      - name: Enforce the platform floor
+        shell: node {0}
+        env:
+          TRIVY_JSON: ${{ runner.temp }}/trivy/out/trivy.json
+          TRIVY_SARIF: ${{ runner.temp }}/trivy/out/trivy.sarif
+          TRIVY_VERSION_JSON: ${{ runner.temp }}/trivy/out/trivy-version.json
+          TRIVY_VERDICT: ${{ runner.temp }}/trivy/out/verdict.json
+        run: |
+          const fs = require("fs");
+          const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"];
+          const BLOCKING = new Set(["CRITICAL", "HIGH"]);
+          const errors = [];
+          const readJson = (path, what) => {
+            try {
+              return JSON.parse(fs.readFileSync(path, "utf8"));
+            } catch (error) {
+              errors.push(`no readable ${what} at ${path} (${error.message})`);
+              return null;
+            }
+          };
+          const report = readJson(process.env.TRIVY_JSON, "Trivy JSON report");
+          const sarif = readJson(process.env.TRIVY_SARIF, "Trivy SARIF report");
+          const version = readJson(process.env.TRIVY_VERSION_JSON, "Trivy version record");
+          if (report !== null) {
+            if (report.SchemaVersion !== 2) errors.push(`the report has schema ${report.SchemaVersion}, not 2`);
+            if (report.Trivy?.Version !== process.env.TRIVY_VERSION) errors.push(`the report was written by Trivy ${report.Trivy?.Version}, not the pinned ${process.env.TRIVY_VERSION}`);
+            if (report.Results !== undefined && !Array.isArray(report.Results)) errors.push("the report's Results is not an array");
+          }
+          if (sarif !== null && (!Array.isArray(sarif.runs) || sarif.runs.length === 0)) errors.push("the SARIF report holds no run");
+          const db = version?.VulnerabilityDB ?? null;
+          if (version !== null && (db === null || typeof db.UpdatedAt !== "string")) errors.push("the vulnerability database metadata is missing, so the advisories the scan used are unknown");
+          const results = Array.isArray(report?.Results) ? report.Results : [];
+          const counts = { fixable: {}, unfixed: {}, misconfig: {} };
+          for (const bucket of Object.values(counts)) for (const severity of SEVERITIES) bucket[severity] = 0;
+          const blocking = [];
+          let unrecognised = 0;
+          const targets = [];
+          for (const result of results) {
+            targets.push(`${result.Target} (${result.Type ?? result.Class})`);
+            for (const vulnerability of Array.isArray(result.Vulnerabilities) ? result.Vulnerabilities : []) {
+              const severity = vulnerability.Severity;
+              if (!SEVERITIES.includes(severity)) {
+                unrecognised += 1;
+                continue;
+              }
+              const fixable = typeof vulnerability.FixedVersion === "string" && vulnerability.FixedVersion.trim() !== "";
+              counts[fixable ? "fixable" : "unfixed"][severity] += 1;
+              if (fixable && BLOCKING.has(severity)) {
+                blocking.push(`${vulnerability.VulnerabilityID} ${severity} in ${vulnerability.PkgName} ${vulnerability.InstalledVersion} (fixed in ${vulnerability.FixedVersion}) at ${result.Target}`);
+              }
+            }
+            for (const misconfiguration of Array.isArray(result.Misconfigurations) ? result.Misconfigurations : []) {
+              if (misconfiguration.Status !== "FAIL") continue;
+              const severity = misconfiguration.Severity;
+              if (!SEVERITIES.includes(severity)) {
+                unrecognised += 1;
+                continue;
+              }
+              counts.misconfig[severity] += 1;
+              if (BLOCKING.has(severity)) {
+                blocking.push(`${misconfiguration.AVDID ?? misconfiguration.ID} ${severity} ${misconfiguration.Title} at ${result.Target}`);
+              }
+            }
+          }
+          if (unrecognised > 0) errors.push(`${unrecognised} finding(s) carry no recognised severity, so they cannot be proven below High`);
+          if (blocking.length > 0) errors.push(`${blocking.length} blocking finding(s): ${blocking.slice(0, 20).join("; ")}`);
+          const status = errors.length === 0 ? "PASS" : "FAIL";
+          const rows = SEVERITIES.map((severity) => `| ${severity} | ${counts.fixable[severity]} | ${counts.unfixed[severity]} | ${counts.misconfig[severity]} |`);
+          const summary = [
+            "### adaptix/trivy-security",
+            "",
+            `Trivy ${report?.Trivy?.Version ?? "unknown"}; vulnerability database v${db?.Version ?? "?"} updated ${db?.UpdatedAt ?? "unknown"}; ${targets.length} target(s): ${targets.join(", ") || "none"}.`,
+            "",
+            "| Severity | Vulnerabilities with a fix | Without a fix (reported, not blocking) | Failed misconfiguration checks |",
+            "| --- | --- | --- | --- |",
+            ...rows,
+            "",
+            status === "PASS" ? "Platform floor: PASS (no fixable High/Critical vulnerability, no High/Critical misconfiguration)." : `Platform floor: FAIL -- ${errors.join("; ")}.`,
+            "",
+          ].join("\n");
+          fs.writeFileSync(process.env.TRIVY_VERDICT, JSON.stringify({ status, errors, blocking, counts, database: db, targets }, null, 2));
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          console.log(summary);
+          for (const message of errors) console.log(`::error title=adaptix/trivy-security::${message}`);
+          process.exitCode = errors.length === 0 ? 0 : 1;
+
+      - name: Archive the Trivy evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: adaptix-trivy-security-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/trivy/out/
+          if-no-files-found: error
+          # Kept for the repository's own artifact retention (the organisation
+          # maximum); code scanning keeps the SARIF beyond it.
+
+      # Never from a merge group: see NO CODE-SCANNING UPLOAD FROM A MERGE GROUP.
+      - name: Publish the SARIF evidence to code scanning
+        if: ${{ !cancelled() && true && github.event_name != 'merge_group' }}
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: ${{ runner.temp }}/trivy/out/trivy.sarif
+          category: trivy

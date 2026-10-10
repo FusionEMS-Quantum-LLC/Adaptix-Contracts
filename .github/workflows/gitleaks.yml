@@ -1,11 +1,13 @@
 name: gitleaks-security
 
-# THE THIN GITLEAKS CARRIER (QOD-005), rendered by adaptix-ops
-# scripts/lib/securityBackstop.ts.
-# The Gitleaks secret scan.
-# Event wiring and one call to the canonical reusable workflow at an
-# immutable adaptix-ops commit -- no scanning logic, no rules, no
-# configuration of its own. It publishes the check
+# THE NATIVE GITLEAKS GATE (QOD-005), rendered by adaptix-ops
+# scripts/lib/securityBackstopNative.ts. Do not edit it by hand: render it again.
+# A public repository cannot call a reusable workflow kept in a private
+# repository, so this repository carries the gate's one job itself. The job
+# below is the scan job of that reusable workflow, unchanged, at the commit
+# named here:
+# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/gitleaks-reusable.yml@131797d91033cd44458823826b60f6e4612c6687
+# It publishes the check
 # "adaptix/gitleaks-security / scan".
 
 on:
@@ -27,9 +29,361 @@ permissions:
   contents: read
 
 jobs:
-  gitleaks:
-    name: adaptix/gitleaks-security
-    # Exactly what the called job needs, and no more.
+  scan:
+    name: adaptix/gitleaks-security / scan
+    runs-on: ubuntu-latest
+    # The required-path ceiling (config/platform-standard.yaml
+    # requiredCriticalPathTimeoutMinutes); npm test keeps this at or below it.
+    timeout-minutes: 15
     permissions:
       contents: read
-    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/gitleaks-reusable.yml@131797d91033cd44458823826b60f6e4612c6687
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - name: Refuse an untrusted trigger or a fork
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          set -euo pipefail
+          case "${EVENT}" in
+            pull_request|merge_group|push|workflow_dispatch) ;;
+            *)
+              echo "::error title=adaptix/gitleaks-security::event ${EVENT} is refused; only pull_request, merge_group, push and workflow_dispatch may run the secret scan (never pull_request_target)."
+              exit 1
+              ;;
+          esac
+          if [ "${EVENT}" = "pull_request" ] && [ "${HEAD_REPOSITORY}" != "${REPOSITORY}" ]; then
+            echo "::error title=adaptix/gitleaks-security::pull request from fork ${HEAD_REPOSITORY} is refused; the platform's gates run on branches of this repository only."
+            exit 1
+          fi
+
+      - name: Check out the full history under analysis
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Every commit of the range, and the .gitleaksignore fingerprints,
+          # which are commit-scoped; a shallow clone would narrow the scan.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned, checksum-verified Gitleaks
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="${RUNNER_TEMP}/gitleaks"
+          mkdir -p "${dir}/bin" "${dir}/out"
+          # A release-server 5xx burst can outlast curl's default retry window:
+          # --retry 3 backs off 1, 2 and 4 seconds, about eight seconds in all.
+          # On 2026-10-02 github.com answered 500 four times inside that window
+          # (Adaptix-AI-Service run 37043654229) and the repository's main went
+          # red with no finding. Retry with the same backoff for up to 150 s,
+          # then fail closed exactly as before: no download, no scan, no pass.
+          curl --fail --silent --show-error --location \
+            --connect-timeout 20 --retry 7 --retry-max-time 150 \
+            --output "${dir}/gitleaks.tar.gz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${dir}/gitleaks.tar.gz" | sha256sum --check --strict -
+          tar -xzf "${dir}/gitleaks.tar.gz" -C "${dir}/bin" gitleaks
+          installed="$("${dir}/bin/gitleaks" version)"
+          if [ "${installed#v}" != "${GITLEAKS_VERSION}" ]; then
+            echo "::error title=adaptix/gitleaks-security::the installed Gitleaks reports ${installed}, not the pinned ${GITLEAKS_VERSION}."
+            exit 1
+          fi
+          echo "${dir}/bin" >> "${GITHUB_PATH}"
+
+      - name: Resolve the commit range
+        id: range
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          set -euo pipefail
+          # Every event scans the full history of the commit checked out: for a
+          # pull request the merge of its head into its base, for a merge group
+          # the group commit that the default branch becomes, for a push or a
+          # dispatch the commit itself. A pull request or merge group also names
+          # the commits it adds, so a finding in them reads as this change's
+          # and a finding before them as the history's.
+          # GITLEAKS-PR-MAIN-PARITY-001: until 2026-09-28 a pull request and a
+          # merge group scanned only base..head while a push scanned the full
+          # history, so a finding in the history failed every push and no pull
+          # request or merge group: Adaptix-Core-Service's merge-group runs
+          # passed and its push runs failed on the same commits for eleven
+          # merges in a row (bafba160: merge group 36377940328 passed, push
+          # 36378857811 failed on generic-api-key in commits 39ea2982625c and
+          # 35f3d096bc71).
+          head="$(git rev-parse HEAD)"
+          case "${EVENT}" in
+            pull_request) base="${PR_BASE_SHA}"; added="${PR_HEAD_SHA}" ;;
+            merge_group) base="${GROUP_BASE_SHA}"; added="${GROUP_HEAD_SHA}" ;;
+            *) base=""; added="" ;;
+          esac
+          for sha in ${added:+"${added}"} ${base:+"${base}"}; do
+            if ! git rev-parse --quiet --verify "${sha}^{commit}" > /dev/null; then
+              echo "::error title=adaptix/gitleaks-security::commit '${sha}' is not in this checkout, so the range cannot be scanned."
+              exit 1
+            fi
+          done
+          range=""
+          if [ -n "${base}" ]; then
+            # The commit checked out must contain the change it stands for;
+            # anything else would scan a history this change does not merge.
+            if ! git merge-base --is-ancestor "${added}" "${head}"; then
+              echo "::error title=adaptix/gitleaks-security::the checked-out commit ${head} does not contain ${added}, the ${EVENT} head, so its history is not the one this change merges."
+              exit 1
+            fi
+            range="${base}..${added}"
+            scope="the full history of ${head}, of which this change adds the $(git rev-list --count "${range}") commit(s) ${range}"
+          else
+            scope="the full history of ${head}"
+          fi
+          log_opts="${head}"
+          expected="$(git rev-list --count "${log_opts}")"
+          echo "log-opts=${log_opts}" >> "${GITHUB_OUTPUT}"
+          echo "expected=${expected}" >> "${GITHUB_OUTPUT}"
+          echo "changed=1" >> "${GITHUB_OUTPUT}"
+          echo "range=${range}" >> "${GITHUB_OUTPUT}"
+          echo "scanning ${scope}: ${expected} commit(s)"
+
+      - name: Require the repository configuration to extend the default rules
+        shell: bash
+        env:
+          GITLEAKS_DEFAULT_RULE_IDS: >-
+            1password-secret-key 1password-service-account-token adafruit-api-key adobe-client-id adobe-client-secret
+            age-secret-key airtable-api-key airtable-personnal-access-token algolia-api-key alibaba-access-key-id
+            alibaba-secret-key anthropic-admin-api-key anthropic-api-key artifactory-api-key artifactory-reference-token
+            asana-client-id asana-client-secret atlassian-api-token authress-service-client-access-key aws-access-token
+            aws-amazon-bedrock-api-key-long-lived aws-amazon-bedrock-api-key-short-lived azure-ad-client-secret beamer-api-token bitbucket-client-id
+            bitbucket-client-secret bittrex-access-key bittrex-secret-key cisco-meraki-api-key clickhouse-cloud-api-secret-key
+            clojars-api-token cloudflare-api-key cloudflare-global-api-key cloudflare-origin-ca-key codecov-access-token
+            cohere-api-token coinbase-access-token confluent-access-token confluent-secret-key contentful-delivery-api-token
+            curl-auth-header curl-auth-user databricks-api-token datadog-access-token defined-networking-api-token
+            digitalocean-access-token digitalocean-pat digitalocean-refresh-token discord-api-token discord-client-id
+            discord-client-secret doppler-api-token droneci-access-token dropbox-api-token dropbox-long-lived-api-token
+            dropbox-short-lived-api-token duffel-api-token dynatrace-api-token easypost-api-token easypost-test-api-token
+            etsy-access-token facebook-access-token facebook-page-access-token facebook-secret fastly-api-token
+            finicity-api-token finicity-client-secret finnhub-access-token flickr-access-token flutterwave-encryption-key
+            flutterwave-public-key flutterwave-secret-key flyio-access-token frameio-api-token freemius-secret-key
+            freshbooks-access-token gcp-api-key generic-api-key github-app-token github-fine-grained-pat
+            github-oauth github-pat github-refresh-token gitlab-cicd-job-token gitlab-deploy-token
+            gitlab-feature-flag-client-token gitlab-feed-token gitlab-incoming-mail-token gitlab-kubernetes-agent-token gitlab-oauth-app-secret
+            gitlab-pat gitlab-pat-routable gitlab-ptt gitlab-rrt gitlab-runner-authentication-token
+            gitlab-runner-authentication-token-routable gitlab-scim-token gitlab-session-cookie gitter-access-token gocardless-api-token
+            grafana-api-key grafana-cloud-api-token grafana-service-account-token harness-api-key hashicorp-tf-api-token
+            hashicorp-tf-password heroku-api-key heroku-api-key-v2 hubspot-api-key huggingface-access-token
+            huggingface-organization-api-token infracost-api-token intercom-api-key intra42-client-secret jfrog-api-key
+            jfrog-identity-token jwt jwt-base64 kraken-access-token kubernetes-secret-yaml
+            kucoin-access-token kucoin-secret-key launchdarkly-access-token linear-api-key linear-client-secret
+            linkedin-client-id linkedin-client-secret lob-api-key lob-pub-api-key looker-client-id
+            looker-client-secret mailchimp-api-key mailgun-private-api-token mailgun-pub-key mailgun-signing-key
+            mapbox-api-token mattermost-access-token maxmind-license-key messagebird-api-token messagebird-client-id
+            microsoft-teams-webhook netlify-access-token new-relic-browser-api-token new-relic-insert-key new-relic-user-api-id
+            new-relic-user-api-key notion-api-token npm-access-token nuget-config-password nytimes-access-token
+            octopus-deploy-api-key okta-access-token openai-api-key openshift-user-token perplexity-api-key
+            pkcs12-file plaid-api-token plaid-client-id plaid-secret-key planetscale-api-token
+            planetscale-oauth-token planetscale-password postman-api-token prefect-api-token private-key
+            privateai-api-token pulumi-api-token pypi-upload-token rapidapi-access-token readme-api-token
+            rubygems-api-token scalingo-api-token sendbird-access-id sendbird-access-token sendgrid-api-token
+            sendinblue-api-token sentry-access-token sentry-org-token sentry-user-token settlemint-application-access-token
+            settlemint-personal-access-token settlemint-service-access-token shippo-api-token shopify-access-token shopify-custom-access-token
+            shopify-private-app-access-token shopify-shared-secret sidekiq-secret sidekiq-sensitive-url slack-app-token
+            slack-bot-token slack-config-access-token slack-config-refresh-token slack-legacy-bot-token slack-legacy-token
+            slack-legacy-workspace-token slack-user-token slack-webhook-url snyk-api-token sonar-api-token
+            sourcegraph-access-token square-access-token squarespace-access-token stripe-access-token sumologic-access-id
+            sumologic-access-token telegram-bot-api-token travisci-access-token twilio-api-key twitch-api-token
+            twitter-access-secret twitter-access-token twitter-api-key twitter-api-secret twitter-bearer-token
+            typeform-api-token vault-batch-token vault-service-token yandex-access-token yandex-api-key
+            yandex-aws-access-token zendesk-secret-key
+        run: |
+          set -euo pipefail
+          if [ ! -f .gitleaks.toml ]; then
+            echo "No .gitleaks.toml: the Gitleaks ${GITLEAKS_VERSION} default rules apply as they are."
+          else
+            python3 - <<'ADAPTIX_GITLEAKS_CONFIG'
+          import os
+          import sys
+          import tomllib
+
+          defaults = set(os.environ["GITLEAKS_DEFAULT_RULE_IDS"].split())
+          problems = []
+          try:
+              with open(".gitleaks.toml", "rb") as handle:
+                  config = tomllib.load(handle)
+          except (OSError, tomllib.TOMLDecodeError) as error:
+              problems.append(f"it is not readable TOML ({error})")
+              config = {}
+          extend = config.get("extend") if isinstance(config.get("extend"), dict) else {}
+          if extend.get("useDefault") is not True:
+              problems.append("[extend] useDefault = true is required: a repository configuration adds to the default rules, never replaces them")
+          if extend.get("disabledRules"):
+              problems.append(f"[extend] disabledRules {extend['disabledRules']!r} is refused: no default rule may be switched off")
+          for key in ("path", "url"):
+              if extend.get(key):
+                  problems.append(f"[extend] {key} is refused: the configuration is this file, not one read from elsewhere")
+          rules = config.get("rules") if isinstance(config.get("rules"), list) else []
+          detection = {"regex", "path", "entropy", "keywords", "secretGroup"}
+          for rule in rules:
+              rule_id = rule.get("id") if isinstance(rule, dict) else None
+              if rule_id in defaults and detection & set(rule):
+                  problems.append(f"[[rules]] {rule_id} redefines a default rule ({', '.join(sorted(detection & set(rule)))}); a default rule may only be given an allowlist")
+          allowlists = len(config.get("allowlists", [])) + (1 if "allowlist" in config else 0)
+          extended = sum(1 for rule in rules if isinstance(rule, dict) and rule.get("id") in defaults)
+          added = sum(1 for rule in rules if isinstance(rule, dict) and rule.get("id") not in defaults)
+          print(f".gitleaks.toml: {added} added rule(s), {extended} default rule(s) given an allowlist, {allowlists} global allowlist(s).")
+          for problem in problems:
+              print(f"::error title=adaptix/gitleaks-security::.gitleaks.toml: {problem}")
+          sys.exit(1 if problems else 0)
+          ADAPTIX_GITLEAKS_CONFIG
+          fi
+          if [ -f .gitleaksignore ]; then
+            echo ".gitleaksignore: $(grep -cvE '^[[:space:]]*(#|$)' .gitleaksignore) fingerprint(s) of reviewed historical findings."
+          fi
+
+      - name: Scan for secrets
+        shell: bash
+        env:
+          LOG_OPTS: ${{ steps.range.outputs.log-opts }}
+          RANGE: ${{ steps.range.outputs.range }}
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/gitleaks/out"
+          # However the scan ends, every finding in the redacted report becomes an
+          # error annotation on the file and line it names: rule, file, line and
+          # commit, never the value. The trap leaves the step's exit status as the
+          # scan set it, so a finding still fails the step.
+          annotate_findings() {
+            python3 - "${out}/gitleaks.json" <<'ADAPTIX_GITLEAKS_ANNOTATE'
+          import json
+          import os
+          import subprocess
+          import sys
+
+
+          def data(value):
+              return str(value).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+          def prop(value):
+              return data(value).replace(":", "%3A").replace(",", "%2C")
+
+
+          # A pull request or merge group names the commits it adds (RANGE,
+          # base..head): a finding in them is this change's own, a finding
+          # before them is in the history the default branch fails on too.
+          change_range = os.environ.get("RANGE", "")
+          added = None
+          if change_range:
+              listed = subprocess.run(["git", "rev-list", change_range], capture_output=True, text=True, check=False)
+              if listed.returncode == 0:
+                  added = set(listed.stdout.split())
+          try:
+              with open(sys.argv[1], encoding="utf-8") as handle:
+                  findings = json.load(handle)
+          except (OSError, ValueError):
+              findings = []
+          for finding in findings if isinstance(findings, list) else []:
+              path, line = finding.get("File", ""), finding.get("StartLine", 0)
+              full = str(finding.get("Commit", ""))
+              commit = full[:12]
+              if added is None:
+                  whose = ""
+              elif full in added:
+                  whose = ", which this change adds: take the secret out of the change and rotate it"
+              else:
+                  whose = ", already in the history this change builds on, so the default branch fails on it too: rotate it and record its fingerprint in .gitleaksignore"
+              print(
+                  f"::error file={prop(path)},line={prop(line)},title=adaptix/gitleaks-security::"
+                  + data(f"{finding.get('RuleID')} at {path}:{line} in commit {commit}{whose}; the value is redacted from every log and report")
+              )
+          ADAPTIX_GITLEAKS_ANNOTATE
+          }
+          trap annotate_findings EXIT
+          # Any finding exits 1 and fails this step; the redacted report is
+          # archived below either way.
+          gitleaks git --no-banner --no-color --redact --verbose \
+            --log-opts="${LOG_OPTS}" \
+            --report-format json --report-path "${out}/gitleaks.json" \
+            --exit-code 1 . 2>&1 | tee "${out}/gitleaks.log"
+
+      - name: Prove the range was scanned and the report is empty
+        shell: node {0}
+        env:
+          GITLEAKS_REPORT: ${{ runner.temp }}/gitleaks/out/gitleaks.json
+          GITLEAKS_LOG: ${{ runner.temp }}/gitleaks/out/gitleaks.log
+          EXPECTED_COMMITS: ${{ steps.range.outputs.expected }}
+          CONTENT_CHANGED: ${{ steps.range.outputs.changed }}
+          RANGE: ${{ steps.range.outputs.range }}
+        run: |
+          const fs = require("fs");
+          const errors = [];
+          let findings = null;
+          try {
+            findings = JSON.parse(fs.readFileSync(process.env.GITLEAKS_REPORT, "utf8"));
+          } catch (error) {
+            errors.push(`no readable Gitleaks report (${error.message}); a scan without a report is not a pass`);
+          }
+          if (findings !== null && !Array.isArray(findings)) errors.push("the Gitleaks report is not a JSON array");
+          // Whose findings they are: the commits a pull request or merge group
+          // adds (RANGE), or the history it builds on, which the default
+          // branch's scan fails on as well.
+          const ownership = (list) => {
+            const range = process.env.RANGE || "";
+            if (range === "") return "";
+            let added;
+            try {
+              added = new Set(require("child_process").execFileSync("git", ["rev-list", range], { encoding: "utf8" }).split(/\s+/u).filter(Boolean));
+            } catch {
+              return "";
+            }
+            const own = list.filter((finding) => added.has(String(finding?.Commit ?? ""))).length;
+            return ` (${own} in the commits this change adds, ${list.length - own} already in the history it builds on, which the default branch fails on too)`;
+          };
+          if (Array.isArray(findings) && findings.length > 0) errors.push(`${findings.length} secret finding(s) in the report${ownership(findings)}`);
+          let log = "";
+          try {
+            log = fs.readFileSync(process.env.GITLEAKS_LOG, "utf8");
+          } catch (error) {
+            errors.push(`no Gitleaks log (${error.message})`);
+          }
+          const counted = /(\d+) commits scanned/u.exec(log);
+          const expected = Number(process.env.EXPECTED_COMMITS);
+          if (!Number.isInteger(expected) || expected < 0) errors.push(`the commit range resolved to no count (${process.env.EXPECTED_COMMITS})`);
+          if (counted === null) {
+            errors.push("Gitleaks never reported how many commits it scanned, so the range cannot be shown to have been read");
+          } else {
+            const scanned = Number(counted[1]);
+            // Gitleaks counts commits that carry a patch; a merge or empty commit
+            // has none, so it may count fewer than git, never more, and never
+            // zero while the range changes content.
+            if (scanned > expected) errors.push(`Gitleaks reports ${scanned} commits scanned for a range of ${expected}`);
+            if (scanned === 0 && process.env.CONTENT_CHANGED === "1") errors.push("Gitleaks scanned 0 commits of a range that changes content");
+            console.log(`Gitleaks scanned ${scanned} of ${expected} commit(s) in range; ${Array.isArray(findings) ? findings.length : "unknown"} finding(s).`);
+          }
+          const summary = [
+            "### adaptix/gitleaks-security",
+            "",
+            counted === null ? "Commits scanned: unknown." : `Commits scanned: ${counted[1]} of ${expected}.`,
+            "",
+            errors.length === 0 ? "Secret scan: PASS (no finding)." : `Secret scan: FAIL -- ${errors.join("; ")}.`,
+            "",
+          ].join("\n");
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          for (const message of errors) console.log(`::error title=adaptix/gitleaks-security::${message}`);
+          process.exitCode = errors.length === 0 ? 0 : 1;
+
+      - name: Archive the redacted Gitleaks evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: adaptix-gitleaks-security-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/gitleaks/out/
+          if-no-files-found: error
+          # Kept for the repository's own artifact retention (the organisation
+          # maximum). The failing check and its annotations outlive it.
