@@ -8,6 +8,7 @@ and verified to survive a JSON serialize/deserialize round trip without drift.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -540,7 +541,9 @@ def _checkout_session_response() -> CheckoutSessionResponse:
         (_app_access_policy, AppAccessPolicy),
     ],
 )
-def test_shared_service_contracts_round_trip(factory, expected_type) -> None:
+def test_shared_service_contracts_round_trip(
+    factory: Callable[[], BaseModel], expected_type: type[BaseModel]
+) -> None:
     """Ensure each shared-service contract survives a JSON round trip."""
 
     contract = factory()

@@ -1,9 +1,15 @@
 name: qodana-security
 
-# THE THIN QODANA CARRIER (QOD-003), rendered by adaptix-ops
-# scripts/lib/qodanaCarrier.ts. Event wiring and one call to the canonical
-# reusable workflow at an immutable adaptix-ops commit -- no scanning logic.
-# It publishes the check "adaptix/qodana-security / scan".
+# THE NATIVE QODANA GATE (QOD-003), rendered by adaptix-ops
+# scripts/lib/qodanaNative.ts. Do not edit it by hand: render it again.
+# A public repository cannot call a reusable workflow kept in a private
+# repository, so this repository carries the scan job itself. The job below
+# is the scan job of that reusable workflow at the commit named here, with
+# its inputs resolved to the values named here and nothing else changed:
+# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/qodana-reusable.yml@e9101c166a862233ef2acfcddb73206b5f8b449c
+# inputs: {"baseline-path":"","config-path":"qodana.yaml","linter":"qodana-python","runner":"ubuntu-latest","scan-budget-minutes":15,"working-directory":"."}
+# It publishes the check
+# "adaptix/qodana-security / scan".
 
 on:
   pull_request:
@@ -24,12 +30,939 @@ permissions:
   contents: read
 
 jobs:
-  qodana:
-    name: adaptix/qodana-security
-    uses: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/qodana-reusable.yml@de4186058aa3ef6894e92a84d4359770a0ab819a
-    with:
-      linter: qodana-python
-      config-path: qodana.yaml
-    # Only this repository's own project token, never `secrets: inherit`.
-    secrets:
-      QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+  scan:
+    name: adaptix/qodana-security / scan
+    # An allowlisted label (THE RUNNER above); the guard step is the first
+    # thing that runs on it and fails the job for any other label.
+    runs-on: ${{ 'ubuntu-latest' }}
+    # The ceiling depends on the event (github is the CALLER's context here).
+    #   pull_request, merge_group  scan-budget-minutes: 15 by default, the
+    #     required-path ceiling (config/platform-standard.yaml
+    #     requiredCriticalPathTimeoutMinutes), at most 30 (THE BUDGET above;
+    #     the guard step refuses any other value). These are the only events
+    #     on the merge-queue path: this check is required beside
+    #     adaptix/repo-validation and a merge queue answers within its check
+    #     response timeout. Both analyse only their change (see THE MERGE
+    #     QUEUE above) without the license audit (THE CHANGE-ANALYSIS
+    #     CONFIGURATION above); a slow scan is made faster first, and only
+    #     the four largest services are given a longer ceiling, with numbers.
+    #   push, workflow_dispatch    60. A full analysis of the default branch
+    #     or of a dispatched revision, which no merge waits on; the push run
+    #     populates the Qodana Cloud project report. The merge-queue budget
+    #     does not bind it, and 15 is too short
+    #     for the largest repositories: a full Adaptix-Web-App analysis was
+    #     cancelled at 15 minutes with no report (run 36077763272), and the
+    #     same analysis needed a 29-minute Qodana scan step under a 90-minute
+    #     diagnostic ceiling (run 36080165385). The largest Python services
+    #     (Billing, Core, EPCR, CAD) are of comparable size.
+    # npm test parses this exact expression, holds the input's default to the
+    # required-path ceiling, its guard to 15..30, and the second value to 60.
+    timeout-minutes: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 15 || 60 }}
+    permissions:
+      contents: read
+    steps:
+      - name: Refuse an untrusted trigger, a missing token or an unsafe input
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+          LINTER: ${{ 'qodana-python' }}
+          CONFIG_PATH: ${{ 'qodana.yaml' }}
+          BASELINE_PATH: ${{ '' }}
+          WORKING_DIRECTORY: ${{ '.' }}
+          SCAN_BUDGET_MINUTES: ${{ 15 }}
+          RUNNER: ${{ 'ubuntu-latest' }}
+        run: |
+          set -euo pipefail
+          case "${EVENT}" in
+            pull_request|merge_group|push|workflow_dispatch) ;;
+            *)
+              echo "::error title=adaptix/qodana-security::event ${EVENT} is refused; only pull_request, merge_group, push and workflow_dispatch may run the Qodana scan (never pull_request_target)."
+              exit 1
+              ;;
+          esac
+          if [ "${EVENT}" = "pull_request" ] && [ "${HEAD_REPOSITORY}" != "${REPOSITORY}" ]; then
+            echo "::error title=adaptix/qodana-security::pull request from fork ${HEAD_REPOSITORY} is refused: a fork is never scanned with this repository's QODANA_TOKEN."
+            exit 1
+          fi
+          if [ -z "${QODANA_TOKEN}" ]; then
+            echo "::error title=adaptix/qodana-security::QODANA_TOKEN is empty or missing. It must be an Actions secret (and a Dependabot secret for Dependabot pull requests): npm run qodana:provision-token in adaptix-ops. A scan is never skipped for want of a token."
+            exit 1
+          fi
+          case "${LINTER}" in
+            qodana-python|qodana-js|qodana-android|qodana-jvm|qodana-go|qodana-dotnet|qodana-cpp|qodana-php) ;;
+            *)
+              echo "::error title=adaptix/qodana-security::linter ${LINTER} is not an approved generally available paid Qodana linter."
+              exit 1
+              ;;
+          esac
+          for value in "${CONFIG_PATH}" "${WORKING_DIRECTORY}" "${BASELINE_PATH}"; do
+            if [ -z "${value}" ]; then
+              continue
+            fi
+            if [[ ! "${value}" =~ ^[A-Za-z0-9._/-]+$ ]] || [[ "${value}" == /* ]] || [[ "${value}" == *..* ]]; then
+              echo "::error title=adaptix/qodana-security::path input ${value} must be repository-relative, without spaces or '..'."
+              exit 1
+            fi
+          done
+          # THE RUNNER: only the allowlisted labels (scripts/lib/qodanaCarrier.ts
+          # QODANA_RUNNERS; npm test holds the two lists equal).
+          case "${RUNNER}" in
+            ubuntu-latest|ubuntu-24.04|adaptix-ubuntu-16gb|adaptix-ubuntu-32gb) ;;
+            *)
+              echo "::error title=adaptix/qodana-security::runner ${RUNNER} is not an allowlisted label (ubuntu-latest, ubuntu-24.04, adaptix-ubuntu-16gb, adaptix-ubuntu-32gb); the scan and its token never go to an arbitrary runner."
+              exit 1
+              ;;
+          esac
+          # THE BUDGET: a whole number of minutes from the required-path
+          # ceiling to twice it. The job's timeout-minutes already used this
+          # value; a value outside the bounds ends the job here, in seconds.
+          if [[ ! "${SCAN_BUDGET_MINUTES}" =~ ^[0-9]+$ ]] || [ "${SCAN_BUDGET_MINUTES}" -lt 15 ] || [ "${SCAN_BUDGET_MINUTES}" -gt 30 ]; then
+            echo "::error title=adaptix/qodana-security::scan-budget-minutes ${SCAN_BUDGET_MINUTES} is not a whole number of minutes from 15 (the required-path ceiling) to 30; a longer change analysis is made faster, not given more time."
+            exit 1
+          fi
+
+      - name: Check out the exact revision under analysis
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The pull request's HEAD, not GitHub's synthetic merge commit; the
+          # merge group's own commit for merge_group; the pushed or dispatched
+          # commit otherwise.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          # Full history: a pull request diffs against its merge base, a
+          # merge group against its base commit.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve the analysis scope
+        id: scope
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          LINTER: ${{ 'qodana-python' }}
+          CONFIG_PATH: ${{ 'qodana.yaml' }}
+          BASELINE_PATH: ${{ '' }}
+          WORKING_DIRECTORY: ${{ '.' }}
+          # The fleet profile (scripts/lib/qodanaProfile.ts): its path, as the
+          # qodana.yaml names it, and the sha256 of renderQodanaProfile().
+          ADAPTIX_PROFILE_PATH: ".qodana/profiles/adaptix.recommended.yaml"
+          ADAPTIX_PROFILE_SHA256: "15f59c978191ac614fd33c9055968214ef3d53749ba1c7f07287a24081a7d896"
+          # The derived configuration of a change analysis (THE CHANGE-ANALYSIS
+          # CONFIGURATION above): its file name, written in the directory of
+          # the checked qodana.yaml so that its relative paths resolve as
+          # qodana.yaml's do.
+          CHANGE_CONFIG_NAME: "qodana.change-analysis.yaml"
+          # The carrier that called this workflow: in a reusable workflow the
+          # github context is the caller's, so workflow_ref names the
+          # repository's own .github/workflows/qodana.yml at the ref it ran
+          # from (A CHANGE TO THE ANALYSIS ITSELF, below).
+          CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+          # The configuration a full analysis runs when qodana.yaml carries
+          # license overrides (LICENSE OVERRIDES FOLLOW THE LOCK, below),
+          # written beside qodana.yaml like the change-analysis one.
+          LOCK_CONFIG_NAME: "qodana.lock-licenses.yaml"
+        run: |
+          set -euo pipefail
+          if [ ! -d "${WORKING_DIRECTORY}" ]; then
+            echo "::error title=adaptix/qodana-security::working directory ${WORKING_DIRECTORY} does not exist in this revision."
+            exit 1
+          fi
+          # Qodana resolves --config and --baseline against the PROJECT
+          # directory (qodana-cli qdyaml.GetLocalNotEffectiveQodanaYamlFullPath
+          # joins the project dir and the config path; the baseline docs say
+          # "relative to the project root"), and it loads a --config file that
+          # does not exist as an EMPTY configuration -- the default
+          # qodana.starter profile, no error. So both are checked exactly where
+          # Qodana will read them, never at the repository root.
+          config_file="${WORKING_DIRECTORY}/${CONFIG_PATH}"
+          if [ ! -f "${config_file}" ]; then
+            echo "::error title=adaptix/qodana-security::${config_file} does not exist in this revision; a Qodana-required repository carries its qodana.yaml in the analysed project directory."
+            exit 1
+          fi
+          # THE FLEET PROFILE. The qodana.yaml's top-level profile: mapping must
+          # be exactly "path: <ADAPTIX_PROFILE_PATH>" (comments and blank lines
+          # aside), declared once; the file there must be the rendered profile,
+          # byte for byte. Anything else would run a different inspection set.
+          stanza="$(tr -d '\r' < "${config_file}" | awk '
+            /^profile:[[:space:]]*(#.*)?$/ { count++; inside = 1; print "profile:"; next }
+            /^profile:/ { count++; inside = 0; print "profile: <inline>"; next }
+            inside && /^[^[:space:]#][^:]*:/ { inside = 0 }
+            inside && /^[[:space:]]*(#.*)?$/ { next }
+            inside { sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, ""); print }
+            END { if (count != 1) print "profile: declared " count + 0 " times" }
+          ')"
+          expected_stanza="$(printf 'profile:\n  path: %s' "${ADAPTIX_PROFILE_PATH}")"
+          if [ "${stanza}" != "${expected_stanza}" ]; then
+            echo "::error title=adaptix/qodana-security::${config_file} must select the fleet profile with exactly 'profile:' / '  path: ${ADAPTIX_PROFILE_PATH}' (qodana.recommended with all test code analysed; npm run qodana:render-config in adaptix-ops). Found: $(printf '%s' "${stanza:-no profile: mapping}" | tr '\n' ' ')"
+            exit 1
+          fi
+          profile_file="${WORKING_DIRECTORY}/${ADAPTIX_PROFILE_PATH}"
+          if [ ! -f "${profile_file}" ]; then
+            echo "::error title=adaptix/qodana-security::${profile_file} does not exist in this revision; render it with npm run qodana:render-config in adaptix-ops."
+            exit 1
+          fi
+          profile_sha256="$(sha256sum "${profile_file}" | cut -d' ' -f1)"
+          if [ "${profile_sha256}" != "${ADAPTIX_PROFILE_SHA256}" ]; then
+            echo "::error title=adaptix/qodana-security::${profile_file} is not the fleet profile this workflow pins (sha256 ${profile_sha256}, expected ${ADAPTIX_PROFILE_SHA256}); re-render it with npm run qodana:render-config in adaptix-ops, never edit it by hand."
+            exit 1
+          fi
+          # Sanity inspections are how Qodana reports that the analysis could
+          # not see the project (unresolved references, no interpreter). A
+          # configuration that switches them off could never be proven complete.
+          # A line-anchored match let every other YAML spelling of the key
+          # through: quoted ("disableSanityInspections": true), flow-mapped
+          # ({disableSanityInspections: true}) and escaped
+          # ("disableSanity\u0049nspections": true). A text check cannot tell a
+          # comment from content either ({a: " #", key: v} hides the key behind
+          # a quoted " #"). So the name may not appear anywhere in the file, in
+          # any case, comments included; the verdict is printed and assigned, so
+          # an unreadable file stops the step (set -e) instead of reading as
+          # clean.
+          sanity="$(awk '
+            tolower($0) ~ /disablesanityinspections/ { named = 1 }
+            END { print (named ? "named" : "clean") }
+          ' "${config_file}")"
+          if [ "${sanity}" = "named" ]; then
+            echo "::error title=adaptix/qodana-security::${config_file} names disableSanityInspections; Qodana's sanity checks are how the floor proves the analysis saw the whole project, so they are never switched off, and the name is refused in any spelling, comments included."
+            exit 1
+          fi
+          # A spelling without the name -- an escape in a double-quoted key, a
+          # !!binary key, a key an alias or merge key brings in -- is judged on
+          # the DECODED document (QODANA-SANITY-GUARD-DECODED-001). yq reads it
+          # with go-yaml v3, the parser family qodana-cli reads qodana.yaml
+          # with, resolves every escape, quote, flow mapping, alias and merge
+          # key (explode), and names every key and tag. A key that decodes to
+          # the name, in any case, is refused, and so is any tag outside the
+          # YAML core schema, which could decode to it by other means. Until
+          # 2026-09-28 the file could carry no backslash at all instead: a
+          # line continuation in a bootstrap script or a `\+` in a comment then
+          # refused a configuration that switched nothing off (Exports, EPCR,
+          # NEMSIS, CRR, Social and AdaptixControl at adaptix-ops 312464f),
+          # while a !!binary key, which needs no backslash, passed.
+          if ! command -v yq > /dev/null 2>&1 || ! yq --version 2>/dev/null | grep -Eq 'mikefarah'; then
+            echo "::error title=adaptix/qodana-security::yq 4 (mikefarah) is not on this runner, so ${config_file} cannot be decoded to prove it does not switch the sanity checks off."
+            exit 1
+          fi
+          if ! decoded="$(yq eval 'explode(.) | [.. | select(tag == "!!map") | keys | .[] | tag + " " + (. | tostring)] | .[]' "${config_file}")" \
+            || ! tags="$(yq eval 'explode(.) | [.. | tag] | unique | .[]' "${config_file}")"; then
+            echo "::error title=adaptix/qodana-security::${config_file} could not be read as YAML, so it cannot be proven not to switch the sanity checks off."
+            exit 1
+          fi
+          if printf '%s\n' "${decoded}" | tr '[:upper:]' '[:lower:]' | grep -Eq '(^| )disablesanityinspections$'; then
+            echo "::error title=adaptix/qodana-security::${config_file} has a key that decodes to disableSanityInspections; the sanity checks are never switched off, in any spelling."
+            exit 1
+          fi
+          foreign_tags="$(printf '%s\n' "${tags}" "$(printf '%s\n' "${decoded}" | cut -d' ' -f1)" | awk '!/^(!!map|!!seq|!!str|!!int|!!float|!!bool|!!null|)$/' | sort -u | tr '\n' ' ')"
+          if [ -n "${foreign_tags}" ]; then
+            echo "::error title=adaptix/qodana-security::${config_file} uses YAML tags outside the core schema (${foreign_tags% }); a tagged key can decode to a key it does not spell, so a fleet qodana.yaml uses none."
+            exit 1
+          fi
+          # The --config value is decided with the scope, below.
+          args="--project-dir ${WORKING_DIRECTORY}"
+          if [ -n "${BASELINE_PATH}" ]; then
+            if [ ! -f "${WORKING_DIRECTORY}/${BASELINE_PATH}" ]; then
+              echo "::error title=adaptix/qodana-security::baseline ${WORKING_DIRECTORY}/${BASELINE_PATH} was named but does not exist; a missing baseline is never read as an empty one."
+              exit 1
+            fi
+            args="${args} --baseline ${BASELINE_PATH}"
+          fi
+          # THE TYPESCRIPT LANGUAGE SERVICE (qodana-js). The product starts it
+          # with --max_old_space_size=1024 from its own
+          # -Dtypescript.service.node.defaultMemoryLimit=1024, which it passes
+          # AFTER the user vmoptions, so qodana.yaml properties cannot raise it
+          # (measured: Adaptix-Transport-Request-App runs 36187768966 and
+          # 36187765718 still started it at 1024). _JAVA_OPTIONS is applied by
+          # the JVM after its command line, and does (run 36188295052: 2048).
+          # The limit is a quarter of this runner's memory -- the ceiling
+          # WebStorm itself grows the service to -- never below the product's
+          # 1024. A service that still runs out of memory fails the floor.
+          if [ "${LINTER}" = "qodana-js" ]; then
+            memory_kb="$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)"
+            ts_limit_mb=$(( memory_kb / 1024 / 4 ))
+            if [ "${ts_limit_mb}" -lt 1024 ]; then
+              ts_limit_mb=1024
+            fi
+            args="${args} --env _JAVA_OPTIONS=-Dtypescript.service.node.defaultMemoryLimit=${ts_limit_mb}"
+            echo "TypeScript language service limit: ${ts_limit_mb} MB (a quarter of ${memory_kb} kB)"
+          fi
+          if [ "${LINTER}" = "qodana-python" ]; then
+            # The project model stays fixed for the whole analysis. Qodana for
+            # Python 2026.2 (QDPY-262) AUTO-APPLIES the "mark directory as
+            # source root" quick-fix of an unresolved import (registry key
+            # python.source.root.suggest.quickfix.auto.apply, default true):
+            # PySourceRootDetectionService.markAsSourceRoot queues an EDT write
+            # action in the middle of the headless analysis. The write waits for
+            # the analysing thread's read lock, a pending write admits no new
+            # reader, and the analysis collapses onto that one thread and stops
+            # progressing at 96-100%: CAD, Core, EPCR, Billing and Fire full
+            # scans on main were cancelled at the 60-minute ceiling (CAD run
+            # 36151681017: 99% at 15:22Z, no progress until 16:04Z). A local
+            # 2026.2 run of CAD e27c0c8 reached 100% and then stopped with the
+            # EDT in edtWriteAction and three markAsSourceRoot coroutines queued;
+            # the same run with this property off finished its analysis in
+            # 8 minutes. Off, the quick-fix is still reported, never applied;
+            # no inspection and no file leaves the analysis. The IDE reads a
+            # registry key from a JVM system property of the same name
+            # (RegistryValue.resolveRequiredValue), which --property sets.
+            args="${args} --property python.source.root.suggest.quickfix.auto.apply=false"
+          fi
+          pr_mode=false
+          base=""
+          base_name=""
+          if [ "${EVENT}" = "pull_request" ]; then
+            # The action would otherwise `git fetch origin` with the credential
+            # this checkout deliberately did not persist. The history is
+            # already here, so the merge base is computed locally.
+            base="$(git merge-base "origin/${BASE_REF}" HEAD)"
+            base_name="merge base"
+          elif [ "${EVENT}" = "merge_group" ]; then
+            # The change from the commit the queue built this group on to the
+            # group commit checked out above (its parent, for a squash queue).
+            # The base must be a full commit SHA that HEAD descends from:
+            # anything else would analyse the wrong change, and qodana-cli
+            # would turn a missing commit into a silent full analysis. So it
+            # fails instead.
+            if [[ ! "${MERGE_GROUP_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "${MERGE_GROUP_BASE_SHA}^{commit}" 2>/dev/null; then
+              echo "::error title=adaptix/qodana-security::merge group base '${MERGE_GROUP_BASE_SHA}' is not a commit in this checkout, so the group's change cannot be computed."
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "${MERGE_GROUP_BASE_SHA}" HEAD; then
+              echo "::error title=adaptix/qodana-security::merge group base ${MERGE_GROUP_BASE_SHA} is not an ancestor of the group commit $(git rev-parse HEAD)."
+              exit 1
+            fi
+            base="${MERGE_GROUP_BASE_SHA}"
+            base_name="merge group base"
+          fi
+          if [ -n "${base}" ]; then
+            # A change analysis checks the base out and loads the --config
+            # file THERE (qodana-cli incremental_analysis.go RunFunc ->
+            # config-loader-cli --local-qodana-yaml). A change that introduces
+            # the config -- every carrier pull request -- has none at its
+            # base, and Qodana exits 1 before analysing anything: 'invalid
+            # value for --local-qodana-yaml: file "/data/project/qodana.yaml"
+            # does not exist' (QOD-004 canary, Adaptix-QHIN-Service run
+            # 36070720754). With no Qodana state to compare against, such a
+            # change gets a FULL analysis of its head: never a skip, and never
+            # a diff of the YAML files alone.
+            config_in_repository="${WORKING_DIRECTORY%/}/${CONFIG_PATH}"
+            config_in_repository="${config_in_repository#./}"
+            # AN EMPTY CHANGE HAS NO VERDICT. A pull request or merge-group
+            # commit whose tree equals its base (an empty commit, or a change
+            # that is already on the base) gives the change analysis no file:
+            # qodana-cli prints "Nothing to analyse" and exits 1, the action
+            # reports "qodana scan failed with exit code 1", and the check is
+            # red with no reason a reader can act on (Adaptix-Calendar-Service
+            # run 36221236471). It is refused here, by name, before the scan.
+            # It is never passed: a check that passes with no analysis is the
+            # exact false verdict this floor exists to prevent, and a pull
+            # request that changes nothing has nothing to merge.
+            if git diff --quiet "${base}" HEAD; then
+              echo "::error title=adaptix/qodana-security::the change from ${base_name} ${base} to $(git rev-parse HEAD) touches no file, so there is nothing to analyse and no verdict to give. An empty change is refused, not passed; close the pull request or rebase it onto a base it actually changes."
+              exit 1
+            fi
+            # A CHANGE TO THE ANALYSIS ITSELF (QODANA-PR-MAIN-PARITY-001). The
+            # carrier (its adaptix-ops pin decides this workflow, the floor and
+            # the Qodana release), the qodana.yaml, the fleet profile and a
+            # named baseline decide what EVERY file is judged by. A change
+            # analysis judges only the changed files, and of a change to these
+            # files that is none of the sources, so it passed where the
+            # default branch's full analysis then failed on files the change
+            # never touched: Adaptix-Governance #302 (qodana.yaml only;
+            # merge-group run 36227013453 passed, push run 36227070767 failed
+            # on 5 Critical/High findings), Adaptix-Temporal-Service #158
+            # (qodana.yaml only; 36227119421 passed, 36227180105 failed on 20
+            # sanity problems and 3 Critical/High) and Adaptix-Mobile-Shell #175
+            # (carrier, qodana.yaml and profile; 36226591452 passed,
+            # 36227112036 failed on 3 Critical/High). Such a change gets the
+            # full analysis the default branch will run, of its head, under the
+            # merge-queue configuration below, inside the change budget
+            # (scan-budget-minutes; a repository whose full analysis does not
+            # fit names a larger runner). The carrier is the workflow that
+            # called this one: github.workflow_ref names the CALLER's file.
+            caller_workflow="${CALLER_WORKFLOW_REF%%@*}"
+            caller_workflow="${caller_workflow#*/*/}"
+            if [[ ! "${caller_workflow}" =~ ^\.github/workflows/[^/]+\.ya?ml$ ]]; then
+              echo "::error title=adaptix/qodana-security::the calling workflow '${CALLER_WORKFLOW_REF}' does not name a file under .github/workflows, so this scan cannot tell whether the change alters its own carrier."
+              exit 1
+            fi
+            profile_in_repository="${WORKING_DIRECTORY%/}/${ADAPTIX_PROFILE_PATH}"
+            definition=("${caller_workflow}" "${config_in_repository}" "${profile_in_repository#./}")
+            if [ -n "${BASELINE_PATH}" ]; then
+              baseline_in_repository="${WORKING_DIRECTORY%/}/${BASELINE_PATH}"
+              definition+=("${baseline_in_repository#./}")
+            fi
+            definition_changes="$(git diff --name-only "${base}" HEAD -- "${definition[@]}" | tr '\n' ' ')"
+            # A TYPESCRIPT 7 PROJECT IS ANALYSED IN ONE PASS
+            # (QODANA-TS7-SINGLE-PASS-001). TypeScript 7 ships no classic
+            # language server (typescript@7.0.2 has lib/tsc.js and the native
+            # @typescript/typescript-<platform> binaries, no tsserver.js), so
+            # Qodana for JS 2026.2 must type-check it through TypeScript-Go. A
+            # change analysis runs the IDE twice on one system directory
+            # (idea.system.path=/data/cache/idea/262): the base pass opens the
+            # project cold and refreshes its TypeScript libraries before
+            # analysing ("TypeScriptLibraryProviderImpl - Start refreshing
+            # typescript libraries"); the head pass reopens on that state, never
+            # refreshes them, and its first service lookup returns the classic
+            # TypeScriptServerServiceImpl on one call and TypeScriptGoLspService
+            # on another (IdempotenceChecker SEVERE "Non-idempotent computation"),
+            # then five "TypeScriptServerServiceImpl: Timed out waiting for ready
+            # notification" before TypeScript-Go is up about 5.5 s in. Whatever
+            # file falls in that window is judged without the project's
+            # TypeScript: adaptix-ops #1515 drew 50 false Criticals in
+            # productionCertificationPlan.ts on both attempts of run
+            # 36828020314, and its base pass 4 Moderate. Keeping node_modules
+            # byte-identical between the passes (#1519 run 36832463237) and
+            # removing the scanner-generated .idea (run 36833291317) left the
+            # signature in place. A full analysis opens the project once, cold:
+            # adaptix-ops' push runs 36829887191, 36830927915 and 36833287538
+            # refreshed the libraries 38-60 s before analysing, logged no SEVERE
+            # and no classic timeout, and found no Critical. So a qodana-js
+            # change whose package-lock.json resolves TypeScript 7 or later --
+            # at the head, or at the base whose IDE state the head would reopen
+            # -- gets that full analysis. The resolved version is read, never
+            # the package.json range. A lock jq cannot read fails the scan; a
+            # revision with no npm lock has no resolved TypeScript to read. The
+            # floor below still refuses a log carrying the signature.
+            typescript_7=""
+            if [ "${LINTER}" = "qodana-js" ]; then
+              if ! command -v jq > /dev/null 2>&1; then
+                echo "::error title=adaptix/qodana-security::jq is not on this runner, so the TypeScript version the lock resolves cannot be read."
+                exit 1
+              fi
+              lock_in_repository="${WORKING_DIRECTORY%/}/package-lock.json"
+              lock_in_repository="${lock_in_repository#./}"
+              for side in head base; do
+                revision="HEAD"
+                if [ "${side}" = "base" ]; then
+                  revision="${base}"
+                fi
+                if ! git cat-file -e "${revision}:${lock_in_repository}" 2>/dev/null; then
+                  continue
+                fi
+                if ! ts_version="$(git show "${revision}:${lock_in_repository}" | jq -r '.packages["node_modules/typescript"].version // ""')"; then
+                  echo "::error title=adaptix/qodana-security::${lock_in_repository} at the ${side} (${revision}) cannot be read as JSON, so the TypeScript version it resolves is unknown."
+                  exit 1
+                fi
+                ts_major="${ts_version%%.*}"
+                if [[ "${ts_major}" =~ ^[0-9]+$ ]] && [ "${ts_major}" -ge 7 ]; then
+                  typescript_7="${typescript_7}${side} ${ts_version}, "
+                fi
+              done
+            fi
+            if ! git cat-file -e "${base}:${config_in_repository}" 2>/dev/null; then
+              echo "${EVENT}: ${base_name} ${base} has no ${config_in_repository}; this change introduces the Qodana configuration, so it gets a full analysis of $(git rev-parse HEAD)"
+            elif [ -n "${definition_changes}" ]; then
+              echo "${EVENT}: this change alters what every file is judged by (${definition_changes% }), so it gets a full analysis of $(git rev-parse HEAD), the analysis the default branch will run"
+            elif [ -n "${typescript_7}" ]; then
+              echo "${EVENT}: ${lock_in_repository} resolves TypeScript 7 or later (${typescript_7%, }), which a second, warm analysis pass type-checks with the wrong service first, so this change gets a full analysis of $(git rev-parse HEAD), which opens the project once"
+            else
+              pr_mode=true
+              echo "QODANA_PR_SHA=${base}" >> "${GITHUB_ENV}"
+              echo "${EVENT}: analysing the change since ${base_name} ${base}"
+            fi
+          else
+            echo "${EVENT}: full analysis of $(git rev-parse HEAD)"
+          fi
+          # --config is the repository's qodana.yaml on push and
+          # workflow_dispatch, and the derived configuration on the merge-queue
+          # path, a change analysis or a full one (THE CHANGE-ANALYSIS
+          # CONFIGURATION above): the checked qodana.yaml with the license
+          # audit's inspection appended to its exclude list, nothing else,
+          # written beside it. The license audit judges nothing unless
+          # raiseLicenseProblems is set, so a full analysis without it reaches
+          # the verdict the default branch's full analysis reaches, in the
+          # merge-queue budget. qodana-cli resolves --config against the
+          # project directory, at both commits, exactly as it resolves
+          # qodana.yaml, and the file's own relative paths against its
+          # directory -- the same directory as qodana.yaml's.
+          scan_config="${CONFIG_PATH}"
+          raise_license=false
+          if [ -n "${base}" ]; then
+            if ! command -v yq > /dev/null 2>&1 || ! yq --version 2>/dev/null | grep -Eq 'mikefarah'; then
+              echo "::error title=adaptix/qodana-security::yq 4 (mikefarah) is not on this runner, so the change-analysis configuration cannot be derived; the scan does not fall back to the full-cost configuration."
+              exit 1
+            fi
+            if ! raise_license="$(yq eval '.raiseLicenseProblems // false' "${config_file}")"; then
+              echo "::error title=adaptix/qodana-security::${config_file} could not be read as YAML, so the change-analysis configuration cannot be derived from it."
+              exit 1
+            fi
+          fi
+          if [ "${pr_mode}" = "true" ] && [ "${LINTER}" = "qodana-android" ]; then
+            # THE ANDROID PROJECT MODEL OF A CHANGE ANALYSIS (above): where the
+            # repository opens an AGP newer than the IDE's Android plugin
+            # knows, the head pass attaches the model the base pass imported
+            # instead of re-syncing while it analyses. A full analysis has one
+            # pass and imports the model once.
+            if ! future_agp="$(yq eval '.properties["gradle.ide.support.future.agp.versions"] // ""' "${config_file}")"; then
+              echo "::error title=adaptix/qodana-security::${config_file} could not be read as YAML, so the change analysis cannot tell how its head pass reopens the Android project."
+              exit 1
+            fi
+            if [ "$(printf '%s' "${future_agp}" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+              args="${args} --property studio.skip.agp.upgrade=true"
+              echo "change analysis: ${config_file} opens a newer AGP (gradle.ide.support.future.agp.versions), so the head pass reopens the project with studio.skip.agp.upgrade=true and attaches the model the base pass imported instead of re-syncing during its analysis"
+            fi
+          fi
+          if [ -n "${base}" ] && [ "${raise_license}" = "true" ]; then
+            # License problems are results here (THE CHANGE-ANALYSIS
+            # CONFIGURATION above): the license audit stays in the gate.
+            echo "${EVENT}: ${config_file} sets raiseLicenseProblems, so a license problem is a result the floor judges; ${config_file} is analysed as it is, license audit included"
+          elif [ -n "${base}" ]; then
+            config_directory="$(dirname "${CONFIG_PATH}")"
+            if [ "${config_directory}" = "." ]; then
+              scan_config="${CHANGE_CONFIG_NAME}"
+            else
+              scan_config="${config_directory}/${CHANGE_CONFIG_NAME}"
+            fi
+            change_config="${WORKING_DIRECTORY%/}/${scan_config}"
+            change_in_repository="${change_config#./}"
+            # Untracked at both commits, or `git checkout -f` would replace it
+            # with the tracked copy between the two passes.
+            if git ls-files --error-unmatch -- "${change_in_repository}" > /dev/null 2>&1 || git cat-file -e "${base}:${change_in_repository}" 2>/dev/null; then
+              echo "::error title=adaptix/qodana-security::${change_in_repository} is tracked in this repository, so the change-analysis configuration cannot be written there; rename or remove the tracked file."
+              exit 1
+            fi
+            if ! yq eval '.exclude = ((.exclude // []) + [{"name": "CheckDependencyLicenses"}])' "${config_file}" > "${change_config}"; then
+              rm -f "${change_config}"
+              echo "::error title=adaptix/qodana-security::${config_file} could not be read as YAML, so the change-analysis configuration cannot be derived from it."
+              exit 1
+            fi
+            # The profile it names must resolve from the derived file's own
+            # directory, where Qodana resolves it (ops ed8913c's defect).
+            derived_profile="$(yq eval '.profile.path // ""' "${change_config}")"
+            if [ -z "${derived_profile}" ] || [ ! -f "$(dirname "${change_config}")/${derived_profile}" ]; then
+              rm -f "${change_config}"
+              echo "::error title=adaptix/qodana-security::the change-analysis configuration ${change_config} names profile.path '${derived_profile}', which does not resolve from its own directory; the scan would fail before analysing anything."
+              exit 1
+            fi
+            echo "${EVENT}: ${change_config} is ${config_file} with CheckDependencyLicenses (the license audit) excluded; every other inspection, the profile (${derived_profile}) and the bootstrap are unchanged"
+          fi
+          # LICENSE OVERRIDES FOLLOW THE LOCK (QODANA-LICENSE-OVERRIDES-001). A
+          # dependencyOverrides entry tells the license audit a dependency's
+          # license, and Qodana applies it only to the exact version it names.
+          # The fleet's entries were written for the versions locked on the
+          # day, so every Dependabot bump of one of those packages left its
+          # entry behind: the default branch's full analysis, which runs the
+          # audit, then found the new version's license unknown and went red,
+          # while the pull request's change analysis, which leaves the audit
+          # out, had passed (ruff 0.16.8 in Inventory, Integrations, CRR,
+          # Crew, App-Management, Patient-Identity and Device, 2026-09-28).
+          # So the analysed configuration carries every entry at each version
+          # the repository's locks resolve for its name (uv.lock, poetry.lock,
+          # requirements*.txt|lock|in pins, package-lock.json) as well as at
+          # the version written: the license is the fact the owner recorded,
+          # and the lock is what is installed. An entry no lock names stays
+          # as written, and qodana.yaml itself is never rewritten.
+          effective_config="${WORKING_DIRECTORY%/}/${scan_config}"
+          if grep -Eq '^dependencyOverrides:' "${effective_config}"; then
+            if ! command -v yq > /dev/null 2>&1 || ! yq --version 2>/dev/null | grep -Eq 'mikefarah'; then
+              echo "::error title=adaptix/qodana-security::yq 4 (mikefarah) is not on this runner, so the license overrides cannot follow the lock; the scan does not run with stale overrides."
+              exit 1
+            fi
+            if [ "${scan_config}" = "${CONFIG_PATH}" ]; then
+              config_directory="$(dirname "${CONFIG_PATH}")"
+              if [ "${config_directory}" = "." ]; then
+                scan_config="${LOCK_CONFIG_NAME}"
+              else
+                scan_config="${config_directory}/${LOCK_CONFIG_NAME}"
+              fi
+              lock_config="${WORKING_DIRECTORY%/}/${scan_config}"
+              if git ls-files --error-unmatch -- "${lock_config#./}" > /dev/null 2>&1; then
+                echo "::error title=adaptix/qodana-security::${lock_config#./} is tracked in this repository, so the configuration whose license overrides follow the lock cannot be written there; rename or remove the tracked file."
+                exit 1
+              fi
+              cp "${effective_config}" "${lock_config}"
+              effective_config="${lock_config}"
+            fi
+            overrides_json="${effective_config}.overrides.json"
+            followed_json="${effective_config}.followed.json"
+            yq eval -o=json '.dependencyOverrides // []' "${effective_config}" > "${overrides_json}"
+            if ! python3 - "${WORKING_DIRECTORY}" "${overrides_json}" > "${followed_json}" <<'ADAPTIX_LOCKED_VERSIONS'
+          import json
+          import os
+          import re
+          import sys
+          import tomllib
+
+          root, overrides_path = sys.argv[1], sys.argv[2]
+          SKIP = {".git", "node_modules", ".venv", "venv", "build", "dist", "target", ".gradle", ".idea"}
+          PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?\s*==\s*([A-Za-z0-9][A-Za-z0-9._+!-]*)")
+
+
+          def key(name):
+              return re.sub(r"[-_.]+", "-", name).lower()
+
+
+          locked = {}
+
+
+          def add(name, version):
+              if isinstance(name, str) and isinstance(version, str) and name and version:
+                  locked.setdefault(key(name), set()).add(version)
+
+
+          for directory, subdirectories, names in os.walk(root):
+              subdirectories[:] = [name for name in subdirectories if name not in SKIP]
+              for name in names:
+                  path = os.path.join(directory, name)
+                  try:
+                      if name in ("uv.lock", "poetry.lock"):
+                          with open(path, "rb") as handle:
+                              for package in tomllib.load(handle).get("package", []):
+                                  add(package.get("name"), package.get("version"))
+                      elif name == "package-lock.json":
+                          with open(path, encoding="utf-8") as handle:
+                              for location, package in (json.load(handle).get("packages") or {}).items():
+                                  if location:
+                                      add(package.get("name") or location.rsplit("node_modules/", 1)[-1], package.get("version"))
+                      elif name.startswith("requirements") and name.endswith((".txt", ".lock", ".in")):
+                          with open(path, encoding="utf-8", errors="replace") as handle:
+                              for line in handle:
+                                  match = PIN.match(line.strip())
+                                  if match:
+                                      add(match.group(1), match.group(2))
+                  except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
+                      print(f"license overrides: {path} could not be read ({error}); its versions are not followed", file=sys.stderr)
+
+          with open(overrides_path, encoding="utf-8") as handle:
+              overrides = json.load(handle)
+          followed = []
+          seen = set()
+          for entry in overrides if isinstance(overrides, list) else []:
+              versions = [entry.get("version")] if isinstance(entry, dict) else [None]
+              if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                  versions += sorted(locked.get(key(entry["name"]), ()))
+              for version in versions:
+                  item = dict(entry, version=version) if isinstance(entry, dict) else entry
+                  identity = json.dumps(item, sort_keys=True)
+                  if identity not in seen:
+                      seen.add(identity)
+                      followed.append(item)
+          json.dump(followed, sys.stdout)
+          ADAPTIX_LOCKED_VERSIONS
+            then
+              rm -f "${overrides_json}" "${followed_json}"
+              echo "::error title=adaptix/qodana-security::the license overrides of ${effective_config} could not be made to follow the lock."
+              exit 1
+            fi
+            written="$(yq eval '.dependencyOverrides | length' "${effective_config}")"
+            yq eval -i ".dependencyOverrides = load(\"${followed_json}\")" "${effective_config}"
+            rm -f "${overrides_json}" "${followed_json}"
+            echo "${EVENT}: ${effective_config} carries the ${written} license override(s) of ${config_file} at every version the locks resolve ($(yq eval '.dependencyOverrides | length' "${effective_config}") entries); ${config_file} itself is unchanged"
+          fi
+          args="--linter ${LINTER} --config ${scan_config} ${args}"
+          echo "args=${args}" >> "${GITHUB_OUTPUT}"
+          echo "pr_mode=${pr_mode}" >> "${GITHUB_OUTPUT}"
+
+      - name: Qodana scan
+        uses: JetBrains/qodana-action@10be11607eb323a180e2b76b26c9c5cdceac3e77 # v2026.2.1
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+        with:
+          args: ${{ steps.scope.outputs.args }}
+          pr-mode: ${{ steps.scope.outputs.pr_mode == 'true' }}
+          push-fixes: none
+          post-pr-comment: false
+          use-annotations: false
+          upload-result: true
+          # Nothing restored, nothing saved: see NO RESTORED ANALYSIS STATE.
+          # The action's cache directory is its per-run default under
+          # runner.temp, empty at the start of every job.
+          use-caches: false
+
+      - name: Enforce the platform floor on the SARIF report
+        shell: node {0}
+        env:
+          QODANA_RESULTS: ${{ runner.temp }}/qodana/results
+          LINTER: ${{ 'qodana-python' }}
+          # true for a pull_request or merge_group change analysis, which
+          # names the analysis in the summary (A NAME WRITTEN AS A STRING
+          # below); the scan's project directory, where the analysed sources
+          # sit.
+          CHANGE_ANALYSIS: ${{ steps.scope.outputs.pr_mode }}
+          PROJECT_DIR: ${{ '.' }}
+        run: |
+          const fs = require("fs");
+          const path = require("path");
+          const SEVERITIES = ["Critical", "High", "Moderate", "Low", "Info"];
+          const LEVEL_TO_SEVERITY = { error: "High", warning: "Moderate", note: "Low" };
+          // Linters whose analysis needs an interpreter or JDK: without one it
+          // resolves nothing and reports (almost) nothing, silently.
+          const SDK_LINTERS = new Set(["qodana-python", "qodana-android", "qodana-jvm"]);
+          const results = process.env.QODANA_RESULTS;
+          const errors = [];
+          const problems = [];
+          const counts = { new: {}, baselined: {}, sanity: {} };
+          for (const bucket of Object.keys(counts)) for (const severity of SEVERITIES) counts[bucket][severity] = 0;
+          let unrecognised = 0;
+          const severityOf = (result) => result.properties?.qodanaSeverity ?? LEVEL_TO_SEVERITY[result.level];
+          const where = (result) => {
+            const location = result.locations?.[0]?.physicalLocation;
+            const uri = location?.artifactLocation?.uri ?? "?";
+            return location?.region?.startLine === undefined ? uri : `${uri}:${location.region.startLine}`;
+          };
+          // A NAME WRITTEN AS A STRING (QODANA-PR-MAIN-PARITY-001). A
+          // reference written as a STRING -- monkeypatch.setattr(module,
+          // "name", ...), patch("package.attribute") -- is resolved by name,
+          // and Qodana resolves it unreliably in BOTH analyses. A change
+          // analysis resolves it only through the index of the changed files:
+          // Adaptix-Hospital-Service #208 (run 36216566864) reported
+          // "Unresolved reference 'EventBusPublisherClient'" at
+          // monkeypatch.setattr(bus, "EventBusPublisherClient", fake), a name
+          // event_bus.py imports on line 42. A full analysis misses names that
+          // exist as well. Until 2026-09-28 only a change analysis listed such
+          // a result and a full analysis failed on it, so four changes the
+          // merge queue had passed turned the default branch red on their push
+          // runs, each on monkeypatch targets that exist and on nothing else:
+          // Adaptix-Inventory-Service 1fa4f706 (run 36365477512,
+          // monkeypatch.setattr(events.httpx, "AsyncClient", ...)),
+          // Adaptix-Documents-Service f85ec8df (run 36363334525),
+          // Adaptix-Vision-Service c183725a (run 36364032621,
+          // "publish_vision_event", which artifact_service.py imports on line
+          // 26) and Adaptix-QHIN-Service 2401dcab (run 36356026682,
+          // "QHINClient" and "MIHClient"). A verdict the pull request could not
+          // see is not a gate. Such a result says nothing about the interpreter
+          // or the dependencies -- a missing dependency also leaves the
+          // module's own imports unresolved, and those still fail -- so in
+          // EVERY analysis it is listed in the summary and not counted as
+          // incompleteness. Every other sanity result -- an unresolved import,
+          // an unresolved attribute read, a missing module -- fails both
+          // analyses. The classification reads the reported line from the
+          // checked-out project: a result whose file or line cannot be read is
+          // not proven and still counts.
+          const changeAnalysis = process.env.CHANGE_ANALYSIS === "true";
+          const projectDir = process.env.PROJECT_DIR || ".";
+          const literalReferences = [];
+          const insideStringLiteral = (result) => {
+            const location = result.locations?.[0]?.physicalLocation;
+            const uri = location?.artifactLocation?.uri;
+            const line = location?.region?.startLine;
+            if (typeof uri !== "string" || typeof line !== "number") return false;
+            let text;
+            try {
+              text = fs.readFileSync(path.join(projectDir, uri), "utf8").split(/\r?\n/)[line - 1];
+            } catch {
+              return false;
+            }
+            if (typeof text !== "string") return false;
+            const name = /reference '([^']+)'/.exec(result.message?.text ?? "")?.[1];
+            if (name === undefined) return false;
+            // Mark every column that sits inside a quoted string on the line
+            // (single, double or backtick quotes; a backslash escapes the next
+            // character). The opening and closing quotes count as inside.
+            const inString = new Array(text.length).fill(false);
+            let quote = null;
+            let escaped = false;
+            for (let i = 0; i < text.length; i += 1) {
+              const ch = text[i];
+              if (quote !== null) {
+                inString[i] = true;
+                if (escaped) escaped = false;
+                else if (ch === "\\") escaped = true;
+                else if (ch === quote) quote = null;
+              } else if (ch === '"' || ch === "'" || ch === "`") {
+                quote = ch;
+                inString[i] = true;
+              }
+            }
+            const column = location.region?.startColumn;
+            if (typeof column === "number" && column >= 1 && column <= text.length) return inString[column - 1] === true;
+            // Without a column, every occurrence of the name on the line must be quoted.
+            let index = text.indexOf(name);
+            if (index === -1) return false;
+            while (index !== -1) {
+              if (!inString[index]) return false;
+              index = text.indexOf(name, index + name.length);
+            }
+            return true;
+          };
+          const sarifPath = path.join(results, "qodana.sarif.json");
+          let sarif = null;
+          try {
+            sarif = JSON.parse(fs.readFileSync(sarifPath, "utf8"));
+          } catch (error) {
+            errors.push(`no readable Qodana SARIF report at ${sarifPath} (${error.message}); a scan without a report is not a pass`);
+          }
+          const runs = sarif !== null && Array.isArray(sarif.runs) ? sarif.runs : [];
+          if (sarif !== null && runs.length === 0) errors.push("the SARIF report holds no run");
+          const sanityByRule = {};
+          const sanityExamples = [];
+          for (const run of runs) {
+            const failed = (run.invocations ?? []).some((invocation) => invocation.executionSuccessful === false);
+            if (failed) errors.push("Qodana reports its own execution as unsuccessful");
+            if (!Array.isArray(run.results)) {
+              errors.push("a SARIF run carries no results array");
+              continue;
+            }
+            for (const result of run.results) {
+              const state = result.baselineState ?? "";
+              if (state === "absent") continue;
+              // A result without qodanaSeverity is judged by its SARIF level,
+              // exactly as the Qodana CLI does (qodana-cli ext_gitlab.go
+              // toCodeClimateSeverity: error ranks with High, warning with
+              // Moderate, note with Low). One with neither is unrecognised.
+              const severity = severityOf(result);
+              if (!SEVERITIES.includes(severity)) {
+                unrecognised += 1;
+                continue;
+              }
+              counts[state === "unchanged" ? "baselined" : "new"][severity] += 1;
+            }
+            // SANITY. Qodana keeps its project-configuration problems apart
+            // from the results, under run.properties["qodana.sanity.results"]:
+            // references the analysis could not resolve (dependencies not
+            // installed, missing modules, no interpreter). They are what Qodana
+            // Cloud calls "Possible project misconfiguration", they are never
+            // baselined, and a report that has them may be incomplete. The
+            // property is absent when there are none.
+            const properties = run.properties ?? {};
+            if (!Object.prototype.hasOwnProperty.call(properties, "qodana.sanity.results")) continue;
+            const sanity = properties["qodana.sanity.results"];
+            if (!Array.isArray(sanity)) {
+              errors.push('run.properties["qodana.sanity.results"] is not a list, so the sanity problems cannot be counted');
+              continue;
+            }
+            for (const result of sanity) {
+              if ((result.baselineState ?? "") === "absent") continue;
+              if (insideStringLiteral(result)) {
+                literalReferences.push(where(result));
+                continue;
+              }
+              const severity = severityOf(result);
+              if (SEVERITIES.includes(severity)) counts.sanity[severity] += 1;
+              else unrecognised += 1;
+              const rule = typeof result.ruleId === "string" ? result.ruleId : "an unnamed rule";
+              sanityByRule[rule] = (sanityByRule[rule] ?? 0) + 1;
+              if (sanityExamples.length < 5) sanityExamples.push(where(result));
+            }
+          }
+          const sanityTotal = Object.values(sanityByRule).reduce((sum, count) => sum + count, 0);
+          if (sanityTotal > 0) {
+            const rules = Object.entries(sanityByRule).map(([rule, count]) => `${rule} x${count}`).join(", ");
+            problems.push(`${sanityTotal} sanity problem(s) -- ${rules}; e.g. ${sanityExamples.join(", ")}. The analysis could not resolve these references: install the project's dependencies (bootstrap) and give it its interpreter or SDK`);
+          }
+          const notes = [];
+          if (literalReferences.length > 0) {
+            notes.push(`${changeAnalysis ? "Change analysis" : "Full analysis"}: ${literalReferences.length} sanity result(s) point at a name inside a string literal (${literalReferences.slice(0, 5).join(", ")}${literalReferences.length > 5 ? ", ..." : ""}); Qodana resolves a name written as a string unreliably in both analyses, so they are listed here and not counted as incompleteness, in a pull request, a merge group and on the default branch alike.`);
+          }
+          // THE LANGUAGE SERVICES. The IDE log records a language service that
+          // ran out of memory ("OOM crash detected in typescript service with
+          // configured max memory 1024 MB"), each silent restart, and the point
+          // where it gives up ("Won't restart typescript service silently after
+          // an OOM crash, attempt limit exceeded"). Requests in flight are lost
+          // at every crash, and after the last one the analysis continues
+          // without the service (Adaptix-Web-App run 36153196460: three crashes,
+          // then 21 minutes without it).
+          const logFiles = [];
+          const collect = (directory) => {
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const full = path.join(directory, entry.name);
+              if (entry.isDirectory()) collect(full);
+              else if (/^idea(\.\d+)?\.log$/.test(entry.name)) logFiles.push(full);
+            }
+          };
+          try {
+            collect(results);
+          } catch (error) {
+            errors.push(`the Qodana results directory ${results} cannot be read (${error.message})`);
+          }
+          if (logFiles.length === 0) errors.push(`no IDE log (idea.log) under ${results}, so the analysis cannot be shown to have run with its language services`);
+          // Every crash ends in exactly one restart or the give-up, so those
+          // are counted; a detection with neither still counts as one crash.
+          const crashes = {};
+          const abandoned = {};
+          const limits = {};
+          // THE TYPESCRIPT SERVICE CHOICE (QODANA-TS7-SINGLE-PASS-001, the
+          // scope step). The IDE reports, in its own words, choosing the
+          // classic TypeScriptServerServiceImpl and TypeScript-Go for one
+          // project ("TypeScriptServerServiceImpl != class
+          // com.intellij.lang.typescript.lsp.TypeScriptGoLspService"), and a
+          // classic service that never became ready in a project TypeScript-Go
+          // analysed ("TypeScriptServerServiceImpl: Timed out waiting for ready
+          // notification" beside a TypeScriptGoLspClientDescriptor). Either
+          // means the files analysed before TypeScript-Go came up were judged
+          // without the project's TypeScript (#1515: 50 false Criticals). A
+          // classic timeout in a project that never started TypeScript-Go is a
+          // TypeScript 5 service starting slowly, and is not this.
+          let serviceChoiceSplit = false;
+          let classicTimeouts = 0;
+          let typescriptGo = false;
+          for (const file of logFiles) {
+            for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+              const restarted = /Restarting (\S+) service silently after an OOM crash/.exec(line);
+              const gaveUp = /Won't restart (\S+) service silently after an OOM crash/.exec(line);
+              const detected = /OOM crash detected in (\S+) service with configured max memory (\d+) MB/.exec(line);
+              if (restarted) crashes[restarted[1]] = (crashes[restarted[1]] ?? 0) + 1;
+              if (gaveUp) {
+                crashes[gaveUp[1]] = (crashes[gaveUp[1]] ?? 0) + 1;
+                abandoned[gaveUp[1]] = true;
+              }
+              if (detected) limits[detected[1]] = detected[2];
+              // IdempotenceChecker prints the first result, then the recomputed one: either order.
+              if (/TypeScriptServerServiceImpl != class com\.intellij\.lang\.typescript\.lsp\.TypeScriptGoLspService|TypeScriptGoLspService != class com\.intellij\.lang\.typescript\.compiler\.languageService\.TypeScriptServerServiceImpl/.test(line)) serviceChoiceSplit = true;
+              if (/TypeScriptServerServiceImpl: Timed out waiting for ready notification/.test(line)) classicTimeouts += 1;
+              if (/TypeScriptGoLspClientDescriptor/.test(line)) typescriptGo = true;
+            }
+          }
+          if (serviceChoiceSplit || (classicTimeouts > 0 && typescriptGo)) {
+            const said = [];
+            if (serviceChoiceSplit) said.push("the IDE chose both the classic TypeScriptServerServiceImpl and TypeScript-Go for this project (IdempotenceChecker: non-idempotent computation)");
+            if (classicTimeouts > 0 && typescriptGo) said.push(`the classic service timed out ${classicTimeouts} time(s) waiting to be ready in a project TypeScript-Go analysed`);
+            problems.push(`the TypeScript language service was not settled: ${said.join("; ")}. Files analysed before TypeScript-Go came up were judged without the project's TypeScript (QODANA-TS7-SINGLE-PASS-001)`);
+          }
+          for (const service of Object.keys(limits)) if (crashes[service] === undefined) crashes[service] = 1;
+          for (const [service, count] of Object.entries(crashes)) {
+            const limit = limits[service] === undefined ? "" : ` at its ${limits[service]} MB limit`;
+            const end = abandoned[service]
+              ? "; Qodana then stopped restarting it and analysed the rest of the project without it"
+              : "; requests in flight at each crash were lost";
+            problems.push(`the ${service} language service ran out of memory${limit} ${count} time(s)${end}`);
+          }
+          // THE SDK. Qodana lists the interpreters and JDKs the analysis used in
+          // projectStructure/SDKs.json. One with no roots was never set up: the
+          // analysis then resolves nothing and reports nothing -- a silent
+          // green (measured: a qodana-python scan with no interpreter reported
+          // 0 problems and 0 sanity problems over planted High defects).
+          if (SDK_LINTERS.has(process.env.LINTER)) {
+            const sdkPath = path.join(results, "projectStructure", "SDKs.json");
+            let sdks = null;
+            try {
+              sdks = JSON.parse(fs.readFileSync(sdkPath, "utf8")).sdks;
+            } catch (error) {
+              errors.push(`no readable SDK list at ${sdkPath} (${error.message}), so the analysis cannot be shown to have had its interpreter or JDK`);
+            }
+            if (sdks !== null) {
+              const list = Array.isArray(sdks) ? sdks : [];
+              const rooted = list.filter((sdk) => Array.isArray(sdk.roots) && sdk.roots.length > 0);
+              const empty = list.filter((sdk) => typeof sdk.name === "string" && sdk.name !== "" && !(Array.isArray(sdk.roots) && sdk.roots.length > 0));
+              if (rooted.length === 0) problems.push(`the analysis had no usable interpreter or JDK (${list.length} SDK(s) listed, none with roots): name one in qodana.yaml (for Python, properties qodana.python.path)`);
+              for (const sdk of empty) problems.push(`SDK ${sdk.name} has no roots: it was never set up, so code that depends on it was not resolved`);
+            }
+          }
+          const blocking = counts.new.Critical + counts.new.High;
+          const baselinedBlocking = counts.baselined.Critical + counts.baselined.High;
+          if (blocking > 0) errors.push(`${blocking} Critical/High finding(s) are present`);
+          if (baselinedBlocking > 0) errors.push(`${baselinedBlocking} Critical/High finding(s) are carried in the baseline, which the baseline policy forbids`);
+          if (unrecognised > 0) errors.push(`${unrecognised} finding(s) carry neither a Qodana severity nor a SARIF level, so they cannot be proven below High`);
+          for (const problem of problems) errors.push(`the analysis may be incomplete: ${problem}`);
+          const rows = SEVERITIES.map((severity) => `| ${severity} | ${counts.new[severity]} | ${counts.baselined[severity]} | ${counts.sanity[severity]} |`);
+          const summary = [
+            "### adaptix/qodana-security",
+            "",
+            "| Severity | New | In baseline | Sanity |",
+            "| --- | --- | --- | --- |",
+            ...rows,
+            "",
+            problems.length === 0 ? "Configuration: complete (no sanity problem, language service crash, unsettled TypeScript service or missing SDK)." : `Configuration: INCOMPLETE -- ${problems.join("; ")}.`,
+            ...notes.flatMap((note) => ["", note]),
+            "",
+            errors.length === 0 ? "Platform floor: PASS (no Critical or High finding, complete analysis)." : `Platform floor: FAIL -- ${errors.join("; ")}.`,
+            "",
+          ].join("\n");
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          console.log(summary);
+          for (const message of errors) console.log(`::error title=adaptix/qodana-security::${message}`);
+          process.exitCode = errors.length === 0 ? 0 : 1;

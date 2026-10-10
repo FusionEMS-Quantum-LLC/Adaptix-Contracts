@@ -1,20 +1,23 @@
-# Qodana configuration for Adaptix-Contracts (QOD-004 carrier shape, fleet rollout).
+# Qodana configuration for Adaptix-Contracts (QOD-004, fleet rollout).
 #
-# The scan runs only through .github/workflows/qodana.yml, the thin carrier
-# that calls FusionEMS-Quantum-LLC/adaptix-ops qodana-reusable.yml and
-# publishes the check "adaptix/qodana-security / scan". This file holds the
-# analysis settings the reusable workflow reads through its config-path input.
+# The scan runs only through .github/workflows/qodana.yml and publishes the
+# check "adaptix/qodana-security / scan". This repository is public, and a
+# public repository cannot call a reusable workflow kept in a private one, so
+# that workflow is the native form (adaptix-ops NATIVE-QODANA-001): the scan
+# job of FusionEMS-Quantum-LLC/adaptix-ops qodana-reusable.yml at the commit
+# it names, rendered by adaptix-ops and never edited by hand. This file holds
+# the analysis settings that job reads at its recorded config-path.
 #
 # linter is the one adaptix-ops config/qodana-fleet.json assigns this
-# repository (repo.yaml runtime.kind python -> qodana-python); the reusable
-# workflow passes the same value as --linter.
+# repository (repo.yaml runtime.kind python -> qodana-python); the workflow
+# passes the same value as --linter.
 version: "1.0"
 linter: qodana-python
 
 # The directive's required profile (adaptix-ops scripts/lib/qodanaAudit.ts
 # REQUIRED_QODANA_PROFILE). Without it Qodana runs the smaller qodana.starter.
 profile:
-  name: qodana.recommended
+  path: .qodana/profiles/adaptix.recommended.yaml
 
 # THE INTERPRETER AND ITS PACKAGES. With no interpreter configured, Qodana for
 # Python analyses with no SDK at all, and every PEP 604 union (`str | None`)

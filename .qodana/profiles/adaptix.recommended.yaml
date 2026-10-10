@@ -1,0 +1,37 @@
+# The Adaptix fleet Qodana profile: JetBrains qodana.recommended with all test
+# code analysed like product code (owner decision 2026-09-25). Rendered by
+# adaptix-ops scripts/lib/qodanaProfile.ts (npm run qodana:render-config); the
+# reusable Qodana workflow refuses any other content. Do not edit by hand.
+#
+# qodana.recommended ignores three test locations for every inspection:
+# tests/** (a top-level tests/ folder), **.test.ts, and scope#test:*..* (the
+# IDE's test source roots, such as Gradle src/test and src/androidTest). The
+# first block re-enables exactly those. The second restates the remaining
+# qodana.recommended ignores after it, so vendored, generated, build,
+# gitignored and Markdown content under a test path stays excluded as it is
+# under a product path: a later scope takes precedence. No inspection,
+# severity or option is changed.
+baseProfile: qodana.recommended
+name: adaptix.recommended
+inspections:
+  - group: ALL
+    ignore:
+      - "!tests/**"
+      - "!**.test.ts"
+      - "!scope#test:*..*"
+  - group: ALL
+    ignore:
+      - "vendor/**"
+      - "build/**"
+      - "buildSrc/**"
+      - "builds/**"
+      - "dist/**"
+      - "tools/**"
+      - ".qodana/**"
+      - "**/node_modules/**"
+      - "scope#$gitignore"
+      - "scope#file:buildSrc/*"
+      - "**.md"
+  - group: "category:JavaScript and TypeScript"
+    ignore:
+      - "**/resources/**"
