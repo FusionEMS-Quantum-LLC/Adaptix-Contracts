@@ -25,6 +25,7 @@ import hashlib
 import hmac
 import json
 import time
+from unittest.mock import patch
 from uuid import uuid4
 
 import jwt as pyjwt
@@ -368,6 +369,119 @@ def test_direct_bearer_wrong_app_client_rejected_401(
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401, resp.text
     assert resp.json()["detail"]["code"] == "invalid_bearer_token"
+
+
+def _bearer_outcome(token: str) -> tuple[int, str]:
+    """The status a direct bearer gets and, for a refusal, its detail code."""
+    resp = TestClient(_bearer_app()).get(
+        "/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"}
+    )
+    if resp.status_code == 200:
+        return 200, ""
+    return resp.status_code, str(resp.json()["detail"]["code"])
+
+
+def test_direct_id_token_for_this_app_client_passes(
+    monkeypatch: pytest.MonkeyPatch, rsa_keypair: tuple[str, str]
+) -> None:
+    # An ID token carries the app client in `aud`; one minted for this client
+    # is verified by the library against the configured audience and accepted.
+    private_pem, public_pem = rsa_keypair
+    _set_cognito_env(monkeypatch)
+    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    token = _cognito_token(private_pem, token_use="id", module_entitlements=["billing"])
+    assert _bearer_outcome(token) == (200, "")
+
+
+def test_direct_id_token_for_another_app_client_is_refused_by_the_library(
+    monkeypatch: pytest.MonkeyPatch,
+    rsa_keypair: tuple[str, str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # An ID token whose `aud` names another client never reaches the claim
+    # checks: PyJWT refuses it (InvalidAudienceError), because the audience
+    # check is on for every bearer.
+    private_pem, public_pem = rsa_keypair
+    _set_cognito_env(monkeypatch)
+    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    token = _cognito_token(
+        private_pem,
+        token_use="id",
+        client_id="some-other-client",
+        module_entitlements=["billing"],
+    )
+    with caplog.at_level("WARNING", logger=meg.logger.name):
+        outcome = _bearer_outcome(token)
+    assert outcome == (401, "invalid_bearer_token")
+    assert [r.getMessage() for r in caplog.records] == [
+        "module_entitlement_gate: rejecting unverifiable direct bearer "
+        "(InvalidAudienceError)"
+    ]
+
+
+def test_direct_access_token_carrying_a_foreign_audience_is_refused_401(
+    monkeypatch: pytest.MonkeyPatch, rsa_keypair: tuple[str, str]
+) -> None:
+    # THE FIX: an access token that carries an `aud` for another client used to
+    # be accepted on its `client_id` alone, because the audience check was
+    # switched off for every bearer. A bearer that names an audience now has
+    # it verified, whatever its token_use.
+    private_pem, public_pem = rsa_keypair
+    _set_cognito_env(monkeypatch)
+    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    token = _cognito_token(
+        private_pem, aud="some-other-client", module_entitlements=["billing"]
+    )
+    assert _bearer_outcome(token) == (401, "invalid_bearer_token")
+
+
+def test_direct_access_token_carrying_this_audience_passes(
+    monkeypatch: pytest.MonkeyPatch, rsa_keypair: tuple[str, str]
+) -> None:
+    # An access token that does carry this client's `aud` is still bound by its
+    # `client_id`, and is accepted when both name this app client.
+    private_pem, public_pem = rsa_keypair
+    _set_cognito_env(monkeypatch)
+    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    token = _cognito_token(
+        private_pem, aud=_COGNITO_CLIENT_ID, module_entitlements=["billing"]
+    )
+    assert _bearer_outcome(token) == (200, "")
+    mismatched = _cognito_token(
+        private_pem,
+        aud=_COGNITO_CLIENT_ID,
+        client_id="some-other-client",
+        module_entitlements=["billing"],
+    )
+    assert _bearer_outcome(mismatched) == (401, "invalid_bearer_token")
+
+
+def test_the_audience_check_is_on_for_every_decode(
+    monkeypatch: pytest.MonkeyPatch, rsa_keypair: tuple[str, str]
+) -> None:
+    # No bearer is ever decoded with verify_aud off: an access token is decoded
+    # once with no audience expected, an ID token a second time with the
+    # configured audience named.
+    private_pem, public_pem = rsa_keypair
+    _set_cognito_env(monkeypatch)
+    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+
+    def decodes_of(token: str) -> list[tuple[object, object]]:
+        # The gate and this test import the same `jwt` module, so the spy sees
+        # every decode the gate makes, and passes each one through.
+        with patch.object(pyjwt, "decode", wraps=pyjwt.decode) as decode:
+            assert _bearer_outcome(token) == (200, "")
+        return [
+            (call.kwargs["options"]["verify_aud"], call.kwargs.get("audience"))
+            for call in decode.call_args_list
+        ]
+
+    access = _cognito_token(private_pem, module_entitlements=["billing"])
+    assert decodes_of(access) == [(True, None)]
+    id_token = _cognito_token(
+        private_pem, token_use="id", module_entitlements=["billing"]
+    )
+    assert decodes_of(id_token) == [(True, None), (True, [_COGNITO_CLIENT_ID])]
 
 
 def test_no_identity_at_all_is_401_missing_bearer(client: TestClient) -> None:

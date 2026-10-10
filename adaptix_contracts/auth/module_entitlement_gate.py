@@ -326,6 +326,65 @@ def _id_token_audiences(aud: object) -> set[str]:
     return set()
 
 
+def _decode_cognito_bearer(
+    token: str, config: AdaptixCognitoConfig
+) -> dict[str, object]:
+    """Verify a Cognito bearer's signature and claims with the audience check on.
+
+    A Cognito ACCESS token carries no ``aud`` (its app client is in
+    ``client_id``); an ID token carries its app client in ``aud``. PyJWT, given
+    no audience to expect, accepts a token that has no ``aud`` and refuses one
+    that has (``InvalidAudienceError``). So the bearer is verified first as a
+    token that must carry no audience, and only a bearer refused for carrying
+    one is verified again, as a token whose ``aud`` must be one of this pool's
+    app clients.
+
+    ``verify_aud`` is never switched off: a token whose ``aud`` names another
+    client is refused here, by the library, before any claim is read. The
+    caller still binds the bearer to the app client by ``token_use``, which is
+    the only binding an access token has.
+
+    Raises:
+        jwt.PyJWTError: the bearer is not verifiable for any reason.
+    """
+    signing_key = _cognito_signing_key(token, config)
+    try:
+        return pyjwt.decode(
+            token,
+            signing_key,
+            algorithms=list(_COGNITO_ALGORITHMS),
+            issuer=config.issuer,
+            leeway=config.clock_skew_seconds,
+            options={
+                "require": ["exp", "iat", "sub", "token_use"],
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_iat": True,
+                "verify_iss": True,
+                "verify_aud": True,
+            },
+        )
+    except pyjwt.InvalidAudienceError:
+        # The bearer carries `aud`, as an ID token does. It is verified again
+        # with the audiences this service accepts; an empty list accepts none.
+        return pyjwt.decode(
+            token,
+            signing_key,
+            algorithms=list(_COGNITO_ALGORITHMS),
+            issuer=config.issuer,
+            audience=[client for client in config.allowed_audiences if client],
+            leeway=config.clock_skew_seconds,
+            options={
+                "require": ["exp", "iat", "sub", "token_use", "aud"],
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_iat": True,
+                "verify_iss": True,
+                "verify_aud": True,
+            },
+        )
+
+
 def _verify_direct_bearer_claims(token: str) -> dict[str, object]:
     """Return VERIFIED claims for a direct (non-gateway) bearer, or fail closed.
 
@@ -376,24 +435,7 @@ def _verify_direct_bearer_claims(token: str) -> dict[str, object]:
         )
 
     try:
-        signing_key = _cognito_signing_key(token, config)
-        claims: dict[str, object] = pyjwt.decode(
-            token,
-            signing_key,
-            algorithms=list(_COGNITO_ALGORITHMS),
-            issuer=config.issuer,
-            leeway=config.clock_skew_seconds,
-            options={
-                "require": ["exp", "iat", "sub", "token_use"],
-                "verify_signature": True,
-                "verify_exp": True,
-                "verify_iat": True,
-                "verify_iss": True,
-                # Cognito ACCESS tokens carry no `aud`; the audience / app-client
-                # binding is enforced explicitly below against `token_use`.
-                "verify_aud": False,
-            },
-        )
+        claims = _decode_cognito_bearer(token, config)
     except pyjwt.PyJWTError as exc:
         logger.warning(
             "module_entitlement_gate: rejecting unverifiable direct bearer (%s)",
