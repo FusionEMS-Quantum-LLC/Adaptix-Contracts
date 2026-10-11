@@ -1,0 +1,7 @@
+# The generated catalogs are compared byte for byte with the exporters' LF output
+# (tests/test_application_registry.py::test_committed_catalog_json_is_current and
+# tests/test_commercial_offer_catalog.py::TestExports::test_committed_commercial_catalog_json_is_current).
+# Without this, a Windows checkout with core.autocrlf=true writes them as CRLF and
+# both tests fail on a tree that matches the repository exactly.
+adaptix_contracts/application_catalog.json text eol=lf
+adaptix_contracts/commercial_catalog.json text eol=lf
