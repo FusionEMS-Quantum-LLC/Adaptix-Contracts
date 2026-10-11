@@ -27,6 +27,31 @@ from the installed package metadata).
     explicit `null` for a field fail validation and are never coerced.
   - Every model is strict, frozen and forbids unknown keys.
 
+### Security
+
+- **The entitlement gate's direct-bearer verifier always checks the
+  audience** (#385).
+  - Before: a direct (non-gateway) bearer was decoded with `verify_aud` off,
+    and the client was bound from the claims afterwards. A pool-signed
+    access token whose `aud` named another app client was accepted on its
+    `client_id` alone.
+  - Now: the bearer is verified with no audience expected. A token that
+    carries an `aud` is verified a second time against the configured app
+    clients, with `aud` required.
+  - **Newly refused:** a bearer whose `aud` names an app client this
+    service does not accept is refused 401 `invalid_bearer_token`.
+  - **Unchanged:** a Cognito access token, which carries no `aud`, and an
+    ID token whose `aud` is one of the configured app clients.
+  - **Repin evidence:** a service that mounts a `require_*_entitlement`
+    gate and takes this release shows that its direct-bearer callers send
+    one of the unchanged token kinds, and that its tests of the direct path
+    still pass.
+
+### Changed
+
+- The `dev` extra pins `ruff` 0.16.10 (was 0.16.9) and `mypy` 2.4.0 (was
+  2.3.1) (#379). Neither is a runtime dependency of the package.
+
 ## [5.42.0] - 2026-10-07
 
 ### Added
