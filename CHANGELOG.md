@@ -10,6 +10,23 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [5.43.0] - 2026-10-11
+
+### Added
+
+- **`ACINScoringContext`** (`adaptix_contracts.acin.scoring_context`, exported
+  from `adaptix_contracts.acin`) is the input of AI-Service's ACIN scoring
+  rules, the body EPCR's ACIN assembler sends to `POST /api/v1/ai/acin/score`.
+  - It is moved unchanged from AI-Service `ai_app/acin/scoring/context.py`
+    (AI-Service #354 and #356, acin-scoring-rules 2.0.0), so the producer and
+    the consumer import one model.
+  - Absent means unknown: an absent section or field reads `None`, and a
+    metric that reads it is `insufficient_evidence`. A producer omits what it
+    cannot substantiate.
+  - Malformed is refused: wrong types, unknown keys, negative counts, and an
+    explicit `null` for a field fail validation and are never coerced.
+  - Every model is strict, frozen and forbids unknown keys.
+
 ## [5.42.0] - 2026-10-07
 
 ### Added
