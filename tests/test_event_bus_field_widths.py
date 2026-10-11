@@ -94,7 +94,7 @@ def test_the_constant_is_not_sized_to_todays_observed_lengths() -> None:
         len(labor_correlation_id(LABOR_SHIFT_CREATED)),
         len(labor_correlation_id(LABOR_SHIFT_CANCELLED)),
     )
-    assert BUS_CORRELATION_ID_MAX_LENGTH > longest_observed
+    assert longest_observed < BUS_CORRELATION_ID_MAX_LENGTH
 
 
 def test_both_import_paths_resolve_to_the_same_owner() -> None:
@@ -170,7 +170,7 @@ def test_an_envelope_refuses_a_correlation_id_one_character_over(
 
     too_long = "c" * (BUS_CORRELATION_ID_MAX_LENGTH + 1)
     with pytest.raises(ValidationError) as caught:
-        model.model_validate(kwargs(too_long))
+        _ = model.model_validate(kwargs(too_long))
     assert "correlation_id" in str(caught.value)
 
 
@@ -191,7 +191,8 @@ def test_the_envelope_bound_is_read_from_the_owner_not_a_literal() -> None:
     """A second copy of the number would be the defect this card is about."""
 
     for model in (AdaptixEventEnvelope, OperationalEventEnvelope):
-        field = model.model_fields["correlation_id"]
+        field = model.model_fields.get("correlation_id")
+        assert field is not None
         lengths = [
             getattr(item, "max_length", None)
             for item in field.metadata

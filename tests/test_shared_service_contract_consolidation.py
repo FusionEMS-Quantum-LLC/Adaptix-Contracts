@@ -490,7 +490,8 @@ def test_payer_type_divergence_is_versioned_not_unified() -> None:
     assert canonical == billing | intake
 
     # The divergence is real and preserved (not silently unified).
-    assert "other" in billing and "other" not in intake
+    assert "other" in billing
+    assert "other" not in intake
     assert {"tricare", "workers_comp"}.issubset(intake)
     assert {"tricare", "workers_comp"}.isdisjoint(billing)
 

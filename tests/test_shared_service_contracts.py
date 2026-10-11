@@ -78,6 +78,11 @@ from adaptix_contracts.schemas import (
 )
 
 
+#: A stand-in for the signed JWT an RTC provider issues. It is three dotted
+#: words, not a credential: no key signed it and nothing verifies it.
+_SAMPLE_PARTICIPANT_JWT = "jwt.token.value"
+
+
 def _ts() -> datetime:
     """Return a deterministic UTC timestamp for regression tests."""
 
@@ -405,7 +410,7 @@ def _rtc_participant_token() -> RTCParticipantToken:
         session_id=uuid4(),
         room_name="dispatch-42",
         participant_identity="user-001",
-        token="jwt.token.value",
+        token=_SAMPLE_PARTICIPANT_JWT,
         url="wss://rtc.adaptixcore.com",
         expires_at=_ts(),
     )
@@ -555,8 +560,14 @@ def test_audit_event_is_immutable() -> None:
     """AuditEvent must be frozen so audit records cannot be mutated in place."""
 
     event = _audit_event()
-    with pytest.raises(ValidationError):
-        event.action = "tampered"
+    before = event.model_dump()
+    # Every field the record carries, written by name: a frozen model refuses
+    # the write itself, whatever the value, so nothing changes after the record
+    # exists.
+    for field in before:
+        with pytest.raises(ValidationError):
+            setattr(event, field, None)
+    assert event.model_dump() == before
 
 
 def test_notification_request_reused_from_communications() -> None:
@@ -577,7 +588,7 @@ def test_decimal_money_fields_reject_negative_amounts() -> None:
     """Monetary Decimal fields reject financially impossible negatives."""
 
     with pytest.raises(ValidationError):
-        InvoiceRef(
+        _ = InvoiceRef(
             tenant_id=uuid4(),
             stripe_invoice_id="in_123",
             stripe_customer_id="cus_123",
@@ -590,7 +601,7 @@ def test_geo_coordinate_rejects_out_of_range_latitude() -> None:
     """Coordinates outside valid WGS84 bounds are rejected."""
 
     with pytest.raises(ValidationError):
-        GeoCoordinate(latitude=91.0, longitude=0.0)
+        _ = GeoCoordinate(latitude=91.0, longitude=0.0)
 
 
 def test_expected_delivery_date_is_a_date() -> None:
