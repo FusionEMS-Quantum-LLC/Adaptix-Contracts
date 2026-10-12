@@ -7,13 +7,12 @@ import re
 import shutil
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Literal, TypedDict
 
 import boto3
 import yaml
-
 
 ROOT = pathlib.Path.cwd()
 REPORT = ROOT / "bedrock-repair-report.md"
@@ -65,12 +64,22 @@ ALLOWED_MODEL_PREFIXES = (
 # the two name the same file.
 _PATCH_ARTIFACT_ARGS = (str(PATCH_ARTIFACT), PATCH_ARTIFACT.name)
 
+
 # I/O options shared by every ``subprocess.run`` call site below. ``shell`` is
 # pinned here rather than restated 15 times, so no spawn in this module can hand
 # an argument to a shell to reparse. ``check`` is deliberately NOT in here: it is
 # passed explicitly at every call site so the spawn's failure mode is readable
 # where it happens.
-_SPAWN_IO: dict[str, Any] = {
+class _SpawnIO(TypedDict):
+    """The keyword arguments every runner below passes to ``subprocess.run``."""
+
+    cwd: pathlib.Path
+    text: Literal[True]
+    capture_output: Literal[True]
+    shell: Literal[False]
+
+
+_SPAWN_IO: _SpawnIO = {
     "cwd": ROOT,
     "text": True,
     "capture_output": True,
@@ -169,7 +178,7 @@ class CommandResult:
     stderr: str
 
 
-def validated_argv(command: list[str]) -> list[str]:
+def validated_argv(command: Sequence[object]) -> list[str]:
     """Return ``command`` as an argv list, or raise if it is not permitted.
 
     Enforces three properties at the single point where this module decides what
@@ -264,13 +273,18 @@ def validate_model_id(model_id: str) -> None:
 def get_identity() -> dict[str, str]:
     aws_region = require_env("AWS_REGION")
     sts = boto3.client("sts", region_name=aws_region)
-    identity = sts.get_caller_identity()
+    reply = sts.get_caller_identity()
+    identity = {
+        "Account": reply.get("Account", ""),
+        "Arn": reply.get("Arn", ""),
+        "UserId": reply.get("UserId", ""),
+    }
     CALLER_IDENTITY.write_text(
         "\n".join(
             [
-                f"Account: {identity.get('Account')}",
-                f"Arn: {identity.get('Arn')}",
-                f"UserId: {identity.get('UserId')}",
+                f"Account: {identity['Account']}",
+                f"Arn: {identity['Arn']}",
+                f"UserId: {identity['UserId']}",
             ]
         )
         + "\n",
@@ -301,28 +315,41 @@ def preflight() -> int:
     return 0
 
 
+def converse_text(aws_region: str, model_id: str, prompt: str, max_tokens: int) -> str:
+    """Send ``prompt`` to Bedrock Converse and return the first content block's text.
+
+    Converse's reply may omit ``output.message``, and a content block may carry
+    no ``text`` (a tool-use or reasoning block); either is reported as an error
+    instead of surfacing as a KeyError from inside the reply.
+    """
+    client = boto3.client("bedrock-runtime", region_name=aws_region)
+    response = client.converse(
+        modelId=model_id,
+        messages=[{"role": "user", "content": [{"text": prompt}]}],
+        inferenceConfig={"maxTokens": max_tokens, "temperature": 0},
+    )
+    message = response["output"].get("message")
+    if message is None or not message["content"]:
+        raise RuntimeError("Bedrock Converse returned no message content.")
+    text = message["content"][0].get("text")
+    if text is None:
+        raise RuntimeError(
+            "Bedrock Converse returned a first content block without text."
+        )
+    return text
+
+
 def invoke_test() -> int:
     aws_region = require_env("AWS_REGION")
     model_id = require_env("BEDROCK_REPAIR_MODEL_ID")
     validate_model_id(model_id)
 
-    client = boto3.client("bedrock-runtime", region_name=aws_region)
-    response = client.converse(
-        modelId=model_id,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "text": "Return exactly this text and nothing else: ADAPTIX_BEDROCK_OK"
-                    }
-                ],
-            }
-        ],
-        inferenceConfig={"maxTokens": 64, "temperature": 0},
-    )
-
-    text = response["output"]["message"]["content"][0]["text"].strip()
+    text = converse_text(
+        aws_region,
+        model_id,
+        "Return exactly this text and nothing else: ADAPTIX_BEDROCK_OK",
+        64,
+    ).strip()
     print(f"Bedrock response: {text}")
     if text != "ADAPTIX_BEDROCK_OK":
         raise RuntimeError(
@@ -374,7 +401,7 @@ def yaml_lint() -> int:
     for path in sorted([*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")]):
         try:
             yaml.safe_load(path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001 - CLI reports parser details.
+        except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
             failures.append(f"{path}: {exc}")
 
     if failures:
@@ -515,13 +542,7 @@ def call_bedrock(prompt: str) -> str:
     aws_region = require_env("AWS_REGION")
     model_id = require_env("BEDROCK_REPAIR_MODEL_ID")
     validate_model_id(model_id)
-    client = boto3.client("bedrock-runtime", region_name=aws_region)
-    response = client.converse(
-        modelId=model_id,
-        messages=[{"role": "user", "content": [{"text": prompt}]}],
-        inferenceConfig={"maxTokens": 12000, "temperature": 0},
-    )
-    return clean_patch_text(response["output"]["message"]["content"][0]["text"])
+    return clean_patch_text(converse_text(aws_region, model_id, prompt, 12000))
 
 
 def apply_patch(patch_text: str) -> bool:
