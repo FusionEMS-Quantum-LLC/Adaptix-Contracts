@@ -13,8 +13,9 @@
 # Repository-specific holds (a dependency this repo cannot upgrade yet)
 # are declared in that generator, not here: NPM_VERSION_HOLDS for a
 # version-bounded hold, EXPO_PINNED_NPM / COORDINATED_ANDROID_TOOLCHAIN
-# for the fleet-wide ones. A hold added by hand to this file is silently
-# deleted the next time the generator runs.
+# for the fleet-wide ones, NPM_LOCKSTEP_GROUPS for a package family that
+# must move as one pull request. A hold or group added by hand to this
+# file is silently deleted the next time the generator runs.
 version: 2
 updates:
   - package-ecosystem: "uv"
