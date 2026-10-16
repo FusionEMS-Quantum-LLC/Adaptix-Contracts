@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -141,7 +140,7 @@ class ClaimLineItem(BaseModel):
     units: int = Field(..., gt=0)
     charge_cents: int = Field(..., ge=0)
 
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class AdjustmentContract(BaseModel):
@@ -154,7 +153,7 @@ class AdjustmentContract(BaseModel):
     adjustment_type: str
     amount_cents: int = Field(..., ge=0)
 
-    reason_code: Optional[str] = None
+    reason_code: str | None = None
     applied_at: datetime
 
 
@@ -168,8 +167,8 @@ class PayerContract(BaseModel):
     electronic_claims_supported: bool
     electronic_remittance_supported: bool
 
-    contact_phone: Optional[str] = None
-    contact_email: Optional[str] = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
 
 
 class ClaimContract(BaseModel):
@@ -179,11 +178,11 @@ class ClaimContract(BaseModel):
     tenant_id: str
     patient_id: str
 
-    encounter_id: Optional[str] = None
-    transport_request_id: Optional[str] = None
+    encounter_id: str | None = None
+    transport_request_id: str | None = None
 
-    payer_id: Optional[str] = None
-    payer_name: Optional[str] = None
+    payer_id: str | None = None
+    payer_name: str | None = None
 
     status: ClaimStatus
 
@@ -196,8 +195,8 @@ class ClaimContract(BaseModel):
 
     created_at: datetime
     updated_at: datetime
-    submitted_at: Optional[datetime] = None
-    closed_at: Optional[datetime] = None
+    submitted_at: datetime | None = None
+    closed_at: datetime | None = None
 
 
 class DenialContract(BaseModel):
@@ -225,7 +224,7 @@ class PaymentContract(BaseModel):
     tenant_id: str
 
     amount_cents: int = Field(..., ge=0)
-    payer_name: Optional[str] = None
+    payer_name: str | None = None
 
     status: PaymentStatus
     posted_at: datetime
@@ -254,9 +253,9 @@ class ClearinghouseSubmission(BaseModel):
     provider: ClearinghouseProvider
     status: ClearinghouseStatus
 
-    submitted_at: Optional[datetime] = None
-    response_received_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    submitted_at: datetime | None = None
+    response_received_at: datetime | None = None
+    error_message: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -313,14 +312,14 @@ class ClaimStatusUpdatedEvent(BaseModel):
 
     claim_id: str
     tenant_id: str
-    encounter_id: Optional[str] = None
-    status: Optional[ClaimStatus] = None
-    old_status: Optional[ClaimStatus] = None
-    new_status: Optional[ClaimStatus] = None
-    total_paid_cents: Optional[int] = None
-    patient_balance_cents: Optional[int] = None
-    denial_reason_code: Optional[str] = None
-    payer_name: Optional[str] = None
+    encounter_id: str | None = None
+    status: ClaimStatus | None = None
+    old_status: ClaimStatus | None = None
+    new_status: ClaimStatus | None = None
+    total_paid_cents: int | None = None
+    patient_balance_cents: int | None = None
+    denial_reason_code: str | None = None
+    payer_name: str | None = None
     updated_at: datetime
 
 
@@ -344,7 +343,7 @@ class PaymentPostedEvent(BaseModel):
     claim_id: str
     tenant_id: str
     amount_cents: int = Field(..., ge=0)
-    payer_id: Optional[str] = None
+    payer_id: str | None = None
     posted_at: datetime
 
 

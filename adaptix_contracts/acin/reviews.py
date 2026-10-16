@@ -12,7 +12,6 @@ non-negotiable that contradictions are surfaced for a human, not auto-resolved.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -24,23 +23,23 @@ class ACINReviewFindingDTO(BaseModel):
     """A single finding produced by a Cortex review."""
 
     finding_id: str
-    review_id: Optional[str] = None
+    review_id: str | None = None
     severity: ACINReviewSeverity
     category: str
     message: str
     source_field_refs: list[ACINSourceRef] = Field(default_factory=list)
     is_contradiction: bool = False
-    resolution: Optional[str] = Field(
+    resolution: str | None = Field(
         default=None,
         description="Always None when is_contradiction — ACIN flags, it does not resolve.",
     )
-    suggested_action: Optional[str] = None
+    suggested_action: str | None = None
     requires_human_review: bool = True
-    accepted_by: Optional[str] = None
-    accepted_at: Optional[datetime] = None
+    accepted_by: str | None = None
+    accepted_at: datetime | None = None
 
     @model_validator(mode="after")
-    def _contradictions_are_flagged_not_resolved(self) -> "ACINReviewFindingDTO":
+    def _contradictions_are_flagged_not_resolved(self) -> ACINReviewFindingDTO:
         if self.is_contradiction and self.resolution is not None:
             raise ValueError(
                 "A contradiction finding is flagged, not resolved (resolution must be None)"
@@ -59,11 +58,11 @@ class ACINReviewDTO(BaseModel):
     chart_id: str
     review_type: ACINReviewType
     status: ACINReviewStatus = ACINReviewStatus.PENDING
-    capability_key: Optional[str] = None
-    model_name: Optional[str] = None
-    model_version: Optional[str] = None
-    generated_at: Optional[datetime] = None
-    summary_text_redacted: Optional[str] = None
+    capability_key: str | None = None
+    model_name: str | None = None
+    model_version: str | None = None
+    generated_at: datetime | None = None
+    summary_text_redacted: str | None = None
     findings: list[ACINReviewFindingDTO] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

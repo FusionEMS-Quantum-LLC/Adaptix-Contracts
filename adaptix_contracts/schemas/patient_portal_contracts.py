@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -41,9 +40,9 @@ class PatientVerifyRequest(BaseModel):
     verification_method: PatientVerificationMethod
     patient_name: str = Field(..., max_length=255)
     date_of_birth: str = Field(..., description="ISO 8601 date: YYYY-MM-DD")
-    account_last4: Optional[str] = Field(default=None, min_length=4, max_length=4)
-    ssn_last4: Optional[str] = Field(default=None, min_length=4, max_length=4)
-    access_token: Optional[str] = Field(
+    account_last4: str | None = Field(default=None, min_length=4, max_length=4)
+    ssn_last4: str | None = Field(default=None, min_length=4, max_length=4)
+    access_token: str | None = Field(
         default=None, description="Used with token_link method"
     )
 
@@ -60,18 +59,18 @@ class PatientAccountSummary(BaseModel):
     account_id: str
     patient_name: str
     outstanding_balance_cents: int
-    last_statement_date: Optional[datetime] = None
+    last_statement_date: datetime | None = None
     active_payment_plan: bool
     open_disputes: int
     unread_documents: int
-    last_communication_at: Optional[datetime] = None
+    last_communication_at: datetime | None = None
 
 
 class StatementSummaryResponse(BaseModel):
     id: str
     account_id: str
     statement_date: datetime
-    service_date: Optional[datetime] = None
+    service_date: datetime | None = None
     total_billed_cents: int
     insurance_paid_cents: int
     adjustments_cents: int
@@ -79,23 +78,23 @@ class StatementSummaryResponse(BaseModel):
     amount_paid_cents: int
     balance_due_cents: int
     status: str
-    due_date: Optional[datetime] = None
+    due_date: datetime | None = None
 
 
 class StatementLineItem(BaseModel):
     description: str
-    service_date: Optional[datetime] = None
+    service_date: datetime | None = None
     billed_cents: int
     insurance_paid_cents: int
     patient_responsibility_cents: int
-    code: Optional[str] = None
+    code: str | None = None
 
 
 class StatementDetailResponse(BaseModel):
     id: str
     account_id: str
     statement_date: datetime
-    service_date: Optional[datetime] = None
+    service_date: datetime | None = None
     total_billed_cents: int
     insurance_paid_cents: int
     adjustments_cents: int
@@ -103,10 +102,10 @@ class StatementDetailResponse(BaseModel):
     amount_paid_cents: int
     balance_due_cents: int
     status: str
-    due_date: Optional[datetime] = None
+    due_date: datetime | None = None
     line_items: list[StatementLineItem]
-    transport_id: Optional[str] = None
-    encounter_id: Optional[str] = None
+    transport_id: str | None = None
+    encounter_id: str | None = None
 
 
 class PaymentOptionResponse(BaseModel):
@@ -115,12 +114,12 @@ class PaymentOptionResponse(BaseModel):
     payment_plan_eligible: bool
     minimum_payment_cents: int
     outstanding_balance_cents: int
-    payment_plan_minimum_monthly_cents: Optional[int] = None
+    payment_plan_minimum_monthly_cents: int | None = None
 
 
 class PaymentSubmitRequest(BaseModel):
     account_id: str
-    statement_id: Optional[str] = None
+    statement_id: str | None = None
     amount_cents: int = Field(..., gt=0)
     payment_method: PaymentMethod
     payment_token: str = Field(
@@ -137,7 +136,7 @@ class PaymentSubmitResponse(BaseModel):
     account_id: str
     amount_cents: int
     status: str
-    receipt_url: Optional[str] = None
+    receipt_url: str | None = None
     processed_at: datetime
 
 
@@ -158,16 +157,16 @@ class PaymentPlanResponse(BaseModel):
     estimated_months: int
     payment_day_of_month: int
     status: str
-    next_payment_date: Optional[datetime] = None
+    next_payment_date: datetime | None = None
     created_at: datetime
 
 
 class DisputeSubmitRequest(BaseModel):
     account_id: str
-    statement_id: Optional[str] = None
+    statement_id: str | None = None
     reason: DisputeReason
     description: str = Field(..., min_length=10, max_length=2000)
-    supporting_info: Optional[str] = Field(default=None, max_length=2000)
+    supporting_info: str | None = Field(default=None, max_length=2000)
 
 
 class DisputeSubmitResponse(BaseModel):
@@ -182,11 +181,11 @@ class PatientDocumentResponse(BaseModel):
     id: str
     document_type: str
     document_name: str
-    service_date: Optional[datetime] = None
-    transport_id: Optional[str] = None
+    service_date: datetime | None = None
+    transport_id: str | None = None
     signed: bool
-    signed_at: Optional[datetime] = None
-    download_url: Optional[str] = None
+    signed_at: datetime | None = None
+    download_url: str | None = None
     created_at: datetime
 
 
@@ -194,7 +193,7 @@ class CommunicationEventResponse(BaseModel):
     id: str
     channel: str
     direction: str
-    subject: Optional[str] = None
+    subject: str | None = None
     summary: str
     sent_at: datetime
     delivery_status: str
@@ -202,8 +201,8 @@ class CommunicationEventResponse(BaseModel):
 
 class AiExplanationRequest(BaseModel):
     account_id: str
-    statement_id: Optional[str] = None
-    question: Optional[str] = Field(
+    statement_id: str | None = None
+    question: str | None = Field(
         default=None,
         max_length=500,
         description="Optional specific question from patient",
@@ -212,7 +211,7 @@ class AiExplanationRequest(BaseModel):
 
 class AiExplanationResponse(BaseModel):
     account_id: str
-    statement_id: Optional[str] = None
+    statement_id: str | None = None
     explanation: str
     disclaimer: str
     generated_at: datetime

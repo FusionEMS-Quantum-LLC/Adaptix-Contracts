@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -45,10 +44,10 @@ class OfficeAllyEnrollment(BaseModel):
 
     tenant_id: UUID
     status: OfficeAllyEnrollmentStatus
-    npi: Optional[str] = Field(default=None, max_length=10)
-    provider_id: Optional[str] = Field(default=None, max_length=64)
-    payer_id: Optional[str] = Field(default=None, max_length=64)
-    enrolled_at: Optional[datetime] = None
+    npi: str | None = Field(default=None, max_length=10)
+    provider_id: str | None = Field(default=None, max_length=64)
+    payer_id: str | None = Field(default=None, max_length=64)
+    enrolled_at: datetime | None = None
     updated_at: datetime
 
 
@@ -64,17 +63,17 @@ class OfficeAllySubmission(BaseModel):
 
     id: UUID
     tenant_id: UUID
-    correlation_id: Optional[str] = None
-    claim_id: Optional[str] = Field(default=None, max_length=64)
-    batch_id: Optional[str] = Field(default=None, max_length=64)
+    correlation_id: str | None = None
+    claim_id: str | None = Field(default=None, max_length=64)
+    batch_id: str | None = Field(default=None, max_length=64)
     submission_type: str = Field(
         ..., min_length=1, max_length=32, description="e.g. 837P, 837I, 270."
     )
-    file_name: Optional[str] = Field(default=None, max_length=255)
-    payload_reference: Optional[str] = Field(
+    file_name: str | None = Field(default=None, max_length=255)
+    payload_reference: str | None = Field(
         default=None, max_length=2000, description="Pointer to the stored X12 payload."
     )
-    submitted_at: Optional[datetime] = None
+    submitted_at: datetime | None = None
     created_at: datetime
 
 
@@ -84,11 +83,11 @@ class OfficeAllyResponse(BaseModel):
     submission_id: UUID
     tenant_id: UUID
     accepted: bool
-    office_ally_ref: Optional[str] = Field(default=None, max_length=128)
-    ack_type: Optional[str] = Field(
+    office_ally_ref: str | None = Field(default=None, max_length=128)
+    ack_type: str | None = Field(
         default=None, max_length=32, description="e.g. 999, 277CA, TA1."
     )
-    status_code: Optional[str] = Field(default=None, max_length=32)
-    message: Optional[str] = Field(default=None, max_length=2000)
+    status_code: str | None = Field(default=None, max_length=32)
+    message: str | None = Field(default=None, max_length=2000)
     errors: list[str] = Field(default_factory=list)
     received_at: datetime

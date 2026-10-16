@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -37,7 +36,7 @@ class BillingReadinessGate(BaseModel):
 
     gate: str
     status: TransportReadinessGateStatus
-    detail: Optional[str] = None
+    detail: str | None = None
 
 
 class TransportReadinessResponse(BaseModel):
@@ -91,7 +90,7 @@ class BillingTransportLinkEvent(BaseModel):
     event_type: str = "billing.transport.linked"
     transport_request_id: str
     tenant_id: str
-    claim_id: Optional[str] = None
+    claim_id: str | None = None
     linked_at: datetime
 
 
@@ -100,6 +99,6 @@ class ClaimReadinessResolvedEvent(BaseModel):
 
     event_type: str = "billing.transport.claim_ready"
     transport_request_id: str
-    claim_id: Optional[str] = None
+    claim_id: str | None = None
     tenant_id: str
     resolved_at: datetime

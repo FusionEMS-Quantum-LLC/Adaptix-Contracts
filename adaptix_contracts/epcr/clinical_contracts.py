@@ -16,7 +16,6 @@ Architecture rules enforced by these contracts:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -31,22 +30,22 @@ class PhysicalFindingDTO(BaseModel):
     id: str
     chart_id: str
     tenant_id: str
-    caregraph_node_id: Optional[str] = None
+    caregraph_node_id: str | None = None
     anatomy: str  # REQUIRED — no orphan findings
     physiologic_system: str  # REQUIRED — no orphan findings
     finding_class: str
     severity: str
     finding_label: str
-    finding_description: Optional[str] = None
-    laterality: Optional[str] = None
+    finding_description: str | None = None
+    laterality: str | None = None
     detection_method: str
     review_state: str  # direct_confirmed, vision_proposed, smart_text_proposed, accepted, rejected
-    snomed_code: Optional[str] = None
-    snomed_display: Optional[str] = None
-    nemsis_exam_element: Optional[str] = None
-    nemsis_exam_value: Optional[str] = None
+    snomed_code: str | None = None
+    snomed_display: str | None = None
+    nemsis_exam_element: str | None = None
+    nemsis_exam_value: str | None = None
     has_contradiction: bool
-    contradiction_detail: Optional[str] = None
+    contradiction_detail: str | None = None
     provider_id: str
     observed_at: datetime
     version: int
@@ -62,9 +61,9 @@ class FindingReassessmentDTO(BaseModel):
     chart_id: str
     tenant_id: str
     evolution: str  # improving, worsening, unchanged, resolved
-    severity_at_reassessment: Optional[str] = None
-    description: Optional[str] = None
-    intervention_trigger_id: Optional[str] = None
+    severity_at_reassessment: str | None = None
+    description: str | None = None
+    intervention_trigger_id: str | None = None
     provider_id: str
     reassessed_at: datetime
 
@@ -82,7 +81,7 @@ class VASOverlayDTO(BaseModel):
     id: str
     chart_id: str
     physical_finding_id: str  # REQUIRED — no free-floating overlays
-    caregraph_node_id: Optional[str] = None
+    caregraph_node_id: str | None = None
     tenant_id: str
     patient_model: str  # adult, pediatric, neonatal
     anatomical_view: str  # front, posterior, left_lateral, right_lateral, regional_zoom
@@ -108,12 +107,12 @@ class VASProjectionReviewDTO(BaseModel):
     vision_artifact_id: str
     proposed_overlay: dict
     confidence: float
-    model_version: Optional[str] = None
+    model_version: str | None = None
     review_state: (
         str  # pending, accepted, rejected, edited_accepted — NEVER auto-accepted
     )
-    reviewer_id: Optional[str] = None  # None until reviewed
-    reviewed_at: Optional[datetime] = None  # None until reviewed
+    reviewer_id: str | None = None  # None until reviewed
+    reviewed_at: datetime | None = None  # None until reviewed
     proposed_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -149,13 +148,13 @@ class VisionExtractionDTO(BaseModel):
     tenant_id: str
     proposal_target: str
     extracted_value: dict
-    raw_text: Optional[str] = None
+    raw_text: str | None = None
     confidence: float
-    model_version: Optional[str] = None
+    model_version: str | None = None
     review_state: str  # pending_review, accepted, rejected, edited_and_accepted — NEVER auto-accepted
-    reviewer_id: Optional[str] = None  # None until reviewed
-    reviewed_at: Optional[datetime] = None  # None until reviewed
-    accepted_chart_field: Optional[str] = None
+    reviewer_id: str | None = None  # None until reviewed
+    reviewed_at: datetime | None = None  # None until reviewed
+    accepted_chart_field: str | None = None
     extracted_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -170,7 +169,7 @@ class VisionReviewQueueDTO(BaseModel):
     tenant_id: str
     priority: int
     queue_state: str  # pending, in_review, completed, escalated
-    assigned_to_user_id: Optional[str] = None
+    assigned_to_user_id: str | None = None
     queued_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -201,14 +200,14 @@ class InfusionRunDTO(BaseModel):
     chart_id: str
     tenant_id: str
     medication_name: str
-    rxnorm_code: Optional[str] = None
-    concentration: Optional[str] = None
+    rxnorm_code: str | None = None
+    concentration: str | None = None
     initial_rate_value: float
     initial_rate_unit: str
     indication: str  # REQUIRED — no interventions without indication
-    protocol_family: Optional[str] = None
+    protocol_family: str | None = None
     started_at: datetime
-    ended_at: Optional[datetime] = None
+    ended_at: datetime | None = None
     provider_id: str
 
     model_config = ConfigDict(from_attributes=True)
@@ -221,11 +220,11 @@ class VentilatorSessionDTO(BaseModel):
     chart_id: str
     tenant_id: str
     mode: str
-    tidal_volume_ml: Optional[int] = None
-    respiratory_rate: Optional[int] = None
-    fio2_percent: Optional[int] = None
-    peep_cmh2o: Optional[float] = None
-    airway_type: Optional[str] = None
+    tidal_volume_ml: int | None = None
+    respiratory_rate: int | None = None
+    fio2_percent: int | None = None
+    peep_cmh2o: float | None = None
+    airway_type: str | None = None
     indication: str  # REQUIRED
     started_at: datetime
     provider_id: str
@@ -241,11 +240,11 @@ class ResponseWindowDTO(BaseModel):
     intervention_id: str
     tenant_id: str
     expected_response: str
-    expected_response_window_minutes: Optional[int] = None
-    actual_response: Optional[str] = None
+    expected_response_window_minutes: int | None = None
+    actual_response: str | None = None
     response_availability: str  # documented, unavailable_transport_time, unavailable_patient_condition, pending
-    unavailability_reason: Optional[str] = None  # REQUIRED if unavailable
-    response_adequate: Optional[bool] = None
+    unavailability_reason: str | None = None  # REQUIRED if unavailable
+    response_adequate: bool | None = None
     escalation_triggered: bool
     provider_id: str
 
@@ -263,20 +262,20 @@ class ImpressionBindingDTO(BaseModel):
     id: str
     chart_id: str
     tenant_id: str
-    caregraph_node_id: Optional[str] = None
+    caregraph_node_id: str | None = None
     impression_class: str  # primary, secondary, differential, ruled_out, billing
     adaptix_label: str
-    snomed_code: Optional[str] = None
-    snomed_display: Optional[str] = None
-    icd10_code: Optional[str] = None
-    icd10_display: Optional[str] = None
-    nemsis_element: Optional[str] = None
-    nemsis_value: Optional[str] = None
-    nemsis_export_valid: Optional[bool] = None
+    snomed_code: str | None = None
+    snomed_display: str | None = None
+    icd10_code: str | None = None
+    icd10_display: str | None = None
+    nemsis_element: str | None = None
+    nemsis_value: str | None = None
+    nemsis_export_valid: bool | None = None
     is_ai_suggested: bool  # if True, review_state must be pending_review until reviewed
     review_state: str  # direct_confirmed, pending_review, accepted, rejected
-    reviewer_id: Optional[str] = None
-    reviewed_at: Optional[datetime] = None
+    reviewer_id: str | None = None
+    reviewed_at: datetime | None = None
     provider_id: str
     documented_at: datetime
 
@@ -299,13 +298,13 @@ class SmartTextProposalDTO(BaseModel):
     entity_type: str
     entity_label: str
     entity_payload: dict
-    target_chart_field: Optional[str] = None
+    target_chart_field: str | None = None
     confidence: float
     proposal_state: str  # pending_review, accepted, rejected, edited_and_accepted, ignored — NEVER auto-accepted
-    reviewer_id: Optional[str] = None
-    reviewed_at: Optional[datetime] = None
+    reviewer_id: str | None = None
+    reviewed_at: datetime | None = None
     is_contradiction: bool
-    contradiction_detail: Optional[str] = None
+    contradiction_detail: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -321,7 +320,7 @@ class SyncEventDTO(BaseModel):
 
     id: str
     tenant_id: str
-    chart_id: Optional[str] = None
+    chart_id: str | None = None
     device_id: str
     user_id: str
     event_type: str
@@ -347,8 +346,8 @@ class SyncHealthDTO(BaseModel):
     failed_uploads_count: int
     unresolved_conflicts_count: int
     is_degraded: bool
-    degraded_reason: Optional[str] = None
-    last_successful_sync_at: Optional[datetime] = None
+    degraded_reason: str | None = None
+    last_successful_sync_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -358,10 +357,10 @@ class UploadQueueItemDTO(BaseModel):
 
     id: str
     tenant_id: str
-    chart_id: Optional[str] = None
+    chart_id: str | None = None
     upload_type: str  # vision_artifact, signature, attachment
     content_type: str
-    file_size_bytes: Optional[int] = None
+    file_size_bytes: int | None = None
     upload_status: str  # pending, uploading, completed, failed
     bytes_uploaded: int
     idempotency_key: str
@@ -384,9 +383,9 @@ class DashboardProfileDTO(BaseModel):
     profile_name: str
     density: str  # compact, normal, expanded
     theme_mode: str  # light, dark, field, high_contrast, system
-    accent_color: Optional[str] = None
-    card_order: Optional[list[str]] = None
-    hidden_cards: Optional[list[str]] = None
+    accent_color: str | None = None
+    card_order: list[str] | None = None
+    hidden_cards: list[str] | None = None
     # No clinical fields — dashboard cannot affect clinical truth
 
     model_config = ConfigDict(from_attributes=True)
@@ -421,11 +420,11 @@ class ValidationIssueDTO(BaseModel):
     severity: str  # error, warning, info
     code: str
     message: str
-    field: Optional[str] = None
-    entity_id: Optional[str] = None
-    entity_type: Optional[str] = None
-    nemsis_element: Optional[str] = None
-    remediation: Optional[str] = None
+    field: str | None = None
+    entity_id: str | None = None
+    entity_type: str | None = None
+    nemsis_element: str | None = None
+    remediation: str | None = None
 
 
 class ValidationResultDTO(BaseModel):
@@ -472,7 +471,7 @@ class MappingTraceDTO(BaseModel):
     id: str
     chart_id: str
     nemsis_field: str
-    nemsis_value: Optional[str] = None
+    nemsis_value: str | None = None
     source: str  # manual, ocr, device, system
     created_at: datetime
     version: int
@@ -488,7 +487,7 @@ class AuditEventDTO(BaseModel):
     tenant_id: str
     user_id: str
     action: str
-    detail: Optional[dict] = None
+    detail: dict | None = None
     performed_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

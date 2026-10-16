@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -201,8 +201,8 @@ class StediProviderRow(BaseModel):
     """One tenant billing-provider identity row for Stedi readiness."""
 
     provider_id: str
-    provider_name: Optional[str] = None
-    npi_masked: Optional[str] = None
+    provider_name: str | None = None
+    npi_masked: str | None = None
     state: StediReadinessState
 
 
@@ -210,7 +210,7 @@ class StediPayerRow(BaseModel):
     """One Stedi payer enrollment row and whether enrollment is required."""
 
     payer_id: str
-    payer_name: Optional[str] = None
+    payer_name: str | None = None
     state: StediReadinessState
     enrollment_required: bool
 
@@ -219,7 +219,7 @@ class StediWebhookStatus(BaseModel):
     """Tri-state inbound-webhook verification for Stedi events."""
 
     verification: StediWebhookVerification
-    last_event_at: Optional[str] = None
+    last_event_at: str | None = None
 
 
 class StediStatusBlocker(BaseModel):
@@ -236,7 +236,7 @@ class StediStatusResponse(BaseModel):
 
     tenant_id: str
     state: StediReadinessState
-    checked_at: Optional[str] = None
+    checked_at: str | None = None
     providers: list[StediProviderRow]
     payers: list[StediPayerRow]
     webhook: StediWebhookStatus
@@ -259,9 +259,9 @@ class StediMigrationModeResponse(BaseModel):
     tenant_id: str
     mode: StediMigrationMode
     description: str
-    updated_by: Optional[str] = None
-    last_reason: Optional[str] = None
-    updated_at: Optional[str] = None
+    updated_by: str | None = None
+    last_reason: str | None = None
+    updated_at: str | None = None
     is_default: bool
     allowed_transitions: list[StediAllowedTransition]
 
@@ -290,8 +290,8 @@ class StediMigrationTransitionResponse(BaseModel):
     to_mode: StediMigrationMode
     kind: StediMigrationTransitionKind
     reason: str
-    actor_id: Optional[str] = None
-    actor_role: Optional[str] = None
+    actor_id: str | None = None
+    actor_role: str | None = None
     founder_authorized: bool
     occurred_at: str
 
@@ -301,12 +301,12 @@ class StediMigrationTransitionHistoryRow(BaseModel):  # pylint: disable=invalid-
 
     id: str  # pylint: disable=invalid-name
     tenant_id: str
-    from_mode: Optional[StediMigrationMode] = None
+    from_mode: StediMigrationMode | None = None
     to_mode: StediMigrationMode
     kind: StediMigrationTransitionKind
     reason: str
-    actor_id: Optional[str] = None
-    actor_role: Optional[str] = None
+    actor_id: str | None = None
+    actor_role: str | None = None
     founder_authorized: bool
     created_at: str
 
@@ -317,7 +317,7 @@ class StediCreateEnrollmentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     payer_id: str = Field(..., min_length=1, max_length=80)
-    payer_name: Optional[str] = Field(default=None, max_length=200)
+    payer_name: str | None = Field(default=None, max_length=200)
     transaction_types: list[StediEnrollmentTransactionType] = Field(..., min_length=1)
 
     @field_validator("payer_id")
@@ -348,15 +348,15 @@ class MigrationSourceClearinghouseSettingsResponse(BaseModel):
 
     tenant_id: str
     clearinghouse_vendor: MigrationSourceVendor
-    oa_sftp_username: Optional[str] = None
-    oa_tpid: Optional[str] = None
+    oa_sftp_username: str | None = None
+    oa_tpid: str | None = None
     oa_sftp_verified: bool
     edi_837p_enabled: bool
     edi_835_enabled: bool
     edi_999_enabled: bool
     edi_277_enabled: bool
     submission_frequency: SubmissionFrequency
-    updated_at: Optional[str] = None
+    updated_at: str | None = None
 
 
 class MigrationSourceClearinghouseSettingsUpdate(BaseModel):
@@ -367,8 +367,8 @@ class MigrationSourceClearinghouseSettingsUpdate(BaseModel):
     clearinghouse_vendor: MigrationSourceVendor = Field(
         default=MigrationSourceVendor.OFFICE_ALLY
     )
-    oa_sftp_username: Optional[str] = Field(default=None, max_length=200)
-    oa_tpid: Optional[str] = Field(default=None, max_length=50)
+    oa_sftp_username: str | None = Field(default=None, max_length=200)
+    oa_tpid: str | None = Field(default=None, max_length=50)
     oa_sftp_verified: bool = False
     edi_837p_enabled: bool = True
     edi_835_enabled: bool = True
@@ -393,13 +393,13 @@ class RemittanceSummary(BaseModel):
     """Parsed 835 remittance summary with posting status."""
 
     id: str
-    era_check_number: Optional[str] = None
-    payer_name: Optional[str] = None
-    payer_id: Optional[str] = None
+    era_check_number: str | None = None
+    payer_name: str | None = None
+    payer_id: str | None = None
     total_paid_cents: int = Field(..., ge=0)
     claim_count: int = Field(..., ge=0)
-    source_filename: Optional[str] = None
-    received_at: Optional[str] = None
+    source_filename: str | None = None
+    received_at: str | None = None
     posting_status: RemittancePostingStatus
 
 
@@ -426,8 +426,8 @@ class StediNormalizedArtifact(BaseModel):
     """Provider-agnostic Stedi artifact view used by the state machine."""
 
     kind: StediArtifactTransactionKind
-    ack_accepted: Optional[bool] = None
-    syntactic_accepted: Optional[bool] = None
+    ack_accepted: bool | None = None
+    syntactic_accepted: bool | None = None
     service_lines: list[StediServiceLineOutcome] = Field(default_factory=list)
 
 
@@ -435,8 +435,8 @@ class StediNormalizationResult(BaseModel):
     """Normalized artifact plus tenant/claim reference for reconciliation."""
 
     artifact: StediNormalizedArtifact
-    tenant_id: Optional[str] = None
-    claim_ref: Optional[str] = None
+    tenant_id: str | None = None
+    claim_ref: str | None = None
 
 
 class StediWebhookReconcileOutcome(BaseModel):
@@ -460,7 +460,7 @@ class ClaimSubmissionRequest(BaseModel):
     provider: ClearinghouseProvider
     edi_payload: str = Field(..., description="X12 837 payload")
 
-    submitted_by_user_id: Optional[str] = None
+    submitted_by_user_id: str | None = None
 
 
 class ClaimSubmissionResponse(BaseModel):
@@ -473,8 +473,8 @@ class ClaimSubmissionResponse(BaseModel):
     provider: ClearinghouseProvider
     status: SubmissionStatus
 
-    external_reference_id: Optional[str] = None
-    message: Optional[str] = None
+    external_reference_id: str | None = None
+    message: str | None = None
 
     submitted_at: datetime
 
@@ -495,7 +495,7 @@ class ClearinghouseAck(BaseModel):
     ack_type: AckType
 
     ack_code: str
-    ack_message: Optional[str] = None
+    ack_message: str | None = None
 
     accepted: bool
     received_at: datetime
@@ -536,7 +536,7 @@ class RemittanceClaimPayment(BaseModel):
     paid_cents: int = Field(..., ge=0)
     adjusted_cents: int = Field(..., ge=0)
 
-    payer_claim_control_number: Optional[str] = None
+    payer_claim_control_number: str | None = None
 
 
 class RemittanceIngestResponse(BaseModel):
@@ -585,8 +585,8 @@ class ClearinghouseAckReceivedEvent(BaseModel):
     provider: ClearinghouseProvider
     ack_type: AckType
     accepted: bool
-    ack_code: Optional[str] = None
-    ack_message: Optional[str] = None
+    ack_code: str | None = None
+    ack_message: str | None = None
 
     received_at: datetime
 
@@ -657,13 +657,13 @@ class StediWebhookRequest(BaseModel):
         description="Stable Stedi/EventBridge event id; second half of the "
         "(provider, provider_event_id) idempotency key.",
     )
-    detail_type: Optional[str] = Field(
+    detail_type: str | None = Field(
         default=None,
         alias="detail-type",
         description="Event type. Known values in StediWebhookEventType; unknown "
         "types are still accepted (202) and persisted for investigation.",
     )
-    detail: Optional[dict[str, Any]] = Field(
+    detail: dict[str, Any] | None = Field(
         default=None,
         description="EventBridge detail payload (transaction/file event body). "
         "Stored verbatim by the service; not validated by the route.",
@@ -678,7 +678,7 @@ class StediWebhookAcceptedResponse(BaseModel):
 
     status: str = "accepted"
     event_id: str
-    event_type: Optional[str] = None
+    event_type: str | None = None
     known_event_type: bool
     enqueued: bool
 
@@ -767,11 +767,11 @@ class ClaimRetryEligibilityResponse(BaseModel):
     claim_id: str
     tenant_id: str
     safe: bool
-    blocking_state: Optional[str] = None
+    blocking_state: str | None = None
     reason_code: str
     reason: str
-    latest_clearinghouse_slug: Optional[str] = None
-    latest_transmission_state: Optional[str] = None
+    latest_clearinghouse_slug: str | None = None
+    latest_transmission_state: str | None = None
 
 
 class ClaimOperatorFallbackRequest(BaseModel):
@@ -802,7 +802,7 @@ class ClaimOperatorFallbackResponse(BaseModel):
     original_clearinghouse_slug: str
     original_transmission_state: str
     target_clearinghouse_slug: ClearinghouseProvider
-    new_submission_reference: Optional[str] = None
+    new_submission_reference: str | None = None
     cost_cents: int
 
 

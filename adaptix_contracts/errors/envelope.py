@@ -8,7 +8,7 @@ No raw exception text may be returned to clients.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional, Self
+from typing import Any, Self
 from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime, timezone
@@ -133,7 +133,7 @@ class AdaptixErrorEnvelopeBase(BaseModel):
     success: bool = False
     message: str
     detail: str | None = None
-    validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None
+    validation_errors: list[AdaptixValidationErrorDetail] | None = None
     provider_error: AdaptixProviderErrorDetail | None = None
     trace: AdaptixTraceContext | None = None
     timestamp: str = Field(

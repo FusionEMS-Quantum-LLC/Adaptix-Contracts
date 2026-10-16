@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,12 +15,12 @@ class NotificationRequest(BaseModel):
 
     channel: str = Field(..., description="email | sms | push")
 
-    subject: Optional[str] = None
+    subject: str | None = None
     body: str
 
-    correlation_id: Optional[str] = None
-    reference_type: Optional[str] = None
-    reference_id: Optional[str] = None
+    correlation_id: str | None = None
+    reference_type: str | None = None
+    reference_id: str | None = None
 
 
 class NotificationDeliveredEvent(BaseModel):

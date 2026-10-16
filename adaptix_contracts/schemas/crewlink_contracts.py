@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -17,7 +16,7 @@ class CrewPageSentEvent(BaseModel):
     tenant_id: str
     crew_member_id: str
 
-    incident_id: Optional[str] = None
+    incident_id: str | None = None
     message: str
 
     sent_at: datetime
@@ -63,7 +62,7 @@ class CrewPageEscalatedEvent(BaseModel):
     crew_member_id: str
 
     reason: str
-    destination: Optional[str] = None
+    destination: str | None = None
 
     escalated_at: datetime
 

@@ -7,7 +7,6 @@ for the AdaptixCore Geo shared service.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 import httpx
@@ -35,11 +34,11 @@ class GeocodeRequest(BaseModel):
     """Request to resolve an address to coordinates."""
 
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     address: str = Field(..., min_length=1, max_length=500)
-    city: Optional[str] = Field(default=None, max_length=120)
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    postal_code: Optional[str] = Field(default=None, max_length=16)
+    city: str | None = Field(default=None, max_length=120)
+    state: str | None = Field(default=None, min_length=2, max_length=2)
+    postal_code: str | None = Field(default=None, max_length=16)
     country: str = Field(default="US", min_length=2, max_length=2)
 
 
@@ -49,9 +48,9 @@ class GeocodeResult(BaseModel):
     coordinate: GeoCoordinate
     formatted_address: str
     matched: bool
-    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    place_id: Optional[str] = None
-    provider: Optional[str] = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    place_id: str | None = None
+    provider: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +65,7 @@ class DistanceResult(BaseModel):
     destination: GeoCoordinate
     distance_meters: float = Field(..., ge=0.0)
     distance_miles: float = Field(..., ge=0.0)
-    provider: Optional[str] = None
+    provider: str | None = None
 
 
 class RouteEstimate(BaseModel):
@@ -78,10 +77,10 @@ class RouteEstimate(BaseModel):
     distance_miles: float = Field(..., ge=0.0)
     duration_seconds: float = Field(..., ge=0.0)
     duration_minutes: float = Field(..., ge=0.0)
-    polyline: Optional[str] = Field(
+    polyline: str | None = Field(
         default=None, description="Encoded route geometry, if provided."
     )
-    provider: Optional[str] = None
+    provider: str | None = None
     estimated_at: datetime
 
 
@@ -98,10 +97,10 @@ class ServiceArea(BaseModel):
     id: UUID
     tenant_id: UUID
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(default=None, max_length=1000)
+    description: str | None = Field(default=None, max_length=1000)
     polygon: list[GeoCoordinate] = Field(default_factory=list)
-    center: Optional[GeoCoordinate] = None
-    radius_miles: Optional[float] = Field(default=None, ge=0.0)
+    center: GeoCoordinate | None = None
+    radius_miles: float | None = Field(default=None, ge=0.0)
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
@@ -116,7 +115,7 @@ class ReverseGeocodeRequest(BaseModel):
     """Request to resolve coordinates back to a formatted address."""
 
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     coordinate: GeoCoordinate
 
 
@@ -124,7 +123,7 @@ class AutocompleteRequest(BaseModel):
     """Request for address autocomplete suggestions."""
 
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     query: str = Field(..., min_length=1, max_length=500)
     country: str = Field(default="US", min_length=2, max_length=2)
     limit: int = Field(default=5, ge=1, le=25)
@@ -134,16 +133,16 @@ class AddressSuggestion(BaseModel):
     """A single address autocomplete suggestion."""
 
     formatted_address: str
-    coordinate: Optional[GeoCoordinate] = None
-    place_id: Optional[str] = None
-    provider: Optional[str] = None
+    coordinate: GeoCoordinate | None = None
+    place_id: str | None = None
+    provider: str | None = None
 
 
 class AutocompleteResult(BaseModel):
     """Ordered set of address autocomplete suggestions."""
 
     suggestions: list[AddressSuggestion] = Field(default_factory=list)
-    provider: Optional[str] = None
+    provider: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +154,7 @@ class RouteRequest(BaseModel):
     """Request for a driving route/ETA between two coordinates."""
 
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     origin: GeoCoordinate
     destination: GeoCoordinate
     include_polyline: bool = True
@@ -165,7 +164,7 @@ class DistanceRequest(BaseModel):
     """Request for the distance between two coordinates."""
 
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     origin: GeoCoordinate
     destination: GeoCoordinate
 
@@ -196,9 +195,9 @@ class GeoClient:
         self,
         base_url: str,
         *,
-        token: Optional[str] = None,
+        token: str | None = None,
         timeout: float = 8.0,
-        client: Optional[httpx.AsyncClient] = None,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout

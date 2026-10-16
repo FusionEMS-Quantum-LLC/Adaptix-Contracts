@@ -8,7 +8,7 @@ No PHI, prompts, completions, tokens, or secrets are logged.
 
 from __future__ import annotations
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 
@@ -21,8 +21,8 @@ class DocumentRequirementContract(BaseModel):
 
 
 class MedicalNecessitySupportContract(BaseModel):
-    draft_pcs_narrative: Optional[str] = None
-    confidence: Optional[float] = None
+    draft_pcs_narrative: str | None = None
+    confidence: float | None = None
     human_review_required: bool = True
     no_invented_facts: bool = True
 
@@ -79,11 +79,11 @@ class DocumentIntelligenceAssessRequest(BaseModel):
     tenant_id: str
     actor_id: str
     request_data: dict[str, Any] = {}
-    idempotency_key: Optional[str] = None
+    idempotency_key: str | None = None
 
 
 class DocumentIntelligenceLatestResponse(BaseModel):
-    assessment: Optional[DocumentIntelligenceAssessmentContract] = None
+    assessment: DocumentIntelligenceAssessmentContract | None = None
     has_assessment: bool = False
     credential_gated: bool = False
-    credential_gated_reason: Optional[str] = None
+    credential_gated_reason: str | None = None

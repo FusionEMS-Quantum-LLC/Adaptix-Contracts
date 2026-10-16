@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -160,7 +159,7 @@ class BillingMfaState(BaseModel):
     """
 
     satisfied: bool
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
 
 class BillingOrganizationSummary(BaseModel):
@@ -181,8 +180,8 @@ class BillingOrganizationMembership(BaseModel):
     user_id: str
     role: BillingOperatorRole
     status: BillingMembershipStatus
-    created_at: Optional[datetime] = None
-    last_accessed_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    last_accessed_at: datetime | None = None
 
 
 class BillingAgencyScope(BaseModel):
@@ -251,16 +250,16 @@ class BillingAccessContextV2(BaseModel):
 
     authenticated_user_id: str
 
-    billing_organization_id: Optional[str] = None
-    billing_organization_name: Optional[str] = None
+    billing_organization_id: str | None = None
+    billing_organization_name: str | None = None
 
-    membership_id: Optional[str] = None
-    operator_role: Optional[BillingOperatorRole] = None
+    membership_id: str | None = None
+    operator_role: BillingOperatorRole | None = None
 
     mfa: BillingMfaState
 
     permitted_agencies: list[BillingAgencyScope] = Field(default_factory=list)
-    default_scope: Optional[BillingAgencyScope] = None
+    default_scope: BillingAgencyScope | None = None
 
     destination_route: str = "/billing/portal"
 

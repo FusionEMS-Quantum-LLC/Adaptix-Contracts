@@ -7,7 +7,6 @@ crew assignment display, incident notes, and map/route display.
 from __future__ import annotations
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from pydantic import BaseModel
 
 
@@ -28,13 +27,13 @@ class MDTUnitStatusUpdate(BaseModel):
     unit_id: str
     tenant_id: str
     actor_id: str
-    case_id: Optional[str] = None
+    case_id: str | None = None
     status: UnitStatus
-    location_lat: Optional[float] = None
-    location_lon: Optional[float] = None
-    notes: Optional[str] = None
+    location_lat: float | None = None
+    location_lon: float | None = None
+    notes: str | None = None
     updated_at: datetime
-    idempotency_key: Optional[str] = None
+    idempotency_key: str | None = None
 
 
 class MDTCaseAssignment(BaseModel):
@@ -43,14 +42,14 @@ class MDTCaseAssignment(BaseModel):
     case_id: str
     tenant_id: str
     unit_id: str
-    incident_type: Optional[str] = None
-    priority: Optional[str] = None
-    location: Optional[str] = None
-    chief_complaint: Optional[str] = None
-    dispatch_notes: Optional[str] = None
+    incident_type: str | None = None
+    priority: str | None = None
+    location: str | None = None
+    chief_complaint: str | None = None
+    dispatch_notes: str | None = None
     crew_members: list[str] = []
     assigned_at: datetime
-    cad_sync_at: Optional[datetime] = None
+    cad_sync_at: datetime | None = None
 
 
 class MDTIncidentNote(BaseModel):
@@ -84,10 +83,10 @@ class MDTRouteResponse(BaseModel):
     unit_id: str
     route_available: bool
     provider_status: str
-    estimated_minutes: Optional[int] = None
-    distance_miles: Optional[float] = None
+    estimated_minutes: int | None = None
+    distance_miles: float | None = None
     credential_gated: bool = False
-    credential_gated_reason: Optional[str] = None
+    credential_gated_reason: str | None = None
 
 
 class MDTOfflineState(BaseModel):
@@ -95,8 +94,8 @@ class MDTOfflineState(BaseModel):
 
     unit_id: str
     tenant_id: str
-    last_sync_at: Optional[datetime] = None
+    last_sync_at: datetime | None = None
     pending_status_updates: int = 0
     pending_notes: int = 0
-    offline_since: Optional[datetime] = None
+    offline_since: datetime | None = None
     sync_required: bool = False

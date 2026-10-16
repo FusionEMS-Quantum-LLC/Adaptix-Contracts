@@ -16,7 +16,6 @@ envelope.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import Field
 
@@ -108,11 +107,11 @@ class QhinErrorEnvelope(AdaptixErrorEnvelope):
         qhin_code: QhinErrorCode,
         *,
         message: str,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "QhinErrorEnvelope":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> QhinErrorEnvelope:
         return cls(
             error_code=to_adaptix_error_code(qhin_code),
             qhin_error_code=qhin_code,
@@ -145,11 +144,11 @@ class QhinServiceError(Exception):
         *,
         message: str,
         http_status: int = 400,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "QhinServiceError":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> QhinServiceError:
         envelope = QhinErrorEnvelope.from_qhin_code(
             qhin_code,
             message=message,
@@ -168,7 +167,7 @@ class QhinServiceError(Exception):
 
 def credential_not_found(
     credential_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> QhinErrorEnvelope:
     return QhinErrorEnvelope.from_qhin_code(
         QhinErrorCode.CREDENTIAL_NOT_FOUND,
@@ -180,7 +179,7 @@ def credential_not_found(
 def credential_purpose_not_authorized(
     credential_id: str,
     purpose: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> QhinErrorEnvelope:
     return QhinErrorEnvelope.from_qhin_code(
         QhinErrorCode.CREDENTIAL_PURPOSE_NOT_AUTHORIZED,
@@ -194,7 +193,7 @@ def credential_purpose_not_authorized(
 
 def transaction_not_found(
     transaction_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> QhinErrorEnvelope:
     return QhinErrorEnvelope.from_qhin_code(
         QhinErrorCode.TRANSACTION_NOT_FOUND,
@@ -205,7 +204,7 @@ def transaction_not_found(
 
 def qhin_unavailable(
     qhin: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> QhinErrorEnvelope:
     return QhinErrorEnvelope.from_qhin_code(
         QhinErrorCode.QHIN_UNAVAILABLE,

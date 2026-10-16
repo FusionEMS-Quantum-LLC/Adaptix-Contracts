@@ -9,7 +9,6 @@ score rows it aggregates (ACIN aggregates rather than silently recomputing).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,14 +35,14 @@ class ACINScoreSetDTO(BaseModel):
     missing_elements_count: int = Field(ge=0)
 
     # Model attribution.
-    model_name: Optional[str] = None
-    model_version: Optional[str] = None
+    model_name: str | None = None
+    model_version: str | None = None
     capability_key: str = "acin.scoring"
-    scored_at: Optional[datetime] = None
+    scored_at: datetime | None = None
 
     # Aggregation provenance — references to existing score rows this set draws from.
-    source_run_iq_score_id: Optional[str] = None
-    source_chart_intel_score_id: Optional[str] = None
+    source_run_iq_score_id: str | None = None
+    source_chart_intel_score_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

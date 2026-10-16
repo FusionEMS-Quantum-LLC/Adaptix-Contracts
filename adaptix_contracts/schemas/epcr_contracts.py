@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, BaseModel, Field, StringConstraints
 
@@ -72,15 +72,15 @@ class EpcrChartAmendedEvent(BaseModel):
         "legacy_field_diff"
     )
 
-    actor_id: Optional[str] = None
-    amended_at: Optional[datetime] = None
+    actor_id: str | None = None
+    amended_at: datetime | None = None
 
     # Canonical signed-version pointers. Present only when
     # ``amendment_authority == "canonical_signed_version"``.
-    signed_version_id: Optional[str] = None
-    supersedes_signed_version_id: Optional[str] = None
-    signature_id: Optional[str] = None
-    document_hash: Optional[str] = None
+    signed_version_id: str | None = None
+    supersedes_signed_version_id: str | None = None
+    signature_id: str | None = None
+    document_hash: str | None = None
 
 
 class EpcrChartFinalizedEvent(BaseModel):
@@ -130,7 +130,7 @@ class EpcrChartFinalizedEvent(BaseModel):
     # "unknown — do not assume compliant" and obtain the status from the
     # authoritative compliance contract (``EpcrNemsissComplianceContract``)
     # rather than inferring it from this event.
-    is_nemsis_compliant: Optional[bool] = None
+    is_nemsis_compliant: bool | None = None
 
     missing_fields: list[str] = Field(default_factory=list)
 
@@ -155,7 +155,7 @@ class EpcrChartFinalizedEvent(BaseModel):
     # of service and attending crew instead of ``patient_name = call_number``.
     # Every field is optional — a finalized chart is a clinical/legal act and
     # must never be blocked by an incomplete billing fact set.
-    billing_snapshot: Optional["EpcrBillingSnapshot"] = None
+    billing_snapshot: EpcrBillingSnapshot | None = None
 
     # Why ``billing_snapshot`` is absent (5.31.0). Finalizing a chart is a
     # clinical and legal act and is never blocked by a billing fact set that
@@ -165,7 +165,7 @@ class EpcrChartFinalizedEvent(BaseModel):
     # encounter for the producer's re-emitted handoff rather than bill from
     # placeholders. ``None`` with a snapshot present is the normal case;
     # ``None`` with no snapshot is a producer that predates 5.31.0.
-    billing_snapshot_error: Optional[str] = Field(default=None, max_length=120)
+    billing_snapshot_error: str | None = Field(default=None, max_length=120)
 
 
 class EpcrNemsisSubmitSucceededEvent(BaseModel):  # pylint: disable=too-few-public-methods
@@ -196,21 +196,21 @@ class EpcrNemsisSubmitSucceededEvent(BaseModel):  # pylint: disable=too-few-publ
 class EpcrBillingPatientDemographics(BaseModel):
     """Demographic block carried on the finalized event for billing."""
 
-    first_name: Optional[str] = None
-    middle_name: Optional[str] = None
-    last_name: Optional[str] = None
-    date_of_birth: Optional[str] = None
-    age_years: Optional[int] = None
-    sex: Optional[str] = None
-    weight_kg: Optional[float] = None
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
+    date_of_birth: str | None = None
+    age_years: int | None = None
+    sex: str | None = None
+    weight_kg: float | None = None
 
 
 class EpcrBillingCrewMember(BaseModel):
     """One attending crew member carried on the finalized event."""
 
     crew_member_id: str
-    level_code: Optional[str] = None
-    response_role_code: Optional[str] = None
+    level_code: str | None = None
+    response_role_code: str | None = None
     sequence_index: int = 0
 
 
@@ -275,22 +275,22 @@ class EpcrBillingTransportBlock(BaseModel):
     unparseable or absent value as absent and must never geocode a substitute.
     """
 
-    origin_name: Optional[str] = None
-    origin_address: Optional[str] = None
-    origin_latitude: Optional[str] = None
-    origin_longitude: Optional[str] = None
-    origin_city: Optional[str] = None  # eScene.17
-    origin_state: Optional[str] = None  # eScene.18
-    origin_zip: Optional[str] = None  # eScene.19
-    destination_name: Optional[str] = None
-    destination_address: Optional[str] = None
-    destination_city: Optional[str] = None  # eDisposition.04
-    destination_state: Optional[str] = None  # eDisposition.05
-    destination_zip: Optional[str] = None  # eDisposition.07
-    transport_distance_miles: Optional[str] = None
-    service_type_code: Optional[str] = None
-    unit_role_code: Optional[str] = None
-    transport_method_code: Optional[str] = None  # eDisposition.16
+    origin_name: str | None = None
+    origin_address: str | None = None
+    origin_latitude: str | None = None
+    origin_longitude: str | None = None
+    origin_city: str | None = None  # eScene.17
+    origin_state: str | None = None  # eScene.18
+    origin_zip: str | None = None  # eScene.19
+    destination_name: str | None = None
+    destination_address: str | None = None
+    destination_city: str | None = None  # eDisposition.04
+    destination_state: str | None = None  # eDisposition.05
+    destination_zip: str | None = None  # eDisposition.07
+    transport_distance_miles: str | None = None
+    service_type_code: str | None = None
+    unit_role_code: str | None = None
+    transport_method_code: str | None = None  # eDisposition.16
 
 
 class EpcrBillingInsuranceBlock(BaseModel):
@@ -304,23 +304,23 @@ class EpcrBillingInsuranceBlock(BaseModel):
     verified coverage (verification belongs to the eligibility workflow).
     """
 
-    insurance_company_id: Optional[str] = None  # ePayment.09
-    insurance_company_name: Optional[str] = None  # ePayment.10
-    insurance_billing_priority_code: Optional[str] = None  # ePayment.11
-    insurance_company_address: Optional[str] = None  # ePayment.12
-    insurance_company_city: Optional[str] = None  # ePayment.13
-    insurance_company_state: Optional[str] = None  # ePayment.14
-    insurance_company_zip: Optional[str] = None  # ePayment.15
-    insurance_group_id: Optional[str] = None  # ePayment.17
-    insurance_policy_id_number: Optional[str] = None  # ePayment.18
-    insured_last_name: Optional[str] = None  # ePayment.19
-    insured_first_name: Optional[str] = None  # ePayment.20
-    insured_middle_name: Optional[str] = None  # ePayment.21
-    relationship_to_insured_code: Optional[str] = None  # ePayment.22
-    payer_type_code: Optional[str] = None  # ePayment.57
-    insurance_group_name: Optional[str] = None  # ePayment.58
-    insurance_company_phone: Optional[str] = None  # ePayment.59
-    insured_date_of_birth: Optional[str] = None  # ePayment.60, ISO date string
+    insurance_company_id: str | None = None  # ePayment.09
+    insurance_company_name: str | None = None  # ePayment.10
+    insurance_billing_priority_code: str | None = None  # ePayment.11
+    insurance_company_address: str | None = None  # ePayment.12
+    insurance_company_city: str | None = None  # ePayment.13
+    insurance_company_state: str | None = None  # ePayment.14
+    insurance_company_zip: str | None = None  # ePayment.15
+    insurance_group_id: str | None = None  # ePayment.17
+    insurance_policy_id_number: str | None = None  # ePayment.18
+    insured_last_name: str | None = None  # ePayment.19
+    insured_first_name: str | None = None  # ePayment.20
+    insured_middle_name: str | None = None  # ePayment.21
+    relationship_to_insured_code: str | None = None  # ePayment.22
+    payer_type_code: str | None = None  # ePayment.57
+    insurance_group_name: str | None = None  # ePayment.58
+    insurance_company_phone: str | None = None  # ePayment.59
+    insured_date_of_birth: str | None = None  # ePayment.60, ISO date string
 
 
 class EpcrBillingCertificationBlock(BaseModel):
@@ -333,30 +333,30 @@ class EpcrBillingCertificationBlock(BaseModel):
     837P needs. Raw stored codes only — no inference, no invented values.
     """
 
-    physician_certification_statement_code: Optional[str] = None  # ePayment.02
-    pcs_signed_date: Optional[str] = None  # ePayment.03, ISO date string
-    reason_for_pcs_codes: Optional[list[str]] = None  # ePayment.04 (1:M)
-    pcs_provider_type_code: Optional[str] = None  # ePayment.05
-    pcs_last_name: Optional[str] = None  # ePayment.06
-    pcs_first_name: Optional[str] = None  # ePayment.07
-    ambulance_transport_reason_code: Optional[str] = None  # ePayment.44
-    ambulance_conditions_indicator_codes: Optional[list[str]] = None  # ePayment.47
-    mileage_to_closest_hospital: Optional[float] = None  # ePayment.48
-    cms_service_level_code: Optional[str] = None  # ePayment.50
-    ems_condition_codes: Optional[list[str]] = None  # ePayment.51
-    cms_transportation_indicator_codes: Optional[list[str]] = None  # ePayment.52
-    transport_authorization_code: Optional[str] = None  # ePayment.53
-    prior_authorization_code_payer: Optional[str] = None  # ePayment.54
+    physician_certification_statement_code: str | None = None  # ePayment.02
+    pcs_signed_date: str | None = None  # ePayment.03, ISO date string
+    reason_for_pcs_codes: list[str] | None = None  # ePayment.04 (1:M)
+    pcs_provider_type_code: str | None = None  # ePayment.05
+    pcs_last_name: str | None = None  # ePayment.06
+    pcs_first_name: str | None = None  # ePayment.07
+    ambulance_transport_reason_code: str | None = None  # ePayment.44
+    ambulance_conditions_indicator_codes: list[str] | None = None  # ePayment.47
+    mileage_to_closest_hospital: float | None = None  # ePayment.48
+    cms_service_level_code: str | None = None  # ePayment.50
+    ems_condition_codes: list[str] | None = None  # ePayment.51
+    cms_transportation_indicator_codes: list[str] | None = None  # ePayment.52
+    transport_authorization_code: str | None = None  # ePayment.53
+    prior_authorization_code_payer: str | None = None  # ePayment.54
     # Medical-necessity facts (5.31.0). The crew's coded statement of urgency
     # and of why the patient could not travel another way, plus the two
     # narratives NEMSIS keeps beside them. A PCS "does not alone demonstrate"
     # necessity (42 CFR 410.40(e)(2)); these are what the record says.
-    response_urgency_code: Optional[str] = None  # ePayment.40
-    patient_transport_assessment_code: Optional[str] = None  # ePayment.41
-    specialty_care_transport_provider_code: Optional[str] = None  # ePayment.42
-    round_trip_purpose_description: Optional[str] = None  # ePayment.45
-    stretcher_purpose_description: Optional[str] = None  # ePayment.46
-    als_assessment_performed_warranted_code: Optional[str] = None  # ePayment.49
+    response_urgency_code: str | None = None  # ePayment.40
+    patient_transport_assessment_code: str | None = None  # ePayment.41
+    specialty_care_transport_provider_code: str | None = None  # ePayment.42
+    round_trip_purpose_description: str | None = None  # ePayment.45
+    stretcher_purpose_description: str | None = None  # ePayment.46
+    als_assessment_performed_warranted_code: str | None = None  # ePayment.49
 
 
 class EpcrBillingProcedureItem(BaseModel):  # pylint: disable=too-few-public-methods
@@ -372,9 +372,9 @@ class EpcrBillingProcedureItem(BaseModel):  # pylint: disable=too-few-public-met
     """
 
     procedure_code: str
-    code_system: Optional[str] = None  # e.g. "SNOMED"
+    code_system: str | None = None  # e.g. "SNOMED"
     performed_count: int = 1
-    successful_count: Optional[int] = None
+    successful_count: int | None = None
 
 
 class EpcrBillingMedicationAdministrationItem(BaseModel):  # pylint: disable=too-few-public-methods
@@ -391,8 +391,8 @@ class EpcrBillingMedicationAdministrationItem(BaseModel):  # pylint: disable=too
     """
 
     medication_code: str
-    code_system: Optional[str] = None  # e.g. "RxNorm"
-    route_code: Optional[str] = None  # NEMSIS eMedications.10
+    code_system: str | None = None  # e.g. "RxNorm"
+    route_code: str | None = None  # NEMSIS eMedications.10
     administration_count: int = 1
 
 
@@ -418,12 +418,10 @@ class EpcrBillingInterventionsBlock(BaseModel):  # pylint: disable=too-few-publi
     rows of that category.
     """
 
-    procedures: Optional[list[EpcrBillingProcedureItem]] = None
-    medication_administrations: Optional[
-        list[EpcrBillingMedicationAdministrationItem]
-    ] = None
-    procedure_total: Optional[int] = None
-    medication_administration_total: Optional[int] = None
+    procedures: list[EpcrBillingProcedureItem] | None = None
+    medication_administrations: list[EpcrBillingMedicationAdministrationItem] | None = None
+    procedure_total: int | None = None
+    medication_administration_total: int | None = None
 
 
 class EpcrBillingGuarantorBlock(BaseModel):  # pylint: disable=too-few-public-methods
@@ -436,16 +434,16 @@ class EpcrBillingGuarantorBlock(BaseModel):  # pylint: disable=too-few-public-me
     the chart has no ePayment row or documents none of these elements.
     """
 
-    last_name: Optional[str] = None  # ePayment.23
-    first_name: Optional[str] = None  # ePayment.24
-    middle_name: Optional[str] = None  # ePayment.25
-    street_address: Optional[str] = None  # ePayment.26
-    city: Optional[str] = None  # ePayment.27 (CityGnisCode, not a display name)
-    state: Optional[str] = None  # ePayment.28 (ANSIStateCode)
-    zip: Optional[str] = None  # ePayment.29
-    country: Optional[str] = None  # ePayment.30
-    phone: Optional[str] = None  # ePayment.31
-    relationship_code: Optional[str] = None  # ePayment.32
+    last_name: str | None = None  # ePayment.23
+    first_name: str | None = None  # ePayment.24
+    middle_name: str | None = None  # ePayment.25
+    street_address: str | None = None  # ePayment.26
+    city: str | None = None  # ePayment.27 (CityGnisCode, not a display name)
+    state: str | None = None  # ePayment.28 (ANSIStateCode)
+    zip: str | None = None  # ePayment.29
+    country: str | None = None  # ePayment.30
+    phone: str | None = None  # ePayment.31
+    relationship_code: str | None = None  # ePayment.32
 
 
 class EpcrBillingEmployerBlock(BaseModel):  # pylint: disable=too-few-public-methods
@@ -458,13 +456,13 @@ class EpcrBillingEmployerBlock(BaseModel):  # pylint: disable=too-few-public-met
     (ePayment.01) and the payer, which Billing evaluates.
     """
 
-    name: Optional[str] = None  # ePayment.33
-    address: Optional[str] = None  # ePayment.34
-    city: Optional[str] = None  # ePayment.35
-    state: Optional[str] = None  # ePayment.36
-    zip: Optional[str] = None  # ePayment.37
-    country: Optional[str] = None  # ePayment.38
-    phone: Optional[str] = None  # ePayment.39
+    name: str | None = None  # ePayment.33
+    address: str | None = None  # ePayment.34
+    city: str | None = None  # ePayment.35
+    state: str | None = None  # ePayment.36
+    zip: str | None = None  # ePayment.37
+    country: str | None = None  # ePayment.38
+    phone: str | None = None  # ePayment.39
 
 
 class EpcrBillingAttachmentRef(BaseModel):  # pylint: disable=too-few-public-methods
@@ -477,10 +475,10 @@ class EpcrBillingAttachmentRef(BaseModel):  # pylint: disable=too-few-public-met
     """
 
     attachment_id: str = Field(..., min_length=1)
-    content_type: Optional[str] = None
-    size_bytes: Optional[int] = Field(default=None, ge=0)
-    sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    uploaded_at: Optional[AwareDatetime] = None
+    content_type: str | None = None
+    size_bytes: int | None = Field(default=None, ge=0)
+    sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    uploaded_at: AwareDatetime | None = None
 
 
 class EpcrBillingSignatureFact(BaseModel):  # pylint: disable=too-few-public-methods
@@ -518,62 +516,51 @@ class EpcrBillingSignatureFact(BaseModel):  # pylint: disable=too-few-public-met
     """
 
     signature_id: str = Field(..., min_length=1)
-    signature_class: Optional[str] = None
-    signature_method: Optional[str] = None
+    signature_class: str | None = None
+    signature_method: str | None = None
     # Who signed, as EPCR classifies its own ``signature_class`` vocabulary.
     # ``None`` means a class EPCR does not recognise; a consumer must not
     # count such a signature toward any requirement.
-    signer_role: Optional[
-        Literal[
-            "patient",
-            "patient_representative",
-            "ems_crew",
-            "receiving_facility",
-            "witness",
-            "medical_control",
-            "medical_director",
-            "other",
-        ]
-    ] = None
+    signer_role: Literal["patient", "patient_representative", "ems_crew", "receiving_facility", "witness", "medical_control", "medical_director", "other"] | None = None
     # True when EPCR holds evidence the person signed: a captured graphic, a
     # completed TrustSign attestation, or a documented signature on file. False
     # for a documented not-signed reason (eOther.15 "Not Signed - ...").
     signature_obtained: bool = False
-    signer_type_code: Optional[str] = Field(
+    signer_type_code: str | None = Field(
         default=None, pattern=r"^4512\d{3}$"
     )  # eOther.12
     signature_reason_codes: list[
         Annotated[str, StringConstraints(pattern=r"^4513\d{3}$")]
     ] = Field(default_factory=list)  # eOther.13 (0:M)
-    representative_type_code: Optional[str] = Field(
+    representative_type_code: str | None = Field(
         default=None, pattern=r"^4514\d{3}$"
     )  # eOther.14
-    signature_status_code: Optional[str] = Field(
+    signature_status_code: str | None = Field(
         default=None, pattern=r"^4515\d{3}$"
     )  # eOther.15
-    signed_at: Optional[AwareDatetime] = None  # eOther.19
+    signed_at: AwareDatetime | None = None  # eOther.19
     signer_identity_documented: bool = False
-    signer_relationship: Optional[str] = None
-    signer_authority_basis: Optional[str] = None
-    patient_capable_to_sign: Optional[bool] = None
+    signer_relationship: str | None = None
+    signer_authority_basis: str | None = None
+    patient_capable_to_sign: bool | None = None
     incapacity_reason_documented: bool = False
     signature_graphic_captured: bool = False
     signature_on_file_documented: bool = False
     ambulance_employee_exception: bool = False
-    receiving_facility_name: Optional[str] = None
+    receiving_facility_name: str | None = None
     receiving_clinician_documented: bool = False
-    receiving_role_title: Optional[str] = None
-    transfer_of_care_time: Optional[AwareDatetime] = None
-    transfer_exception_reason_code: Optional[str] = None
-    receiving_facility_verification_status: Optional[str] = None
-    compliance_decision: Optional[str] = None
-    billing_readiness_effect: Optional[str] = None
+    receiving_role_title: str | None = None
+    transfer_of_care_time: AwareDatetime | None = None
+    transfer_exception_reason_code: str | None = None
+    receiving_facility_verification_status: str | None = None
+    compliance_decision: str | None = None
+    billing_readiness_effect: str | None = None
     missing_requirements: list[str] = Field(default_factory=list)
     # True when an amendment changed the chart content after this signature
     # attested to it. The signature is real history, but it no longer attests
     # to the chart being billed.
     content_invalidated: bool = False
-    trustsign_verification_id: Optional[str] = None
+    trustsign_verification_id: str | None = None
 
 
 class EpcrBillingSnapshot(BaseModel):
@@ -585,29 +572,29 @@ class EpcrBillingSnapshot(BaseModel):
     the consumer decide whether to open a claim or hold for documentation.
     """
 
-    chart_status: Optional[str] = None
-    primary_impression: Optional[str] = None
-    primary_impression_icd10: Optional[str] = None
-    primary_impression_snomed: Optional[str] = None
-    transport_reason: Optional[str] = None
-    transport_reason_source: Optional[str] = None
-    level_of_service_code: Optional[str] = None
-    level_of_service_label: Optional[str] = None
-    patient_demographics: Optional[EpcrBillingPatientDemographics] = None
+    chart_status: str | None = None
+    primary_impression: str | None = None
+    primary_impression_icd10: str | None = None
+    primary_impression_snomed: str | None = None
+    transport_reason: str | None = None
+    transport_reason_source: str | None = None
+    level_of_service_code: str | None = None
+    level_of_service_label: str | None = None
+    patient_demographics: EpcrBillingPatientDemographics | None = None
     attending_crew: list[EpcrBillingCrewMember] = Field(default_factory=list)
     # Transport facts the producer has always emitted under "transport"; typed
     # here (2.8.0) so validation stops discarding them. See the block docstring.
-    transport: Optional[EpcrBillingTransportBlock] = None
+    transport: EpcrBillingTransportBlock | None = None
     # ePayment insurance + PCS/authorization blocks, emitted by EPCR from
     # 2.8.0-aligned producers. Absent on older events — consumers fall back to
     # their prior behaviour.
-    insurance: Optional[EpcrBillingInsuranceBlock] = None
-    certification: Optional[EpcrBillingCertificationBlock] = None
+    insurance: EpcrBillingInsuranceBlock | None = None
+    certification: EpcrBillingCertificationBlock | None = None
     # Structured performed-procedure and medication-administration facts
     # (5.7.0) so Billing's ALS2/SCT undercoding detection can apply CMS
     # level-of-service policy deterministically. Absent on older events —
     # consumers fall back to their prior behaviour. See the block docstring.
-    performed_interventions: Optional[EpcrBillingInterventionsBlock] = None
+    performed_interventions: EpcrBillingInterventionsBlock | None = None
     # Date of service (5.26.0, BILL-PRE-001). ``encounter_occurred_at`` is the
     # authoritative encounter instant the producer takes from NEMSIS eTimes
     # (eTimes.01 PSAP call, else eTimes.02 dispatch notified, else eTimes.03
@@ -618,8 +605,8 @@ class EpcrBillingSnapshot(BaseModel):
     # finalized after 00:00Z would otherwise bill the wrong day. ``None``
     # means the producer had no eTimes to derive it from (or predates 5.26.0);
     # a consumer must hold the claim rather than substitute another date.
-    date_of_service: Optional[date] = None
-    encounter_occurred_at: Optional[AwareDatetime] = None
+    date_of_service: date | None = None
+    encounter_occurred_at: AwareDatetime | None = None
     # Encounter lineage (5.27.0). The canonical chain of opaque identifiers
     # (dispatch, transport request, trip, unit, vehicle, crew, patient, payer)
     # plus service start/completion and the requested -> dispatched ->
@@ -627,7 +614,7 @@ class EpcrBillingSnapshot(BaseModel):
     # Crew and Workforce for the resources actually used. ePCR populates it;
     # ``None`` means the producer predates 5.27.0 or had no lineage to carry.
     # ``attending_crew`` and ``date_of_service`` above are unchanged.
-    lineage: Optional[EncounterLineage] = None
+    lineage: EncounterLineage | None = None
     # CMS ambulance origin/destination TYPE tokens (5.29.0). ePCR derives them
     # from eScene.09 (incident location type) and eDisposition.21 (type of
     # destination), mapping only codes with one unambiguous CMS facility type;
@@ -636,7 +623,7 @@ class EpcrBillingSnapshot(BaseModel):
     # through its facility letter table. ``None`` means unknown, ambiguous or a
     # producer that predates 5.29.0; a consumer must not substitute a guessed
     # letter. The raw location facts stay on ``transport``.
-    origin_type: Optional[str] = Field(
+    origin_type: str | None = Field(
         default=None,
         description=(
             "CMS ambulance origin token derived by ePCR from eScene.09 "
@@ -644,7 +631,7 @@ class EpcrBillingSnapshot(BaseModel):
             "it through its facility letter table."
         ),
     )
-    destination_type: Optional[str] = Field(
+    destination_type: str | None = Field(
         default=None,
         description=(
             "CMS ambulance destination token derived by ePCR from "
@@ -659,25 +646,25 @@ class EpcrBillingSnapshot(BaseModel):
     # eSituation.12 Provider's Secondary Impressions, ICD-10-CM codes in the
     # order the crew ranked them. ``primary_impression_icd10`` above is
     # unchanged and is never repeated here.
-    secondary_impression_icd10_codes: Optional[list[str]] = None
+    secondary_impression_icd10_codes: list[str] | None = None
     # ePayment.01 Primary Method of Payment (National, Required) and
     # ePayment.08 Patient Resides in Service Area, raw NEMSIS codes.
-    primary_method_of_payment_code: Optional[str] = None
-    patient_resides_in_service_area_code: Optional[str] = None
-    guarantor: Optional[EpcrBillingGuarantorBlock] = None
-    employer: Optional[EpcrBillingEmployerBlock] = None
+    primary_method_of_payment_code: str | None = None
+    patient_resides_in_service_area_code: str | None = None
+    guarantor: EpcrBillingGuarantorBlock | None = None
+    employer: EpcrBillingEmployerBlock | None = None
     # Signatures and documented not-signed reasons (eOther.12-.21). See
     # ``EpcrBillingSignatureFact`` for how Billing reads them under 424.36.
-    signatures: Optional[list[EpcrBillingSignatureFact]] = None
+    signatures: list[EpcrBillingSignatureFact] | None = None
     # References to the files attached to the chart. Pointers only.
-    attachments: Optional[list[EpcrBillingAttachmentRef]] = None
+    attachments: list[EpcrBillingAttachmentRef] | None = None
     # When the producer assembled this snapshot (5.33.0). A chart can be handed
     # off again after it is finalized (a signature obtained later, a corrected
     # pickup ZIP), and the bus delivers at least once, so deliveries can arrive
     # out of order. A consumer that already holds facts for the chart keeps the
     # snapshot with the later ``built_at``; ``finalized_at`` cannot order them
     # because it does not move when the chart is handed off again.
-    built_at: Optional[AwareDatetime] = None
+    built_at: AwareDatetime | None = None
     missing_fields: list[str] = Field(default_factory=list)
     ready_for_billing: bool = False
 
@@ -701,22 +688,22 @@ class EpcrChartHospitalHandoffEvent(BaseModel):  # pylint: disable=too-few-publi
     handoff_status: str
     created_at: datetime
 
-    hospital_name: Optional[str] = None
-    incident_id: Optional[str] = None
-    unit_id: Optional[str] = None
-    bed_assignment: Optional[str] = None
-    receiving_facility: Optional[str] = None
-    receiving_clinician_name: Optional[str] = None
-    receiving_role_title: Optional[str] = None
-    transfer_of_care_time: Optional[datetime] = None
-    hl7_message_id: Optional[str] = None
+    hospital_name: str | None = None
+    incident_id: str | None = None
+    unit_id: str | None = None
+    bed_assignment: str | None = None
+    receiving_facility: str | None = None
+    receiving_clinician_name: str | None = None
+    receiving_role_title: str | None = None
+    transfer_of_care_time: datetime | None = None
+    hl7_message_id: str | None = None
     is_test: bool = False
-    chief_complaint: Optional[str] = None
-    primary_impression: Optional[str] = None
-    handoff_summary: Optional[str] = None
-    patient_demographics: Optional[EpcrBillingPatientDemographics] = None
-    transmitted_at: Optional[datetime] = None
-    acknowledged_at: Optional[datetime] = None
+    chief_complaint: str | None = None
+    primary_impression: str | None = None
+    handoff_summary: str | None = None
+    patient_demographics: EpcrBillingPatientDemographics | None = None
+    transmitted_at: datetime | None = None
+    acknowledged_at: datetime | None = None
 
 
 class EpcrChartContract(BaseModel):
@@ -730,8 +717,8 @@ class EpcrChartContract(BaseModel):
     incident_type: str
 
     created_at: datetime
-    updated_at: Optional[datetime] = None
-    finalized_at: Optional[datetime] = None
+    updated_at: datetime | None = None
+    finalized_at: datetime | None = None
 
 
 class EpcrPatientProfileContract(BaseModel):
@@ -739,14 +726,14 @@ class EpcrPatientProfileContract(BaseModel):
 
     chart_id: str
     tenant_id: str
-    first_name: Optional[str] = None
-    middle_name: Optional[str] = None
-    last_name: Optional[str] = None
-    date_of_birth: Optional[str] = None
-    age_years: Optional[int] = None
-    sex: Optional[str] = None
-    phone_number: Optional[str] = None
-    weight_kg: Optional[float] = None
+    first_name: str | None = None
+    middle_name: str | None = None
+    last_name: str | None = None
+    date_of_birth: str | None = None
+    age_years: int | None = None
+    sex: str | None = None
+    phone_number: str | None = None
+    weight_kg: float | None = None
     allergies: list[str] = Field(default_factory=list)
     updated_at: datetime
 
@@ -757,13 +744,13 @@ class EpcrVitalSetContract(BaseModel):
     id: str
     chart_id: str
     tenant_id: str
-    bp_sys: Optional[int] = None
-    bp_dia: Optional[int] = None
-    hr: Optional[int] = None
-    rr: Optional[int] = None
-    temp_f: Optional[float] = None
-    spo2: Optional[int] = None
-    glucose: Optional[int] = None
+    bp_sys: int | None = None
+    bp_dia: int | None = None
+    hr: int | None = None
+    rr: int | None = None
+    temp_f: float | None = None
+    spo2: int | None = None
+    glucose: int | None = None
     recorded_at: datetime
 
 
@@ -772,14 +759,14 @@ class EpcrClinicalImpressionContract(BaseModel):
 
     chart_id: str
     tenant_id: str
-    chief_complaint: Optional[str] = None
-    field_diagnosis: Optional[str] = None
-    primary_impression: Optional[str] = None
-    secondary_impression: Optional[str] = None
-    impression_notes: Optional[str] = None
-    snomed_code: Optional[str] = None
-    icd10_code: Optional[str] = None
-    acuity: Optional[str] = None
+    chief_complaint: str | None = None
+    field_diagnosis: str | None = None
+    primary_impression: str | None = None
+    secondary_impression: str | None = None
+    impression_notes: str | None = None
+    snomed_code: str | None = None
+    icd10_code: str | None = None
+    acuity: str | None = None
     documented_at: datetime
 
 
@@ -790,12 +777,12 @@ class EpcrMedicationAdministrationContract(BaseModel):
     chart_id: str
     tenant_id: str
     medication_name: str
-    rxnorm_code: Optional[str] = None
-    dose_value: Optional[str] = None
-    dose_unit: Optional[str] = None
+    rxnorm_code: str | None = None
+    dose_value: str | None = None
+    dose_unit: str | None = None
     route: str
     indication: str
-    response: Optional[str] = None
+    response: str | None = None
     export_state: str
     administered_at: datetime
 
@@ -813,13 +800,13 @@ class EpcrSignatureArtifactContract(BaseModel):
     workflow_policy: str
     policy_pack_version: str
     payer_class: str
-    signer_identity: Optional[str] = None
-    signer_relationship: Optional[str] = None
-    patient_capable_to_sign: Optional[bool] = None
-    receiving_facility: Optional[str] = None
-    transfer_of_care_time: Optional[datetime] = None
-    signature_artifact_data_url: Optional[str] = None
-    signature_on_file_reference: Optional[str] = None
+    signer_identity: str | None = None
+    signer_relationship: str | None = None
+    patient_capable_to_sign: bool | None = None
+    receiving_facility: str | None = None
+    transfer_of_care_time: datetime | None = None
+    signature_artifact_data_url: str | None = None
+    signature_on_file_reference: str | None = None
     compliance_decision: str
     compliance_why: str
     chart_completion_effect: str
@@ -861,25 +848,25 @@ class EpcrBillingHandoffPayload(BaseModel):
     is_test: bool = False
 
     # Patient demographics from ePCR
-    patient_first_name: Optional[str] = None
-    patient_last_name: Optional[str] = None
-    patient_date_of_birth: Optional[str] = None
-    patient_phone: Optional[str] = None
+    patient_first_name: str | None = None
+    patient_last_name: str | None = None
+    patient_date_of_birth: str | None = None
+    patient_phone: str | None = None
 
     # Clinical data for claim coding
-    chief_complaint: Optional[str] = None
-    primary_icd10_code: Optional[str] = None
+    chief_complaint: str | None = None
+    primary_icd10_code: str | None = None
     secondary_icd10_codes: list[str] = Field(default_factory=list)
-    field_diagnosis: Optional[str] = None
+    field_diagnosis: str | None = None
 
     # Transport/Response info
     incident_type: str
-    response_started_at: Optional[datetime] = None
-    response_completed_at: Optional[datetime] = None
+    response_started_at: datetime | None = None
+    response_completed_at: datetime | None = None
 
     # Service-level charge (configurable by org)
     base_charge_cents: int = Field(default=0, ge=0)
-    mileage_km: Optional[float] = None
+    mileage_km: float | None = None
     mileage_charge_cents: int = Field(default=0, ge=0)
 
     # Compliance & readiness
@@ -897,5 +884,5 @@ class EpcrBillingHandoffResponse(BaseModel):
     claim_id: str
     status: str
     total_charge_cents: int
-    message: Optional[str] = None
+    message: str | None = None
     created_at: datetime

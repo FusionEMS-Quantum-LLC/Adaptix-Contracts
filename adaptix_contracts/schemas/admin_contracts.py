@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -33,9 +33,9 @@ class UserContract(BaseModel):
     is_active: bool = True
     is_founder: bool = False
     mfa_enabled: bool = False
-    last_login_at: Optional[datetime] = None
+    last_login_at: datetime | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class UserCreateRequest(BaseModel):
@@ -46,16 +46,16 @@ class UserCreateRequest(BaseModel):
 
 
 class UserUpdateRequest(BaseModel):
-    full_name: Optional[str] = None
-    role: Optional[str] = None
-    is_active: Optional[bool] = None
+    full_name: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
 
 
 class RoleContract(BaseModel):
     id: UUID
     tenant_id: UUID
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     permissions: list[str] = Field(default_factory=list)
     created_at: datetime
 
@@ -63,7 +63,7 @@ class RoleContract(BaseModel):
 class PermissionContract(BaseModel):
     id: UUID
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     resource_type: str
     action: str
 
@@ -74,14 +74,14 @@ class ApiKeyContract(BaseModel):
     name: str
     key_prefix: str
     is_active: bool = True
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     created_at: datetime
 
 
 class ServiceIdentityContract(BaseModel):
     id: UUID
     service_name: str
-    description: Optional[str] = None
+    description: str | None = None
     is_active: bool = True
     created_at: datetime
 

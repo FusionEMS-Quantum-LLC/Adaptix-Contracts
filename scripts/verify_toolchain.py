@@ -8,7 +8,8 @@ import re
 import sys
 import tomllib
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "governance" / "approved-tools.json"

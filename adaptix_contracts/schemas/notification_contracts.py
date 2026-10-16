@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -61,16 +61,16 @@ class NotificationDeliveryStatus(BaseModel):
     recipient_id: UUID
     channel: NotificationChannel
     status: NotificationStatus
-    correlation_id: Optional[str] = None
-    template_key: Optional[str] = None
+    correlation_id: str | None = None
+    template_key: str | None = None
     attempts: int = Field(default=0, ge=0)
-    provider_message_id: Optional[str] = None
-    error_reason: Optional[str] = None
-    queued_at: Optional[datetime] = None
-    sent_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
-    read_at: Optional[datetime] = None
-    failed_at: Optional[datetime] = None
+    provider_message_id: str | None = None
+    error_reason: str | None = None
+    queued_at: datetime | None = None
+    sent_at: datetime | None = None
+    delivered_at: datetime | None = None
+    read_at: datetime | None = None
+    failed_at: datetime | None = None
     updated_at: datetime
 
 
@@ -107,10 +107,10 @@ class NotificationTemplate(BaseModel):
     tenant_id: UUID
     key: str = Field(..., min_length=1, max_length=160)
     channel: NotificationChannel
-    subject_template: Optional[str] = Field(default=None, max_length=500)
+    subject_template: str | None = Field(default=None, max_length=500)
     body_template: str = Field(..., min_length=1)
     locale: str = Field(default="en-US", max_length=16)
-    description: Optional[str] = Field(default=None, max_length=1000)
+    description: str | None = Field(default=None, max_length=1000)
     is_active: bool = True
     created_at: datetime
     updated_at: datetime
@@ -136,17 +136,17 @@ class NotificationSendRequest(BaseModel):
     recipient_id: UUID
     channel: NotificationChannel
     category: str = Field(..., min_length=1, max_length=100)
-    subject: Optional[str] = Field(default=None, max_length=500)
+    subject: str | None = Field(default=None, max_length=500)
     body: str = Field(..., min_length=1)
-    template_key: Optional[str] = Field(default=None, max_length=160)
-    correlation_id: Optional[str] = None
-    idempotency_key: Optional[str] = Field(
+    template_key: str | None = Field(default=None, max_length=160)
+    correlation_id: str | None = None
+    idempotency_key: str | None = Field(
         default=None,
         max_length=255,
         description="Dedup key; a retry with the same key must not double-send.",
     )
-    reference_type: Optional[str] = Field(default=None, max_length=64)
-    reference_id: Optional[str] = Field(default=None, max_length=255)
+    reference_type: str | None = Field(default=None, max_length=64)
+    reference_id: str | None = Field(default=None, max_length=255)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -173,10 +173,10 @@ class NotificationPreferenceSet(BaseModel):
     sms_enabled: bool = False
     in_app_enabled: bool = True
     push_enabled: bool = False
-    quiet_hours_start: Optional[str] = Field(
+    quiet_hours_start: str | None = Field(
         default=None, max_length=5, description="Local start time HH:MM, 24-hour."
     )
-    quiet_hours_end: Optional[str] = Field(
+    quiet_hours_end: str | None = Field(
         default=None, max_length=5, description="Local end time HH:MM, 24-hour."
     )
     timezone: str = Field(default="UTC", max_length=64)
@@ -203,7 +203,7 @@ class NotificationQueuedEvent(BaseModel):
     recipient_id: UUID
     channel: NotificationChannel
     category: str
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     queued_at: datetime
 
 
@@ -216,7 +216,7 @@ class NotificationSentEvent(BaseModel):
     tenant_id: UUID
     recipient_id: UUID
     channel: NotificationChannel
-    provider_message_id: Optional[str] = None
+    provider_message_id: str | None = None
     sent_at: datetime
 
 

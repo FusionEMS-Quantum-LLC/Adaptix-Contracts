@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -43,17 +42,17 @@ class CadTransportLinkContract(BaseModel):
     request_id: str
     tenant_id: str
     status: CadTransportLinkStatus
-    patient_name: Optional[str] = None
-    transport_type: Optional[str] = None
-    level_of_care: Optional[str] = None
-    pickup_facility_name: Optional[str] = None
-    destination_facility_name: Optional[str] = None
-    scheduled_pickup_at: Optional[datetime] = None
-    unit_id: Optional[str] = None
-    cad_case_id: Optional[str] = None
-    activated_at: Optional[datetime] = None
-    last_synced_at: Optional[datetime] = None
-    error_detail: Optional[str] = None
+    patient_name: str | None = None
+    transport_type: str | None = None
+    level_of_care: str | None = None
+    pickup_facility_name: str | None = None
+    destination_facility_name: str | None = None
+    scheduled_pickup_at: datetime | None = None
+    unit_id: str | None = None
+    cad_case_id: str | None = None
+    activated_at: datetime | None = None
+    last_synced_at: datetime | None = None
+    error_detail: str | None = None
 
 
 class CadDispatchReadyEntryContract(BaseModel):
@@ -66,11 +65,11 @@ class CadDispatchReadyEntryContract(BaseModel):
     transport_type: str
     pickup_facility_name: str
     scheduled_pickup_at: datetime
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     readiness_confirmed_at: datetime
-    minutes_until_pickup: Optional[int] = None
+    minutes_until_pickup: int | None = None
     removed: bool = False
-    removed_at: Optional[datetime] = None
+    removed_at: datetime | None = None
 
 
 class CadTransportExceptionEntryContract(BaseModel):
@@ -86,7 +85,7 @@ class CadTransportExceptionEntryContract(BaseModel):
     blocking_gates: list[str] = Field(default_factory=list)
     flagged_at: datetime
     resolved: bool = False
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
 
 
 class CadTransportStatusSyncContract(BaseModel):
@@ -95,11 +94,11 @@ class CadTransportStatusSyncContract(BaseModel):
     trip_id: str
     tenant_id: str
     new_status: str
-    unit_id: Optional[str] = None
-    operator_note: Optional[str] = None
+    unit_id: str | None = None
+    operator_note: str | None = None
     synced_at: datetime
     transport_accepted: bool = False
-    transport_timeline_event_id: Optional[str] = None
+    transport_timeline_event_id: str | None = None
 
 
 class ScheduledTransportLaneItem(BaseModel):
@@ -117,18 +116,18 @@ class ScheduledTransportLaneItem(BaseModel):
     destination_facility_name: str
 
     scheduled_pickup_at: datetime
-    scheduled_dropoff_at: Optional[datetime] = None
+    scheduled_dropoff_at: datetime | None = None
 
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     crew_ids: list[str]
 
     readiness_state: str
     documents_ready: bool
     signature_complete: bool
-    authorization_status: Optional[str] = None
+    authorization_status: str | None = None
 
     lane_status: CadTransportLaneStatus
-    minutes_until_pickup: Optional[int] = None
+    minutes_until_pickup: int | None = None
 
 
 class DispatchReadyItem(BaseModel):
@@ -147,7 +146,7 @@ class DispatchReadyItem(BaseModel):
 
     scheduled_pickup_at: datetime
 
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     crew_ids: list[str]
 
     readiness_confirmed_at: datetime
@@ -175,16 +174,16 @@ class CadTransportActivateRequest(BaseModel):
     """Contract for activating a dispatch-ready transport into CAD operations."""
 
     trip_id: str
-    assigned_unit_id: Optional[str] = None
+    assigned_unit_id: str | None = None
     assigned_crew_ids: list[str] = Field(default_factory=list)
-    operator_note: Optional[str] = Field(default=None, max_length=500)
+    operator_note: str | None = Field(default=None, max_length=500)
 
 
 class CadTransportActivateResponse(BaseModel):
     """Response contract for transport activation in CAD."""
 
     trip_id: str
-    cad_case_id: Optional[str] = None
+    cad_case_id: str | None = None
     activated_at: datetime
     status: str
 
@@ -195,9 +194,9 @@ class CadTransportSyncPayload(BaseModel):
     trip_id: str
     tenant_id: str
     new_status: str
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     synced_at: datetime
-    operator_note: Optional[str] = None
+    operator_note: str | None = None
 
 
 class CadTransportSyncResponse(BaseModel):
@@ -205,7 +204,7 @@ class CadTransportSyncResponse(BaseModel):
 
     trip_id: str
     transport_status_updated: bool
-    timeline_event_id: Optional[str] = None
+    timeline_event_id: str | None = None
     accepted_at: datetime
 
 
@@ -217,7 +216,7 @@ class TransportActivatedEvent(BaseModel):
     trip_id: str
     request_id: str
     tenant_id: str
-    cad_case_id: Optional[str] = None
+    cad_case_id: str | None = None
 
     activated_at: datetime
 

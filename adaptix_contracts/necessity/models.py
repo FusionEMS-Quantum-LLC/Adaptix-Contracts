@@ -25,7 +25,6 @@ the shared event bus.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -81,7 +80,7 @@ class LcdRule(BaseModel):
         default_factory=list,
         description="Narrative/attestation elements the MAC requires on file",
     )
-    source_url: Optional[str] = Field(
+    source_url: str | None = Field(
         default=None, description="CMS Coverage Database URL for this LCD revision"
     )
 
@@ -114,7 +113,7 @@ class PayerDenialPattern(BaseModel):
     )
     cpt_code: str = Field(..., description="CPT/HCPCS code observed on the claim line")
     icd10_code: str = Field(..., description="Primary ICD-10-CM code observed")
-    modifier: Optional[str] = Field(
+    modifier: str | None = Field(
         default=None,
         description="Claim-line modifier if the pattern is modifier-scoped",
     )
@@ -138,7 +137,7 @@ class PayerDenialPattern(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="after")
-    def _check_denial_count_within_sample(self) -> "PayerDenialPattern":
+    def _check_denial_count_within_sample(self) -> PayerDenialPattern:
         if self.denial_count > self.sample_size:
             raise ValueError(
                 f"denial_count ({self.denial_count}) cannot exceed sample_size "
@@ -174,7 +173,7 @@ class DenialPrediction(BaseModel):
     prediction_id: str = Field(..., description="Stable id for this prediction")
     tenant_id: str
     chart_id: str = Field(..., description="ePCR chart the prediction is bound to")
-    claim_line_id: Optional[str] = Field(
+    claim_line_id: str | None = Field(
         default=None,
         description=(
             "Prospective claim-line identifier when the pre-submit linter "
@@ -186,7 +185,7 @@ class DenialPrediction(BaseModel):
     cpt_code: str
     icd10_code: str
     mac_region: MacRegion
-    modifier: Optional[str] = None
+    modifier: str | None = None
     probability: float = Field(
         ..., ge=0.0, le=1.0, description="Predicted denial probability in [0,1]"
     )
@@ -195,7 +194,7 @@ class DenialPrediction(BaseModel):
         ge=0,
         description="Line-level allowed amount at risk in USD cents (no floats)",
     )
-    based_on_pattern_id: Optional[str] = Field(
+    based_on_pattern_id: str | None = Field(
         default=None,
         description=(
             "``PayerDenialPattern.pattern_id`` this prediction is grounded in. "
@@ -238,20 +237,20 @@ class NecessityFinding(BaseModel):
         ),
     )
     message: str = Field(..., description="Human-readable message for the reviewer UI")
-    cpt_code: Optional[str] = Field(
+    cpt_code: str | None = Field(
         default=None, description="CPT/HCPCS the finding is anchored to"
     )
-    icd10_code: Optional[str] = Field(
+    icd10_code: str | None = Field(
         default=None, description="ICD-10-CM the finding is anchored to"
     )
-    lcd_id: Optional[str] = Field(
+    lcd_id: str | None = Field(
         default=None, description="``LcdRule.lcd_id`` when the finding is LCD-grounded"
     )
-    pattern_id: Optional[str] = Field(
+    pattern_id: str | None = Field(
         default=None,
         description="``PayerDenialPattern.pattern_id`` when pattern-grounded",
     )
-    denial_prediction: Optional[DenialPrediction] = Field(
+    denial_prediction: DenialPrediction | None = Field(
         default=None,
         description="Attached prediction when the finding forecasts a denial",
     )
@@ -264,7 +263,7 @@ class NecessityFinding(BaseModel):
             "or downgrade a BLOCK without losing the severity signal."
         ),
     )
-    remediation_hint: Optional[str] = Field(
+    remediation_hint: str | None = Field(
         default=None,
         description=(
             "Short reviewer-facing hint on what to fix, e.g. "
@@ -295,7 +294,7 @@ class NecessityAssessment(BaseModel):
     assessment_id: str = Field(..., description="Stable id for this assessment run")
     tenant_id: str
     chart_id: str
-    payer_id: Optional[str] = Field(
+    payer_id: str | None = Field(
         default=None,
         description=(
             "Primary payer the assessment was scoped to when known at "
@@ -336,7 +335,7 @@ class NecessityAssessment(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="after")
-    def _check_verdict_matches_findings(self) -> "NecessityAssessment":
+    def _check_verdict_matches_findings(self) -> NecessityAssessment:
         blocking = [f for f in self.findings if f.blocks_submission]
         has_warn = any(
             f.severity is NecessityVerdict.WARN and not f.blocks_submission

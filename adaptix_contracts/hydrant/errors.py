@@ -17,7 +17,6 @@ envelope.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import Field
 
@@ -97,11 +96,11 @@ class HydrantErrorEnvelope(AdaptixErrorEnvelope):
         hydrant_code: HydrantErrorCode,
         *,
         message: str,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "HydrantErrorEnvelope":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> HydrantErrorEnvelope:
         return cls(
             error_code=to_adaptix_error_code(hydrant_code),
             hydrant_error_code=hydrant_code,
@@ -134,11 +133,11 @@ class HydrantServiceError(Exception):
         *,
         message: str,
         http_status: int = 400,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "HydrantServiceError":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> HydrantServiceError:
         envelope = HydrantErrorEnvelope.from_hydrant_code(
             hydrant_code,
             message=message,
@@ -157,7 +156,7 @@ class HydrantServiceError(Exception):
 
 def hydrant_not_found(
     hydrant_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> HydrantErrorEnvelope:
     return HydrantErrorEnvelope.from_hydrant_code(
         HydrantErrorCode.HYDRANT_NOT_FOUND,
@@ -170,7 +169,7 @@ def hydrant_invalid_status_transition(
     hydrant_id: str,
     from_status: str,
     to_status: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> HydrantErrorEnvelope:
     return HydrantErrorEnvelope.from_hydrant_code(
         HydrantErrorCode.HYDRANT_INVALID_STATUS_TRANSITION,
@@ -184,7 +183,7 @@ def hydrant_invalid_status_transition(
 def test_invalid_reading(
     hydrant_test_id: str,
     reason: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> HydrantErrorEnvelope:
     return HydrantErrorEnvelope.from_hydrant_code(
         HydrantErrorCode.TEST_INVALID_READING,
@@ -195,7 +194,7 @@ def test_invalid_reading(
 
 def maintenance_not_found(
     hydrant_maintenance_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> HydrantErrorEnvelope:
     return HydrantErrorEnvelope.from_hydrant_code(
         HydrantErrorCode.MAINTENANCE_NOT_FOUND,

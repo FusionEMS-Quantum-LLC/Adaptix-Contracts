@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -32,12 +31,12 @@ class FeatureFlagRule(BaseModel):
     target_type: TargetType
     target_value: str
     enabled: bool
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class FeatureFlagContract(BaseModel):
     flag_key: str
-    description: Optional[str] = None
+    description: str | None = None
 
     status: FeatureFlagStatus
     default_enabled: bool
@@ -48,16 +47,16 @@ class FeatureFlagContract(BaseModel):
 
 class FeatureFlagResolutionRequest(BaseModel):
     flag_key: str
-    tenant_id: Optional[str] = None
-    user_id: Optional[str] = None
-    role: Optional[str] = None
-    service_name: Optional[str] = None
+    tenant_id: str | None = None
+    user_id: str | None = None
+    role: str | None = None
+    service_name: str | None = None
 
 
 class FeatureFlagResolutionResponse(BaseModel):
     flag_key: str
     resolved_enabled: bool
-    resolved_by_rule_id: Optional[str] = None
+    resolved_by_rule_id: str | None = None
     evaluated_at: datetime
 
 

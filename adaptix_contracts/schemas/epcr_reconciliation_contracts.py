@@ -30,7 +30,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -83,11 +82,11 @@ class EpcrMedItem(BaseModel):
     """
 
     name: str = Field(min_length=1, max_length=500)
-    rxnorm_code: Optional[str] = Field(default=None, max_length=50)
-    dose: Optional[str] = Field(default=None, max_length=100)
-    route: Optional[str] = Field(default=None, max_length=50)
-    frequency: Optional[str] = Field(default=None, max_length=100)
-    administered_at: Optional[str] = Field(
+    rxnorm_code: str | None = Field(default=None, max_length=50)
+    dose: str | None = Field(default=None, max_length=100)
+    route: str | None = Field(default=None, max_length=50)
+    frequency: str | None = Field(default=None, max_length=100)
+    administered_at: str | None = Field(
         default=None,
         max_length=64,
         description="ISO-8601 administration time, if known.",
@@ -104,7 +103,7 @@ class EpcrReconciliationCreateRequest(BaseModel):
 
     epcr_chart_id: str = Field(min_length=1, max_length=255)
     patient_id: str = Field(min_length=1, max_length=255)
-    encounter_id: Optional[str] = Field(default=None, max_length=255)
+    encounter_id: str | None = Field(default=None, max_length=255)
     medications_from_epcr: list[EpcrMedItem] = Field(default_factory=list)
     medications_from_mar: list[EpcrMedItem] = Field(default_factory=list)
 
@@ -115,7 +114,7 @@ class EpcrReconciliationResolveRequest(BaseModel):
     """
 
     resolution_action: EpcrResolutionAction
-    resolution_notes: Optional[str] = Field(default=None, max_length=2000)
+    resolution_notes: str | None = Field(default=None, max_length=2000)
 
 
 class EpcrFieldDiff(BaseModel):
@@ -125,8 +124,8 @@ class EpcrFieldDiff(BaseModel):
     (one of dose / route / frequency).
     """
 
-    epcr: Optional[str] = None
-    mar: Optional[str] = None
+    epcr: str | None = None
+    mar: str | None = None
 
 
 class EpcrReconciliationDiscrepancy(BaseModel):
@@ -138,9 +137,9 @@ class EpcrReconciliationDiscrepancy(BaseModel):
 
     type: EpcrDiscrepancyType
     identity_key: str
-    epcr: Optional[EpcrMedItem] = None
-    mar: Optional[EpcrMedItem] = None
-    field_diffs: Optional[dict[str, EpcrFieldDiff]] = None
+    epcr: EpcrMedItem | None = None
+    mar: EpcrMedItem | None = None
+    field_diffs: dict[str, EpcrFieldDiff] | None = None
 
 
 class EpcrReconciliationResponse(BaseModel):
@@ -153,7 +152,7 @@ class EpcrReconciliationResponse(BaseModel):
     reconciliation_id: str
     tenant_id: str
     epcr_chart_id: str
-    encounter_id: Optional[str] = None
+    encounter_id: str | None = None
     patient_id: str
     reconciliation_status: EpcrReconciliationStatus
     medications_from_epcr: list[EpcrMedItem] = Field(default_factory=list)
@@ -162,14 +161,14 @@ class EpcrReconciliationResponse(BaseModel):
     discrepancies: list[EpcrReconciliationDiscrepancy] = Field(default_factory=list)
     # Comma-joined, sorted set of discrepancy types present (e.g.
     # "dose_mismatch,missing_from_mar"), or None when the session is clean.
-    discrepancy_type: Optional[str] = None
-    resolved_by: Optional[str] = None
-    resolved_date: Optional[datetime] = None
-    resolution_notes: Optional[str] = None
-    resolution_action: Optional[EpcrResolutionAction] = None
-    created_by: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    discrepancy_type: str | None = None
+    resolved_by: str | None = None
+    resolved_date: datetime | None = None
+    resolution_notes: str | None = None
+    resolution_action: EpcrResolutionAction | None = None
+    created_by: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class EpcrReconciliationListResponse(BaseModel):

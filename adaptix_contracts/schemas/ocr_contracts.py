@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -44,8 +43,8 @@ class OcrFieldConfidence(str, Enum):
 class OcrJobCreate(BaseModel):
     source_type: OcrSourceType
     document_id: str
-    transport_request_id: Optional[str] = None
-    chart_id: Optional[str] = None
+    transport_request_id: str | None = None
+    chart_id: str | None = None
     s3_key: str
     tenant_id: str
     requested_by_user_id: str
@@ -58,8 +57,8 @@ class OcrJobStatusResponse(BaseModel):
     source_type: OcrSourceType
     document_id: str
 
-    transport_request_id: Optional[str] = None
-    chart_id: Optional[str] = None
+    transport_request_id: str | None = None
+    chart_id: str | None = None
 
     status: OcrJobStatus
 
@@ -68,11 +67,11 @@ class OcrJobStatusResponse(BaseModel):
     approved_count: int
 
     submitted_at: datetime
-    extraction_completed_at: Optional[datetime] = None
-    reviewed_at: Optional[datetime] = None
-    reviewer_user_id: Optional[str] = None
+    extraction_completed_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    reviewer_user_id: str | None = None
 
-    failure_reason: Optional[str] = None
+    failure_reason: str | None = None
 
 
 class OcrFieldCandidateResponse(BaseModel):
@@ -81,18 +80,18 @@ class OcrFieldCandidateResponse(BaseModel):
 
     field_name: str
     extracted_value: str
-    normalized_value: Optional[str] = None
+    normalized_value: str | None = None
 
     confidence: OcrFieldConfidence
     confidence_score: float = Field(..., ge=0.0, le=1.0)
 
-    page_number: Optional[int] = None
-    bounding_box: Optional[dict] = None
+    page_number: int | None = None
+    bounding_box: dict | None = None
 
     alternative_values: list[str] = Field(default_factory=list)
 
     review_status: str
-    reviewer_note: Optional[str] = None
+    reviewer_note: str | None = None
 
 
 class OcrJobDetailResponse(BaseModel):
@@ -102,24 +101,24 @@ class OcrJobDetailResponse(BaseModel):
     source_type: OcrSourceType
     document_id: str
 
-    transport_request_id: Optional[str] = None
-    chart_id: Optional[str] = None
+    transport_request_id: str | None = None
+    chart_id: str | None = None
 
     status: OcrJobStatus
 
     submitted_at: datetime
-    extraction_completed_at: Optional[datetime] = None
+    extraction_completed_at: datetime | None = None
 
     field_candidates: list[OcrFieldCandidateResponse]
 
-    failure_reason: Optional[str] = None
+    failure_reason: str | None = None
 
 
 class OcrFieldApproval(BaseModel):
     field_candidate_id: str
     approved: bool
-    corrected_value: Optional[str] = None
-    reviewer_note: Optional[str] = Field(default=None, max_length=500)
+    corrected_value: str | None = None
+    reviewer_note: str | None = Field(default=None, max_length=500)
 
 
 class OcrApprovalRequest(BaseModel):
@@ -129,7 +128,7 @@ class OcrApprovalRequest(BaseModel):
     field_approvals: list[OcrFieldApproval]
 
     overall_approved: bool
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
 
 class OcrApprovalResponse(BaseModel):
@@ -152,8 +151,8 @@ class OcrExtractionCompletedEvent(BaseModel):
     source_type: OcrSourceType
     document_id: str
 
-    transport_request_id: Optional[str] = None
-    chart_id: Optional[str] = None
+    transport_request_id: str | None = None
+    chart_id: str | None = None
 
     field_candidates_count: int
     review_required: bool
@@ -167,8 +166,8 @@ class OcrFieldsApprovedEvent(BaseModel):
     job_id: str
     tenant_id: str
 
-    transport_request_id: Optional[str] = None
-    chart_id: Optional[str] = None
+    transport_request_id: str | None = None
+    chart_id: str | None = None
 
     approved_fields_count: int
     promoted_at: datetime

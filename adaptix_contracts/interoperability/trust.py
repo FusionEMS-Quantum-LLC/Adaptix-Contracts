@@ -140,7 +140,7 @@ class TrustRelationship(BaseModel):  # pylint: disable=too-few-public-methods
     revoked_at: datetime | None = None
 
     @model_validator(mode="after")
-    def validate_window(self) -> "TrustRelationship":
+    def validate_window(self) -> TrustRelationship:
         """Reject a validity window that closes at or before it opens.
 
         A ``valid_until`` that is not strictly after ``valid_from`` describes

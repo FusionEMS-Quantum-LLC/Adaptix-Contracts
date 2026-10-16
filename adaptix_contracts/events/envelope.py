@@ -7,7 +7,7 @@ Every event must include tenant, actor, correlation, timestamp, idempotency, and
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel, Field, field_validator
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -61,7 +61,7 @@ class AdaptixEventEnvelope(BaseModel):
     payload: dict[str, Any] = Field(
         default_factory=dict, description="Event-specific payload data"
     )
-    metadata: Optional[dict[str, Any]] = Field(
+    metadata: dict[str, Any] | None = Field(
         default=None,
         description="Optional additional metadata (routing hints, flags, etc.)",
     )
@@ -111,7 +111,7 @@ class AdaptixEventEnvelope(BaseModel):
         causation_id: str | None = None,
         idempotency_key: str | None = None,
         event_version: str = "1.0",
-    ) -> "AdaptixEventEnvelope":
+    ) -> AdaptixEventEnvelope:
         """Factory method for creating a properly formed event."""
         return cls(
             event_type=event_type,

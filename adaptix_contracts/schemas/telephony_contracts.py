@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -132,22 +132,22 @@ class Call(BaseModel):
     )
     from_number: str = Field(..., min_length=1, max_length=64)
     to_number: str = Field(..., min_length=1, max_length=64)
-    destination_type: Optional[DestinationType] = None
-    destination_id: Optional[str] = Field(
+    destination_type: DestinationType | None = None
+    destination_id: str | None = Field(
         default=None,
         max_length=255,
         description="UUID (user/team/queue/…) or non-UUID (external number) target.",
     )
     status: CallStatus
-    started_at: Optional[datetime] = None
-    answered_at: Optional[datetime] = None
-    ended_at: Optional[datetime] = None
-    duration_seconds: Optional[int] = Field(default=None, ge=0)
-    recording_status: Optional[str] = Field(default=None, max_length=32)
-    transcription_status: Optional[str] = Field(default=None, max_length=32)
-    assigned_user_id: Optional[UUID] = None
-    assigned_queue_id: Optional[UUID] = None
-    failure_code: Optional[str] = Field(default=None, max_length=64)
+    started_at: datetime | None = None
+    answered_at: datetime | None = None
+    ended_at: datetime | None = None
+    duration_seconds: int | None = Field(default=None, ge=0)
+    recording_status: str | None = Field(default=None, max_length=32)
+    transcription_status: str | None = Field(default=None, max_length=32)
+    assigned_user_id: UUID | None = None
+    assigned_queue_id: UUID | None = None
+    failure_code: str | None = Field(default=None, max_length=64)
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
@@ -160,31 +160,31 @@ class Voicemail(BaseModel):
 
     voicemail_id: UUID
     tenant_id: UUID
-    call_id: Optional[UUID] = Field(
+    call_id: UUID | None = Field(
         default=None,
         description="Originating call, when the voicemail derives from a call leg.",
     )
     voicemail_box_id: UUID
     caller_number: str = Field(..., min_length=1, max_length=64)
-    caller_contact_id: Optional[UUID] = None
-    audio_object_key: Optional[str] = Field(
+    caller_contact_id: UUID | None = None
+    audio_object_key: str | None = Field(
         default=None,
         max_length=1024,
         description="Object-storage key of the recorded audio.",
     )
-    duration_seconds: Optional[int] = Field(default=None, ge=0)
-    transcript: Optional[str] = None
-    summary: Optional[str] = None
-    intent: Optional[str] = Field(default=None, max_length=255)
-    urgency: Optional[str] = Field(default=None, max_length=32)
+    duration_seconds: int | None = Field(default=None, ge=0)
+    transcript: str | None = None
+    summary: str | None = None
+    intent: str | None = Field(default=None, max_length=255)
+    urgency: str | None = Field(default=None, max_length=32)
     status: VoicemailStatus
-    assigned_user_id: Optional[UUID] = None
+    assigned_user_id: UUID | None = None
     callback_required: bool = False
-    callback_completed_at: Optional[datetime] = None
+    callback_completed_at: datetime | None = None
     received_at: datetime
-    listened_at: Optional[datetime] = None
-    archived_at: Optional[datetime] = None
-    retention_until: Optional[datetime] = None
+    listened_at: datetime | None = None
+    archived_at: datetime | None = None
+    retention_until: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -208,7 +208,7 @@ class Queue(BaseModel):
     routing_policy: dict[str, Any] = Field(default_factory=dict)
     business_hours_policy: dict[str, Any] = Field(default_factory=dict)
     overflow_policy: dict[str, Any] = Field(default_factory=dict)
-    voicemail_box_id: Optional[UUID] = None
+    voicemail_box_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -232,6 +232,6 @@ class UserPresence(BaseModel):
         max_length=32,
         description="e.g. 'registered', 'unregistered'.",
     )
-    last_seen_at: Optional[datetime] = None
-    active_call_id: Optional[UUID] = None
+    last_seen_at: datetime | None = None
+    active_call_id: UUID | None = None
     do_not_disturb: bool = False

@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -98,23 +98,23 @@ class TerminologyConceptEventPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     concept_id: UUID
-    concept_type: Optional[str] = None
-    preferred_name: Optional[str] = None
-    status: Optional[str] = None
+    concept_type: str | None = None
+    preferred_name: str | None = None
+    status: str | None = None
 
     # concept.term_added / concept.term_removed
-    term_id: Optional[UUID] = None
-    term: Optional[str] = None
-    term_type: Optional[str] = None
+    term_id: UUID | None = None
+    term: str | None = None
+    term_type: str | None = None
 
     # concept.code_mapped
-    mapping_id: Optional[UUID] = None
-    code_system: Optional[str] = None
-    code: Optional[str] = None
+    mapping_id: UUID | None = None
+    code_system: str | None = None
+    code: str | None = None
 
     # concept.semantic_type_changed
-    semantic_type: Optional[str] = None
-    previous_semantic_type: Optional[str] = None
+    semantic_type: str | None = None
+    previous_semantic_type: str | None = None
 
     # concept.updated / concept.enriched
     changed_fields: list[str] = Field(default_factory=list)
@@ -132,10 +132,10 @@ def build_terminology_event(
     event_type: TerminologyEventType,
     tenant_id: UUID,
     payload: TerminologyConceptEventPayload | Mapping[str, Any],
-    occurred_at: Optional[datetime] = None,
-    event_id: Optional[UUID] = None,
-    correlation_id: Optional[str] = None,
-    idempotency_key: Optional[str] = None,
+    occurred_at: datetime | None = None,
+    event_id: UUID | None = None,
+    correlation_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> SignalCoreEvent:
     """Build a canonical :class:`SignalCoreEvent` for a terminology concept event.
 

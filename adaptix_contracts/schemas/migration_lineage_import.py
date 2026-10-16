@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -27,14 +26,14 @@ class MigrationLineage(BaseModel):
     domain: MigrationDomain
     entity: str
     source_record_id: str
-    transformed_hash_sha256: Optional[str] = Field(
+    transformed_hash_sha256: str | None = Field(
         default=None, min_length=64, max_length=64
     )
-    destination_record_id: Optional[str] = None
-    recorded_at: Optional[datetime] = None
+    destination_record_id: str | None = None
+    recorded_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class RollbackPlan(BaseModel):
@@ -45,10 +44,10 @@ class RollbackPlan(BaseModel):
     plan_id: str
     watermark_id: str
     destination_record_ids: list[str] = Field(default_factory=list)
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class MigrationEvidence(BaseModel):
@@ -58,14 +57,14 @@ class MigrationEvidence(BaseModel):
     migration_run_id: str
     evidence_id: str
     kind: str
-    object_store_key: Optional[str] = None
-    content_hash_sha256: Optional[str] = Field(
+    object_store_key: str | None = None
+    content_hash_sha256: str | None = Field(
         default=None, min_length=64, max_length=64
     )
-    recorded_at: Optional[datetime] = None
+    recorded_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class HistoricalRecordProvenance(BaseModel):
@@ -80,7 +79,7 @@ class HistoricalRecordProvenance(BaseModel):
     historical: bool = True
 
     @model_validator(mode="after")
-    def _historical_must_stay_true(self) -> "HistoricalRecordProvenance":
+    def _historical_must_stay_true(self) -> HistoricalRecordProvenance:
         if self.source != "migration":
             raise ValueError("historical provenance source must be migration")
         if not self.historical:
@@ -123,14 +122,14 @@ class DomainMigrationImportRequest(BaseModel):
         default_factory=default_side_effect_suppression
     )
     dry_run: bool = True
-    payload_hash_sha256: Optional[str] = Field(
+    payload_hash_sha256: str | None = Field(
         default=None, min_length=64, max_length=64
     )
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
     @model_validator(mode="after")
-    def _historical_import_must_suppress(self) -> "DomainMigrationImportRequest":
+    def _historical_import_must_suppress(self) -> DomainMigrationImportRequest:
         if self.provenance.migration_run_id != self.migration_run_id:
             raise ValueError("provenance run id mismatch")
         required = set(DEFAULT_SIDE_EFFECT_SUPPRESSION)
@@ -150,8 +149,8 @@ class DomainMigrationImportResponse(BaseModel):
     migration_run_id: str
     accepted: bool
     dry_run: bool
-    destination_record_id: Optional[str] = None
-    lineage_id: Optional[str] = None
-    rejected_reason: Optional[str] = None
+    destination_record_id: str | None = None
+    lineage_id: str | None = None
+    rejected_reason: str | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None

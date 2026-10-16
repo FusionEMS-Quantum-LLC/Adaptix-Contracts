@@ -13,7 +13,6 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -67,18 +66,18 @@ class FinancialSummaryCreateRequest(BaseModel):
     """Request schema for creating a FinancialSummary."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=4000)
+    description: str | None = Field(default=None, max_length=4000)
     status: str = Field(default="active", min_length=1, max_length=50)
-    metadata_json: Optional[dict] = Field(default=None)
+    metadata_json: dict | None = Field(default=None)
 
 
 class FinancialSummaryUpdateRequest(BaseModel):
     """Request schema for updating a FinancialSummary."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=4000)
-    status: Optional[str] = Field(default=None, min_length=1, max_length=50)
-    metadata_json: Optional[dict] = Field(default=None)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=4000)
+    status: str | None = Field(default=None, min_length=1, max_length=50)
+    metadata_json: dict | None = Field(default=None)
 
 
 class FinancialSummaryResponse(BaseModel):
@@ -88,15 +87,15 @@ class FinancialSummaryResponse(BaseModel):
 
     id: UUID
     tenant_id: UUID
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
     status: str
-    metadata_json: Optional[dict] = None
-    created_by: Optional[UUID] = None
-    updated_by: Optional[UUID] = None
+    metadata_json: dict | None = None
+    created_by: UUID | None = None
+    updated_by: UUID | None = None
     created_at: datetime
     updated_at: datetime
-    deleted_at: Optional[datetime] = None
+    deleted_at: datetime | None = None
 
 
 class FinancialSummaryListResponse(BaseModel):
@@ -115,12 +114,12 @@ class RevenueRecordCreateRequest(BaseModel):
     """Request schema for creating a RevenueRecord."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=4000)
+    description: str | None = Field(default=None, max_length=4000)
     status: str = Field(default="active", min_length=1, max_length=50)
-    metadata_json: Optional[dict] = Field(default=None)
-    amount: Optional[Decimal] = Field(default=None)
+    metadata_json: dict | None = Field(default=None)
+    amount: Decimal | None = Field(default=None)
     currency: str = Field(default="USD", max_length=3)
-    recorded_at: Optional[datetime] = None
+    recorded_at: datetime | None = None
 
 
 class RevenueRecordResponse(BaseModel):
@@ -130,12 +129,12 @@ class RevenueRecordResponse(BaseModel):
 
     id: UUID
     tenant_id: UUID
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
     status: str
-    amount: Optional[Decimal] = None
+    amount: Decimal | None = None
     currency: str
-    recorded_at: Optional[datetime] = None
+    recorded_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -158,17 +157,17 @@ class LedgerAccountCreateRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=24)
     name: str = Field(..., min_length=1, max_length=160)
     type: AccountType
-    parent_id: Optional[UUID] = None
+    parent_id: UUID | None = None
     is_active: bool = True
 
 
 class LedgerAccountUpdateRequest(BaseModel):
     """Partial update for a ledger account."""
 
-    name: Optional[str] = Field(default=None, max_length=160)
-    type: Optional[AccountType] = None
-    parent_id: Optional[UUID] = None
-    is_active: Optional[bool] = None
+    name: str | None = Field(default=None, max_length=160)
+    type: AccountType | None = None
+    parent_id: UUID | None = None
+    is_active: bool | None = None
 
 
 class LedgerAccountResponse(BaseModel):
@@ -180,7 +179,7 @@ class LedgerAccountResponse(BaseModel):
     code: str
     name: str
     type: AccountType
-    parent_id: Optional[UUID] = None
+    parent_id: UUID | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -206,7 +205,7 @@ class JournalLineRequest(BaseModel):
     account_id: UUID
     debit_cents: int = Field(default=0, ge=0)
     credit_cents: int = Field(default=0, ge=0)
-    memo: Optional[str] = Field(default=None, max_length=500)
+    memo: str | None = Field(default=None, max_length=500)
 
     @field_validator("debit_cents", "credit_cents")
     @classmethod
@@ -222,7 +221,7 @@ class JournalEntryCreateRequest(BaseModel):
     entry_date: date
     memo: str = Field(..., min_length=1, max_length=500)
     source: TransactionSource = TransactionSource.MANUAL
-    reference_id: Optional[str] = Field(default=None, max_length=255)
+    reference_id: str | None = Field(default=None, max_length=255)
     lines: list[JournalLineRequest] = Field(..., min_length=2)
 
 
@@ -235,7 +234,7 @@ class JournalLineResponse(BaseModel):
     account_id: UUID
     debit_cents: int
     credit_cents: int
-    memo: Optional[str] = None
+    memo: str | None = None
 
 
 class JournalEntryResponse(BaseModel):
@@ -248,8 +247,8 @@ class JournalEntryResponse(BaseModel):
     entry_date: date
     memo: str
     source: TransactionSource
-    reference_id: Optional[str] = None
-    posted_by: Optional[UUID] = None
+    reference_id: str | None = None
+    posted_by: UUID | None = None
     created_at: datetime
     lines: list[JournalLineResponse]
 
@@ -278,9 +277,9 @@ class ReconciliationPeriodResponse(BaseModel):
     period_start: date
     period_end: date
     status: ReconciliationStatus
-    reconciled_by: Optional[UUID] = None
-    reconciled_at: Optional[datetime] = None
-    notes: Optional[str] = None
+    reconciled_by: UUID | None = None
+    reconciled_at: datetime | None = None
+    notes: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -315,7 +314,7 @@ class RevenueRecordCreatedEvent(BaseModel):
     event_type: str = "finance.revenue_record.created"
     tenant_id: UUID
     record_id: UUID
-    amount_cents: Optional[int] = None
+    amount_cents: int | None = None
     currency: str = "USD"
     created_at: datetime
 
@@ -328,5 +327,5 @@ class JournalEntryPostedEvent(BaseModel):
     entry_id: UUID
     entry_date: date
     source: TransactionSource
-    posted_by: Optional[UUID] = None
+    posted_by: UUID | None = None
     posted_at: datetime

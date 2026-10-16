@@ -10,7 +10,7 @@ Architecture rules:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -201,8 +201,8 @@ class AISuggestion(BaseModel):
     )
     suggested_action: str
     human_review_status: HumanReviewStatus = "pending"
-    reviewed_by: Optional[str] = None
-    reviewed_at: Optional[datetime] = None
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -242,23 +242,23 @@ class CreateQATriggerRequest(BaseModel):
 class QACaseDTO(BaseModel):
     id: str
     tenant_id: str
-    agency_id: Optional[str]
+    agency_id: str | None
     source_chart_id: str
     case_number: str
     trigger_key: str
     trigger_type: QATriggerSource
     priority: Priority
     status: QACaseStatus
-    assigned_to: Optional[str]
-    assigned_at: Optional[datetime]
-    due_date: Optional[datetime]
-    qa_score: Optional[float]
-    score_version: Optional[str]
+    assigned_to: str | None
+    assigned_at: datetime | None
+    due_date: datetime | None
+    qa_score: float | None
+    score_version: str | None
     education_assigned: bool
     medical_director_escalated: bool
-    closure_notes: Optional[str]
-    closed_at: Optional[datetime]
-    closed_by: Optional[str]
+    closure_notes: str | None
+    closed_at: datetime | None
+    closed_by: str | None
     created_by: str
     created_at: datetime
     updated_at: datetime
@@ -270,13 +270,13 @@ class CreateQACaseRequest(BaseModel):
     trigger_key: str
     trigger_type: QATriggerSource = "supervisor"
     priority: Priority = "standard"
-    agency_id: Optional[str] = None
-    due_date: Optional[datetime] = None
+    agency_id: str | None = None
+    due_date: datetime | None = None
 
 
 class AssignQACaseRequest(BaseModel):
     reviewer_id: str
-    due_date: Optional[datetime] = None
+    due_date: datetime | None = None
 
 
 class CloseQACaseRequest(BaseModel):
@@ -313,7 +313,7 @@ class SubmitQAScoreRequest(BaseModel):
     timeliness_score: float = Field(..., ge=0, le=100)
     clinical_quality_score: float = Field(..., ge=0, le=100)
     operational_quality_score: float = Field(..., ge=0, le=100)
-    reviewer_notes: Optional[str] = None
+    reviewer_notes: str | None = None
     context_flags: dict = Field(default_factory=dict)
     call_complexity_adjustment: float = Field(default=0.0, ge=-10, le=10)
     documentation_weight: float = Field(default=0.25, ge=0.0, le=1.0)
@@ -331,7 +331,7 @@ class QAScoreInterpretation(BaseModel):
     label: str
 
     @classmethod
-    def from_score(cls, score: float) -> "QAScoreInterpretation":
+    def from_score(cls, score: float) -> QAScoreInterpretation:
         if score >= 90:
             return cls(composite_score=score, band="exemplary", label="Exemplary")
         elif score >= 80:
@@ -366,12 +366,12 @@ class QAReviewFindingDTO(BaseModel):
     severity: Severity
     domain: ScoreDomain
     description: str
-    recommendation: Optional[str]
+    recommendation: str | None
     education_recommended: bool
     process_improvement_recommended: bool
     medical_director_review_recommended: bool
     status: str
-    provider_response: Optional[str]
+    provider_response: str | None
     created_at: datetime
 
 
@@ -381,7 +381,7 @@ class AddFindingRequest(BaseModel):
     severity: Severity = "minor"
     domain: ScoreDomain = "documentation"
     description: str = Field(..., min_length=1)
-    recommendation: Optional[str] = None
+    recommendation: str | None = None
     chart_reference: dict = Field(default_factory=dict)
     education_recommended: bool = False
     process_improvement_recommended: bool = False
@@ -403,12 +403,12 @@ class PeerReviewDTO(BaseModel):
     is_blind: bool
     conflict_of_interest_checked: bool
     status: PeerReviewStatus
-    strengths_notes: Optional[str]
-    improvement_notes: Optional[str]
-    education_recommendation: Optional[str]
+    strengths_notes: str | None
+    improvement_notes: str | None
+    education_recommendation: str | None
     exemplary_care_flag: bool
     is_protected: bool
-    completed_at: Optional[datetime]
+    completed_at: datetime | None
     created_at: datetime
 
 
@@ -419,16 +419,16 @@ class AssignPeerReviewRequest(BaseModel):
     chart_provider_id: str
     crew_member_ids: list[str] = Field(default_factory=list)
     is_blind: bool = False
-    due_date: Optional[datetime] = None
+    due_date: datetime | None = None
 
 
 class CompletePeerReviewRequest(BaseModel):
-    strengths_notes: Optional[str] = None
-    improvement_notes: Optional[str] = None
-    education_recommendation: Optional[str] = None
-    process_improvement_suggestion: Optional[str] = None
+    strengths_notes: str | None = None
+    improvement_notes: str | None = None
+    education_recommendation: str | None = None
+    process_improvement_suggestion: str | None = None
     exemplary_care_flag: bool = False
-    reviewer_signature: Optional[str] = None
+    reviewer_signature: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -446,13 +446,13 @@ class MedicalDirectorReviewDTO(BaseModel):
     escalation_reason: str
     status: MDReviewStatus
     review_type: MDReviewType
-    finding_classification: Optional[FindingClassification]
+    finding_classification: FindingClassification | None
     protocol_deviation_identified: bool
     exemplary_care_identified: bool
     education_recommended: bool
     protocol_revision_recommended: bool
     agency_leadership_flag: bool
-    completed_at: Optional[datetime]
+    completed_at: datetime | None
     created_at: datetime
 
 
@@ -467,8 +467,8 @@ class MedicalDirectorNoteDTO(BaseModel):
     author_role: str
     note_type: str
     note_text: str
-    recommendation: Optional[str]
-    finding_type: Optional[str]
+    recommendation: str | None
+    finding_type: str | None
     is_protected: bool  # always True
     created_at: datetime
 
@@ -476,12 +476,12 @@ class MedicalDirectorNoteDTO(BaseModel):
 class AddMDNoteRequest(BaseModel):
     note_type: str = "finding"
     note_text: str = Field(..., min_length=1)
-    recommendation: Optional[str] = None
-    finding_type: Optional[str] = None
+    recommendation: str | None = None
+    finding_type: str | None = None
 
 
 class CompleteMDReviewRequest(BaseModel):
-    finding_classification: Optional[FindingClassification] = None
+    finding_classification: FindingClassification | None = None
     protocol_deviation_identified: bool = False
     exemplary_care_identified: bool = False
     education_recommended: bool = False
@@ -506,7 +506,7 @@ class ProtocolDocumentDTO(BaseModel):
     protocol_code: str
     protocol_name: str
     protocol_category: str
-    current_version_id: Optional[str]
+    current_version_id: str | None
     status: ProtocolStatus
     acknowledgment_required: bool
     created_at: datetime
@@ -518,10 +518,10 @@ class ProtocolVersionDTO(BaseModel):
     protocol_id: str
     version_number: str
     effective_date: datetime
-    expiration_date: Optional[datetime]
+    expiration_date: datetime | None
     status: ProtocolVersionStatus
-    approved_at: Optional[datetime]
-    published_at: Optional[datetime]
+    approved_at: datetime | None
+    published_at: datetime | None
     created_at: datetime
 
 
@@ -536,9 +536,9 @@ class CreateProtocolRequest(BaseModel):
 class CreateProtocolVersionRequest(BaseModel):
     version_number: str
     effective_date: datetime
-    expiration_date: Optional[datetime] = None
-    content_text: Optional[str] = None
-    content_url: Optional[str] = None
+    expiration_date: datetime | None = None
+    content_text: str | None = None
+    content_url: str | None = None
     scope_applicability: dict = Field(default_factory=dict)
 
 
@@ -555,13 +555,13 @@ class EducationFollowUpDTO(BaseModel):
     assigned_by_role: str
     education_type: EducationType
     education_title: str
-    education_description: Optional[str]
-    education_resource_url: Optional[str]
-    due_date: Optional[datetime]
-    completed_at: Optional[datetime]
+    education_description: str | None
+    education_resource_url: str | None
+    due_date: datetime | None
+    completed_at: datetime | None
     status: EducationStatus
     effectiveness_measured: bool
-    qa_case_id: Optional[str]
+    qa_case_id: str | None
     created_at: datetime
 
 
@@ -569,12 +569,12 @@ class AssignEducationRequest(BaseModel):
     provider_id: str
     education_type: EducationType = "remedial"
     education_title: str = Field(..., min_length=1)
-    education_description: Optional[str] = None
-    education_resource_url: Optional[str] = None
-    due_date: Optional[datetime] = None
-    qa_case_id: Optional[str] = None
-    medical_director_review_id: Optional[str] = None
-    qi_initiative_id: Optional[str] = None
+    education_description: str | None = None
+    education_resource_url: str | None = None
+    due_date: datetime | None = None
+    qa_case_id: str | None = None
+    medical_director_review_id: str | None = None
+    qi_initiative_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -592,7 +592,7 @@ class ProviderFeedbackDTO(BaseModel):
     subject: str
     message_text: str
     is_protected: bool
-    acknowledged_at: Optional[datetime]
+    acknowledged_at: datetime | None
     status: FeedbackStatus
     created_at: datetime
 
@@ -602,8 +602,8 @@ class SendFeedbackRequest(BaseModel):
     feedback_type: FeedbackType = "informational"
     subject: str = Field(..., min_length=1)
     message_text: str = Field(..., min_length=1)
-    qa_case_id: Optional[str] = None
-    medical_director_review_id: Optional[str] = None
+    qa_case_id: str | None = None
+    medical_director_review_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -617,18 +617,18 @@ class QIInitiativeDTO(BaseModel):
     initiative_title: str
     category: QICategory
     source_trend_description: str
-    baseline_metric_value: Optional[float]
-    baseline_metric_label: Optional[str]
-    target_metric_value: Optional[float]
-    target_metric_label: Optional[str]
-    current_metric_value: Optional[float]
+    baseline_metric_value: float | None
+    baseline_metric_label: str | None
+    target_metric_value: float | None
+    target_metric_label: str | None
+    current_metric_value: float | None
     start_date: datetime
-    target_completion_date: Optional[datetime]
+    target_completion_date: datetime | None
     owner_id: str
     status: QIInitiativeStatus
-    outcome_summary: Optional[str]
+    outcome_summary: str | None
     accreditation_evidence_included: bool
-    closed_at: Optional[datetime]
+    closed_at: datetime | None
     created_at: datetime
 
 
@@ -638,20 +638,20 @@ class CreateQIInitiativeRequest(BaseModel):
     source_trend_description: str = Field(..., min_length=1)
     intervention_plan: str = Field(..., min_length=1)
     owner_id: str
-    start_date: Optional[datetime] = None
-    baseline_metric_value: Optional[float] = None
-    baseline_metric_label: Optional[str] = None
-    target_metric_value: Optional[float] = None
-    target_metric_label: Optional[str] = None
-    target_completion_date: Optional[datetime] = None
+    start_date: datetime | None = None
+    baseline_metric_value: float | None = None
+    baseline_metric_label: str | None = None
+    target_metric_value: float | None = None
+    target_metric_label: str | None = None
+    target_completion_date: datetime | None = None
     stakeholder_ids: list[str] = Field(default_factory=list)
 
 
 class AdvanceQIStatusRequest(BaseModel):
     new_status: QIInitiativeStatus
-    notes: Optional[str] = None
-    outcome_summary: Optional[str] = None
-    current_metric_value: Optional[float] = None
+    notes: str | None = None
+    outcome_summary: str | None = None
+    current_metric_value: float | None = None
 
 
 class RecordQIMetricRequest(BaseModel):
@@ -659,7 +659,7 @@ class RecordQIMetricRequest(BaseModel):
     metric_value: float
     metric_label: str
     measurement_period: str = Field(..., description="e.g. '2025-04' or '2025-Q1'")
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -675,7 +675,7 @@ class QualityAuditEventDTO(BaseModel):
     event_type: str
     reference_type: str
     reference_id: str
-    source_chart_id: Optional[str]
+    source_chart_id: str | None
     event_metadata_json: dict
     occurred_at: datetime
 
@@ -736,7 +736,7 @@ class AccreditationEvidencePackageDTO(BaseModel):
     peer_review_summary_json: dict
     education_completion_json: dict
     protocol_compliance_json: dict
-    compiled_at: Optional[datetime]
+    compiled_at: datetime | None
     created_at: datetime
 
 

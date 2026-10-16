@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -41,16 +40,16 @@ class WorkflowStep(BaseModel):
     status: WorkflowStepStatus
     retry_count: int = Field(default=0, ge=0)
 
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
 
 
 class WorkflowContext(BaseModel):
     workflow_id: str
-    tenant_id: Optional[str] = None
-    correlation_id: Optional[str] = None
-    initiator_user_id: Optional[str] = None
+    tenant_id: str | None = None
+    correlation_id: str | None = None
+    initiator_user_id: str | None = None
 
 
 class WorkflowExecution(BaseModel):
@@ -60,19 +59,19 @@ class WorkflowExecution(BaseModel):
     context: WorkflowContext
     status: WorkflowStatus
 
-    current_step_id: Optional[str] = None
+    current_step_id: str | None = None
     steps: list[WorkflowStep] = Field(default_factory=list)
 
     started_at: datetime
-    completed_at: Optional[datetime] = None
-    failure_reason: Optional[str] = None
+    completed_at: datetime | None = None
+    failure_reason: str | None = None
 
 
 class WorkflowStartRequest(BaseModel):
     workflow_type: str
-    tenant_id: Optional[str] = None
-    correlation_id: Optional[str] = None
-    initiator_user_id: Optional[str] = None
+    tenant_id: str | None = None
+    correlation_id: str | None = None
+    initiator_user_id: str | None = None
     input_payload: dict = Field(default_factory=dict)
 
 
@@ -100,7 +99,7 @@ class WorkflowFailedEvent(BaseModel):
 
     workflow_id: str
     workflow_type: str
-    current_step_id: Optional[str] = None
+    current_step_id: str | None = None
     failure_reason: str
 
     failed_at: datetime

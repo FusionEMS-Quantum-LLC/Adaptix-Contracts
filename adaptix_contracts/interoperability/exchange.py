@@ -57,7 +57,7 @@ class PublicSafetyExchangeEnvelope(BaseModel):  # pylint: disable=too-few-public
     idempotency_key: str = Field(..., min_length=1)
 
     @model_validator(mode="after")
-    def validate_expiry(self) -> "PublicSafetyExchangeEnvelope":
+    def validate_expiry(self) -> PublicSafetyExchangeEnvelope:
         """Reject an expiry that is not strictly after creation.
 
         An ``expires_at`` at or before ``created_at`` describes an envelope

@@ -42,7 +42,6 @@ DeprecationWarning) until the next major version.
 
 import warnings
 from enum import Enum
-from typing import Optional
 from pydantic import BaseModel
 
 warnings.warn(
@@ -75,10 +74,10 @@ class ErrorCode(str, Enum):
 class ErrorEnvelope(BaseModel):
     error: str
     code: ErrorCode
-    detail: Optional[str] = None
-    field: Optional[str] = None
-    correlation_id: Optional[str] = None
-    tenant_id: Optional[str] = None
+    detail: str | None = None
+    field: str | None = None
+    correlation_id: str | None = None
+    tenant_id: str | None = None
 
 
 class CredentialGatedResponse(BaseModel):

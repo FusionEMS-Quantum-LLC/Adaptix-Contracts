@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -93,14 +92,14 @@ class MigrationExceptionRecord(BaseModel):
     tenant_id: str
     migration_run_id: str
     exception_id: str
-    domain: Optional[MigrationDomain] = None
-    entity: Optional[str] = None
-    source_record_id: Optional[str] = None
+    domain: MigrationDomain | None = None
+    entity: str | None = None
+    source_record_id: str | None = None
     category: MigrationExceptionCategory
     action: MigrationExceptionAction
     blocking: bool = True
-    opened_at: Optional[datetime] = None
-    resolved_at: Optional[datetime] = None
+    opened_at: datetime | None = None
+    resolved_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)

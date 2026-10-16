@@ -385,7 +385,7 @@ class TrustSignClient:
 
     # ── lifecycle ───────────────────────────────────────────────────────
 
-    async def __aenter__(self) -> "TrustSignClient":
+    async def __aenter__(self) -> TrustSignClient:
         return self
 
     async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:

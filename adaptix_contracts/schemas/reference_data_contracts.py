@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -133,8 +133,8 @@ class ReferenceDataItem(BaseModel):
 
     code: str = Field(..., min_length=1, max_length=160)
     label: str = Field(..., min_length=1, max_length=500)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    parent_code: Optional[str] = Field(default=None, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    parent_code: str | None = Field(default=None, max_length=160)
     sort_order: int = Field(default=0, ge=0)
     is_active: bool = True
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -152,10 +152,10 @@ class ReferenceDataList(BaseModel):
 
     list_key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    tenant_id: Optional[UUID] = Field(
+    tenant_id: UUID | None = Field(
         default=None, description="None for platform-shared reference lists."
     )
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000)
     version: int = Field(default=1, ge=1)
     items: list[ReferenceDataItem] = Field(default_factory=list)
     updated_at: datetime
@@ -171,19 +171,19 @@ class ReferenceDataListCreateRequest(BaseModel):
 
     list_key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    tenant_id: Optional[UUID] = Field(
+    tenant_id: UUID | None = Field(
         default=None, description="None creates a platform-shared list (founder-only)."
     )
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000)
     items: list[ReferenceDataItem] = Field(default_factory=list)
 
 
 class ReferenceDataListUpdateRequest(BaseModel):
     """Partial update of a reference-data list's metadata and/or items."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    items: Optional[list[ReferenceDataItem]] = Field(
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    items: list[ReferenceDataItem] | None = Field(
         default=None, description="When provided, replaces the full item set."
     )
 
@@ -193,8 +193,8 @@ class ReferenceDataItemUpsertRequest(BaseModel):
 
     code: str = Field(..., min_length=1, max_length=160)
     label: str = Field(..., min_length=1, max_length=500)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    parent_code: Optional[str] = Field(default=None, max_length=160)
+    description: str | None = Field(default=None, max_length=2000)
+    parent_code: str | None = Field(default=None, max_length=160)
     sort_order: int = Field(default=0, ge=0)
     is_active: bool = True
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -203,8 +203,8 @@ class ReferenceDataItemUpsertRequest(BaseModel):
 class ReferenceDataQuery(BaseModel):
     """Query parameters for listing reference-data lists."""
 
-    list_key: Optional[str] = Field(default=None, max_length=160)
-    tenant_id: Optional[UUID] = None
+    list_key: str | None = Field(default=None, max_length=160)
+    tenant_id: UUID | None = None
     include_platform_shared: bool = True
     include_inactive_items: bool = False
     limit: int = Field(default=50, ge=1, le=500)
@@ -224,14 +224,14 @@ class ReferenceDataPublishRequest(BaseModel):
     """Request to publish (version-bump) a reference-data list."""
 
     list_key: str = Field(..., min_length=1, max_length=160)
-    tenant_id: Optional[UUID] = None
+    tenant_id: UUID | None = None
 
 
 class ReferenceDataPublishResponse(BaseModel):
     """Result of publishing a reference-data list."""
 
     list_key: str
-    tenant_id: Optional[UUID] = None
+    tenant_id: UUID | None = None
     version: int = Field(..., ge=1)
     published_at: datetime
 
@@ -247,7 +247,7 @@ class ReferenceDataListPublishedEvent(BaseModel):
     event_type: str = "reference_data.list.published"
 
     list_key: str
-    tenant_id: Optional[UUID] = None
+    tenant_id: UUID | None = None
     version: int = Field(..., ge=1)
     published_at: datetime
 
@@ -258,6 +258,6 @@ class ReferenceDataListUpdatedEvent(BaseModel):
     event_type: str = "reference_data.list.updated"
 
     list_key: str
-    tenant_id: Optional[UUID] = None
+    tenant_id: UUID | None = None
     version: int = Field(..., ge=1)
     updated_at: datetime

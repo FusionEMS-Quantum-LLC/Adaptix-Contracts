@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -15,12 +14,12 @@ class OfficerProfile(BaseModel):
     person_id: UUID
     badge_number: str
     rank: str
-    squad_id: Optional[UUID] = None
-    district_id: Optional[UUID] = None
-    hire_date: Optional[datetime] = None
+    squad_id: UUID | None = None
+    district_id: UUID | None = None
+    hire_date: datetime | None = None
     seniority_points: float = 0.0
     union_member: bool = False
-    union_id: Optional[str] = None
+    union_id: str | None = None
     active: bool = True
     created_at: datetime
     updated_at: datetime
@@ -54,8 +53,8 @@ class OfficerSpecialty(BaseModel):
     person_id: UUID
     specialty: str  # K9, SWAT, SRO, Detective, Narcotics, etc.
     certified: bool = True
-    certified_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
+    certified_at: datetime | None = None
+    expires_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -65,9 +64,9 @@ class OfficerCertification(BaseModel):
     tenant_id: UUID
     person_id: UUID
     certification_name: str
-    certification_number: Optional[str] = None
+    certification_number: str | None = None
     issued_at: datetime
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     active: bool = True
     created_at: datetime
     updated_at: datetime
@@ -89,16 +88,16 @@ class PatrolAssignment(BaseModel):
     tenant_id: UUID
     shift_id: UUID
     person_id: UUID
-    beat_id: Optional[UUID] = None
-    zone_id: Optional[UUID] = None
-    district_id: Optional[UUID] = None
-    squad_id: Optional[UUID] = None
-    vehicle_id: Optional[UUID] = None
+    beat_id: UUID | None = None
+    zone_id: UUID | None = None
+    district_id: UUID | None = None
+    squad_id: UUID | None = None
+    vehicle_id: UUID | None = None
     assigned_by: UUID
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class BeatAssignment(BaseModel):
@@ -112,7 +111,7 @@ class BeatAssignment(BaseModel):
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class ZoneAssignment(BaseModel):
@@ -126,7 +125,7 @@ class ZoneAssignment(BaseModel):
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class DistrictAssignment(BaseModel):
@@ -140,7 +139,7 @@ class DistrictAssignment(BaseModel):
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class CourtConflict(BaseModel):
@@ -152,11 +151,11 @@ class CourtConflict(BaseModel):
     conflict_type: str = "overlap"
     detected_at: datetime
     resolved: bool = False
-    resolved_by: Optional[UUID] = None
-    resolved_at: Optional[datetime] = None
+    resolved_by: UUID | None = None
+    resolved_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class DetailAssignment(BaseModel):
@@ -166,12 +165,12 @@ class DetailAssignment(BaseModel):
     person_id: UUID
     detail_type: str  # special_event, security, traffic, etc.
     role: str
-    shift_id: Optional[UUID] = None
+    shift_id: UUID | None = None
     assigned_by: UUID
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class K9Assignment(BaseModel):
@@ -185,7 +184,7 @@ class K9Assignment(BaseModel):
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class SWATAssignment(BaseModel):
@@ -194,12 +193,12 @@ class SWATAssignment(BaseModel):
     shift_id: UUID
     person_id: UUID
     swat_role: str  # entry, sniper, negotiator, commander, etc.
-    callout_id: Optional[UUID] = None
+    callout_id: UUID | None = None
     assigned_by: UUID
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class SchoolResourceAssignment(BaseModel):
@@ -208,12 +207,12 @@ class SchoolResourceAssignment(BaseModel):
     shift_id: UUID
     person_id: UUID
     school_name: str
-    school_id: Optional[UUID] = None
+    school_id: UUID | None = None
     assigned_by: UUID
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None
 
 
 class CorrectionsPostAssignment(BaseModel):
@@ -222,11 +221,11 @@ class CorrectionsPostAssignment(BaseModel):
     shift_id: UUID
     person_id: UUID
     post_name: str
-    post_id: Optional[UUID] = None
-    facility_id: Optional[UUID] = None
+    post_id: UUID | None = None
+    facility_id: UUID | None = None
     post_type: str  # housing, control, transport, perimeter, etc.
     assigned_by: UUID
     assigned_at: datetime
     created_at: datetime
     updated_at: datetime
-    audit_event_id: Optional[UUID] = None
+    audit_event_id: UUID | None = None

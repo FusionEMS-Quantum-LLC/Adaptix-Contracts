@@ -11,7 +11,6 @@ EPCR assembler, not by this contract).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -46,28 +45,28 @@ class ACINRecordDTO(BaseModel):
     )
 
     # Sections A-C-I-N-E-L-S (optional to allow partial/incremental generation).
-    activation: Optional[ACINActivationDTO] = None
-    clinical_picture: Optional[ACINClinicalPictureDTO] = None
-    intelligence: Optional[ACINIntelligenceDTO] = None
-    narrative: Optional[ACINNarrativeDTO] = None
-    evidence: Optional[ACINEvidenceDTO] = None
-    logic: Optional[ACINLogicDTO] = None
-    summary: Optional[ACINSummaryDTO] = None
+    activation: ACINActivationDTO | None = None
+    clinical_picture: ACINClinicalPictureDTO | None = None
+    intelligence: ACINIntelligenceDTO | None = None
+    narrative: ACINNarrativeDTO | None = None
+    evidence: ACINEvidenceDTO | None = None
+    logic: ACINLogicDTO | None = None
+    summary: ACINSummaryDTO | None = None
 
     # The 10-score set.
-    scores: Optional[ACINScoreSetDTO] = None
+    scores: ACINScoreSetDTO | None = None
 
     # The four Cortex reviews (clinical / billing / qa / legal).
     reviews: list[ACINReviewDTO] = Field(default_factory=list)
 
     # Attribution / lifecycle timestamps.
-    generated_by_model: Optional[str] = None
-    generated_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    locked_at: Optional[datetime] = None
+    generated_by_model: str | None = None
+    generated_at: datetime | None = None
+    created_at: datetime | None = None
+    locked_at: datetime | None = None
 
     @model_validator(mode="after")
-    def _enforce_advisory_review(self) -> "ACINRecordDTO":
+    def _enforce_advisory_review(self) -> ACINRecordDTO:
         if self.overall_ai_generated and not self.requires_human_review:
             raise ValueError(
                 "An ai-generated ACIN record must set requires_human_review=True "

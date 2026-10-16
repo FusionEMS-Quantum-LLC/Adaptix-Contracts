@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -214,9 +214,9 @@ class _Base(BaseModel):
 class TerminologySource(_Base):
     source_id: UUID
     canonical_name: str
-    short_name: Optional[str] = None
-    authority: Optional[str] = None
-    source_type: Optional[str] = None
+    short_name: str | None = None
+    authority: str | None = None
+    source_type: str | None = None
     license_required: bool = False
     license_status: LicenseStatus = LicenseStatus.UNKNOWN
     status: str = "active"
@@ -227,13 +227,13 @@ class SourceRelease(_Base):
     release_id: UUID
     source_id: UUID
     version: str
-    release_date: Optional[datetime] = None
-    effective_from: Optional[datetime] = None
-    effective_to: Optional[datetime] = None
+    release_date: datetime | None = None
+    effective_from: datetime | None = None
+    effective_to: datetime | None = None
     status: ReleaseStatus = ReleaseStatus.REGISTERED
-    checksum: Optional[str] = None
-    content_location: Optional[str] = None
-    activated_at: Optional[datetime] = None
+    checksum: str | None = None
+    content_location: str | None = None
+    activated_at: datetime | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
@@ -241,19 +241,19 @@ class SourceRelease(_Base):
 class Concept(_Base):
     concept_id: UUID
     authority: str
-    authority_identifier: Optional[str] = Field(
+    authority_identifier: str | None = Field(
         default=None,
         description="External authority id, e.g. a UMLS CUI. Never the PK.",
     )
     preferred_name: str
     normalized_name: str
-    definition: Optional[str] = None
+    definition: str | None = None
     concept_type: ConceptType
     language: str = "en"
     status: ConceptStatus = ConceptStatus.ACTIVE
     is_clinically_sensitive: bool = False
     review_status: ReviewStatus = ReviewStatus.UNREVIEWED
-    tenant_id: Optional[UUID] = Field(
+    tenant_id: UUID | None = Field(
         default=None,
         description="Set for tenant-local concepts; null/nil = global authority.",
     )
@@ -267,9 +267,9 @@ class ConceptTerm(_Base):
     normalized_text: str
     term_type: TermType
     language: str = "en"
-    source_id: Optional[UUID] = None
-    source_release_id: Optional[UUID] = None
-    source_identifier: Optional[str] = None
+    source_id: UUID | None = None
+    source_release_id: UUID | None = None
+    source_identifier: str | None = None
     is_preferred: bool = False
     is_abbreviation: bool = False
     is_case_sensitive: bool = False
@@ -287,26 +287,26 @@ class TerminologyCode(_Base):
     terminology_code_id: UUID
     source_system: str
     code: str
-    display: Optional[str] = None
-    normalized_display: Optional[str] = None
-    source_release_id: Optional[UUID] = None
+    display: str | None = None
+    normalized_display: str | None = None
+    source_release_id: UUID | None = None
     status: str = "active"
-    effective_from: Optional[datetime] = None
-    effective_to: Optional[datetime] = None
+    effective_from: datetime | None = None
+    effective_to: datetime | None = None
 
 
 class CodeMapping(_Base):
     mapping_id: UUID
     concept_id: UUID
     terminology_code_id: UUID
-    source_system: Optional[str] = None
-    code: Optional[str] = None
+    source_system: str | None = None
+    code: str | None = None
     mapping_type: MappingType
     mapping_direction: MappingDirection = MappingDirection.UNIDIRECTIONAL
     authority: str
-    confidence: Optional[float] = None
+    confidence: float | None = None
     status: str = "active"
-    classification: Optional[CrosswalkClassification] = None
+    classification: CrosswalkClassification | None = None
     provenance: dict[str, Any] = Field(
         ..., description="Non-empty. No mapping without provenance (spec §3.6)."
     )
@@ -329,7 +329,7 @@ class CodeMapping(_Base):
 
 
 class EvidenceSpan(_Base):
-    section: Optional[str] = None
+    section: str | None = None
     text: str
     start: int
     end: int
@@ -354,23 +354,23 @@ class ConfidenceBreakdown(_Base):
 
 
 class ConceptCandidate(_Base):
-    concept_id: Optional[UUID] = None
+    concept_id: UUID | None = None
     authority: str = "UMLS"
-    authority_identifier: Optional[str] = None
+    authority_identifier: str | None = None
     preferred_name: str
     match_reason: MatchReason
     score: float
     semantic_types: list[str] = Field(default_factory=list)
     evidence_spans: list[EvidenceSpan] = Field(default_factory=list)
-    assertion: Optional[AssertionContext] = None
-    confidence: Optional[ConfidenceBreakdown] = None
+    assertion: AssertionContext | None = None
+    confidence: ConfidenceBreakdown | None = None
     mappings: list[CodeMapping] = Field(default_factory=list)
 
 
 class ConceptResolutionRequest(_Base):
     text: str
-    workflow: Optional[str] = None
-    tenant_id: Optional[UUID] = None
+    workflow: str | None = None
+    tenant_id: UUID | None = None
     language: str = "en"
     target_systems: list[str] = Field(default_factory=list)
     schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
@@ -393,20 +393,20 @@ class ConceptResolutionResponse(_Base):
 class AutocodeMappingCandidate(_Base):
     system: str
     code: str
-    display: Optional[str] = None
+    display: str | None = None
     status: str = "candidate"
     confidence: float = 0.0
     requires_review: bool = True
 
 
 class AutocodeConcept(_Base):
-    concept_id: Optional[UUID] = None
-    authority_identifier: Optional[str] = None
+    concept_id: UUID | None = None
+    authority_identifier: str | None = None
     preferred_name: str
     assertion: AssertionContext = Field(default_factory=AssertionContext)
     evidence_spans: list[EvidenceSpan] = Field(default_factory=list)
     mappings: list[AutocodeMappingCandidate] = Field(default_factory=list)
-    confidence: Optional[ConfidenceBreakdown] = None
+    confidence: ConfidenceBreakdown | None = None
     review_required: bool = True
     accepted: bool = False
 
@@ -424,21 +424,21 @@ class AutocodeOutput(_Base):
 
 class GraphConceptNode(_Base):
     node_id: str
-    concept_id: Optional[UUID] = None
+    concept_id: UUID | None = None
     node_type: str
-    preferred_name: Optional[str] = None
+    preferred_name: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
 
 
 class GraphRelationshipProvenance(_Base):
     authority: str
-    source_id: Optional[UUID] = None
-    source_release_id: Optional[UUID] = None
+    source_id: UUID | None = None
+    source_release_id: UUID | None = None
     method: str
     evidence: list[str] = Field(default_factory=list)
-    effective_from: Optional[datetime] = None
+    effective_from: datetime | None = None
     review_status: ReviewStatus = ReviewStatus.UNREVIEWED
-    created_by: Optional[UUID] = None
+    created_by: UUID | None = None
 
 
 class GraphRelationship(_Base):
@@ -446,7 +446,7 @@ class GraphRelationship(_Base):
     from_node_id: str
     to_node_id: str
     relationship: str
-    confidence: Optional[float] = None
+    confidence: float | None = None
     provenance: GraphRelationshipProvenance
     status: str = "active"
     schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
@@ -459,13 +459,13 @@ class GraphRelationshipExplanation(_Base):
     relationship: str
     authority: str
     evidence: list[str] = Field(default_factory=list)
-    source_release: Optional[str] = None
-    effective_from: Optional[datetime] = None
-    confidence: Optional[float] = None
+    source_release: str | None = None
+    effective_from: datetime | None = None
+    confidence: float | None = None
     review_status: ReviewStatus = ReviewStatus.UNREVIEWED
-    created_by: Optional[UUID] = None
+    created_by: UUID | None = None
     change_history: list[dict[str, Any]] = Field(default_factory=list)
-    rule_id: Optional[str] = None
+    rule_id: str | None = None
     schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
 
 
@@ -480,10 +480,10 @@ class TerminologyEventEnvelope(_Base):
     schema_version: str = Field(default=_SCHEMA_VERSION, max_length=16)
     occurred_at: datetime
     producer: str = "terminology"
-    concept_id: Optional[UUID] = None
-    tenant_id: Optional[UUID] = None
-    correlation_id: Optional[str] = None
-    causation_id: Optional[str] = None
-    trace_id: Optional[str] = None
-    actor: Optional[str] = None
+    concept_id: UUID | None = None
+    tenant_id: UUID | None = None
+    correlation_id: str | None = None
+    causation_id: str | None = None
+    trace_id: str | None = None
+    actor: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)

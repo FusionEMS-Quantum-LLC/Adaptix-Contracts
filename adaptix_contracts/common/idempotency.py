@@ -1,7 +1,6 @@
 """Idempotency contracts for Adaptix services."""
 
 from datetime import datetime
-from typing import Optional
 from pydantic import BaseModel
 
 
@@ -12,7 +11,7 @@ class IdempotencyRecord(BaseModel):
     operation: str
     request_hash: str
     response_status: int
-    response_body: Optional[dict] = None
+    response_body: dict | None = None
     created_at: datetime
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     is_duplicate: bool = False

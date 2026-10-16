@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -17,15 +16,15 @@ class PilotGoNoGoEvent(BaseModel):
     decision_id: UUID
     tenant_id: UUID
     pilot_id: UUID
-    mission_request_id: Optional[UUID]
+    mission_request_id: UUID | None
 
     decision: str  # go, no_go, conditional
     evaluated_at: datetime
 
-    fatigue_go: Optional[bool]
-    medical_go: Optional[bool]
-    proficiency_go: Optional[bool]
-    weather_go: Optional[bool]
+    fatigue_go: bool | None
+    medical_go: bool | None
+    proficiency_go: bool | None
+    weather_go: bool | None
 
 
 class PilotReadinessStatus(BaseModel):

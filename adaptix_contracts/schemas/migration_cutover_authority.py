@@ -8,7 +8,6 @@ unpublished event. This module is the gate that must pass before either.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -35,11 +34,11 @@ class CutoverReadiness(BaseModel):
     ready: bool = False
     blocking_reasons: list[str] = Field(default_factory=list)
     watermark_present: bool = False
-    reconciliation_status: Optional[MigrationReconciliationStatus] = None
+    reconciliation_status: MigrationReconciliationStatus | None = None
     blocking_exception_count: int = Field(default=0, ge=0)
-    evaluated_at: Optional[datetime] = None
+    evaluated_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 def evaluate_cutover_readiness(
@@ -103,14 +102,14 @@ class CutoverApproval(BaseModel):
     approved_by_user_id: str
     approved_at: datetime
     fresh_mfa_verified: bool = False
-    fresh_mfa_at: Optional[datetime] = None
+    fresh_mfa_at: datetime | None = None
     readiness: CutoverReadiness
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def _require_fresh_mfa_and_readiness(self) -> "CutoverApproval":
+    def _require_fresh_mfa_and_readiness(self) -> CutoverApproval:
         if not self.fresh_mfa_verified or self.fresh_mfa_at is None:
             raise ValueError("cutover approval requires verified fresh MFA")
         if self.fresh_mfa_at > self.approved_at:

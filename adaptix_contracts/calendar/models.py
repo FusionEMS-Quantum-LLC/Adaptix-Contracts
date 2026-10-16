@@ -3,7 +3,6 @@
 from __future__ import annotations
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from pydantic import BaseModel
 
 
@@ -28,13 +27,13 @@ class ShiftAssignment(BaseModel):
     shift_id: str
     tenant_id: str
     staff_id: str
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     shift_type: ShiftType
     start_datetime: datetime
     end_datetime: datetime
     status: ScheduleStatus = ScheduleStatus.DRAFT
-    role: Optional[str] = None
-    notes: Optional[str] = None
+    role: str | None = None
+    notes: str | None = None
     created_by: str
     created_at: datetime
     audit_trail: list[dict] = []
@@ -55,7 +54,7 @@ class ScheduleEntry(BaseModel):
     cad_linked: bool = False
     crewlink_linked: bool = False
     fatigue_risk_flag: bool = False
-    fatigue_risk_reason: Optional[str] = None
+    fatigue_risk_reason: str | None = None
 
 
 class StaffingCoverage(BaseModel):
@@ -69,7 +68,7 @@ class StaffingCoverage(BaseModel):
     coverage_percentage: float
     gaps: list[str] = []
     at_risk: bool = False
-    ai_recommendation: Optional[str] = None
+    ai_recommendation: str | None = None
     human_review_required: bool = True
 
 
@@ -78,8 +77,8 @@ class CalendarExportRequest(BaseModel):
 
     tenant_id: str
     actor_id: str
-    staff_id: Optional[str] = None
-    unit_id: Optional[str] = None
+    staff_id: str | None = None
+    unit_id: str | None = None
     start_date: str
     end_date: str
     format: str = "ical"  # ical, google

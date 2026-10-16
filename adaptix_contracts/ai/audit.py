@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 import uuid
 
 
@@ -100,11 +99,11 @@ class AIAuditEvent:
     model_name: str = ""
     risk_level: str = "unknown"
     human_review_required: bool = False
-    confidence: Optional[float] = None
+    confidence: float | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    causation_id: Optional[str] = None
-    error: Optional[str] = None
+    causation_id: str | None = None
+    error: str | None = None
     # Explicitly NOT included: prompt_text, completion_text, phi_data, tokens, secrets
 
 
@@ -173,13 +172,13 @@ class AIModelExecutionRecord:
     input_hash: str = ""
     output_hash: str = ""
     structured_output_schema: str = ""
-    confidence: Optional[float] = None
+    confidence: float | None = None
     regulatory_mode: str = ""
-    human_confirmation_receipt_id: Optional[str] = None
-    latency_ms: Optional[int] = None
-    input_token_count: Optional[int] = None
-    output_token_count: Optional[int] = None
-    estimated_cost_usd: Optional[str] = None
+    human_confirmation_receipt_id: str | None = None
+    latency_ms: int | None = None
+    input_token_count: int | None = None
+    output_token_count: int | None = None
+    estimated_cost_usd: str | None = None
     failure_class: AIExecutionFailureClass = AIExecutionFailureClass.NONE
     downstream_action: str = ""
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))

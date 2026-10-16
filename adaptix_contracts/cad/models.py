@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel, Field
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
@@ -602,8 +602,8 @@ class CadAuditEvent(BaseModel):
     action: str
     resource_type: str
     resource_id: str
-    changes_before: Optional[dict[str, Any]] = None
-    changes_after: Optional[dict[str, Any]] = None
+    changes_before: dict[str, Any] | None = None
+    changes_after: dict[str, Any] | None = None
     override: bool = False
     override_reason: str | None = None
     supervisor_required: bool = False

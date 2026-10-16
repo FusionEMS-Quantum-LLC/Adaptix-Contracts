@@ -5,7 +5,6 @@ from __future__ import annotations
 import enum
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -44,7 +43,7 @@ class FounderOperatingExpenseContract(BaseModel):
     description: str
     amount: Decimal
     incurred_date: date
-    vendor: Optional[str] = None
+    vendor: str | None = None
     created_at: datetime
 
 
@@ -53,10 +52,10 @@ class FounderRevenueEntryContract(BaseModel):
     tenant_id: UUID
     source: str
     amount: Decimal
-    description: Optional[str] = None
+    description: str | None = None
     entry_date: date
-    claim_id: Optional[UUID] = None
-    payment_id: Optional[UUID] = None
+    claim_id: UUID | None = None
+    payment_id: UUID | None = None
     created_at: datetime
 
 
@@ -66,8 +65,8 @@ class FounderFinancialTransactionContract(BaseModel):
     transaction_type: str
     amount: Decimal
     description: str
-    reference_id: Optional[UUID] = None
-    reference_type: Optional[str] = None
+    reference_id: UUID | None = None
+    reference_type: str | None = None
     entry_date: date
     created_at: datetime
 
@@ -87,13 +86,13 @@ class FounderDashboardSummary(BaseModel):
 class FounderExportRequest(BaseModel):
     tenant_id: UUID
     export_type: str  # "csv_revenue", "annual_summary", "cpa_package"
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    start_date: date | None = None
+    end_date: date | None = None
 
 
 class FounderExportResponse(BaseModel):
     export_id: UUID
     export_type: str
     status: str
-    s3_key: Optional[str] = None
+    s3_key: str | None = None
     created_at: datetime
