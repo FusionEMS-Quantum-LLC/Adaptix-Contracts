@@ -10,6 +10,37 @@ Each item below is attributed to the PR that introduced it. The current
 package version is `5.0.0` (see `pyproject.toml`; `__version__` resolves it
 from the installed package metadata).
 
+## [Unreleased]
+
+### Added
+
+- **`air.mission.authorized` and `air.mission.authorization_invalidated` are
+  registered** (AIR-09), producer `air`.
+  - Adaptix-Air-Service already stages both through its outbox and relay
+    (`air_app/services/__init__.py:671` and `:499` at Air main `48ef5320`).
+    They were missing from `ALL_EVENTS`, so the operational backbone gate
+    refused them and a consumer could only subscribe by listing them as
+    unregistered topics.
+  - Both payloads carry `transition_observed_at`, so a consumer can order a
+    late copy behind a newer state.
+  - No subscription is declared yet. CAD's consumer adds them first; the
+    `event_subscriptions.py` entry follows with CAD's code citation.
+- **`transportlink.request.created` and `transportlink.signature.completed`
+  are registered** (COM-07), producer `transport`.
+  - They are registered under the names their existing payload models
+    already carry (`schemas.transport_contracts.TransportRequestCreatedEvent`
+    and `SignatureCompletedEvent`). No second `transport.*` name is added.
+  - Transport stages `transportlink.request.created` on EventBridge today.
+    `transportlink.signature.completed` is registered ahead of its producer,
+    which still only writes a log line.
+  - The request-created payload Transport stages today does not satisfy
+    `TransportRequestCreatedEvent`. The payload model is unchanged; the
+    Transport change must send its fields.
+- Constants `AIR_MISSION_AUTHORIZED`, `AIR_MISSION_AUTHORIZATION_INVALIDATED`,
+  `TRANSPORTLINK_REQUEST_CREATED` and `TRANSPORTLINK_SIGNATURE_COMPLETED` in
+  `adaptix_contracts.events.registry`; the two transport constants are in its
+  `__all__`.
+
 ## [5.43.0] - 2026-10-11
 
 ### Added

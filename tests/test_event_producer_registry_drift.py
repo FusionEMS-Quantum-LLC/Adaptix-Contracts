@@ -506,6 +506,20 @@ INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
         "air",
         "Adaptix-Air-Service/backend/air_app/services/__init__.py:266",
     ),
+    # The two flight-release facts, same relay. Verified 2026-10-16 at Air
+    # origin/main 48ef53209ca0d3bcc11c2a466eb185edea66979a: :671 is the
+    # _TRANSITION_EVENT_TYPES entry, :499 the invalidation-hop override in
+    # _stage_transition_event.
+    (
+        "air.mission.authorized",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:671",
+    ),
+    (
+        "air.mission.authorization_invalidated",
+        "air",
+        "Adaptix-Air-Service/backend/air_app/services/__init__.py:499",
+    ),
     # --- Adaptix-EPCR-Service, via ChartEventOutbox -> epcr_app/outbox_worker.py
     # generic relay (same pattern as the epcr.chart.* rows above). Verified
     # 2026-09-21 at EPCR origin/main 9a6cdd750fd49ab587bcbd0ca809fc4b64f52570. ---
