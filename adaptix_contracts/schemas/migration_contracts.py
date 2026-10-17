@@ -666,9 +666,7 @@ class SourceSchemaFingerprint(BaseModel):
     source_file_id: str | None = None
 
     entity_hint: str | None = None
-    fingerprint_sha256: str | None = Field(
-        default=None, min_length=64, max_length=64
-    )
+    fingerprint_sha256: str | None = Field(default=None, min_length=64, max_length=64)
 
     column_names: list[str] = Field(default_factory=list)
     column_count: int | None = Field(default=None, ge=0)

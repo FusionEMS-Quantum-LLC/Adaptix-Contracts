@@ -77,9 +77,7 @@ class NarcoticsVialEvent(BaseModel):
     to_unit_id: str | None = Field(default=None, description="Destination unit")
 
     # For usage
-    patient_id: str | None = Field(
-        default=None, description="Patient (if applicable)"
-    )
+    patient_id: str | None = Field(default=None, description="Patient (if applicable)")
     used_by: str | None = Field(
         default=None, description="Clinician who used substance"
     )
@@ -234,9 +232,7 @@ class NarcoticsAnalyticsEvent(BaseModel):
     cost: Decimal | None = Field(default=None)
 
     # Risk indicators
-    risk_score: float | None = Field(
-        default=None, description="Diversion risk 0-100"
-    )
+    risk_score: float | None = Field(default=None, description="Diversion risk 0-100")
     risk_level: str | None = Field(default=None, description="green/yellow/red")
 
     # Custom metadata

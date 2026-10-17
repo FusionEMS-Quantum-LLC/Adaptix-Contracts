@@ -58,9 +58,7 @@ class MigrationEvidence(BaseModel):
     evidence_id: str
     kind: str
     object_store_key: str | None = None
-    content_hash_sha256: str | None = Field(
-        default=None, min_length=64, max_length=64
-    )
+    content_hash_sha256: str | None = Field(default=None, min_length=64, max_length=64)
     recorded_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
     correlation_id: str | None = None
@@ -122,9 +120,7 @@ class DomainMigrationImportRequest(BaseModel):
         default_factory=default_side_effect_suppression
     )
     dry_run: bool = True
-    payload_hash_sha256: str | None = Field(
-        default=None, min_length=64, max_length=64
-    )
+    payload_hash_sha256: str | None = Field(default=None, min_length=64, max_length=64)
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
     correlation_id: str | None = None
 

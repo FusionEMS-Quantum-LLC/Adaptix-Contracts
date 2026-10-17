@@ -93,9 +93,7 @@ class MedicationAdministrationEvent(BaseModel):
     medication_id: str = Field(..., description="Medication UUID")
     medication_name: str = Field(..., description="Medication name")
     lot_id: str = Field(..., description="Lot/batch ID")
-    patient_id: str | None = Field(
-        default=None, description="Patient (if applicable)"
-    )
+    patient_id: str | None = Field(default=None, description="Patient (if applicable)")
 
     quantity_administered: int = Field(..., description="Amount given")
     unit_of_measure: str = Field(...)
@@ -104,9 +102,7 @@ class MedicationAdministrationEvent(BaseModel):
 
     administered_by: str | None = Field(default=None, description="Clinician")
     administered_date: datetime = Field(...)
-    protocol_id: str | None = Field(
-        default=None, description="Protocol being followed"
-    )
+    protocol_id: str | None = Field(default=None, description="Protocol being followed")
 
     timestamp: datetime = Field(...)
     correlation_id: str | None = Field(default=None)
@@ -224,12 +220,8 @@ class MedicationShortageAlert(BaseModel):
     shortage_entry_id: str = Field(..., description="drug_shortage_entries row id")
     shortage_generic_name: str = Field(..., description="FDA listing generic name")
     company_name: str | None = Field(default=None, description="Reporting company")
-    package_ndc: str | None = Field(
-        default=None, description="Package NDC as listed"
-    )
-    presentation: str | None = Field(
-        default=None, description="Presentation as listed"
-    )
+    package_ndc: str | None = Field(default=None, description="Package NDC as listed")
+    presentation: str | None = Field(default=None, description="Presentation as listed")
     status: str = Field(..., description="FDA status as published, e.g. Current")
     availability: str | None = Field(
         default=None, description="Availability as published"

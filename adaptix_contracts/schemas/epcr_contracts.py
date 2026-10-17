@@ -419,7 +419,9 @@ class EpcrBillingInterventionsBlock(BaseModel):  # pylint: disable=too-few-publi
     """
 
     procedures: list[EpcrBillingProcedureItem] | None = None
-    medication_administrations: list[EpcrBillingMedicationAdministrationItem] | None = None
+    medication_administrations: list[EpcrBillingMedicationAdministrationItem] | None = (
+        None
+    )
     procedure_total: int | None = None
     medication_administration_total: int | None = None
 
@@ -521,7 +523,19 @@ class EpcrBillingSignatureFact(BaseModel):  # pylint: disable=too-few-public-met
     # Who signed, as EPCR classifies its own ``signature_class`` vocabulary.
     # ``None`` means a class EPCR does not recognise; a consumer must not
     # count such a signature toward any requirement.
-    signer_role: Literal["patient", "patient_representative", "ems_crew", "receiving_facility", "witness", "medical_control", "medical_director", "other"] | None = None
+    signer_role: (
+        Literal[
+            "patient",
+            "patient_representative",
+            "ems_crew",
+            "receiving_facility",
+            "witness",
+            "medical_control",
+            "medical_director",
+            "other",
+        ]
+        | None
+    ) = None
     # True when EPCR holds evidence the person signed: a captured graphic, a
     # completed TrustSign attestation, or a documented signature on file. False
     # for a documented not-signed reason (eOther.15 "Not Signed - ...").
