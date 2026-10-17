@@ -24,6 +24,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
+    rebase-strategy: "disabled"
     groups:
       patch-and-minor:
         applies-to: version-updates
@@ -36,6 +37,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
+    rebase-strategy: "disabled"
     groups:
       patch-and-minor:
         applies-to: version-updates
