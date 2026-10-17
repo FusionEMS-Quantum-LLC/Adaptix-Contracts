@@ -390,38 +390,50 @@ INDIRECT_ENVELOPE_PRODUCERS: tuple[tuple[str, str, str], ...] = (
     (
         "epcr.vision.capture_created",
         "epcr",
-        "Adaptix-EPCR-Service/backend/epcr_app/services/"
-        "chart_vision_capture_service.py:905",
+        (
+            "Adaptix-EPCR-Service/backend/epcr_app/services/"
+            "chart_vision_capture_service.py:905"
+        ),
     ),
     (
         "epcr.vision.capture_accepted",
         "epcr",
-        "Adaptix-EPCR-Service/backend/epcr_app/services/"
-        "chart_vision_capture_service.py:1119",
+        (
+            "Adaptix-EPCR-Service/backend/epcr_app/services/"
+            "chart_vision_capture_service.py:1119"
+        ),
     ),
     (
         "epcr.vision.vital_signs_accepted",
         "epcr",
-        "Adaptix-EPCR-Service/backend/epcr_app/services/"
-        "chart_vision_capture_service.py:1132",
+        (
+            "Adaptix-EPCR-Service/backend/epcr_app/services/"
+            "chart_vision_capture_service.py:1132"
+        ),
     ),
     (
         "epcr.vision.twelve_lead_accepted",
         "epcr",
-        "Adaptix-EPCR-Service/backend/epcr_app/services/"
-        "chart_vision_capture_service.py:1147",
+        (
+            "Adaptix-EPCR-Service/backend/epcr_app/services/"
+            "chart_vision_capture_service.py:1147"
+        ),
     ),
     (
         "epcr.vision.capture_rejected",
         "epcr",
-        "Adaptix-EPCR-Service/backend/epcr_app/services/"
-        "chart_vision_capture_service.py:1201",
+        (
+            "Adaptix-EPCR-Service/backend/epcr_app/services/"
+            "chart_vision_capture_service.py:1201"
+        ),
     ),
     (
         "hospital.cath_lab.activate_recommended",
         "epcr",
-        "Adaptix-EPCR-Service/backend/epcr_app/services/"
-        "chart_vision_capture_service.py:1155",
+        (
+            "Adaptix-EPCR-Service/backend/epcr_app/services/"
+            "chart_vision_capture_service.py:1155"
+        ),
     ),
     # --- Adaptix-Patient-Identity-Service, via OutboxEvent -> worker:88 ---
     (
@@ -608,12 +620,12 @@ def test_indirect_and_direct_inventories_do_not_overlap() -> None:
 
 
 @pytest.mark.parametrize(
-    ("event_type", "slug", "site"),
-    INDIRECT_ENVELOPE_PRODUCERS,
+    ("event_type", "slug"),
+    [(event_type, slug) for event_type, slug, _site in INDIRECT_ENVELOPE_PRODUCERS],
     ids=[entry[0] for entry in INDIRECT_ENVELOPE_PRODUCERS],
 )
 def test_indirect_producer_event_passes_operational_backbone_gate(
-    event_type: str, slug: str, site: str
+    event_type: str, slug: str
 ) -> None:
     """Proves the allow-list gate now ACCEPTS each indirectly-produced event.
 
@@ -734,7 +746,7 @@ def test_unknown_source_service_resolves_to_none_not_a_guess() -> None:
 
 def test_producer_of_rejects_an_unregistered_event_type() -> None:
     with pytest.raises(KeyError, match="not registered"):
-        producer_of("totally.unregistered.event")
+        _ = producer_of("totally.unregistered.event")
 
 
 # ---------------------------------------------------------------------------
@@ -818,10 +830,12 @@ def test_registry_module_parses_and_exports_the_new_public_api() -> None:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "__all__":
+                    assert isinstance(node.value, ast.List), "__all__ is a list literal"
                     exported = {
                         element.value
-                        for element in node.value.elts  # type: ignore[attr-defined]
+                        for element in node.value.elts
                         if isinstance(element, ast.Constant)
+                        and isinstance(element.value, str)
                     }
     for name in (
         "producer_of",

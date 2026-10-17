@@ -16,10 +16,14 @@ import hashlib
 import hmac
 import json
 import time
+from contextlib import suppress
+from typing import Annotated
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status
+from pydantic import ValidationError
+from starlette.types import Scope
 
 from adaptix_contracts.auth_contracts import (
     AuthContext,
@@ -156,7 +160,7 @@ def test_get_auth_context_whitespace_stripped() -> None:
 
 def test_get_auth_context_fails_without_user_id() -> None:
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=None,
                 x_tenant_id=str(uuid4()),
@@ -169,7 +173,7 @@ def test_get_auth_context_fails_without_user_id() -> None:
 
 def test_get_auth_context_fails_without_tenant_id() -> None:
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(uuid4()),
                 x_tenant_id=None,
@@ -182,7 +186,7 @@ def test_get_auth_context_fails_without_tenant_id() -> None:
 
 def test_get_auth_context_fails_with_invalid_user_id_uuid() -> None:
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id="not-a-uuid",
                 x_tenant_id=str(uuid4()),
@@ -195,7 +199,7 @@ def test_get_auth_context_fails_with_invalid_user_id_uuid() -> None:
 
 def test_get_auth_context_fails_with_invalid_tenant_id_uuid() -> None:
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(uuid4()),
                 x_tenant_id="not-a-uuid",
@@ -208,7 +212,7 @@ def test_get_auth_context_fails_with_invalid_tenant_id_uuid() -> None:
 
 def test_get_auth_context_fails_with_empty_user_id() -> None:
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id="   ",
                 x_tenant_id=str(uuid4()),
@@ -234,8 +238,11 @@ def test_auth_context_is_frozen() -> None:
         )
     )
 
-    with pytest.raises(Exception):
-        auth.user_id = uuid4()  # type: ignore[misc]
+    # Through __setattr__, which is what the assignment statement calls: mypy's
+    # pydantic plugin knows the model is frozen and rejects the statement itself
+    # at check time, and what this test pins is the refusal at run time.
+    with pytest.raises(ValidationError, match="Instance is frozen"):
+        auth.__setattr__("user_id", uuid4())
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +252,7 @@ def test_auth_context_is_frozen() -> None:
 
 def test_from_token_payload_rejects_missing_tenant_id() -> None:
     with pytest.raises(ValueError, match="tenant_id"):
-        AdaptixAuthContext.from_token_payload(
+        _ = AdaptixAuthContext.from_token_payload(
             {
                 "sub": str(uuid4()),
                 "session_id": str(uuid4()),
@@ -255,7 +262,7 @@ def test_from_token_payload_rejects_missing_tenant_id() -> None:
 
 def test_from_token_payload_rejects_missing_sub() -> None:
     with pytest.raises(ValueError, match="sub"):
-        AdaptixAuthContext.from_token_payload(
+        _ = AdaptixAuthContext.from_token_payload(
             {
                 "tenant_id": str(uuid4()),
                 "session_id": str(uuid4()),
@@ -265,7 +272,7 @@ def test_from_token_payload_rejects_missing_sub() -> None:
 
 def test_from_token_payload_rejects_missing_session_id() -> None:
     with pytest.raises(ValueError, match="session_id"):
-        AdaptixAuthContext.from_token_payload(
+        _ = AdaptixAuthContext.from_token_payload(
             {
                 "tenant_id": str(uuid4()),
                 "sub": str(uuid4()),
@@ -275,7 +282,7 @@ def test_from_token_payload_rejects_missing_session_id() -> None:
 
 def test_from_token_payload_rejects_trusted_tenant_mismatch() -> None:
     with pytest.raises(ValueError, match="mismatch"):
-        AdaptixAuthContext.from_token_payload(
+        _ = AdaptixAuthContext.from_token_payload(
             {
                 "tenant_id": str(uuid4()),
                 "sub": str(uuid4()),
@@ -369,7 +376,7 @@ def _sign_gateway_context(
 ) -> tuple[str, str]:
     """Produce (context_b64, signature_hex) exactly like the gateway producer."""
     now = int(time.time())
-    payload = {
+    payload: dict[str, object] = {
         "sub": user_id,
         "user_id": user_id,
         "tenant_id": tenant_id,
@@ -397,16 +404,16 @@ def _sign_gateway_context(
     return context_b64, sig
 
 
-@pytest.fixture()
-def _gateway_secret(monkeypatch: pytest.MonkeyPatch) -> str:
+@pytest.fixture
+def _gateway_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _F24_SECRET)
     # Ensure enforcement is OFF by default for these tests unless set explicitly.
     monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
     monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
-    return _F24_SECRET
 
 
-def test_f24_valid_signature_with_secret_passes(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_f24_valid_signature_with_secret_passes() -> None:
     """Valid gateway signature + secret -> passes; signed roles are authoritative."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -432,9 +439,8 @@ def test_f24_valid_signature_with_secret_passes(_gateway_secret: str) -> None:
     assert "paramedic" in auth.roles
 
 
-def test_signed_scopes_surface_on_auth_context_and_pass_require_permission(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_signed_scopes_surface_on_auth_context_and_pass_require_permission() -> None:
     """PAIRED CONTRACT TEST — gateway → downstream permission propagation.
 
     The gateway signs Core-minted fine-grained permissions into the context
@@ -475,7 +481,8 @@ def test_signed_scopes_surface_on_auth_context_and_pass_require_permission(
     assert "narcotic.vault.delete" not in permissions  # no over-grant
 
 
-def test_signed_mfa_claim_surfaces_on_auth_context(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_signed_mfa_claim_surfaces_on_auth_context() -> None:
     """A verified boolean MFA claim is available to downstream DEA gates."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -515,9 +522,8 @@ def test_unsigned_path_has_empty_scopes() -> None:
     assert auth.scopes == []
 
 
-def test_f24_signed_roles_authoritative_over_spoofed_headers(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_f24_signed_roles_authoritative_over_spoofed_headers() -> None:
     """A verified signature makes signed roles/founder authoritative.
 
     Security invariant: with a valid gateway signature present, the spoofable
@@ -557,7 +563,8 @@ def test_f24_signed_roles_authoritative_over_spoofed_headers(
     assert auth.email == "user@example.test"  # signed email, not the spoofed one
 
 
-def test_f24_signed_is_founder_claim_honored(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_f24_signed_is_founder_claim_honored() -> None:
     """A signed is_founder=True claim yields is_founder + 'founder' role."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -584,7 +591,8 @@ def test_f24_signed_is_founder_claim_honored(_gateway_secret: str) -> None:
     assert "admin" in auth.roles
 
 
-def test_f24_signed_founder_role_sets_is_founder(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_f24_signed_founder_role_sets_is_founder() -> None:
     """'founder' present in signed roles sets is_founder even if claim omitted."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -606,7 +614,8 @@ def test_f24_signed_founder_role_sets_is_founder(_gateway_secret: str) -> None:
     assert "founder" in {r.lower() for r in auth.roles}
 
 
-def test_f24_tampered_signature_with_secret_rejected(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_f24_tampered_signature_with_secret_rejected() -> None:
     """Invalid/tampered signature + secret -> 401."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -614,7 +623,7 @@ def test_f24_tampered_signature_with_secret_rejected(_gateway_secret: str) -> No
     tampered_sig = ("0" if sig[0] != "0" else "1") + sig[1:]
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -670,7 +679,7 @@ def test_f24_absent_signature_enforce_true_rejected(
     tenant_id = uuid4()
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -680,7 +689,8 @@ def test_f24_absent_signature_enforce_true_rejected(
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_f24_expired_signature_rejected(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_f24_expired_signature_rejected() -> None:
     """Expired timestamp (replay window exceeded) -> 401."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -694,7 +704,7 @@ def test_f24_expired_signature_rejected(_gateway_secret: str) -> None:
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -707,7 +717,8 @@ def test_f24_expired_signature_rejected(_gateway_secret: str) -> None:
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_f24_signed_identity_mismatch_rejected(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_f24_signed_identity_mismatch_rejected() -> None:
     """Valid signature over a DIFFERENT identity than the headers -> 401."""
     header_user = uuid4()
     header_tenant = uuid4()
@@ -717,7 +728,7 @@ def test_f24_signed_identity_mismatch_rejected(_gateway_secret: str) -> None:
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(header_user),
                 x_tenant_id=str(header_tenant),
@@ -774,7 +785,7 @@ def test_f24_audience_pin_mismatch_rejected(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -818,7 +829,7 @@ def test_appsec_production_unsigned_no_flag_rejected(
     monkeypatch.delenv("ADAPTIX_GATEWAY_SHARED_SECRET", raising=False)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(uuid4()),
                 x_tenant_id=str(uuid4()),
@@ -840,7 +851,7 @@ def test_appsec_production_prod_alias_unsigned_no_flag_rejected(
     monkeypatch.delenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", raising=False)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(uuid4()),
                 x_tenant_id=str(uuid4()),
@@ -1006,7 +1017,7 @@ def test_appsec_production_signed_no_secret_fail_closed(
     ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -1032,7 +1043,7 @@ def test_appsec_production_signed_no_secret_enforce_true_still_fail_closed(
     ctx_b64, sig = _sign_gateway_context(user_id=str(user_id), tenant_id=str(tenant_id))
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -1066,7 +1077,7 @@ def test_appsec_production_audience_mismatch_rejected(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -1156,9 +1167,8 @@ def _demo_auth(
     )
 
 
-def test_demo_claims_surface_from_verified_signed_context(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_demo_claims_surface_from_verified_signed_context() -> None:
     """A well-formed signed demo context surfaces all four demo fields."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -1192,9 +1202,8 @@ def test_demo_claims_surface_from_verified_signed_context(
     assert auth.is_founder is False
 
 
-def test_demo_context_with_malformed_session_id_is_rejected_not_downgraded(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_demo_context_with_malformed_session_id_is_rejected_not_downgraded() -> None:
     """Malformed demo_session_id -> 401, never a silent ordinary token."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -1209,7 +1218,7 @@ def test_demo_context_with_malformed_session_id_is_rejected_not_downgraded(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -1221,9 +1230,8 @@ def test_demo_context_with_malformed_session_id_is_rejected_not_downgraded(
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_no_lease_demo_context_is_accepted_and_surfaces_agency(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_no_lease_demo_context_is_accepted_and_surfaces_agency() -> None:
     """is_demo WITHOUT demo_lease_id is the no-lease family (founder Platform
     Demo Mode / public synthetic ``/demo/<app>`` sessions): accepted, with the
     synthetic agency surfaced and no lease -- the same discriminator Core uses."""
@@ -1252,9 +1260,8 @@ def test_no_lease_demo_context_is_accepted_and_surfaces_agency(
     assert auth.is_founder is False
 
 
-def test_no_lease_demo_context_with_only_the_flag_is_accepted(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_no_lease_demo_context_with_only_the_flag_is_accepted() -> None:
     """Bare founder Platform Demo Mode (is_demo and nothing else) is accepted
     with every demo identifier unset; it is never downgraded to non-demo."""
     user_id = uuid4()
@@ -1274,9 +1281,8 @@ def test_no_lease_demo_context_with_only_the_flag_is_accepted(
     assert auth.demo_agency_id is None
 
 
-def test_no_lease_demo_context_may_be_founder(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_no_lease_demo_context_may_be_founder() -> None:
     """Founder Platform Demo Mode IS the founder: no lease -> founder permitted.
     (The founder prohibition is a Cortex Live / leased-tenant rule.)"""
     user_id = uuid4()
@@ -1299,9 +1305,8 @@ def test_no_lease_demo_context_may_be_founder(
     assert auth.demo_lease_id is None
 
 
-def test_no_lease_demo_context_with_malformed_session_id_is_rejected(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_no_lease_demo_context_with_malformed_session_id_is_rejected() -> None:
     """A no-lease demo block that carries a non-UUID demo_session_id -> 401,
     never silently accepted with the id dropped."""
     user_id = uuid4()
@@ -1317,13 +1322,12 @@ def test_no_lease_demo_context_with_malformed_session_id_is_rejected(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
+        _ = _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_demo_context_mixing_lease_and_agency_is_rejected(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_demo_context_mixing_lease_and_agency_is_rejected() -> None:
     """A leased (Cortex Live) demo block that also names a synthetic agency
     mixes the two families -> 401."""
     user_id = uuid4()
@@ -1340,13 +1344,12 @@ def test_demo_context_mixing_lease_and_agency_is_rejected(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
+        _ = _demo_auth(user_id=user_id, tenant_id=tenant_id, ctx_b64=ctx_b64, sig=sig)
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_leased_demo_context_never_surfaces_agency_id(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_leased_demo_context_never_surfaces_agency_id() -> None:
     """The Cortex Live family carries no synthetic agency: demo_agency_id is
     None on a well-formed leased context."""
     user_id = uuid4()
@@ -1367,9 +1370,8 @@ def test_leased_demo_context_never_surfaces_agency_id(
     assert auth.demo_agency_id is None
 
 
-def test_demo_context_with_empty_persona_is_rejected(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_demo_context_with_empty_persona_is_rejected() -> None:
     """is_demo with an empty demo_persona -> 401."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -1384,7 +1386,7 @@ def test_demo_context_with_empty_persona_is_rejected(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -1396,9 +1398,8 @@ def test_demo_context_with_empty_persona_is_rejected(
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_demo_context_claiming_founder_is_rejected(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_demo_context_claiming_founder_is_rejected() -> None:
     """A signed context with is_demo AND founder -> 401. Demo is never founder."""
     user_id = uuid4()
     tenant_id = uuid4()
@@ -1414,7 +1415,7 @@ def test_demo_context_claiming_founder_is_rejected(
     )
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
+        _ = asyncio.run(
             get_auth_context(
                 x_user_id=str(user_id),
                 x_tenant_id=str(tenant_id),
@@ -1445,9 +1446,8 @@ def test_unsigned_request_never_carries_demo_status() -> None:
     assert auth.demo_persona is None
 
 
-def test_signed_non_demo_context_ignores_stray_demo_identifiers(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_signed_non_demo_context_ignores_stray_demo_identifiers() -> None:
     """Without is_demo=true, stray demo identifiers in the payload stay unset.
 
     Prevents a half-demo state where demo_session_id is populated on an
@@ -1495,7 +1495,7 @@ def test_auth_context_demo_fields_default_for_existing_constructors() -> None:
 
 
 def test_get_auth_context_passes_request_method_and_path_to_verifier(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The dependency hands the verifier the ACTUAL inbound method/path so the
     signed method/path binding can be enforced (ledger item 1, gap 1)."""
@@ -1503,12 +1503,12 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
 
     from adaptix_contracts import auth_contracts, gateway_signature
 
-    captured: dict = {}
+    captured: dict[str, object] = {}
 
     user_id = str(uuid4())
     tenant_id = str(uuid4())
 
-    def fake_verify(**kwargs):
+    def fake_verify(**kwargs: object) -> dict[str, object]:
         captured.update(kwargs)
         return {
             "user_id": user_id,
@@ -1517,13 +1517,16 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
             "aud": "adaptix-core",
         }
 
-    monkeypatch.setattr(auth_contracts, "has_gateway_signature", lambda **_: True)
+    def signature_present(**_: object) -> bool:
+        return True
+
+    monkeypatch.setattr(auth_contracts, "has_gateway_signature", signature_present)
     monkeypatch.setattr(auth_contracts, "gateway_shared_secret", lambda: "s3cret")
     # verify-once-per-request routes the crypto verify through the wrapper, which
     # calls gateway_signature.verify_gateway_signature; patch it there so this
     # still pins that the request's method/path reach the verifier.
     monkeypatch.setattr(gateway_signature, "verify_gateway_signature", fake_verify)
-    scope = {
+    scope: Scope = {
         "type": "http",
         "method": "POST",
         "path": "/api/v1/core/things",
@@ -1531,8 +1534,10 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
         "headers": [],
     }
     request = StarletteRequest(scope)
-    try:
-        asyncio.run(
+    # Identity/tenant post-checks may reject the stub payload; the verifier
+    # call itself is what this test pins.
+    with suppress(HTTPException):
+        _ = asyncio.run(
             auth_contracts.get_auth_context(
                 request=request,
                 x_user_id=user_id,
@@ -1541,10 +1546,6 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
                 x_adaptix_auth_signature="sig",
             )
         )
-    except HTTPException:
-        # Identity/tenant post-checks may reject the stub payload; the verifier
-        # call itself is what this test pins.
-        pass
     assert captured["request_method"] == "POST"
     assert captured["request_path"] == "/api/v1/core/things"
 
@@ -1553,19 +1554,18 @@ def test_get_auth_context_mounts_as_fastapi_dependency() -> None:
     """Mounting the dependency must not turn the Request parameter into a
     query field: every downstream service registers routes with
     ``Depends(get_auth_context)`` and would fail at startup otherwise."""
-    from fastapi import Depends, FastAPI
-    from fastapi.testclient import TestClient
-
-    from adaptix_contracts.auth_contracts import get_auth_context
+    from _asgi_client import ASGIClient
 
     app = FastAPI()
 
     @app.get("/probe")
-    async def probe(ctx=Depends(get_auth_context)):  # noqa: B008
+    async def probe(
+        ctx: Annotated[AuthContext, Depends(get_auth_context)],
+    ) -> dict[str, str]:
         return {"user_id": str(ctx.user_id)}
 
-    with TestClient(app) as client:
-        response = client.get("/probe")
+    # The app has no lifespan handlers; the point is that the route registers.
+    response = ASGIClient(app).get("/probe")
     # No identity headers -> the dependency's own 401, which proves the route
     # registered and the Request was injected rather than parsed as a query.
     assert response.status_code == 401
@@ -1580,7 +1580,8 @@ def test_get_auth_context_mounts_as_fastapi_dependency() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_signed_session_jti_surfaces_on_auth_context(_gateway_secret: str) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_signed_session_jti_surfaces_on_auth_context() -> None:
     """A verified signed context's ``session_jti`` claim reaches AuthContext.
 
     The gateway signs ``session_jti`` (the inbound token's session identity,
@@ -1610,9 +1611,8 @@ def test_signed_session_jti_surfaces_on_auth_context(_gateway_secret: str) -> No
     assert auth.session_jti == session_jti
 
 
-def test_signed_empty_session_jti_surfaces_as_empty_string_not_none(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_signed_empty_session_jti_surfaces_as_empty_string_not_none() -> None:
     """A signed ``session_jti: ""`` (no session identity on the inbound token)
     must surface as ``""``, never as ``None``.
 
@@ -1644,9 +1644,8 @@ def test_signed_empty_session_jti_surfaces_as_empty_string_not_none(
     assert auth.session_jti is not None
 
 
-def test_signed_context_without_session_jti_claim_defaults_to_none(
-    _gateway_secret: str,
-) -> None:
+@pytest.mark.usefixtures("_gateway_secret")
+def test_signed_context_without_session_jti_claim_defaults_to_none() -> None:
     """A verified signed context that omits ``session_jti`` entirely (a
     context minted by a gateway build that predates this claim) must surface
     ``None``, not ``""`` — the two are deliberately distinct states."""

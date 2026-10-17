@@ -40,6 +40,7 @@ _EVENTS = (
     (TRANSPORTLINK_REQUEST_CREATED, "transportlink.request.created"),
     (TRANSPORTLINK_SIGNATURE_COMPLETED, "transportlink.signature.completed"),
 )
+_EVENT_TYPES = tuple(event_type for _, event_type in _EVENTS)
 
 _PAYLOAD_BY_EVENT: dict[
     str, type[TransportRequestCreatedEvent] | type[SignatureCompletedEvent]
@@ -54,10 +55,8 @@ def test_constant_names_the_event(constant: str, event_type: str) -> None:
     assert constant == event_type
 
 
-@pytest.mark.parametrize(("constant", "event_type"), _EVENTS)
-def test_event_is_registered_to_the_transport_service(
-    constant: str, event_type: str
-) -> None:
+@pytest.mark.parametrize("event_type", _EVENT_TYPES)
+def test_event_is_registered_to_the_transport_service(event_type: str) -> None:
     assert is_registered(event_type) is True
     assert ALL_EVENTS[event_type] == {"version": "1.0", "source_service": "transport"}
     assert producer_of(event_type) is TRANSPORT_SERVICE
@@ -72,10 +71,8 @@ def test_registry_name_is_the_payload_models_event_type(
     assert payload_model.model_fields["event_type"].default == constant
 
 
-@pytest.mark.parametrize(("constant", "event_type"), _EVENTS)
-def test_event_passes_the_operational_backbone_gate(
-    constant: str, event_type: str
-) -> None:
+@pytest.mark.parametrize("event_type", _EVENT_TYPES)
+def test_event_passes_the_operational_backbone_gate(event_type: str) -> None:
     envelope = OperationalEventEnvelope(
         event_type=event_type,
         tenant_id="tenant-transport-registration",

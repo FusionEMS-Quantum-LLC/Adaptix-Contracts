@@ -872,9 +872,8 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
 }
 
 for event_name in SCHEDULING_EVENTS:
-    ALL_EVENTS.setdefault(
-        event_name, {"version": "1.0", "source_service": "scheduling"}
-    )
+    if event_name not in ALL_EVENTS:
+        ALL_EVENTS[event_name] = {"version": "1.0", "source_service": "scheduling"}
 
 ALL_REGISTERED_EVENTS = [
     *ALL_EVENTS.keys(),
@@ -950,29 +949,26 @@ def producer_of(event_type: str) -> ServiceDefinition:
     try:
         meta = ALL_EVENTS[event_type]
     except KeyError:
-        raise KeyError(
-            f"event_type is not registered in adaptix_contracts.events.registry: "
+        message = (
+            "event_type is not registered in adaptix_contracts.events.registry: "
             f"{event_type!r}"
-        ) from None
+        )
+        raise KeyError(message) from None
     source_service = str(meta["source_service"])
     service = resolve_source_service(source_service)
     if service is None:
-        raise ValueError(
+        message = (
             f"{event_type!r} declares source_service={source_service!r}, which "
             "resolves to no ServiceDefinition in "
             "adaptix_contracts.schemas.service_registry"
         )
+        raise ValueError(message)
     return service
 
 
 __all__ = [
     "ALL_EVENTS",
     "ALL_REGISTERED_EVENTS",
-    "BRIDGE_SMS_DELIVERY_UPDATED",
-    "BRIDGE_SMS_SENT",
-    "BRIDGE_STATUS_UPDATED",
-    "BRIDGE_THREAD_CLOSED",
-    "BRIDGE_THREAD_OPENED",
     "BILLING_CALL_CONTEXT_ASSEMBLED",
     "BILLING_CLAIM_CREATED",
     "BILLING_CLAIM_STATUS_CHANGED",
@@ -984,6 +980,11 @@ __all__ = [
     "BILLING_PAYMENT_RECEIVED",
     "BLOOD_OPS_EXCURSION_STATE_CHANGED",
     "BLOOD_OPS_UNIT_CUSTODY_RECORDED",
+    "BRIDGE_SMS_DELIVERY_UPDATED",
+    "BRIDGE_SMS_SENT",
+    "BRIDGE_STATUS_UPDATED",
+    "BRIDGE_THREAD_CLOSED",
+    "BRIDGE_THREAD_OPENED",
     "CAREGRAPH_EDGE_CREATED",
     "CAREGRAPH_EDGE_REMOVED",
     "CAREGRAPH_NODE_AMENDED",
