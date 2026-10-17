@@ -132,7 +132,9 @@ def test_wrong_algorithm_rejected():
             "exp": 9999999999,
             "ver": 1,
         },
-        "shared-secret",
+        # The forged token's HMAC key is irrelevant to the rejection; it is 32 bytes so
+        # PyJWT does not warn about a key shorter than SHA-256 needs (RFC 7518 3.2).
+        "k" * 32,
         algorithm="HS256",
         headers={"kid": "k1"},
     )
