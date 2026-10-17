@@ -23,18 +23,22 @@ import base64
 import hashlib
 import hmac
 import json
+import secrets
 import time
+from collections.abc import Iterator
+from typing import Annotated, Any
 from uuid import uuid4
 
 import pytest
 from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
+from _asgi_client import ASGIClient
 
 from adaptix_contracts import gateway_signature
 from adaptix_contracts.auth.module_entitlement_gate import require_module_entitlement
 from adaptix_contracts.auth_contracts import AuthContext, get_auth_context
 
-_SECRET = "verify-once-unit-test-hmac-material-not-a-real-value"
+# A fresh secret each run: there is no literal to mistake for a real credential.
+_SECRET = secrets.token_urlsafe(32)
 _AUD = "adaptix-billing"
 
 
@@ -97,14 +101,16 @@ def _gated_app() -> FastAPI:
         "/api/v1/billing/thing",
         dependencies=[Depends(require_module_entitlement("billing"))],
     )
-    def _thing(auth: AuthContext = Depends(get_auth_context)) -> dict:
+    def _thing(
+        auth: Annotated[AuthContext, Depends(get_auth_context)],
+    ) -> dict[str, str]:
         return {"tenant": str(auth.tenant_id), "user": str(auth.user_id)}
 
     return app
 
 
 @pytest.fixture(autouse=True)
-def _hmac_env(monkeypatch: pytest.MonkeyPatch):
+def _hmac_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _SECRET)
     monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
     monkeypatch.delenv("ENVIRONMENT", raising=False)
@@ -118,7 +124,7 @@ def _count_verifications(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
     calls = {"n": 0}
     real = gateway_signature.verify_gateway_signature
 
-    def counting(**kw):
+    def counting(**kw: Any) -> dict[str, Any]:
         calls["n"] += 1
         return real(**kw)
 
@@ -126,14 +132,16 @@ def _count_verifications(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
     return calls
 
 
-def test_one_request_two_checks_verifies_once_and_succeeds(monkeypatch):
+def test_one_request_two_checks_verifies_once_and_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The exact production failure: entitlement gate + get_auth_context on one
     request. It must succeed, and the assertion must be verified EXACTLY once."""
     calls = _count_verifications(monkeypatch)
     uid, tid = str(uuid4()), str(uuid4())
     ctx, sig = _sign(user_id=uid, tenant_id=tid, module_entitlements=["billing"])
 
-    client = TestClient(_gated_app(), raise_server_exceptions=False)
+    client = ASGIClient(_gated_app(), raise_server_exceptions=False)
     resp = client.get("/api/v1/billing/thing", headers=_headers(ctx, sig, uid, tid))
 
     assert resp.status_code == 200, resp.text
@@ -143,11 +151,11 @@ def test_one_request_two_checks_verifies_once_and_succeeds(monkeypatch):
     assert got == 1, f"expected exactly one verification, got {got}"
 
 
-def test_missing_entitlement_still_denies(monkeypatch):
+def test_missing_entitlement_still_denies() -> None:
     """Verify-once must not weaken authorization: no billing entitlement is denied."""
     uid, tid = str(uuid4()), str(uuid4())
     ctx, sig = _sign(user_id=uid, tenant_id=tid, module_entitlements=["epcr"])
-    client = TestClient(_gated_app(), raise_server_exceptions=False)
+    client = ASGIClient(_gated_app(), raise_server_exceptions=False)
     resp = client.get("/api/v1/billing/thing", headers=_headers(ctx, sig, uid, tid))
     # The gate answers 402 Payment Required for a tenant whose subscription
     # lacks the module (not 403) -- the point is it DENIES, and verify-once did
@@ -155,14 +163,16 @@ def test_missing_entitlement_still_denies(monkeypatch):
     assert resp.status_code == 402, resp.text
 
 
-def test_genuine_cross_request_replay_is_rejected(monkeypatch):
+def test_genuine_cross_request_replay_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A SECOND request reusing the same assertion (same jti) must be rejected as
     a replay. This proves verify-once-per-request did not become
     verify-once-per-process/token/user."""
     calls = _count_verifications(monkeypatch)
     uid, tid = str(uuid4()), str(uuid4())
     ctx, sig = _sign(user_id=uid, tenant_id=tid, module_entitlements=["billing"])
-    client = TestClient(_gated_app(), raise_server_exceptions=False)
+    client = ASGIClient(_gated_app(), raise_server_exceptions=False)
     h = _headers(ctx, sig, uid, tid)
 
     first = client.get("/api/v1/billing/thing", headers=h)
@@ -176,10 +186,12 @@ def test_genuine_cross_request_replay_is_rejected(monkeypatch):
     assert calls["n"] == 2
 
 
-def test_a_new_request_with_a_fresh_assertion_verifies_independently(monkeypatch):
+def test_a_new_request_with_a_fresh_assertion_verifies_independently(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls = _count_verifications(monkeypatch)
     uid, tid = str(uuid4()), str(uuid4())
-    client = TestClient(_gated_app(), raise_server_exceptions=False)
+    client = ASGIClient(_gated_app(), raise_server_exceptions=False)
 
     for _ in range(3):
         ctx, sig = _sign(user_id=uid, tenant_id=tid, module_entitlements=["billing"])
@@ -190,11 +202,11 @@ def test_a_new_request_with_a_fresh_assertion_verifies_independently(monkeypatch
     assert calls["n"] == 3
 
 
-def test_verified_principal_does_not_leak_between_requests(monkeypatch):
+def test_verified_principal_does_not_leak_between_requests() -> None:
     """Two different users' requests must each resolve their OWN principal; a
     verified principal from one request must never be observed by another."""
-    client = TestClient(_gated_app(), raise_server_exceptions=False)
-    seen = []
+    client = ASGIClient(_gated_app(), raise_server_exceptions=False)
+    seen: list[tuple[str, str]] = []
     for _ in range(4):
         uid, tid = str(uuid4()), str(uuid4())
         ctx, sig = _sign(user_id=uid, tenant_id=tid, module_entitlements=["billing"])
@@ -206,16 +218,16 @@ def test_verified_principal_does_not_leak_between_requests(monkeypatch):
     assert len(set(seen)) == 4  # every request saw only its own identity
 
 
-def test_invalid_signature_denies_before_authorization(monkeypatch):
+def test_invalid_signature_denies_before_authorization() -> None:
     uid, tid = str(uuid4()), str(uuid4())
     ctx, _sig = _sign(user_id=uid, tenant_id=tid, module_entitlements=["billing"])
     bad_sig = "0" * 64  # well-formed hex, wrong value
-    client = TestClient(_gated_app(), raise_server_exceptions=False)
+    client = ASGIClient(_gated_app(), raise_server_exceptions=False)
     resp = client.get("/api/v1/billing/thing", headers=_headers(ctx, bad_sig, uid, tid))
     assert resp.status_code == 401, resp.text
 
 
-def test_expired_assertion_denies(monkeypatch):
+def test_expired_assertion_denies() -> None:
     uid, tid = str(uuid4()), str(uuid4())
     now = int(time.time())
     payload = {
@@ -236,12 +248,12 @@ def test_expired_assertion_denies(monkeypatch):
     }
     ctx = _b64url(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode())
     sig = hmac.new(_SECRET.encode(), ctx.encode("ascii"), hashlib.sha256).hexdigest()
-    client = TestClient(_gated_app(), raise_server_exceptions=False)
+    client = ASGIClient(_gated_app(), raise_server_exceptions=False)
     resp = client.get("/api/v1/billing/thing", headers=_headers(ctx, sig, uid, tid))
     assert resp.status_code == 401, resp.text
 
 
-def test_no_request_scope_falls_back_to_direct_verify(monkeypatch):
+def test_no_request_scope_falls_back_to_direct_verify() -> None:
     """A non-HTTP caller (request=None) still verifies fully and records replay,
     so there is no scope-less bypass."""
     gateway_signature.reset_gateway_replay_cache_for_tests()
@@ -259,7 +271,7 @@ def test_no_request_scope_falls_back_to_direct_verify(monkeypatch):
     # Second direct verify of the SAME assertion with no request scope -> the
     # replay guard still fires (no request to fold into).
     with pytest.raises(gateway_signature.GatewaySignatureError):
-        gateway_signature.verify_gateway_signature_for_request(
+        _ = gateway_signature.verify_gateway_signature_for_request(
             None,
             context_b64=ctx,
             signature_hex=sig,
