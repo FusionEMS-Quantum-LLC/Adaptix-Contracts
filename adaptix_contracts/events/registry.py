@@ -166,6 +166,62 @@ AIR_MISSION_GROUND_FALLBACK: Final[str] = "air.mission.ground_fallback"
 AIR_MISSION_HOLD: Final[str] = "air.mission.hold"
 AIR_MISSION_COMPLETED: Final[str] = "air.mission.completed"
 
+# The two flight-release facts (AIR-09). Same outbox and relay as the block
+# above; they were produced but unregistered, so a consumer could not
+# subscribe to them without listing them as unregistered topics. Producer
+# citations, Adaptix-Air-Service origin/main
+# ``48ef53209ca0d3bcc11c2a466eb185edea66979a``, verified 2026-10-16 (both in
+# air_app/services/__init__.py, staged by ``_stage_transition_event``):
+#   :671  air.mission.authorized
+#         (``_TRANSITION_EVENT_TYPES[MissionState.AUTHORIZED]``)
+#   :499  air.mission.authorization_invalidated
+#         (set when ``mission_release.is_invalidation_hop(from, to)``)
+# Both payloads carry ``transition_observed_at``, Air's own transition time,
+# so a consumer can order a late copy behind a newer state. No consumer
+# subscription is declared in ``event_subscriptions.py`` until CAD's
+# ``air_event_consumer.py`` handles them on its main branch.
+AIR_MISSION_AUTHORIZED: Final[str] = "air.mission.authorized"
+AIR_MISSION_AUTHORIZATION_INVALIDATED: Final[str] = (
+    "air.mission.authorization_invalidated"
+)
+
+# ---------------------------------------------------------------------------
+# TransportLink request and signature events (producer:
+# Adaptix-Transport-Service, slug ``transport``)
+# ---------------------------------------------------------------------------
+# COM-07. These names are not new: the typed payloads already live in
+# ``adaptix_contracts.schemas.transport_contracts`` as
+# ``TransportRequestCreatedEvent`` (``event_type`` default
+# ``transportlink.request.created``) and ``SignatureCompletedEvent``
+# (``transportlink.signature.completed``). They are registered under those
+# existing names so the registry and the payload contract name one event, not
+# two. A ``transport.*`` spelling would be a second name for the same fact.
+#
+# Transport is the only producer. Adaptix-Transport-Service origin/main
+# ``8f8975c03a341a4811c42c9bf4fa2fa0c0e33dd0``, verified 2026-10-16:
+#   transportlink_app/models/outbox.py:20  REQUEST_CREATED_EVENT
+#   transportlink_app/outbox.py:151  ``enqueue_request_created`` stages a
+#     ``TransportOutboxEvent`` row, called from transportlink_app/services.py:463
+#     in the request-create transaction. transportlink_app/outbox_publisher.py
+#     puts the row on the platform EventBridge bus (``Source``
+#     ``adaptix.transport``, ``DetailType`` = event_type, ``Detail`` = the row
+#     payload). It is not POSTed to Core's event bus.
+#   transportlink.signature.completed has no durable producer yet:
+#     transportlink_app/domain_events.py:46 ``publish_signature_completed``
+#     only writes a log line. It is registered AHEAD of its producer, the
+#     ``billing.eligibility.result.v1`` precedent above; Transport adds the
+#     outbox write in ``complete_signature_request`` (services.py:945).
+# Known gap: the request-created payload Transport stages today
+# (``pickup_facility``/``dropoff_facility``) does not satisfy
+# ``TransportRequestCreatedEvent``, which requires ``transport_type``,
+# ``pickup_facility_id``, ``destination_facility_id`` and ``created_at``. The
+# Transport change sends the contract fields; the contract is not loosened.
+# Neither event is in the producer inventories of
+# tests/test_event_producer_registry_drift.py (no shared envelope; the Fleet
+# block above is the same case). See tests/test_transport_event_registration.py.
+TRANSPORTLINK_REQUEST_CREATED: Final[str] = "transportlink.request.created"
+TRANSPORTLINK_SIGNATURE_COMPLETED: Final[str] = "transportlink.signature.completed"
+
 # ---------------------------------------------------------------------------
 # Billing domain events (producer: Adaptix-Billing-Service, slug ``billing``)
 # ---------------------------------------------------------------------------
@@ -605,6 +661,18 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     AIR_MISSION_GROUND_FALLBACK: {"version": "1.0", "source_service": "air"},
     AIR_MISSION_HOLD: {"version": "1.0", "source_service": "air"},
     AIR_MISSION_COMPLETED: {"version": "1.0", "source_service": "air"},
+    # air_app/services/__init__.py:671 and :499 (same relay; see the block
+    # above the constants)
+    AIR_MISSION_AUTHORIZED: {"version": "1.0", "source_service": "air"},
+    AIR_MISSION_AUTHORIZATION_INVALIDATED: {"version": "1.0", "source_service": "air"},
+    # transportlink_app/outbox.py:151 (TransportOutboxEvent put on EventBridge
+    # by transportlink_app/outbox_publisher.py)
+    TRANSPORTLINK_REQUEST_CREATED: {"version": "1.0", "source_service": "transport"},
+    # Registered ahead of its producer (see the block above the constant).
+    TRANSPORTLINK_SIGNATURE_COMPLETED: {
+        "version": "1.0",
+        "source_service": "transport",
+    },
     BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_STATUS_CHANGED: {"version": "1.0", "source_service": "billing"},
@@ -804,9 +872,8 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
 }
 
 for event_name in SCHEDULING_EVENTS:
-    ALL_EVENTS.setdefault(
-        event_name, {"version": "1.0", "source_service": "scheduling"}
-    )
+    if event_name not in ALL_EVENTS:
+        ALL_EVENTS[event_name] = {"version": "1.0", "source_service": "scheduling"}
 
 ALL_REGISTERED_EVENTS = [
     *ALL_EVENTS.keys(),
@@ -882,29 +949,26 @@ def producer_of(event_type: str) -> ServiceDefinition:
     try:
         meta = ALL_EVENTS[event_type]
     except KeyError:
-        raise KeyError(
-            f"event_type is not registered in adaptix_contracts.events.registry: "
+        message = (
+            "event_type is not registered in adaptix_contracts.events.registry: "
             f"{event_type!r}"
-        ) from None
+        )
+        raise KeyError(message) from None
     source_service = str(meta["source_service"])
     service = resolve_source_service(source_service)
     if service is None:
-        raise ValueError(
+        message = (
             f"{event_type!r} declares source_service={source_service!r}, which "
             "resolves to no ServiceDefinition in "
             "adaptix_contracts.schemas.service_registry"
         )
+        raise ValueError(message)
     return service
 
 
 __all__ = [
     "ALL_EVENTS",
     "ALL_REGISTERED_EVENTS",
-    "BRIDGE_SMS_DELIVERY_UPDATED",
-    "BRIDGE_SMS_SENT",
-    "BRIDGE_STATUS_UPDATED",
-    "BRIDGE_THREAD_CLOSED",
-    "BRIDGE_THREAD_OPENED",
     "BILLING_CALL_CONTEXT_ASSEMBLED",
     "BILLING_CLAIM_CREATED",
     "BILLING_CLAIM_STATUS_CHANGED",
@@ -916,6 +980,11 @@ __all__ = [
     "BILLING_PAYMENT_RECEIVED",
     "BLOOD_OPS_EXCURSION_STATE_CHANGED",
     "BLOOD_OPS_UNIT_CUSTODY_RECORDED",
+    "BRIDGE_SMS_DELIVERY_UPDATED",
+    "BRIDGE_SMS_SENT",
+    "BRIDGE_STATUS_UPDATED",
+    "BRIDGE_THREAD_CLOSED",
+    "BRIDGE_THREAD_OPENED",
     "CAREGRAPH_EDGE_CREATED",
     "CAREGRAPH_EDGE_REMOVED",
     "CAREGRAPH_NODE_AMENDED",
@@ -977,6 +1046,8 @@ __all__ = [
     "QA_CHART_REVIEW_REQUESTED",
     "QA_CHART_REVIEW_STARTED",
     "QA_CHART_REVIEW_SUPERSEDED",
+    "TRANSPORTLINK_REQUEST_CREATED",
+    "TRANSPORTLINK_SIGNATURE_COMPLETED",
     "TRUSTSIGN_DOCUMENT_SIGNED",
     "VAS_OVERLAY_ACCEPTED",
     "VAS_OVERLAY_AMENDED",
