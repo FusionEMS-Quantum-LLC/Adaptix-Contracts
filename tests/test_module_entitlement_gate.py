@@ -24,7 +24,9 @@ import base64
 import hashlib
 import hmac
 import json
+import secrets
 import time
+from collections.abc import Callable
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -33,20 +35,24 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
+from _asgi_client import ASGIClient
 
 import adaptix_contracts.auth.module_entitlement_gate as meg
-from adaptix_contracts.auth.module_entitlement_gate import (
-    _SYSTEM_PRINCIPAL_TENANT_ID,
-    require_module_entitlement,
-)
+from adaptix_contracts.auth.cognito import AdaptixCognitoConfig
+from adaptix_contracts.auth.module_entitlement_gate import require_module_entitlement
 
-_SECRET = "gate-test-shared-secret"  # noqa: S105 — test-only fixture
+# A fresh secret each run: there is no literal to mistake for a real credential.
+_SECRET = secrets.token_urlsafe(32)
+
+# Core's platform system-principal tenant (core_app.auth.system_identity
+# SYSTEM_TENANT_ID), named by value rather than imported from the gate: the
+# bypass must hold for the id Core mints, whatever the gate's own constant says.
+_SYSTEM_PRINCIPAL_TENANT_ID = "00000000-0000-0000-0000-000000000001"
 
 # Cognito app-client identifiers used across the direct-bearer verification
 # tests. The gate binds a verified token to this exact pool + app client.
 _COGNITO_POOL_ID = "us-east-1_gatetest"
-_COGNITO_CLIENT_ID = "gate-test-client-id"  # noqa: S105 — test-only identifier
+_COGNITO_CLIENT_ID = "gate-test-client-id"
 _COGNITO_ISSUER = f"https://cognito-idp.us-east-1.amazonaws.com/{_COGNITO_POOL_ID}"
 _COGNITO_ENV_VARS = (
     "COGNITO_USER_POOL_ID",
@@ -98,26 +104,29 @@ def _clear_cognito_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def _cognito_token(
     private_pem: str,
     *,
-    token_use: str = "access",
+    kind: str = "access",
     client_id: str = _COGNITO_CLIENT_ID,
     iss: str = _COGNITO_ISSUER,
     exp_delta: int = 300,
-    **extra_claims,
+    **extra_claims: object,
 ) -> str:
-    """Mint an RS256 token shaped like a real Cognito access/id token."""
+    """Mint an RS256 token shaped like a real Cognito access/id token.
+
+    ``kind`` is the token's ``token_use`` claim: ``"access"`` or ``"id"``.
+    """
     now = int(time.time())
-    payload: dict = {
+    payload: dict[str, object] = {
         "sub": str(uuid4()),
         "iss": iss,
-        "token_use": token_use,
+        "token_use": kind,
         "iat": now,
         "exp": now + exp_delta,
         **extra_claims,
     }
-    if token_use == "id":
-        payload.setdefault("aud", client_id)
+    if kind == "id":
+        _ = payload.setdefault("aud", client_id)
     else:
-        payload.setdefault("client_id", client_id)
+        _ = payload.setdefault("client_id", client_id)
     return pyjwt.encode(payload, private_pem, algorithm="RS256")
 
 
@@ -128,7 +137,7 @@ def _bearer_app() -> FastAPI:
         "/api/v1/billing/thing",
         dependencies=[Depends(require_module_entitlement("billing"))],
     )
-    def _thing() -> dict:
+    def _thing() -> dict[str, bool]:
         return {"ok": True}
 
     return app
@@ -174,7 +183,7 @@ def _sign_gateway_context(
     return ctx, sig
 
 
-def _bearer_with_claims(**claims) -> str:
+def _bearer_with_claims(**claims: object) -> str:
     """A forged HS256 bearer (attacker-style: not RS256-signed by the pool).
 
     Used to prove the gate now REJECTS such a token instead of trusting its
@@ -187,8 +196,17 @@ def _bearer_with_claims(**claims) -> str:
     )
 
 
+def _signing_key_for(public_pem: str) -> Callable[[str, AdaptixCognitoConfig], str]:
+    """The gate's JWKS lookup, replaced: ``public_pem`` for every token."""
+
+    def signing_key(_token: str, _config: AdaptixCognitoConfig) -> str:
+        return public_pem
+
+    return signing_key
+
+
 @pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch) -> ASGIClient:
     monkeypatch.setenv("ADAPTIX_GATEWAY_SHARED_SECRET", _SECRET)
     monkeypatch.delenv("ADAPTIX_GATEWAY_EXPECTED_AUDIENCE", raising=False)
     app = FastAPI()
@@ -197,10 +215,10 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
         "/api/v1/billing/thing",
         dependencies=[Depends(require_module_entitlement("billing"))],
     )
-    def _thing() -> dict:
+    def _thing() -> dict[str, bool]:
         return {"ok": True}
 
-    return TestClient(app)
+    return ASGIClient(app)
 
 
 def _gw_headers(ctx: str, sig: str) -> dict[str, str]:
@@ -212,7 +230,7 @@ def _gw_headers(ctx: str, sig: str) -> dict[str, str]:
 
 
 def test_gateway_identity_entitled_tenant_passes_without_bearer(
-    client: TestClient,
+    client: ASGIClient,
 ) -> None:
     # A real tenant whose verified context carries the 'billing' entitlement.
     ctx, sig = _sign_gateway_context(
@@ -226,7 +244,7 @@ def test_gateway_identity_entitled_tenant_passes_without_bearer(
     assert resp.json() == {"ok": True}
 
 
-def test_gateway_identity_system_principal_bypasses(client: TestClient) -> None:
+def test_gateway_identity_system_principal_bypasses(client: ASGIClient) -> None:
     # System worker tenant — no subscription entitlement, but platform principal.
     ctx, sig = _sign_gateway_context(
         user_id=str(uuid4()),
@@ -237,7 +255,7 @@ def test_gateway_identity_system_principal_bypasses(client: TestClient) -> None:
     assert resp.status_code == 200, resp.text
 
 
-def test_gateway_identity_founder_role_bypasses(client: TestClient) -> None:
+def test_gateway_identity_founder_role_bypasses(client: ASGIClient) -> None:
     ctx, sig = _sign_gateway_context(
         user_id=str(uuid4()),
         tenant_id=str(uuid4()),
@@ -247,7 +265,7 @@ def test_gateway_identity_founder_role_bypasses(client: TestClient) -> None:
     assert resp.status_code == 200, resp.text
 
 
-def test_gateway_identity_non_entitled_tenant_is_402(client: TestClient) -> None:
+def test_gateway_identity_non_entitled_tenant_is_402(client: ASGIClient) -> None:
     # Real tenant, verified context, but NOT entitled and NOT platform principal.
     ctx, sig = _sign_gateway_context(
         user_id=str(uuid4()),
@@ -260,7 +278,7 @@ def test_gateway_identity_non_entitled_tenant_is_402(client: TestClient) -> None
     assert resp.json()["detail"]["code"] == "module_not_entitled"
 
 
-def test_tampered_gateway_signature_is_401(client: TestClient) -> None:
+def test_tampered_gateway_signature_is_401(client: ASGIClient) -> None:
     ctx, sig = _sign_gateway_context(
         user_id=str(uuid4()),
         tenant_id=_SYSTEM_PRINCIPAL_TENANT_ID,
@@ -279,9 +297,9 @@ def test_direct_verified_bearer_with_entitlement_passes(
     # entitlement is accepted on the direct-service path.
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     token = _cognito_token(private_pem, module_entitlements=["billing"])
-    c = TestClient(_bearer_app())
+    c = ASGIClient(_bearer_app())
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200, resp.text
     assert resp.json() == {"ok": True}
@@ -294,9 +312,9 @@ def test_direct_verified_bearer_founder_passes(
     # bypasses the gate (identical intent to the gateway founder bypass).
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     token = _cognito_token(private_pem, is_founder=True)
-    c = TestClient(_bearer_app())
+    c = ASGIClient(_bearer_app())
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200, resp.text
 
@@ -307,16 +325,16 @@ def test_direct_forged_bearer_is_rejected_401(
     # THE FIX: a forged HS256 bearer claiming is_founder + entitlements is no
     # longer trusted. Cognito is configured and a real JWKS key is available,
     # but the token is not RS256-signed by the pool, so it fails closed with 401.
-    private_pem, public_pem = rsa_keypair
+    _, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     forged = _bearer_with_claims(
         sub=str(uuid4()),
         tid=str(uuid4()),
         is_founder=True,
         module_entitlements=["billing"],
     )
-    c = TestClient(_bearer_app())
+    c = ASGIClient(_bearer_app())
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {forged}"})
     assert resp.status_code == 401, resp.text
     assert resp.json()["detail"]["code"] == "invalid_bearer_token"
@@ -329,7 +347,7 @@ def test_direct_bearer_rejected_when_verifier_unconfigured_401(
     # closed (401), never trusting the unverified claims.
     _clear_cognito_env(monkeypatch)
     forged = _bearer_with_claims(sub=str(uuid4()), tid=str(uuid4()), is_founder=True)
-    c = TestClient(_bearer_app())
+    c = ASGIClient(_bearer_app())
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {forged}"})
     assert resp.status_code == 401, resp.text
     assert resp.json()["detail"]["code"] == "bearer_verifier_not_configured"
@@ -342,13 +360,13 @@ def test_direct_bearer_wrong_issuer_rejected_401(
     # -> rejected (401). Proves issuer pinning.
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     token = _cognito_token(
         private_pem,
         iss="https://evil.example.com/pool",
         module_entitlements=["billing"],
     )
-    c = TestClient(_bearer_app())
+    c = ASGIClient(_bearer_app())
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401, resp.text
     assert resp.json()["detail"]["code"] == "invalid_bearer_token"
@@ -361,11 +379,11 @@ def test_direct_bearer_wrong_app_client_rejected_401(
     # app client -> rejected (audience / app-client binding).
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     token = _cognito_token(
         private_pem, client_id="some-other-client", module_entitlements=["billing"]
     )
-    c = TestClient(_bearer_app())
+    c = ASGIClient(_bearer_app())
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401, resp.text
     assert resp.json()["detail"]["code"] == "invalid_bearer_token"
@@ -373,7 +391,7 @@ def test_direct_bearer_wrong_app_client_rejected_401(
 
 def _bearer_outcome(token: str) -> tuple[int, str]:
     """The status a direct bearer gets and, for a refusal, its detail code."""
-    resp = TestClient(_bearer_app()).get(
+    resp = ASGIClient(_bearer_app()).get(
         "/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"}
     )
     if resp.status_code == 200:
@@ -388,8 +406,8 @@ def test_direct_id_token_for_this_app_client_passes(
     # is verified by the library against the configured audience and accepted.
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
-    token = _cognito_token(private_pem, token_use="id", module_entitlements=["billing"])
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
+    token = _cognito_token(private_pem, kind="id", module_entitlements=["billing"])
     assert _bearer_outcome(token) == (200, "")
 
 
@@ -403,10 +421,10 @@ def test_direct_id_token_for_another_app_client_is_refused_by_the_library(
     # check is on for every bearer.
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     token = _cognito_token(
         private_pem,
-        token_use="id",
+        kind="id",
         client_id="some-other-client",
         module_entitlements=["billing"],
     )
@@ -414,8 +432,10 @@ def test_direct_id_token_for_another_app_client_is_refused_by_the_library(
         outcome = _bearer_outcome(token)
     assert outcome == (401, "invalid_bearer_token")
     assert [r.getMessage() for r in caplog.records] == [
-        "module_entitlement_gate: rejecting unverifiable direct bearer "
-        "(InvalidAudienceError)"
+        (
+            "module_entitlement_gate: rejecting unverifiable direct bearer "
+            "(InvalidAudienceError)"
+        )
     ]
 
 
@@ -428,7 +448,7 @@ def test_direct_access_token_carrying_a_foreign_audience_is_refused_401(
     # it verified, whatever its token_use.
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     token = _cognito_token(
         private_pem, aud="some-other-client", module_entitlements=["billing"]
     )
@@ -442,7 +462,7 @@ def test_direct_access_token_carrying_this_audience_passes(
     # `client_id`, and is accepted when both name this app client.
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
     token = _cognito_token(
         private_pem, aud=_COGNITO_CLIENT_ID, module_entitlements=["billing"]
     )
@@ -464,7 +484,7 @@ def test_the_audience_check_is_on_for_every_decode(
     # configured audience named.
     private_pem, public_pem = rsa_keypair
     _set_cognito_env(monkeypatch)
-    monkeypatch.setattr(meg, "_cognito_signing_key", lambda token, config: public_pem)
+    monkeypatch.setattr(meg, "_cognito_signing_key", _signing_key_for(public_pem))
 
     def decodes_of(token: str) -> list[tuple[object, object]]:
         # The gate and this test import the same `jwt` module, so the spy sees
@@ -478,13 +498,11 @@ def test_the_audience_check_is_on_for_every_decode(
 
     access = _cognito_token(private_pem, module_entitlements=["billing"])
     assert decodes_of(access) == [(True, None)]
-    id_token = _cognito_token(
-        private_pem, token_use="id", module_entitlements=["billing"]
-    )
+    id_token = _cognito_token(private_pem, kind="id", module_entitlements=["billing"])
     assert decodes_of(id_token) == [(True, None), (True, [_COGNITO_CLIENT_ID])]
 
 
-def test_no_identity_at_all_is_401_missing_bearer(client: TestClient) -> None:
+def test_no_identity_at_all_is_401_missing_bearer(client: ASGIClient) -> None:
     resp = client.get("/api/v1/billing/thing")
     assert resp.status_code == 401, resp.text
     assert resp.json()["detail"]["code"] == "missing_bearer_token"
@@ -504,10 +522,10 @@ def test_gateway_signature_present_but_no_secret_falls_back_to_bearer(
         "/api/v1/billing/thing",
         dependencies=[Depends(require_module_entitlement("billing"))],
     )
-    def _thing() -> dict:
+    def _thing() -> dict[str, bool]:
         return {"ok": True}
 
-    c = TestClient(app)
+    c = ASGIClient(app)
     ctx, sig = _sign_gateway_context(
         user_id=str(uuid4()), tenant_id=_SYSTEM_PRINCIPAL_TENANT_ID, roles=["system"]
     )
@@ -530,10 +548,10 @@ def test_gateway_signature_present_but_no_secret_is_503_in_production(
         "/api/v1/billing/thing",
         dependencies=[Depends(require_module_entitlement("billing"))],
     )
-    def _thing() -> dict:
+    def _thing() -> dict[str, bool]:
         return {"ok": True}
 
-    c = TestClient(app)
+    c = ASGIClient(app)
     ctx, sig = _sign_gateway_context(
         user_id=str(uuid4()), tenant_id=_SYSTEM_PRINCIPAL_TENANT_ID, roles=["system"]
     )
@@ -563,7 +581,7 @@ def test_prod_absent_signature_forged_bearer_is_401_not_503(
     monkeypatch.setenv("ENVIRONMENT", "production")
     _clear_cognito_env(monkeypatch)
 
-    c = TestClient(_bearer_app())
+    c = ASGIClient(_bearer_app())
     token = _bearer_with_claims(module_entitlements=["billing"], tenant_id=str(uuid4()))
     resp = c.get("/api/v1/billing/thing", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401, resp.text

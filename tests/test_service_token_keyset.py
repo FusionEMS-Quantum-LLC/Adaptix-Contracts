@@ -9,6 +9,7 @@ key mismatched) -> 401; and authz failures (wrong audience) -> 403.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 
 import jwt
 import pytest
@@ -17,6 +18,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from adaptix_contracts.auth.service_token import (
     ServiceTokenAuthzError,
+    ServiceTokenClaims,
     ServiceTokenError,
     issue_service_token,
     verify_service_token_with_keyset,
@@ -58,7 +60,9 @@ def _issue(priv: str, kid: str, tenant: str, *, audience: str = _AUD) -> str:
     )
 
 
-def _verify(token: str, keys: dict[str, str], tenant: str | None = None):
+def _verify(
+    token: str, keys: dict[str, str], tenant: str | None = None
+) -> ServiceTokenClaims:
     return verify_service_token_with_keyset(
         token,
         trusted_keys=keys,
@@ -70,7 +74,7 @@ def _verify(token: str, keys: dict[str, str], tenant: str | None = None):
     )
 
 
-def test_valid_kid_resolves_and_verifies():
+def test_valid_kid_resolves_and_verifies() -> None:
     priv, pub = _keypair()
     tenant = str(uuid.uuid4())
     claims = _verify(_issue(priv, "k1", tenant), {"k1": pub}, tenant)
@@ -78,7 +82,7 @@ def test_valid_kid_resolves_and_verifies():
     assert claims.aud == _AUD
 
 
-def test_rotation_previous_key_still_verifies():
+def test_rotation_previous_key_still_verifies() -> None:
     p1, pub1 = _keypair()
     p2, pub2 = _keypair()
     tenant = str(uuid.uuid4())
@@ -90,7 +94,7 @@ def test_rotation_previous_key_still_verifies():
     assert _verify(_issue(p2, "k2", tenant), {"k2": pub2, "k1": pub1}, tenant)
 
 
-def test_missing_kid_rejected():
+def test_missing_kid_rejected() -> None:
     priv, pub = _keypair()
     tenant = str(uuid.uuid4())
     # issue WITHOUT kid -> no kid header.
@@ -103,20 +107,20 @@ def test_missing_kid_rejected():
         scope=_SCOPE,
     )
     with pytest.raises(ServiceTokenError) as exc:
-        _verify(token, {"k1": pub}, tenant)
+        _ = _verify(token, {"k1": pub}, tenant)
     assert "KID_MISSING" in str(exc.value)
 
 
-def test_unknown_kid_rejected():
+def test_unknown_kid_rejected() -> None:
     priv, pub = _keypair()
     tenant = str(uuid.uuid4())
     token = _issue(priv, "k9", tenant)  # kid not in keyset
     with pytest.raises(ServiceTokenError) as exc:
-        _verify(token, {"k1": pub}, tenant)
+        _ = _verify(token, {"k1": pub}, tenant)
     assert "KID_UNKNOWN" in str(exc.value)
 
 
-def test_wrong_algorithm_rejected():
+def test_wrong_algorithm_rejected() -> None:
     _, pub = _keypair()
     tenant = str(uuid.uuid4())
     # HS256 token with a kid header — alg confusion must be rejected.
@@ -132,16 +136,18 @@ def test_wrong_algorithm_rejected():
             "exp": 9999999999,
             "ver": 1,
         },
-        "shared-secret",
+        # 32 bytes: RFC 7518 3.2's minimum for HS256, so PyJWT signs it without an
+        # InsecureKeyLengthWarning. The algorithm, not the key, is what gets rejected.
+        "shared-secret-of-32-bytes-length",
         algorithm="HS256",
         headers={"kid": "k1"},
     )
     with pytest.raises(ServiceTokenError) as exc:
-        _verify(token, {"k1": pub}, tenant)
+        _ = _verify(token, {"k1": pub}, tenant)
     assert "ALGORITHM_REJECTED" in str(exc.value)
 
 
-def test_missing_jti_rejected_through_keyset_entry_point():
+def test_missing_jti_rejected_through_keyset_entry_point() -> None:
     """Missing ``jti`` must fail as ServiceTokenError via the REAL entry point.
 
     ``verify_service_token_with_keyset`` is what CAD/Air and MCP->EPCR actually
@@ -168,31 +174,31 @@ def test_missing_jti_rejected_through_keyset_entry_point():
         headers={"kid": "k1"},
     )
     with pytest.raises(ServiceTokenError):
-        _verify(token, {"k1": pub}, tenant)
+        _ = _verify(token, {"k1": pub}, tenant)
 
 
-def test_empty_keyset_rejected():
+def test_empty_keyset_rejected() -> None:
     priv, _ = _keypair()
     tenant = str(uuid.uuid4())
     with pytest.raises(ServiceTokenError) as exc:
-        _verify(_issue(priv, "k1", tenant), {}, tenant)
+        _ = _verify(_issue(priv, "k1", tenant), {}, tenant)
     assert "KEYSET_EMPTY" in str(exc.value)
 
 
-def test_bad_signature_kid_present_rejected():
+def test_bad_signature_kid_present_rejected() -> None:
     priv, _ = _keypair()
     _, other_pub = _keypair()  # trusted key does NOT match the signer
     tenant = str(uuid.uuid4())
     with pytest.raises(ServiceTokenError):
-        _verify(_issue(priv, "k1", tenant), {"k1": other_pub}, tenant)
+        _ = _verify(_issue(priv, "k1", tenant), {"k1": other_pub}, tenant)
 
 
-def test_wrong_audience_is_authz_403():
+def test_wrong_audience_is_authz_403() -> None:
     priv, pub = _keypair()
     tenant = str(uuid.uuid4())
     token = _issue(priv, "k1", tenant, audience="adaptix-air")  # wrong for CAD
     with pytest.raises(ServiceTokenAuthzError):
-        _verify(token, {"k1": pub}, tenant)
+        _ = _verify(token, {"k1": pub}, tenant)
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +210,9 @@ def test_wrong_audience_is_authz_403():
 _CUTOVER = ("adaptix-air-pilot", "adaptix-air")
 
 
-def _verify_cutover(token: str, keys: dict[str, str], tenant: str, audiences):
+def _verify_cutover(
+    token: str, keys: dict[str, str], tenant: str, audiences: str | Sequence[str]
+) -> ServiceTokenClaims:
     return verify_service_token_with_keyset(
         token,
         trusted_keys=keys,
@@ -217,7 +225,9 @@ def _verify_cutover(token: str, keys: dict[str, str], tenant: str, audiences):
 
 
 @pytest.mark.parametrize("audience", _CUTOVER)
-def test_keyset_entry_point_accepts_each_audience_in_the_sequence(audience):
+def test_keyset_entry_point_accepts_each_audience_in_the_sequence(
+    audience: str,
+) -> None:
     priv, pub = _keypair()
     tenant = str(uuid.uuid4())
     token = _issue(priv, "k1", tenant, audience=audience)
@@ -226,18 +236,18 @@ def test_keyset_entry_point_accepts_each_audience_in_the_sequence(audience):
     assert claims.tenant_id == tenant
 
 
-def test_keyset_entry_point_refuses_an_audience_outside_the_sequence():
+def test_keyset_entry_point_refuses_an_audience_outside_the_sequence() -> None:
     priv, pub = _keypair()
     tenant = str(uuid.uuid4())
     token = _issue(priv, "k1", tenant, audience=_AUD)  # adaptix-cad: not in the pair
     with pytest.raises(ServiceTokenAuthzError):
-        _verify_cutover(token, {"k1": pub}, tenant, _CUTOVER)
+        _ = _verify_cutover(token, {"k1": pub}, tenant, _CUTOVER)
 
 
 @pytest.mark.parametrize("empty", [(), []])
 def test_keyset_entry_point_refuses_an_empty_sequence_before_resolving_the_key(
-    empty,
-):
+    empty: Sequence[str],
+) -> None:
     """ValueError, not 401: the configuration is wrong, not the token.
 
     The token carries no ``kid`` and the keyset is empty, either of which would
@@ -246,7 +256,7 @@ def test_keyset_entry_point_refuses_an_empty_sequence_before_resolving_the_key(
     priv, _ = _keypair()
     tenant = str(uuid.uuid4())
     token = _issue(priv, "", tenant)  # no kid header
-    with pytest.raises(ValueError) as excinfo:
-        _verify_cutover(token, {}, tenant, empty)
+    with pytest.raises(ValueError, match="must name at least one audience") as excinfo:
+        _ = _verify_cutover(token, {}, tenant, empty)
     assert not isinstance(excinfo.value, ServiceTokenError)
     assert not isinstance(excinfo.value, ServiceTokenAuthzError)

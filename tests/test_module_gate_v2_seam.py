@@ -29,11 +29,12 @@ from __future__ import annotations
 import base64
 import json
 import time
+from collections.abc import Iterator
 from uuid import uuid4
 
 import pytest
 from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
+from _asgi_client import ASGIClient
 
 from adaptix_contracts.auth.module_entitlement_gate import require_module_entitlement
 from adaptix_contracts.gateway_keys import (
@@ -59,7 +60,7 @@ MODULE = "billing"
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch: pytest.MonkeyPatch):
+def _clean_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     for var in (
         GATEWAY_PUBLIC_KEYS_ENV,
         GATEWAY_SIGNING_PRIVATE_KEY_ENV,
@@ -75,8 +76,8 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch):
     reset_public_keyset_cache()
 
 
-@pytest.fixture()
-def gated_client() -> TestClient:
+@pytest.fixture
+def gated_client() -> ASGIClient:
     """A real route behind the real gate dependency."""
     app = FastAPI()
 
@@ -84,13 +85,13 @@ def gated_client() -> TestClient:
         "/api/v1/billing/thing",
         dependencies=[Depends(require_module_entitlement(MODULE))],
     )
-    def _thing() -> dict:
+    def _thing() -> dict[str, bool]:
         return {"ok": True}
 
-    return TestClient(app, raise_server_exceptions=False)
+    return ASGIClient(app, raise_server_exceptions=False)
 
 
-@pytest.fixture()
+@pytest.fixture
 def asymmetric_only(monkeypatch: pytest.MonkeyPatch) -> None:
     """The D-053 END STATE: public keys present, shared secret ABSENT.
 
@@ -114,7 +115,7 @@ def _gateway_payload(
     roles: list[str] | None = None,
     is_founder: bool = False,
     session_jti: str = "",
-) -> dict:
+) -> dict[str, object]:
     """The gateway's REAL 20-field payload, field for field.
 
     Copied from ``adaptix-gateway .../services/auth_context.py::sign_context``.
@@ -149,7 +150,7 @@ def _gateway_payload(
     }
 
 
-def _sign_v2(payload: dict) -> tuple[str, str, str]:
+def _sign_v2(payload: dict[str, object]) -> tuple[str, str, str]:
     """Ed25519-sign an ARBITRARY payload, exactly as the gateway will.
 
     Returns ``(context_b64, signature_b64, kid)``.
@@ -175,11 +176,12 @@ def _v2_headers(ctx: str, sig: str, kid: str) -> dict[str, str]:
     }
 
 
+@pytest.mark.usefixtures("asymmetric_only")
 class TestKeysOnlyServiceStaysUp:
     """The migrated end state must serve traffic, not 503."""
 
     def test_v2_context_passes_the_gate_with_no_shared_secret(
-        self, gated_client: TestClient, asymmetric_only: None
+        self, gated_client: ASGIClient
     ) -> None:
         # Before 2.33.0 this returned 503 in production and fell through to the
         # bearer path (401) elsewhere: the gate required a shared secret that
@@ -194,7 +196,7 @@ class TestKeysOnlyServiceStaysUp:
         assert resp.json() == {"ok": True}
 
     def test_v2_context_still_enforces_the_entitlement(
-        self, gated_client: TestClient, asymmetric_only: None
+        self, gated_client: ASGIClient
     ) -> None:
         """Verifying a v2 context must not become a bypass of the 402."""
         ctx, sig, kid = _sign_v2(
@@ -206,9 +208,7 @@ class TestKeysOnlyServiceStaysUp:
         assert resp.status_code == 402, resp.text
         assert resp.json()["detail"]["required_module"] == MODULE
 
-    def test_v2_founder_still_bypasses(
-        self, gated_client: TestClient, asymmetric_only: None
-    ) -> None:
+    def test_v2_founder_still_bypasses(self, gated_client: ASGIClient) -> None:
         ctx, sig, kid = _sign_v2(
             _gateway_payload(
                 tenant_id=str(uuid4()), module_entitlements=[], is_founder=True
@@ -220,12 +220,11 @@ class TestKeysOnlyServiceStaysUp:
         assert resp.status_code == 200, resp.text
 
 
+@pytest.mark.usefixtures("asymmetric_only")
 class TestKeyIdIsActuallyForwarded:
     """Without the key-id forward the gate cannot select a verification key."""
 
-    def test_wrong_kid_is_rejected_not_ignored(
-        self, gated_client: TestClient, asymmetric_only: None
-    ) -> None:
+    def test_wrong_kid_is_rejected_not_ignored(self, gated_client: ASGIClient) -> None:
         """A kid naming no known key must fail, proving the kid is consulted."""
         ctx, sig, _kid = _sign_v2(
             _gateway_payload(tenant_id=str(uuid4()), module_entitlements=[MODULE])
@@ -236,12 +235,10 @@ class TestKeyIdIsActuallyForwarded:
         )
         assert resp.status_code == 401, resp.text
 
-    def test_tampered_v2_context_is_rejected(
-        self, gated_client: TestClient, asymmetric_only: None
-    ) -> None:
+    def test_tampered_v2_context_is_rejected(self, gated_client: ASGIClient) -> None:
         """A present-but-invalid signature never falls through to bearer."""
         payload = _gateway_payload(tenant_id=str(uuid4()), module_entitlements=["cad"])
-        ctx, sig, kid = _sign_v2(payload)
+        _, sig, kid = _sign_v2(payload)
         forged = dict(payload, module_entitlements=[MODULE])
         forged_ctx = (
             base64.urlsafe_b64encode(
@@ -260,7 +257,7 @@ class TestFailClosedPostureIsPreserved:
     """Widening the gate to accept keys must not widen it to accept nothing."""
 
     def test_production_with_no_verification_material_still_503s(
-        self, gated_client: TestClient, monkeypatch: pytest.MonkeyPatch
+        self, gated_client: ASGIClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv(ENVIRONMENT_ENV, "production")
         # Neither a shared secret nor a public keyset: unverifiable.
@@ -271,10 +268,10 @@ class TestFailClosedPostureIsPreserved:
         assert resp.status_code == 503, resp.text
         assert resp.json()["detail"]["code"] == "gateway_secret_not_configured"
 
+    @pytest.mark.usefixtures("asymmetric_only")
     def test_hmac_trust_mode_refuses_a_v2_claiming_context(
         self,
-        gated_client: TestClient,
-        asymmetric_only: None,
+        gated_client: ASGIClient,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Headers may select a STRICTER scheme, never a weaker one.
@@ -293,6 +290,7 @@ class TestFailClosedPostureIsPreserved:
         assert resp.status_code == 401, resp.text
 
 
+@pytest.mark.usefixtures("asymmetric_only")
 class TestGatewayPayloadShapeSurvivesVerification:
     """The gateway's real 20-field payload must verify and keep its claims.
 
@@ -303,7 +301,7 @@ class TestGatewayPayloadShapeSurvivesVerification:
     """
 
     def test_full_gateway_payload_verifies_and_entitlement_is_read(
-        self, gated_client: TestClient, asymmetric_only: None
+        self, gated_client: ASGIClient
     ) -> None:
         payload = _gateway_payload(
             tenant_id=str(uuid4()),
@@ -321,7 +319,7 @@ class TestGatewayPayloadShapeSurvivesVerification:
         assert resp.status_code == 200, resp.text
 
     def test_empty_session_jti_is_carried_not_rejected(
-        self, gated_client: TestClient, asymmetric_only: None
+        self, gated_client: ASGIClient
     ) -> None:
         """``session_jti: ""`` is the gateway's documented no-session value.
 

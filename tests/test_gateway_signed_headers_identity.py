@@ -11,11 +11,13 @@ in production, AI-Service's Cortex registry probe).
 
 from __future__ import annotations
 
+import secrets
+from typing import Annotated
 from uuid import uuid4
 
 import pytest
 from fastapi import Depends, FastAPI
-from fastapi.testclient import TestClient
+from _asgi_client import ASGIClient
 
 from adaptix_contracts.auth_contracts import AuthContext, get_auth_context
 from adaptix_contracts.gateway_signing import (
@@ -24,12 +26,13 @@ from adaptix_contracts.gateway_signing import (
     build_gateway_signed_headers,
 )
 
-_SECRET = "signed-headers-identity-unit-test-hmac-material"
+# A fresh secret each run: there is no literal to mistake for a real credential.
+_SECRET = secrets.token_urlsafe(32)
 _AUD = "adaptix-media"
 
 
 @pytest.fixture
-def destination(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def destination(monkeypatch: pytest.MonkeyPatch) -> ASGIClient:
     """A route behind the real verifier, configured as production configures it."""
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("ADAPTIX_GATEWAY_HMAC_ENFORCE", "true")
@@ -40,7 +43,7 @@ def destination(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
     @app.get("/catalogue")
     async def catalogue(
-        ctx: AuthContext = Depends(get_auth_context),
+        ctx: Annotated[AuthContext, Depends(get_auth_context)],
     ) -> dict[str, object]:
         return {
             "user_id": str(ctx.user_id),
@@ -48,10 +51,10 @@ def destination(monkeypatch: pytest.MonkeyPatch) -> TestClient:
             "scopes": list(ctx.scopes),
         }
 
-    return TestClient(app)
+    return ASGIClient(app)
 
 
-def test_the_builder_s_headers_alone_are_accepted(destination: TestClient) -> None:
+def test_the_builder_s_headers_alone_are_accepted(destination: ASGIClient) -> None:
     user_id, tenant_id = str(uuid4()), str(uuid4())
     headers = build_gateway_signed_headers(
         user_id=user_id,
@@ -72,7 +75,7 @@ def test_the_builder_s_headers_alone_are_accepted(destination: TestClient) -> No
 
 
 def test_without_the_identity_headers_the_verifier_still_refuses(
-    destination: TestClient,
+    destination: ASGIClient,
 ) -> None:
     """The control: what callers sent before this fix is the production 401."""
     headers = build_gateway_signed_headers(
@@ -88,7 +91,7 @@ def test_without_the_identity_headers_the_verifier_still_refuses(
 
 
 def test_identity_headers_that_disagree_with_the_signed_claims_are_refused(
-    destination: TestClient,
+    destination: ASGIClient,
 ) -> None:
     """A caller cannot use the plain headers to claim another principal."""
     headers = build_gateway_signed_headers(
