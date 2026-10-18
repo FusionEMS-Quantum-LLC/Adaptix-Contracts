@@ -56,6 +56,19 @@ from the installed package metadata).
   resolves and a recovery succeeds only with evidence; and Tier 5 is derived
   from runtime claims on the exact commit covering every proof category,
   never asserted. Storage and execution are not part of this package.
+- **`verify_gateway_signature_without_request_binding`** in
+  `gateway_signature` and `gateway_identity`, the explicit name for the
+  no-request verifier (Contracts #397). It cannot take a request method or
+  path, and under `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` a bound context
+  fails closed. `gateway_identity` now also re-exports
+  `verify_gateway_signature_for_request`.
+- **`scripts/check_unbound_gateway_verifier.py`**, run by
+  `scripts/ci/verify-toolchain.sh`. It parses Python with `ast` and reports any
+  use of the deprecated name or its alias, and any plain `get_auth_context(...)`
+  call without `request=`, including calls through an import alias. Accepted sites go in
+  `scripts/unbound_gateway_verifier_allowlist.txt` with a required reason; the
+  count and stale entries print on every run. Services can run the same script
+  against their own tree.
 
 ### Deprecated
 
@@ -79,22 +92,6 @@ from the installed package metadata).
     Calendar, Device, Finance, HL7, HR, Imports, Media, NEMSIS, Partner,
     Training and Voice. Those are tracked as lanes in Governance #345 (Device
     by Device #298), not by this change.
-
-### Added
-
-- **`verify_gateway_signature_without_request_binding`** in
-  `gateway_signature` and `gateway_identity`, the explicit name for the
-  no-request verifier (Contracts #397). It cannot take a request method or
-  path, and under `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` a bound context
-  fails closed. `gateway_identity` now also re-exports
-  `verify_gateway_signature_for_request`.
-- **`scripts/check_unbound_gateway_verifier.py`**, run by
-  `scripts/ci/verify-toolchain.sh`. It parses Python with `ast` and reports any
-  use of the deprecated name or its alias, and any plain `get_auth_context(...)`
-  call without `request=`, including calls through an import alias. Accepted sites go in
-  `scripts/unbound_gateway_verifier_allowlist.txt` with a required reason; the
-  count and stale entries print on every run. Services can run the same script
-  against their own tree.
 
 ## [5.44.0] - 2026-10-18
 
