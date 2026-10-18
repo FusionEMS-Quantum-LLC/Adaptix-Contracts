@@ -92,6 +92,13 @@ from the installed package metadata).
     Calendar, Device, Finance, HL7, HR, Imports, Media, NEMSIS, Partner,
     Training and Voice. Those are tracked as lanes in Governance #345 (Device
     by Device #298), not by this change.
+  - This deprecation first ships in **5.45.0**. Two docstrings in
+    `gateway_signature.py` still say "since 5.44.0": the module docstring at
+    line 115 and `verify_gateway_signature`'s at line 1083. They came in with
+    #402 after 5.44.0 was set. Correcting them makes that file a modified file
+    under ADX-ZD-001, and it is not yet at zero (its public verifiers return
+    `dict[str, Any]`), so they are corrected in #408 with that file's typing and
+    its own version.
 
 ## [5.44.0] - 2026-10-18
 
