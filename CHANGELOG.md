@@ -12,10 +12,27 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.44.0] - 2026-10-18
+
 ### Added
 
+- **`gateway_hmac_enforced() -> bool`** in `adaptix_contracts.auth_contracts`,
+  in its `__all__` (Contracts #403). It answers whether an ABSENT gateway
+  signature is rejected, with the resolution `get_auth_context` itself applies:
+  - `ADAPTIX_GATEWAY_HMAC_ENFORCE` explicitly `true`/`1`/`yes` (any case,
+    whitespace ignored) is `True` in every environment;
+  - explicitly `false`/`0`/`no` is `False` in every environment;
+  - unset, blank or any other value (`on`, `off` and `enabled` included) is
+    `True` in production (`ENVIRONMENT` `production`/`prod`) and `False`
+    elsewhere.
+  - The environment is read on every call; nothing is cached.
+  - Why: services report their gateway trust posture. Finance
+    (`finance_app/auth.py:394`) and TrustSign (`app/auth.py:89,100`) call the
+    private `_gateway_hmac_enforce()`; HL7, AssetOps and Device keep local
+    copies of its logic, which can drift from what the library enforces. Each
+    adopts the public name with its next adaptix-contracts bump.
 - **`air.mission.authorized` and `air.mission.authorization_invalidated` are
-  registered** (AIR-09), producer `air`.
+  registered** (AIR-09, #398), producer `air`.
   - Adaptix-Air-Service already stages both through its outbox and relay
     (`air_app/services/__init__.py:671` and `:499` at Air main `48ef5320`).
     They were missing from `ALL_EVENTS`, so the operational backbone gate
@@ -26,7 +43,7 @@ from the installed package metadata).
   - No subscription is declared yet. CAD's consumer adds them first; the
     `event_subscriptions.py` entry follows with CAD's code citation.
 - **`transportlink.request.created` and `transportlink.signature.completed`
-  are registered** (COM-07), producer `transport`.
+  are registered** (COM-07, #398), producer `transport`.
   - They are registered under the names their existing payload models
     already carry (`schemas.transport_contracts.TransportRequestCreatedEvent`
     and `SignatureCompletedEvent`). No second `transport.*` name is added.
@@ -40,6 +57,39 @@ from the installed package metadata).
   `TRANSPORTLINK_REQUEST_CREATED` and `TRANSPORTLINK_SIGNATURE_COMPLETED` in
   `adaptix_contracts.events.registry`; the two transport constants are in its
   `__all__`.
+
+### Changed
+
+- **`auth_contracts` is at zero under the ADX-ZD-001 reference set** (Contracts
+  #403): Pyright strict, mypy `--strict`, the engine Ruff selection. No
+  behaviour changed:
+  - the decoded gateway payload is typed `Mapping[str, object]`, and a signed
+    `roles`/`scopes` claim is read only when it is a JSON array, exactly as
+    before (`_json_narrowing.is_json_list` is `isinstance(value, list)`);
+  - `build_gateway_context_jwt` still accepts any keyword arguments and raises
+    the same `RuntimeError`. Its return annotation is now `NoReturn` (it never
+    returned). `NoReturn` is assignable to the old `str`, and a search of the
+    108 local fleet checkouts on 2026-10-18 found no caller;
+  - every log and error text is unchanged.
+- **#399 rewrote annotations across the package to PEP 604 form** (`X | None`).
+  The JSON schema of every Pydantic model and the members of every `Enum`
+  (2,025 entries across 375 modules) are identical between v5.43.0 and #399's
+  merge commit `57f16e4`.
+- The `dev` extra pins `ruff` 0.17.0 (#394). No runtime dependency range
+  changed.
+
+### Deprecated
+
+- **`auth_contracts._gateway_hmac_enforce` is deprecated; removal is in the
+  next major** (Contracts #403). Replacement: `gateway_hmac_enforced()`.
+  - It is now the same function object as `gateway_hmac_enforced`, so existing
+    callers keep working and cannot get a different answer. It is not in
+    `__all__`.
+  - There is no runtime `DeprecationWarning`, because consumers run their
+    tests with `-W error`.
+  - Downstream impact: none on bump. Finance (`finance_app/auth.py:394`) and
+    TrustSign (`app/auth.py:89,100`) call the old name today; each moves to
+    `gateway_hmac_enforced()` when it adopts this release.
 
 ## [5.43.0] - 2026-10-11
 
