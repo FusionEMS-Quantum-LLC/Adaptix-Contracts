@@ -56,7 +56,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, TypeGuard
 
 import jwt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from adaptix_contracts._json_narrowing import is_object_sequence
 from adaptix_contracts.auth._s2s_keyset import ALGORITHM as _SHARED_ALGORITHM
@@ -450,7 +450,9 @@ def verify_service_token(
 
     ver = raw.get("ver")
     if ver != SERVICE_TOKEN_VERSION:
-        raise ServiceTokenError(f"unsupported service token version: {ver!r}")
+        # The refusal names the claim and the rule, never the value: callers
+        # return this text in their 401 bodies, and the value is attacker input.
+        raise ServiceTokenError("unsupported service token version")
 
     # ``actor_mfa_verified_at`` is checked here, before the closing
     # ``ServiceTokenClaims(**raw)``, for the same reason ``jti`` is required at
@@ -484,7 +486,44 @@ def verify_service_token(
             "service token tenant does not match request tenant"
         )
 
-    return ServiceTokenClaims(**raw)
+    # The explicit checks above cover presence and the authorization rules, not
+    # every claim's type. A validly signed token can still carry a wrongly typed
+    # claim (a numeric ``tenant_id``, a string ``iat``, an object ``aud``) that
+    # only the model rejects. That rejection is ``pydantic.ValidationError``,
+    # which is outside this function's documented errors: a caller catching
+    # only ServiceTokenError/ServiceTokenAuthzError would answer 500, and one
+    # returning ``str(exc)`` would echo the claim value. Convert it to a 401
+    # that names the failing claims and the rule, never the values.
+    try:
+        return ServiceTokenClaims(**raw)
+    except ValidationError as exc:
+        raise ServiceTokenError(
+            f"invalid service token claims: {_describe_claim_errors(exc)}"
+        ) from exc
+
+
+def _describe_claim_errors(exc: ValidationError) -> str:
+    """Name each failing claim and the rule it broke, without any input value.
+
+    Uses only ``loc`` and the error ``type`` (e.g. ``tenant_id: string_type``).
+    The human ``msg`` is not used: for some rules pydantic interpolates the
+    input into it. Locations are claim names this module defines, plus list
+    indices; any other key is reduced to its type so a smuggled claim name
+    cannot carry text into the refusal.
+    """
+    parts: list[str] = []
+    for err in exc.errors(
+        include_url=False, include_input=False, include_context=False
+    ):
+        loc_parts: list[str] = []
+        for item in err.get("loc", ()):
+            if isinstance(item, int) or item in ServiceTokenClaims.model_fields:
+                loc_parts.append(str(item))
+            else:
+                loc_parts.append("<claim>")
+        loc = ".".join(loc_parts) or "<token>"
+        parts.append(f"{loc}: {err.get('type', 'invalid')}")
+    return ", ".join(sorted(set(parts)))
 
 
 def verify_service_token_with_keyset(
