@@ -70,12 +70,14 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, NamedTuple, Annotated
+from collections.abc import Mapping
+from typing import NamedTuple, NoReturn, Annotated
 from uuid import UUID
 
 from fastapi import Header, HTTPException, Request, status
 from pydantic import BaseModel
 
+from adaptix_contracts._json_narrowing import is_json_list
 from adaptix_contracts.environment import is_production as _is_production
 from adaptix_contracts.gateway_keys import has_verification_keys
 from adaptix_contracts.gateway_signature import (
@@ -141,8 +143,14 @@ _FALSEY = ("false", "0", "no")
 _FOUNDER_ROLE = "founder"
 
 
-def _gateway_hmac_enforce() -> bool:
+def gateway_hmac_enforced() -> bool:
     """Whether an ABSENT gateway signature must be rejected (fail-closed).
+
+    This is the resolution ``get_auth_context`` applies to an unsigned request.
+    A service that reports its gateway trust posture (for example on a health
+    route) reads it here instead of re-implementing it, so the report cannot
+    drift from what the dependency enforces. The environment is read on every
+    call; nothing is cached.
 
     Resolution order (safe-by-default in production):
 
@@ -165,6 +173,16 @@ def _gateway_hmac_enforce() -> bool:
         return False
     # Unset / blank / unrecognized: fail-closed in production, off elsewhere.
     return _is_production()
+
+
+# DEPRECATED since 5.44.0: ``_gateway_hmac_enforce`` is the old private name of
+# ``gateway_hmac_enforced``. Use ``gateway_hmac_enforced``. The old name stays
+# until the next major version (DEPRECATION_POLICY.md) because services already
+# call it (Finance ``finance_app/auth.py``, TrustSign ``app/auth.py``). It is the
+# SAME function object, not a copy, so the two cannot disagree. It is not in
+# ``__all__``. There is no runtime ``DeprecationWarning``: consumers run their
+# tests with ``-W error``, and a warning would fail them on a call that works.
+_gateway_hmac_enforce = gateway_hmac_enforced
 
 
 _DEMO_CLAIMS_MALFORMED = "Demo auth context claims are malformed."
@@ -195,13 +213,15 @@ def _demo_uuid(raw: str, *, family: str, field: str) -> UUID:
         return UUID(raw)
     except ValueError as exc:
         raise _reject_demo(
-            f"signed {family} demo context has malformed {field}; "
-            "rejecting (no silent downgrade).",
+            (
+                f"signed {family} demo context has malformed {field}; "
+                "rejecting (no silent downgrade)."
+            ),
             _DEMO_CLAIMS_MALFORMED,
         ) from exc
 
 
-def _claim_text(payload: dict[str, Any], name: str) -> str:
+def _claim_text(payload: Mapping[str, object], name: str) -> str:
     """Return a claim as stripped text, with ``None``/missing as ``""``."""
     return str(payload.get(name) or "").strip()
 
@@ -215,7 +235,7 @@ class _RawDemoClaims(NamedTuple):
     agency: str
 
     @classmethod
-    def from_payload(cls, payload: dict[str, Any]) -> _RawDemoClaims:
+    def from_payload(cls, payload: Mapping[str, object]) -> _RawDemoClaims:
         """Read the four demo claims from a verified payload, stripped, ``""`` when absent."""
         return cls(
             session=_claim_text(payload, "demo_session_id"),
@@ -257,8 +277,10 @@ def _guard_leased_demo(raw: _RawDemoClaims, *, is_founder: bool) -> None:
         )
     if is_founder:
         raise _reject_demo(
-            "signed Cortex Live demo context claims founder; rejecting "
-            "(leased demo principals are never founder).",
+            (
+                "signed Cortex Live demo context claims founder; rejecting "
+                "(leased demo principals are never founder)."
+            ),
             "Demo auth context may not carry founder privilege.",
         )
 
@@ -283,7 +305,7 @@ def _parse_leased_demo(raw: _RawDemoClaims, *, is_founder: bool) -> _DemoBlock:
     )
 
 
-def _parse_demo_block(payload: dict[str, Any], *, is_founder: bool) -> _DemoBlock:
+def _parse_demo_block(payload: Mapping[str, object], *, is_founder: bool) -> _DemoBlock:
     """Parse the demo block of a verified signed context, or reject it with 401.
 
     Two demo families share ``is_demo`` and are told apart by ``demo_lease_id``,
@@ -414,7 +436,7 @@ def _parse_roles(raw: str | None) -> list[str]:
     if stripped.startswith("[") and stripped.endswith("]"):
         try:
             parsed = json.loads(stripped)
-            if isinstance(parsed, list):
+            if is_json_list(parsed):
                 return [str(r).strip() for r in parsed if str(r).strip()]
         except json.JSONDecodeError:
             pass
@@ -520,7 +542,7 @@ async def get_auth_context(
     # F-24: gateway HMAC signature verification (see module header).
     #
     # This block adds 401s for (a) a present but invalid signature, and
-    # (b) an ABSENT signature whenever ``_gateway_hmac_enforce()`` is true.
+    # (b) an ABSENT signature whenever ``gateway_hmac_enforced()`` is true.
     #
     # Read that resolver, not this comment, for the default: an unset or
     # blank ADAPTIX_GATEWAY_HMAC_ENFORCE resolves to ``_is_production()``.
@@ -536,8 +558,9 @@ async def get_auth_context(
     # was successfully verified against the configured shared secret. When set,
     # it is the AUTHORITATIVE source for roles / email / founder status — the
     # individually spoofable X-User-Roles / X-Is-Founder / X-User-Email headers
-    # are then ignored.
-    verified_payload: dict | None = None
+    # are then ignored. Its values are decoded JSON, so each is read as
+    # ``object`` and narrowed where it is used.
+    verified_payload: Mapping[str, object] | None = None
     signature_present = has_gateway_signature(
         context_b64=x_adaptix_auth_context,
         signature_hex=x_adaptix_auth_signature,
@@ -619,12 +642,13 @@ async def get_auth_context(
             # context). Non-production: allow as before, warn once (dev
             # ergonomics).
             if _is_production():
-                logger.error(
+                refusal = (
                     "gateway signature present but neither "
                     "ADAPTIX_GATEWAY_SHARED_SECRET nor ADAPTIX_GATEWAY_PUBLIC_KEYS "
                     "is configured in production; refusing to trust an "
                     "unverifiable signed context (fail-closed)."
                 )
+                logger.error(refusal)
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail=(
@@ -633,17 +657,18 @@ async def get_auth_context(
                     ),
                 )
             if not _warned_missing_secret:
-                logger.warning(
+                allowance = (
                     "gateway signature present but neither "
                     "ADAPTIX_GATEWAY_SHARED_SECRET nor ADAPTIX_GATEWAY_PUBLIC_KEYS "
                     "is configured; cannot verify. Allowing request "
                     "(non-production; configure verification material to enable "
                     "verification)."
                 )
+                logger.warning(allowance)
                 _warned_missing_secret = True
     else:
         # Behavior 2: signature absent. Gated by enforcement flag.
-        if _gateway_hmac_enforce():
+        if gateway_hmac_enforced():
             logger.warning(
                 "gateway signature absent and %s is enabled; rejecting request.",
                 _GATEWAY_HMAC_ENFORCE_ENV,
@@ -657,8 +682,10 @@ async def get_auth_context(
             )
         if not _warned_absent_signature:
             logger.warning(
-                "gateway signature absent; allowing request (enforcement off). "
-                "Set %s=true once all callers sign to require it.",
+                (
+                    "gateway signature absent; allowing request (enforcement off). "
+                    "Set %s=true once all callers sign to require it."
+                ),
                 _GATEWAY_HMAC_ENFORCE_ENV,
             )
             _warned_absent_signature = True
@@ -671,7 +698,7 @@ async def get_auth_context(
         signed_roles = verified_payload.get("roles")
         roles = (
             [str(r).strip() for r in signed_roles if str(r).strip()]
-            if isinstance(signed_roles, list)
+            if is_json_list(signed_roles)
             else []
         )
         email = str(verified_payload.get("email") or "").strip()
@@ -686,7 +713,7 @@ async def get_auth_context(
         signed_scopes = verified_payload.get("scopes")
         scopes = (
             [str(s).strip() for s in signed_scopes if str(s).strip()]
-            if isinstance(signed_scopes, list)
+            if is_json_list(signed_scopes)
             else []
         )
         mfa_verified = verified_payload.get("mfa_verified") is True
@@ -768,7 +795,7 @@ async def get_auth_context(
         # true, which would 401 every not-yet-signing caller fleet-wide.
         #
         # Reachability in production is already narrow: the absent-signature
-        # path is fail-closed by default here (``_gateway_hmac_enforce`` ->
+        # path is fail-closed by default here (``gateway_hmac_enforced`` ->
         # ``_is_production``), so this floor applies only to services that
         # EXPLICITLY set ``ADAPTIX_GATEWAY_HMAC_ENFORCE=false`` — i.e. exactly
         # the services knowingly running in the degraded mode where the
@@ -785,10 +812,12 @@ async def get_auth_context(
         # ------------------------------------------------------------------
         if is_founder_flag and _is_production():
             logger.warning(
-                "founder privilege refused on an UNSIGNED gateway context "
-                "(user=%s tenant=%s roles=%s) — founder is only honoured on an "
-                "HMAC-verified context. Sign the request, or set %s=true once "
-                "every caller of this service signs.",
+                (
+                    "founder privilege refused on an UNSIGNED gateway context "
+                    "(user=%s tenant=%s roles=%s) — founder is only honoured on an "
+                    "HMAC-verified context. Sign the request, or set %s=true once "
+                    "every caller of this service signs."
+                ),
                 user_uuid,
                 tenant_uuid,
                 sorted(roles),
@@ -831,7 +860,7 @@ GATEWAY_SIGNATURE_MAX_AGE_SECONDS = 300
 GATEWAY_JWT_CONTEXT_HEADER = "X-Adaptix-Gateway-Context"
 
 
-def build_gateway_context_jwt(**kwargs) -> str:  # type: ignore[misc]
+def build_gateway_context_jwt(**_kwargs: object) -> NoReturn:
     """Removed — AWS API Gateway replaces custom gateway context JWTs.
 
     This function existed to produce short-lived RS256 context JWTs for the
@@ -839,24 +868,29 @@ def build_gateway_context_jwt(**kwargs) -> str:  # type: ignore[misc]
     Gateway injects verified identity headers directly. Code calling this
     should switch to reading X-User-Id / X-Tenant-Id / X-User-Roles headers.
 
+    It still accepts any keyword arguments, and ignores them, so a legacy call
+    reaches the descriptive error below instead of a ``TypeError``.
+
     Raises RuntimeError (not NotImplementedError) so existing callers that
     catch (ValueError, RuntimeError) for graceful degradation continue to
     work without modification.
     """
-    raise RuntimeError(
+    removal = (
         "build_gateway_context_jwt has been removed. "
         "AWS API Gateway injects X-User-Id / X-Tenant-Id / X-User-Roles headers "
         "after validating the Bearer JWT. No custom context JWT is needed."
     )
+    raise RuntimeError(removal)
 
 
 __all__ = [
-    "AuthContext",
-    "GATEWAY_SHARED_SECRET_ENV",
-    "GATEWAY_PUBLIC_KEY_ENV",
     "GATEWAY_JWT_CONTEXT_HEADER",
+    "GATEWAY_PUBLIC_KEY_ENV",
+    "GATEWAY_SHARED_SECRET_ENV",
     "GATEWAY_SIGNATURE_MAX_AGE_SECONDS",
+    "AuthContext",
     "build_gateway_context_jwt",
+    "gateway_hmac_enforced",
     "get_auth_context",
 ]
 
