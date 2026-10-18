@@ -74,7 +74,7 @@ from collections.abc import Mapping
 from typing import NamedTuple, NoReturn, Annotated
 from uuid import UUID
 
-from fastapi import Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel
 
 from adaptix_contracts._json_narrowing import is_json_list
@@ -443,6 +443,20 @@ def _parse_roles(raw: str | None) -> list[str]:
     return [r.strip() for r in stripped.split(",") if r.strip()]
 
 
+async def _inbound_request(request: Request) -> Request:
+    """The inbound request, for ``get_auth_context``'s ``request`` parameter.
+
+    FastAPI injects the request only into a parameter annotated with the bare
+    ``Request`` class; it reads ``Request | None`` as a query parameter of type
+    ``Request`` and fails app startup. This dependency takes the request under
+    that bare annotation and hands it on, so ``get_auth_context`` can declare
+    the type its parameter really has: the request whenever FastAPI resolves
+    the dependency, ``None`` for a direct caller such as a worker or a unit
+    test. The same pattern as Adaptix-Calendar-Service ``require_auth``.
+    """
+    return request
+
+
 async def get_auth_context(
     x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
     x_tenant_id: Annotated[str | None, Header(alias="X-Tenant-Id")] = None,
@@ -461,20 +475,21 @@ async def get_auth_context(
     x_adaptix_auth_key_id: Annotated[
         str | None, Header(alias="X-Adaptix-Auth-Key-Id")
     ] = None,
-    # Injected by FastAPI from the annotation alone (the default is only for
-    # direct, non-HTTP callers such as the unit tests). It supplies the
-    # actual inbound method/path for the signed method/path binding check;
-    # a service that enables ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH fails
-    # closed when the request is unavailable. Placed LAST so a caller invoking
-    # this dependency positionally (a non-HTTP unit test) cannot bind an
-    # unrelated argument to it. The annotation MUST stay the bare ``Request``
-    # class: FastAPI recognises the request-injection special case only by
-    # ``issubclass`` on the annotation, so ``Request | None`` is treated as a
-    # query parameter of type Request and fails app startup in every service
-    # that mounts this dependency (proven by
-    # test_get_auth_context_mounts_as_fastapi_dependency). The ``None``
-    # default is only for direct callers.
-    request: Request = None,  # type: ignore[assignment]
+    # Supplied by FastAPI through ``_inbound_request`` whenever this dependency
+    # is mounted, so a routed request always carries itself; the ``None``
+    # default is only for direct, non-HTTP callers such as workers and unit
+    # tests. It supplies the actual inbound method/path for the signed
+    # method/path binding check; a service that enables
+    # ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH fails closed when the request is
+    # unavailable. Placed LAST so a caller invoking this dependency
+    # positionally (a non-HTTP unit test) cannot bind an unrelated argument to
+    # it. It cannot be annotated ``Request | None`` directly: FastAPI
+    # recognises the request-injection special case only by ``issubclass`` on
+    # a bare ``Request`` annotation, and would read ``Request | None`` as a
+    # query parameter, failing startup in every service that mounts this
+    # dependency (proven by test_get_auth_context_mounts_as_fastapi_dependency
+    # and test_mounted_dependency_hands_the_real_request_to_the_verifier).
+    request: Annotated[Request | None, Depends(_inbound_request)] = None,
 ) -> AuthContext:
     """FastAPI dependency: extract authenticated identity from API Gateway headers.
 

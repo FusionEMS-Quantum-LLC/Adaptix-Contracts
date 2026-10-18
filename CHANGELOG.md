@@ -12,6 +12,34 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.45.0] - 2026-10-18
+
+### Fixed
+
+- **`get_auth_context`'s `request` parameter is typed as what it is, with no
+  suppression** (fix-forward of #404, from Lane R's independent review). It was
+  `request: Request = None  # type: ignore[assignment]`. That comment hid a real
+  finding: Pyright `reportArgumentType` and mypy `assignment`, because `None` is
+  not a `Request`. It is now
+  `request: Annotated[Request | None, Depends(_inbound_request)] = None`, where
+  the private `_inbound_request(request: Request) -> Request` dependency takes
+  the request under the bare `Request` annotation FastAPI injects into, and
+  hands it on. Adaptix-Calendar-Service `require_auth` uses the same pattern.
+  - No behaviour changed. Mounted, a routed request still reaches the
+    verifier. Called directly, `request=` is still optional, and with
+    `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` on, a bound context with no request
+    still fails closed. `tests/test_auth_context_inbound_request.py` pins all
+    three, and passes against the previous code too.
+  - That test also catches a dependency that hands the verifier `None`. The
+    existing `test_get_auth_context_mounts_as_fastapi_dependency` does not,
+    because it only proves that the route registers.
+  - Callers are unaffected: the signature still accepts the same arguments,
+    and its type now also admits an explicit `None`.
+- **Correction to the 5.44.0 entry below.** It said `auth_contracts` was at
+  zero under the reference set. That was true only because of the
+  suppression above. From this release the file reads zero with nothing
+  suppressed.
+
 ### Added
 
 - **`adaptix_contracts.intelligence`: shared Frontier Intelligence contracts**
@@ -117,7 +145,8 @@ from the installed package metadata).
 ### Changed
 
 - **`auth_contracts` is at zero under the ADX-ZD-001 reference set** (Contracts
-  #403): Pyright strict, mypy `--strict`, the engine Ruff selection. No
+  #403; not quite: one `# type: ignore[assignment]` remained, removed in
+  5.45.0): Pyright strict, mypy `--strict`, the engine Ruff selection. No
   behaviour changed:
   - the decoded gateway payload is typed `Mapping[str, object]`, and a signed
     `roles`/`scopes` claim is read only when it is a JSON array, exactly as
