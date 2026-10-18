@@ -18,7 +18,8 @@ docstrings are never counted.
 * ``unbound-verifier``: any import or use of ``verify_gateway_signature``, or of
   its ``gateway_identity.verify`` alias.
 * ``get-auth-context-without-request``: a plain call of ``get_auth_context``
-  without ``request=``. Resolved as ``Depends(get_auth_context)`` FastAPI
+  without ``request=``, including a call through a local alias made by
+  ``from ... import get_auth_context as <name>``. Resolved as ``Depends(get_auth_context)`` FastAPI
   supplies the request; called by hand without it, the contracts code runs the
   unbound path. Analytics and Graph were found this way.
 
@@ -55,6 +56,7 @@ KINDS = (UNBOUND_VERIFIER, GET_AUTH_CONTEXT_WITHOUT_REQUEST)
 _UNBOUND_NAME = "verify_gateway_signature"
 _ALIAS_MODULE_SUFFIX = "gateway_identity"
 _ALIAS_NAME = "verify"
+_GET_AUTH_CONTEXT = "get_auth_context"
 
 #: Directory and file patterns skipped by default. Tests exercise the
 #: deprecated name on purpose during the overlap; vendored and virtual
@@ -137,6 +139,11 @@ class _Visitor(ast.NodeVisitor):
         # Local names bound to the gateway_identity module, e.g.
         # ``from adaptix_contracts import gateway_identity as gi``.
         self._alias_modules: set[str] = set()
+        # Local names bound to ``get_auth_context``, e.g.
+        # ``from adaptix_contracts.auth_contracts import get_auth_context as
+        # _contracts_get_auth_context``. Calendar, Finance and others call the
+        # canonical dependency through such an alias.
+        self._auth_context_names: set[str] = {_GET_AUTH_CONTEXT}
 
     def _add(self, node: ast.AST, kind: str, detail: str) -> None:
         self.findings.append(
@@ -152,6 +159,8 @@ class _Visitor(ast.NodeVisitor):
                 self._add(node, UNBOUND_VERIFIER, f"import of {module}.verify")
             elif alias.name == _ALIAS_MODULE_SUFFIX:
                 self._alias_modules.add(alias.asname or alias.name)
+            elif alias.name == _GET_AUTH_CONTEXT and alias.asname:
+                self._auth_context_names.add(alias.asname)
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
@@ -177,7 +186,7 @@ class _Visitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
-        if _call_name(node.func) == "get_auth_context":
+        if _call_name(node.func) in self._auth_context_names:
             keywords = {kw.arg for kw in node.keywords}
             # ``**kwargs`` (arg None) may carry request=; it is not provable
             # either way from the call site, so it is not reported.

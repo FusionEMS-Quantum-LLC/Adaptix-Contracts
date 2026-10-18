@@ -29,9 +29,11 @@ from the installed package metadata).
   - Downstream uses on each default branch as of 2026-10-18 (94 repositories
     scanned): Audit `backend/audit_app/api/gateway_auth.py:252` (an HTTP auth
     path, to bind); Core `core/backend/core_app/auth/gateway_context.py:238`
-    (the no-request arm, to rename); Billing `api/cortex_tools.py:157` and
-    `api/dependencies.py:938`, and Device `routes_app_releases.py:291`, call
-    their local `get_auth_context` without `request=` and need triage.
+    (the no-request arm, to rename). Twelve more call `get_auth_context` by
+    hand without `request=`, several through an import alias: Billing,
+    Calendar, Device, Finance, HL7, HR, Imports, Media, NEMSIS, Partner,
+    Training and Voice. Those are tracked as lanes in Governance #345 (Device
+    by Device #298), not by this change.
 
 ### Added
 
@@ -44,7 +46,7 @@ from the installed package metadata).
 - **`scripts/check_unbound_gateway_verifier.py`**, run by
   `scripts/ci/verify-toolchain.sh`. It parses Python with `ast` and reports any
   use of the deprecated name or its alias, and any plain `get_auth_context(...)`
-  call without `request=`. Accepted sites go in
+  call without `request=`, including calls through an import alias. Accepted sites go in
   `scripts/unbound_gateway_verifier_allowlist.txt` with a required reason; the
   count and stale entries print on every run. Services can run the same script
   against their own tree.

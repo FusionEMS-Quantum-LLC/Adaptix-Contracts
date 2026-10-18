@@ -75,6 +75,33 @@ def test_get_auth_context_without_request_is_reported() -> None:
     ]
 
 
+def test_get_auth_context_called_through_an_import_alias_is_reported() -> None:
+    # Calendar's shape: the canonical dependency imported under another name
+    # and awaited by hand without request=.
+    src = (
+        "from adaptix_contracts.auth_contracts import (\n"
+        "    get_auth_context as _contracts_get_auth_context,\n"
+        ")\n"
+        "async def f():\n"
+        "    await _contracts_get_auth_context(x_user_id='u')\n"
+    )
+    assert _kinds(src) == [check.GET_AUTH_CONTEXT_WITHOUT_REQUEST]
+
+
+def test_aliased_get_auth_context_with_request_is_not_reported() -> None:
+    src = (
+        "from adaptix_contracts.auth_contracts import get_auth_context as gac\n"
+        "gac(request=req)\n"
+        "Depends(gac)\n"
+    )
+    assert _kinds(src) == []
+
+
+def test_an_unrelated_name_is_not_treated_as_an_alias() -> None:
+    src = "from x import other as gac\ngac(x_user_id='u')\n"
+    assert _kinds(src) == []
+
+
 def test_get_auth_context_as_dependency_or_with_request_is_not_reported() -> None:
     src = (
         "Depends(get_auth_context)\n"
