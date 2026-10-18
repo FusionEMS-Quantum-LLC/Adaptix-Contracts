@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -21,7 +20,7 @@ class DomainEvent(BaseModel):
     payload: dict
     published_at: datetime
 
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class UserAuthContext(BaseModel):

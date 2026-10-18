@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -19,10 +18,10 @@ class UnitStatusEvent(BaseModel):
 
     unit_identifier: str
 
-    previous_status: Optional[str] = None
+    previous_status: str | None = None
     new_status: str
 
-    incident_id: Optional[UUID] = None
+    incident_id: UUID | None = None
 
     occurred_at: datetime
 
@@ -38,6 +37,6 @@ class UnitTelemetryEvent(BaseModel):
     lat: float
     lon: float
 
-    speed_kmh: Optional[float] = None
+    speed_kmh: float | None = None
 
     recorded_at: datetime

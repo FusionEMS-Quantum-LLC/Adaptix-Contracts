@@ -107,7 +107,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
@@ -624,28 +624,28 @@ class MigrationSourceFile(BaseModel):
     """
 
     tenant_id: str
-    source_file_id: Optional[str] = None
-    migration_id: Optional[str] = None
+    source_file_id: str | None = None
+    migration_id: str | None = None
 
-    original_filename: Optional[str] = None
-    content_type: Optional[str] = None
+    original_filename: str | None = None
+    content_type: str | None = None
 
     # Lowercase hex SHA-256 of the exact bytes received. The live subsystem
     # already carries this as ``file_checksum_sha256``
     # (``models/migration_imports.py:167``); typing it here makes it a contract
     # rather than an optional convention.
-    file_hash_sha256: Optional[str] = Field(default=None, min_length=64, max_length=64)
-    byte_size: Optional[int] = Field(default=None, ge=0)
+    file_hash_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    byte_size: int | None = Field(default=None, ge=0)
 
-    object_store_key: Optional[str] = None
-    received_at: Optional[datetime] = None
+    object_store_key: str | None = None
+    received_at: datetime | None = None
 
-    quarantine_reason: Optional[str] = None
-    quarantined_at: Optional[datetime] = None
+    quarantine_reason: str | None = None
+    quarantined_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class SourceSchemaFingerprint(BaseModel):
@@ -661,26 +661,24 @@ class SourceSchemaFingerprint(BaseModel):
     """
 
     tenant_id: str
-    fingerprint_id: Optional[str] = None
-    migration_id: Optional[str] = None
-    source_file_id: Optional[str] = None
+    fingerprint_id: str | None = None
+    migration_id: str | None = None
+    source_file_id: str | None = None
 
-    entity_hint: Optional[str] = None
-    fingerprint_sha256: Optional[str] = Field(
-        default=None, min_length=64, max_length=64
-    )
+    entity_hint: str | None = None
+    fingerprint_sha256: str | None = Field(default=None, min_length=64, max_length=64)
 
     column_names: list[str] = Field(default_factory=list)
-    column_count: Optional[int] = Field(default=None, ge=0)
-    row_count: Optional[int] = Field(default=None, ge=0)
+    column_count: int | None = Field(default=None, ge=0)
+    row_count: int | None = Field(default=None, ge=0)
 
-    delimiter: Optional[str] = None
-    encoding: Optional[str] = None
-    detected_at: Optional[datetime] = None
+    delimiter: str | None = None
+    encoding: str | None = None
+    detected_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class VendorProfileRef(BaseModel):
@@ -700,17 +698,17 @@ class VendorProfileRef(BaseModel):
     """
 
     tenant_id: str
-    vendor: Optional[MigrationSourceVendor] = None
-    product: Optional[str] = None
-    export_version: Optional[str] = None
-    profile_version: Optional[str] = None
+    vendor: MigrationSourceVendor | None = None
+    product: str | None = None
+    export_version: str | None = None
+    profile_version: str | None = None
 
-    profile_id: Optional[str] = None
-    resolved_at: Optional[datetime] = None
+    profile_id: str | None = None
+    resolved_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -744,31 +742,31 @@ class FieldMappingProposal(BaseModel):
     """
 
     tenant_id: str
-    proposal_id: Optional[str] = None
-    migration_id: Optional[str] = None
+    proposal_id: str | None = None
+    migration_id: str | None = None
 
-    source_field: Optional[str] = None
-    canonical_entity: Optional[str] = None
-    canonical_field: Optional[str] = None
+    source_field: str | None = None
+    canonical_entity: str | None = None
+    canonical_field: str | None = None
 
     # Declarative transform identifier (e.g. a named normalizer), not code.
-    transform: Optional[str] = None
+    transform: str | None = None
 
-    confidence: Optional[MigrationConfidence] = None
+    confidence: MigrationConfidence | None = None
     reason_codes: list[str] = Field(default_factory=list)
-    decision_level: Optional[MappingDecisionLevel] = None
+    decision_level: MappingDecisionLevel | None = None
 
     evidence_masked_examples: list[str] = Field(default_factory=list)
 
     downstream_financial_impact: bool = False
     auto_approve_allowed: bool = False
 
-    proposed_at: Optional[datetime] = None
-    vendor_profile: Optional[VendorProfileRef] = None
+    proposed_at: datetime | None = None
+    vendor_profile: VendorProfileRef | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -800,29 +798,29 @@ class ReconciliationControl(BaseModel):
     """
 
     tenant_id: str
-    control_id: Optional[str] = None
-    migration_id: Optional[str] = None
+    control_id: str | None = None
+    migration_id: str | None = None
 
-    control_name: Optional[str] = None
+    control_name: str | None = None
 
-    source_value_cents: Optional[MigrationMoneyCents] = None
-    canonical_value_cents: Optional[MigrationMoneyCents] = None
-    production_value_cents: Optional[MigrationMoneyCents] = None
-    difference_cents: Optional[MigrationMoneyCents] = None
+    source_value_cents: MigrationMoneyCents | None = None
+    canonical_value_cents: MigrationMoneyCents | None = None
+    production_value_cents: MigrationMoneyCents | None = None
+    difference_cents: MigrationMoneyCents | None = None
 
-    source_value_count: Optional[int] = Field(default=None, ge=0)
-    canonical_value_count: Optional[int] = Field(default=None, ge=0)
-    production_value_count: Optional[int] = Field(default=None, ge=0)
-    difference_count: Optional[int] = None
+    source_value_count: int | None = Field(default=None, ge=0)
+    canonical_value_count: int | None = Field(default=None, ge=0)
+    production_value_count: int | None = Field(default=None, ge=0)
+    difference_count: int | None = None
 
-    tolerance_cents: Optional[MigrationNonNegativeCents] = None
-    status: Optional[MigrationReconciliationStatus] = None
+    tolerance_cents: MigrationNonNegativeCents | None = None
+    status: MigrationReconciliationStatus | None = None
 
-    evaluated_at: Optional[datetime] = None
+    evaluated_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class ReconciliationRunResult(BaseModel):
@@ -836,22 +834,22 @@ class ReconciliationRunResult(BaseModel):
     """
 
     tenant_id: str
-    run_id: Optional[str] = None
-    migration_id: Optional[str] = None
+    run_id: str | None = None
+    migration_id: str | None = None
 
     controls: list[ReconciliationControl] = Field(default_factory=list)
-    overall_status: Optional[MigrationReconciliationStatus] = None
+    overall_status: MigrationReconciliationStatus | None = None
 
-    controls_evaluated: Optional[int] = Field(default=None, ge=0)
-    controls_out_of_balance: Optional[int] = Field(default=None, ge=0)
-    total_absolute_difference_cents: Optional[MigrationNonNegativeCents] = None
+    controls_evaluated: int | None = Field(default=None, ge=0)
+    controls_out_of_balance: int | None = Field(default=None, ge=0)
+    total_absolute_difference_cents: MigrationNonNegativeCents | None = None
 
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -878,27 +876,27 @@ class MigrationExceptionGroup(BaseModel):
     """
 
     tenant_id: str
-    group_id: Optional[str] = None
-    migration_id: Optional[str] = None
+    group_id: str | None = None
+    migration_id: str | None = None
 
-    category: Optional[MigrationExceptionCategory] = None
+    category: MigrationExceptionCategory | None = None
 
-    affected_record_count: Optional[int] = Field(default=None, ge=0)
-    affected_dollar_cents: Optional[MigrationMoneyCents] = None
+    affected_record_count: int | None = Field(default=None, ge=0)
+    affected_dollar_cents: MigrationMoneyCents | None = None
 
     representative_masked_examples: list[str] = Field(default_factory=list)
 
-    proposed_correction: Optional[str] = None
-    confidence: Optional[MigrationConfidence] = None
-    revalidation_impact: Optional[str] = None
+    proposed_correction: str | None = None
+    confidence: MigrationConfidence | None = None
+    revalidation_impact: str | None = None
 
     blocking: bool = True
-    first_seen_at: Optional[datetime] = None
-    resolved_at: Optional[datetime] = None
+    first_seen_at: datetime | None = None
+    resolved_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -920,21 +918,21 @@ class CutoverWatermark(BaseModel):
     """
 
     tenant_id: str
-    watermark_id: Optional[str] = None
-    migration_id: Optional[str] = None
+    watermark_id: str | None = None
+    migration_id: str | None = None
 
-    entity: Optional[str] = None
-    watermark_at: Optional[datetime] = None
-    last_source_record_id: Optional[str] = None
+    entity: str | None = None
+    watermark_at: datetime | None = None
+    last_source_record_id: str | None = None
 
-    records_before_watermark: Optional[int] = Field(default=None, ge=0)
-    open_ar_balance_cents: Optional[MigrationMoneyCents] = None
+    records_before_watermark: int | None = Field(default=None, ge=0)
+    open_ar_balance_cents: MigrationMoneyCents | None = None
 
-    established_at: Optional[datetime] = None
+    established_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class MigrationSignoff(BaseModel):
@@ -951,22 +949,22 @@ class MigrationSignoff(BaseModel):
     """
 
     tenant_id: str
-    signoff_id: Optional[str] = None
-    migration_id: Optional[str] = None
+    signoff_id: str | None = None
+    migration_id: str | None = None
 
-    signed_by_user_id: Optional[str] = None
-    signed_by_role: Optional[str] = None
-    signed_at: Optional[datetime] = None
+    signed_by_user_id: str | None = None
+    signed_by_role: str | None = None
+    signed_at: datetime | None = None
 
-    reconciliation_run_id: Optional[str] = None
-    accepted_variance_cents: Optional[MigrationMoneyCents] = None
+    reconciliation_run_id: str | None = None
+    accepted_variance_cents: MigrationMoneyCents | None = None
     outstanding_exception_group_ids: list[str] = Field(default_factory=list)
 
-    statement: Optional[str] = None
+    statement: str | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -990,19 +988,19 @@ class MigrationError(BaseModel):
     code: MigrationErrorCode
     retryable: bool = False
 
-    user_safe_message: Optional[str] = None
-    operator_diagnostic: Optional[str] = None
+    user_safe_message: str | None = None
+    operator_diagnostic: str | None = None
 
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
     # Optional here alone among these contracts, deliberately: an
     # ``AUTHENTICATION`` or ``TENANT_MISMATCH`` failure occurs BEFORE a tenant
     # is resolved, and a model that demanded the tenant would be unable to
     # describe the two failures that matter most for tenant isolation.
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
 
-    migration_id: Optional[str] = None
-    occurred_at: Optional[datetime] = None
+    migration_id: str | None = None
+    occurred_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
 
@@ -1034,19 +1032,19 @@ class MigrationCreated(BaseModel):
     event_type: str = "migration.created"
 
     tenant_id: str
-    migration_id: Optional[str] = None
-    agency_id: Optional[str] = None
+    migration_id: str | None = None
+    agency_id: str | None = None
 
-    vendor: Optional[MigrationSourceVendor] = None
-    legacy_vendor_name: Optional[str] = None
-    connection_type: Optional[str] = None
+    vendor: MigrationSourceVendor | None = None
+    legacy_vendor_name: str | None = None
+    connection_type: str | None = None
 
-    state: Optional[MigrationState] = None
-    initiated_by: Optional[str] = None
-    created_at: Optional[datetime] = None
+    state: MigrationState | None = None
+    initiated_by: str | None = None
+    created_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class SourceRegistered(BaseModel):
@@ -1055,15 +1053,15 @@ class SourceRegistered(BaseModel):
     event_type: str = "migration.source.registered"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    vendor_profile: Optional[VendorProfileRef] = None
-    connection_type: Optional[str] = None
-    state: Optional[MigrationState] = None
-    registered_at: Optional[datetime] = None
+    vendor_profile: VendorProfileRef | None = None
+    connection_type: str | None = None
+    state: MigrationState | None = None
+    registered_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class SourceFileLanded(BaseModel):
@@ -1078,14 +1076,14 @@ class SourceFileLanded(BaseModel):
     event_type: str = "migration.source.file_landed"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    source_file: Optional[MigrationSourceFile] = None
+    source_file: MigrationSourceFile | None = None
     quarantined: bool = False
-    landed_at: Optional[datetime] = None
+    landed_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class SourceProfiled(BaseModel):
@@ -1094,14 +1092,14 @@ class SourceProfiled(BaseModel):
     event_type: str = "migration.source.profiled"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    fingerprint: Optional[SourceSchemaFingerprint] = None
+    fingerprint: SourceSchemaFingerprint | None = None
     entities_detected: list[str] = Field(default_factory=list)
-    profiled_at: Optional[datetime] = None
+    profiled_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class MappingProposed(BaseModel):
@@ -1114,18 +1112,18 @@ class MappingProposed(BaseModel):
     event_type: str = "migration.mapping.proposed"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    proposal_count: Optional[int] = Field(default=None, ge=0)
-    review_required_count: Optional[int] = Field(default=None, ge=0)
-    blocked_count: Optional[int] = Field(default=None, ge=0)
-    financial_impact_count: Optional[int] = Field(default=None, ge=0)
+    proposal_count: int | None = Field(default=None, ge=0)
+    review_required_count: int | None = Field(default=None, ge=0)
+    blocked_count: int | None = Field(default=None, ge=0)
+    financial_impact_count: int | None = Field(default=None, ge=0)
 
-    vendor_profile: Optional[VendorProfileRef] = None
-    proposed_at: Optional[datetime] = None
+    vendor_profile: VendorProfileRef | None = None
+    proposed_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class MappingApproved(BaseModel):
@@ -1139,15 +1137,15 @@ class MappingApproved(BaseModel):
     event_type: str = "migration.mapping.approved"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    approved_by_user_id: Optional[str] = None
-    approved_proposal_count: Optional[int] = Field(default=None, ge=0)
-    auto_applied_count: Optional[int] = Field(default=None, ge=0)
-    approved_at: Optional[datetime] = None
+    approved_by_user_id: str | None = None
+    approved_proposal_count: int | None = Field(default=None, ge=0)
+    auto_applied_count: int | None = Field(default=None, ge=0)
+    approved_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class DryRunCompleted(BaseModel):
@@ -1161,18 +1159,18 @@ class DryRunCompleted(BaseModel):
     event_type: str = "migration.dry_run.completed"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    would_commit_count: Optional[int] = Field(default=None, ge=0)
-    would_commit_total_cents: Optional[MigrationMoneyCents] = None
-    exception_group_count: Optional[int] = Field(default=None, ge=0)
-    blocking_exception_count: Optional[int] = Field(default=None, ge=0)
+    would_commit_count: int | None = Field(default=None, ge=0)
+    would_commit_total_cents: MigrationMoneyCents | None = None
+    exception_group_count: int | None = Field(default=None, ge=0)
+    blocking_exception_count: int | None = Field(default=None, ge=0)
 
-    state: Optional[MigrationState] = None
-    completed_at: Optional[datetime] = None
+    state: MigrationState | None = None
+    completed_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class MigrationExceptionRaised(BaseModel):
@@ -1181,15 +1179,15 @@ class MigrationExceptionRaised(BaseModel):
     event_type: str = "migration.exception.raised"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    exception_group: Optional[MigrationExceptionGroup] = None
-    category: Optional[MigrationExceptionCategory] = None
+    exception_group: MigrationExceptionGroup | None = None
+    category: MigrationExceptionCategory | None = None
     blocking: bool = True
-    raised_at: Optional[datetime] = None
+    raised_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class ReconciliationCompleted(BaseModel):
@@ -1202,15 +1200,15 @@ class ReconciliationCompleted(BaseModel):
     event_type: str = "migration.reconciliation.completed"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    run: Optional[ReconciliationRunResult] = None
-    overall_status: Optional[MigrationReconciliationStatus] = None
-    total_absolute_difference_cents: Optional[MigrationNonNegativeCents] = None
-    completed_at: Optional[datetime] = None
+    run: ReconciliationRunResult | None = None
+    overall_status: MigrationReconciliationStatus | None = None
+    total_absolute_difference_cents: MigrationNonNegativeCents | None = None
+    completed_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class CutoverApproved(BaseModel):
@@ -1223,16 +1221,16 @@ class CutoverApproved(BaseModel):
     event_type: str = "migration.cutover.approved"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    approved_by_user_id: Optional[str] = None
-    approved_by_role: Optional[str] = None
-    reconciliation_run_id: Optional[str] = None
-    watermark: Optional[CutoverWatermark] = None
-    approved_at: Optional[datetime] = None
+    approved_by_user_id: str | None = None
+    approved_by_role: str | None = None
+    reconciliation_run_id: str | None = None
+    watermark: CutoverWatermark | None = None
+    approved_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class OpenARActivated(BaseModel):
@@ -1247,15 +1245,15 @@ class OpenARActivated(BaseModel):
     event_type: str = "migration.open_ar.activated"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    open_ar_total_cents: Optional[MigrationMoneyCents] = None
-    open_ar_claim_count: Optional[int] = Field(default=None, ge=0)
-    watermark: Optional[CutoverWatermark] = None
-    activated_at: Optional[datetime] = None
+    open_ar_total_cents: MigrationMoneyCents | None = None
+    open_ar_claim_count: int | None = Field(default=None, ge=0)
+    watermark: CutoverWatermark | None = None
+    activated_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class MigrationCompleted(BaseModel):
@@ -1267,16 +1265,16 @@ class MigrationCompleted(BaseModel):
     event_type: str = "migration.completed"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    signoff: Optional[MigrationSignoff] = None
-    final_reconciliation_run_id: Optional[str] = None
-    migrated_claim_count: Optional[int] = Field(default=None, ge=0)
-    migrated_total_cents: Optional[MigrationMoneyCents] = None
-    completed_at: Optional[datetime] = None
+    signoff: MigrationSignoff | None = None
+    final_reconciliation_run_id: str | None = None
+    migrated_claim_count: int | None = Field(default=None, ge=0)
+    migrated_total_cents: MigrationMoneyCents | None = None
+    completed_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
 
 
 class MigrationRolledBack(BaseModel):
@@ -1291,13 +1289,13 @@ class MigrationRolledBack(BaseModel):
     event_type: str = "migration.rolled_back"
 
     tenant_id: str
-    migration_id: Optional[str] = None
+    migration_id: str | None = None
 
-    rolled_back_by_user_id: Optional[str] = None
-    reason: Optional[str] = None
-    reversed_record_count: Optional[int] = Field(default=None, ge=0)
-    reversed_total_cents: Optional[MigrationMoneyCents] = None
-    rolled_back_at: Optional[datetime] = None
+    rolled_back_by_user_id: str | None = None
+    reason: str | None = None
+    reversed_record_count: int | None = Field(default=None, ge=0)
+    reversed_total_cents: MigrationMoneyCents | None = None
+    rolled_back_at: datetime | None = None
 
     schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None

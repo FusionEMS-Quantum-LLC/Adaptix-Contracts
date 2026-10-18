@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -42,7 +42,7 @@ class TelnyxCallCompletedEvent(BaseModel):
     ended_at: datetime
     duration_seconds: int
     status: TelnyxCallStatus
-    recording_url: Optional[str] = None
+    recording_url: str | None = None
 
 
 class TelnyxTranscriptContract(BaseModel):
@@ -51,7 +51,7 @@ class TelnyxTranscriptContract(BaseModel):
     call_id: str
     transcript_text: str
     language: str = "en"
-    confidence: Optional[float] = None
+    confidence: float | None = None
     created_at: datetime
 
 
@@ -61,7 +61,7 @@ class TelnyxRecordingContract(BaseModel):
     call_id: str
     recording_url: str
     duration_seconds: int
-    s3_key: Optional[str] = None
+    s3_key: str | None = None
     created_at: datetime
 
 
@@ -72,7 +72,7 @@ class TelnyxAISummaryContract(BaseModel):
     summary: str
     action_items: list[str] = Field(default_factory=list)
     deadlines: list[str] = Field(default_factory=list)
-    linked_claim_id: Optional[UUID] = None
+    linked_claim_id: UUID | None = None
     ai_run_id: UUID
     created_at: datetime
 
@@ -84,8 +84,8 @@ class TelnyxWebhookEventContract(BaseModel):
     event_type: str
     payload: dict[str, Any]
     processed: bool = False
-    processed_at: Optional[datetime] = None
-    raw_hash: Optional[str] = None
+    processed_at: datetime | None = None
+    raw_hash: str | None = None
     created_at: datetime
 
 

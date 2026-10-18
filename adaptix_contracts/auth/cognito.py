@@ -17,7 +17,6 @@ Rules:
 
 from __future__ import annotations
 
-from typing import Optional
 
 from dataclasses import dataclass, field
 
@@ -45,7 +44,7 @@ class AdaptixCognitoConfig:
     clock_skew_seconds: int = 30
 
     @classmethod
-    def from_env(cls) -> "AdaptixCognitoConfig":
+    def from_env(cls) -> AdaptixCognitoConfig:
         """Build config from environment variables."""
         import os
 
@@ -97,7 +96,7 @@ class AdaptixCognitoClaims(BaseModel):
     cognito_username: str | None = None
     email: str | None = None
     email_verified: bool | None = None
-    cognito_groups: Optional[list[str]] = None
+    cognito_groups: list[str] | None = None
 
     # Adaptix custom attributes (set by admin)
     custom_adaptix_user_id: str | None = None
@@ -106,7 +105,7 @@ class AdaptixCognitoClaims(BaseModel):
     custom_adaptix_roles: str | None = None  # JSON string of roles list
 
     # Optional Microsoft federation fields (when Entra is federated through Cognito)
-    identities: Optional[list[dict]] = None
+    identities: list[dict] | None = None
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -114,7 +113,7 @@ class AdaptixCognitoClaims(BaseModel):
     )
 
     @classmethod
-    def from_raw_claims(cls, claims: dict) -> "AdaptixCognitoClaims":
+    def from_raw_claims(cls, claims: dict) -> AdaptixCognitoClaims:
         """Build from raw JWT claims dict, mapping Cognito field names."""
         mapped = {
             "sub": claims.get("sub", ""),

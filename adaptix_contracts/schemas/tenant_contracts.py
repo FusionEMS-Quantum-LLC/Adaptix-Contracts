@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -54,24 +54,24 @@ class TenantContract(BaseModel):
     name: str
     slug: str
     status: TenantStatus = TenantStatus.ACTIVE
-    plan_tier: Optional[str] = None
-    metadata_json: Optional[dict[str, Any]] = None
+    plan_tier: str | None = None
+    metadata_json: dict[str, Any] | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class TenantCreateRequest(BaseModel):
     name: str
     slug: str
-    plan_tier: Optional[str] = None
-    metadata_json: Optional[dict[str, Any]] = None
+    plan_tier: str | None = None
+    metadata_json: dict[str, Any] | None = None
 
 
 class TenantUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    plan_tier: Optional[str] = None
-    status: Optional[TenantStatus] = None
-    metadata_json: Optional[dict[str, Any]] = None
+    name: str | None = None
+    plan_tier: str | None = None
+    status: TenantStatus | None = None
+    metadata_json: dict[str, Any] | None = None
 
 
 class TenantResponse(BaseModel):
@@ -79,9 +79,9 @@ class TenantResponse(BaseModel):
     name: str
     slug: str
     status: TenantStatus
-    plan_tier: Optional[str] = None
+    plan_tier: str | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class TenantCreatedEvent(BaseModel):
@@ -93,5 +93,5 @@ class TenantCreatedEvent(BaseModel):
 
 class TenantSuspendedEvent(BaseModel):
     tenant_id: UUID
-    reason: Optional[str] = None
+    reason: str | None = None
     suspended_at: datetime

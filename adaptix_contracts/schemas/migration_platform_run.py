@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -200,15 +199,15 @@ class MigrationRun(BaseModel):
     tenant_id: str
     migration_run_id: str
     state: MigrationState = MigrationState.DRAFT
-    source_vendor: Optional[MigrationSourceVendor] = None
-    paused_from_state: Optional[MigrationState] = None
-    created_by_user_id: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    source_vendor: MigrationSourceVendor | None = None
+    paused_from_state: MigrationState | None = None
+    created_by_user_id: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
     billing_schema_version: str = MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class MigrationSource(BaseModel):
@@ -217,13 +216,13 @@ class MigrationSource(BaseModel):
     tenant_id: str
     migration_run_id: str
     source_id: str
-    vendor_profile: Optional[VendorProfileRef] = None
-    connection_type: Optional[str] = None
+    vendor_profile: VendorProfileRef | None = None
+    connection_type: str | None = None
     reachable: bool = False
-    registered_at: Optional[datetime] = None
+    registered_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)
 
 
 class MigrationEntityPlan(BaseModel):
@@ -237,10 +236,10 @@ class MigrationEntityPlan(BaseModel):
     historical: bool = True
     dry_run_required: bool = True
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    record_version: Optional[int] = Field(default=None, ge=0)
+    record_version: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def _must_be_catalogued(self) -> "MigrationEntityPlan":
+    def _must_be_catalogued(self) -> MigrationEntityPlan:
         if catalog_entity(self.domain, self.entity) is None:
             raise ValueError("entity is not in the platform migration catalog")
         return self
@@ -253,7 +252,7 @@ class MigrationPlan(BaseModel):
     migration_run_id: str
     plan_id: str
     entity_plans: list[MigrationEntityPlan] = Field(default_factory=list)
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)

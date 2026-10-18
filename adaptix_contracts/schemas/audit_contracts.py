@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -82,11 +82,11 @@ class AuditContext(BaseModel):
     """Context surrounding an audited operation."""
 
     tenant_id: str
-    correlation_id: Optional[str] = None
-    request_id: Optional[str] = None
-    source_ip: Optional[str] = None
-    user_agent: Optional[str] = None
-    service_name: Optional[str] = None
+    correlation_id: str | None = None
+    request_id: str | None = None
+    source_ip: str | None = None
+    user_agent: str | None = None
+    service_name: str | None = None
 
 
 class AuditRecord(BaseModel):
@@ -95,12 +95,12 @@ class AuditRecord(BaseModel):
     audit_id: str
 
     actor_type: AuditActorType
-    actor_id: Optional[str] = None
-    actor_name: Optional[str] = None
+    actor_id: str | None = None
+    actor_name: str | None = None
 
     action_type: AuditActionType
     resource_type: str
-    resource_id: Optional[str] = None
+    resource_id: str | None = None
 
     success: bool
     severity: AuditSeverity = AuditSeverity.LOW
@@ -108,7 +108,7 @@ class AuditRecord(BaseModel):
     context: AuditContext
 
     changed_fields: list[str] = Field(default_factory=list)
-    reason: Optional[str] = None
+    reason: str | None = None
     occurred_at: datetime
 
 
@@ -122,7 +122,7 @@ class PhiAccessRecord(BaseModel):
     patient_id: str
 
     resource_type: str
-    resource_id: Optional[str] = None
+    resource_id: str | None = None
 
     access_purpose: str
     minimum_necessary_asserted: bool
@@ -134,13 +134,13 @@ class SecurityEventRecord(BaseModel):
     """Security-significant system event."""
 
     event_id: str
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
 
     event_type: str
     severity: AuditSeverity
 
-    actor_id: Optional[str] = None
-    source_ip: Optional[str] = None
+    actor_id: str | None = None
+    source_ip: str | None = None
 
     description: str
     detected_at: datetime
@@ -152,8 +152,8 @@ class ComplianceReviewItem(BaseModel):
     review_id: str
     tenant_id: str
 
-    related_audit_id: Optional[str] = None
-    related_security_event_id: Optional[str] = None
+    related_audit_id: str | None = None
+    related_security_event_id: str | None = None
 
     title: str
     description: str
@@ -161,9 +161,9 @@ class ComplianceReviewItem(BaseModel):
     status: ComplianceReviewStatus
     severity: AuditSeverity
 
-    assigned_to_user_id: Optional[str] = None
+    assigned_to_user_id: str | None = None
     opened_at: datetime
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
 
 
 class AuditRecordCreatedEvent(BaseModel):
@@ -180,8 +180,8 @@ class AuditRecordCreatedEvent(BaseModel):
 
     audit_id: str
     tenant_id: str
-    resource_type: Optional[str] = None
-    resource_id: Optional[str] = None
+    resource_type: str | None = None
+    resource_id: str | None = None
 
     occurred_at: datetime
 
@@ -205,7 +205,7 @@ class SecurityEventDetectedEvent(BaseModel):
     event_type: str = "audit.security_event.detected"
 
     event_id: str
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     severity: AuditSeverity
 
     detected_at: datetime
@@ -296,9 +296,9 @@ class AuditEntry(BaseModel):
     entity_id: str = Field(
         ..., description="Opaque entity ID. Never a patient name or DOB."
     )
-    user_id: Optional[str] = None
-    tenant_id: Optional[str] = None
-    ip_address: Optional[str] = None
+    user_id: str | None = None
+    tenant_id: str | None = None
+    ip_address: str | None = None
     timestamp: datetime
 
 
@@ -325,37 +325,37 @@ class AuditEvent(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    event_id: Optional[UUID] = None
+    event_id: UUID | None = None
     tenant_id: UUID
-    actor_user_id: Optional[UUID] = None
+    actor_user_id: UUID | None = None
     actor_type: AuditActorType = AuditActorType.USER
     action: str = Field(..., min_length=1, max_length=160)
     resource_type: str = Field(..., min_length=1, max_length=120)
-    resource_id: Optional[str] = Field(default=None, max_length=255)
-    correlation_id: Optional[str] = None
+    resource_id: str | None = Field(default=None, max_length=255)
+    correlation_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime
 
     # --- Core parity fields (added 3.2.0, all optional; see AuditIngestRequest) ---
-    outcome: Optional[AuditOutcome] = None
-    ip_address: Optional[str] = Field(default=None, max_length=45)
-    user_agent: Optional[str] = Field(default=None, max_length=500)
-    error_message: Optional[str] = Field(default=None, max_length=500)
-    changes: Optional[dict[str, Any]] = None
-    payload_schema_version: Optional[str] = Field(default=None, max_length=16)
+    outcome: AuditOutcome | None = None
+    ip_address: str | None = Field(default=None, max_length=45)
+    user_agent: str | None = Field(default=None, max_length=500)
+    error_message: str | None = Field(default=None, max_length=500)
+    changes: dict[str, Any] | None = None
+    payload_schema_version: str | None = Field(default=None, max_length=16)
 
 
 class AuditSearchQuery(BaseModel):
     """Query parameters for searching immutable audit events."""
 
     tenant_id: UUID
-    actor_user_id: Optional[UUID] = None
-    action: Optional[str] = Field(default=None, max_length=160)
-    resource_type: Optional[str] = Field(default=None, max_length=120)
-    resource_id: Optional[str] = Field(default=None, max_length=255)
-    correlation_id: Optional[str] = None
-    occurred_after: Optional[datetime] = None
-    occurred_before: Optional[datetime] = None
+    actor_user_id: UUID | None = None
+    action: str | None = Field(default=None, max_length=160)
+    resource_type: str | None = Field(default=None, max_length=120)
+    resource_id: str | None = Field(default=None, max_length=255)
+    correlation_id: str | None = None
+    occurred_after: datetime | None = None
+    occurred_before: datetime | None = None
     limit: int = Field(default=50, ge=1, le=1000)
     offset: int = Field(default=0, ge=0)
 
@@ -366,8 +366,8 @@ class AuditExportRequest(BaseModel):
     tenant_id: UUID
     query: AuditSearchQuery
     export_format: AuditExportFormat = AuditExportFormat.CSV
-    requested_by: Optional[UUID] = None
-    correlation_id: Optional[str] = None
+    requested_by: UUID | None = None
+    correlation_id: str | None = None
     requested_at: datetime
 
 
@@ -391,15 +391,15 @@ class AuditIngestRequest(BaseModel):
     """
 
     tenant_id: UUID
-    actor_user_id: Optional[UUID] = None
+    actor_user_id: UUID | None = None
     actor_type: AuditActorType = AuditActorType.USER
     action: str = Field(..., min_length=1, max_length=160)
-    resource_type: Optional[str] = Field(default=None, max_length=120)
-    resource_id: Optional[str] = Field(default=None, max_length=255)
+    resource_type: str | None = Field(default=None, max_length=120)
+    resource_id: str | None = Field(default=None, max_length=255)
     severity: AuditSeverity = AuditSeverity.LOW
     success: bool = True
-    correlation_id: Optional[str] = None
-    idempotency_key: Optional[str] = Field(default=None, max_length=255)
+    correlation_id: str | None = None
+    idempotency_key: str | None = Field(default=None, max_length=255)
     metadata: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime
 
@@ -408,11 +408,11 @@ class AuditIngestRequest(BaseModel):
     # home here. Without these, replicating a Core row into the Audit service
     # forces the producer to either drop the value or invent one; both are
     # defects on an immutable legal record.
-    outcome: Optional[AuditOutcome] = None
-    ip_address: Optional[str] = Field(default=None, max_length=45)
-    user_agent: Optional[str] = Field(default=None, max_length=500)
-    error_message: Optional[str] = Field(default=None, max_length=500)
-    changes: Optional[dict[str, Any]] = Field(
+    outcome: AuditOutcome | None = None
+    ip_address: str | None = Field(default=None, max_length=45)
+    user_agent: str | None = Field(default=None, max_length=500)
+    error_message: str | None = Field(default=None, max_length=500)
+    changes: dict[str, Any] | None = Field(
         default=None,
         description=(
             "Before/after state for update operations (Core ``changes_json``). "
@@ -420,8 +420,8 @@ class AuditIngestRequest(BaseModel):
             "``metadata`` is arbitrary producer context. Do not conflate them."
         ),
     )
-    payload_schema_version: Optional[str] = Field(default=None, max_length=16)
-    source_service: Optional[str] = Field(default=None, max_length=120)
+    payload_schema_version: str | None = Field(default=None, max_length=16)
+    source_service: str | None = Field(default=None, max_length=120)
 
     @model_validator(mode="before")
     @classmethod
@@ -502,12 +502,12 @@ class AuditExportResponse(BaseModel):
     tenant_id: UUID
     export_format: AuditExportFormat
     status: AuditExportStatus = AuditExportStatus.PENDING
-    record_count: Optional[int] = Field(default=None, ge=0)
-    location: Optional[str] = Field(
+    record_count: int | None = Field(default=None, ge=0)
+    location: str | None = Field(
         default=None,
         max_length=1024,
         description="Object-store URI (e.g. s3://...) of the exported evidence set.",
     )
-    error_reason: Optional[str] = None
+    error_reason: str | None = None
     requested_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None

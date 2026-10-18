@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -40,60 +39,60 @@ class RecurrencePatternContract(str, Enum):
 
 class TransportRequestCreate(BaseModel):
     patient_name: str = Field(..., max_length=255)
-    patient_dob: Optional[str] = Field(default=None, description="ISO 8601 date string")
-    patient_mrn: Optional[str] = Field(default=None, max_length=100)
+    patient_dob: str | None = Field(default=None, description="ISO 8601 date string")
+    patient_mrn: str | None = Field(default=None, max_length=100)
     pickup_facility_id: str
     destination_facility_id: str
     transport_type: TransportRequestTypeContract
     level_of_care: str = Field(..., max_length=100)
     requested_pickup_at: datetime
-    appointment_at: Optional[datetime] = None
+    appointment_at: datetime | None = None
     pcs_required: bool = False
     authorization_required: bool = False
-    payer_name: Optional[str] = Field(default=None, max_length=255)
-    payer_id: Optional[str] = Field(default=None, max_length=100)
+    payer_name: str | None = Field(default=None, max_length=255)
+    payer_id: str | None = Field(default=None, max_length=100)
     is_recurring: bool = False
-    recurrence_pattern: Optional[RecurrencePatternContract] = None
-    recurrence_end_date: Optional[datetime] = None
-    notes: Optional[str] = Field(default=None, max_length=2000)
+    recurrence_pattern: RecurrencePatternContract | None = None
+    recurrence_end_date: datetime | None = None
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class TransportRequestResponse(BaseModel):
     id: str
     tenant_id: str
     patient_name: str
-    patient_dob: Optional[str] = None
-    patient_mrn: Optional[str] = None
+    patient_dob: str | None = None
+    patient_mrn: str | None = None
     pickup_facility_id: str
     destination_facility_id: str
     transport_type: TransportRequestTypeContract
     level_of_care: str
     status: TransportRequestStatusContract
     requested_pickup_at: datetime
-    appointment_at: Optional[datetime] = None
+    appointment_at: datetime | None = None
     pcs_required: bool
     authorization_required: bool
-    authorization_status: Optional[str] = None
-    authorization_number: Optional[str] = None
-    payer_name: Optional[str] = None
-    payer_id: Optional[str] = None
+    authorization_status: str | None = None
+    authorization_number: str | None = None
+    payer_name: str | None = None
+    payer_id: str | None = None
     is_recurring: bool
-    recurrence_pattern: Optional[RecurrencePatternContract] = None
-    recurrence_end_date: Optional[datetime] = None
-    notes: Optional[str] = None
+    recurrence_pattern: RecurrencePatternContract | None = None
+    recurrence_end_date: datetime | None = None
+    notes: str | None = None
     documents_ready: bool
     signature_complete: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class TripScheduleRequest(BaseModel):
     transport_request_id: str
     scheduled_pickup_at: datetime
-    scheduled_dropoff_at: Optional[datetime] = None
-    unit_id: Optional[str] = None
+    scheduled_dropoff_at: datetime | None = None
+    unit_id: str | None = None
     crew_ids: list[str] = Field(default_factory=list)
-    notes: Optional[str] = Field(default=None, max_length=2000)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class TripResponse(BaseModel):
@@ -101,22 +100,22 @@ class TripResponse(BaseModel):
     tenant_id: str
     transport_request_id: str
     scheduled_pickup_at: datetime
-    scheduled_dropoff_at: Optional[datetime] = None
-    unit_id: Optional[str] = None
+    scheduled_dropoff_at: datetime | None = None
+    unit_id: str | None = None
     crew_ids: list[str]
     status: TransportRequestStatusContract
     cad_linked: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class RecurringSeriesCreate(BaseModel):
     transport_request_id: str
     pattern: RecurrencePatternContract
     series_start_date: datetime
-    series_end_date: Optional[datetime] = None
+    series_end_date: datetime | None = None
     preferred_pickup_time: str = Field(..., description="HH:MM in 24-hour format")
-    max_occurrences: Optional[int] = Field(default=None, ge=1, le=365)
+    max_occurrences: int | None = Field(default=None, ge=1, le=365)
 
 
 class RecurringSeriesResponse(BaseModel):
@@ -125,9 +124,9 @@ class RecurringSeriesResponse(BaseModel):
     transport_request_id: str
     pattern: RecurrencePatternContract
     series_start_date: datetime
-    series_end_date: Optional[datetime] = None
+    series_end_date: datetime | None = None
     preferred_pickup_time: str
-    max_occurrences: Optional[int] = None
+    max_occurrences: int | None = None
     occurrences_generated: int
     occurrences_remaining: int
     status: str
@@ -143,12 +142,12 @@ class CalendarEventResponse(BaseModel):
     destination_facility_id: str
     transport_type: TransportRequestTypeContract
     scheduled_pickup_at: datetime
-    scheduled_dropoff_at: Optional[datetime] = None
+    scheduled_dropoff_at: datetime | None = None
     status: TransportRequestStatusContract
     readiness_state: str
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     is_recurring: bool
-    series_id: Optional[str] = None
+    series_id: str | None = None
 
 
 class SlotSuggestionRequest(BaseModel):
@@ -160,7 +159,7 @@ class SlotSuggestionRequest(BaseModel):
 
 class SlotSuggestionResponse(BaseModel):
     suggested_pickup_at: datetime
-    suggested_dropoff_at: Optional[datetime] = None
+    suggested_dropoff_at: datetime | None = None
     available_unit_ids: list[str]
     conflict_score: float = Field(..., ge=0.0, le=1.0)
     confidence: float = Field(..., ge=0.0, le=1.0)
@@ -172,9 +171,9 @@ class DocumentItemResponse(BaseModel):
     document_type: str
     status: str
     signed: bool
-    download_url: Optional[str] = None
-    generated_at: Optional[datetime] = None
-    signed_at: Optional[datetime] = None
+    download_url: str | None = None
+    generated_at: datetime | None = None
+    signed_at: datetime | None = None
 
 
 class DocumentPackageResponse(BaseModel):
@@ -188,24 +187,24 @@ class SignerStatusResponse(BaseModel):
     signer_email: str
     signer_name: str
     status: str
-    signed_at: Optional[datetime] = None
+    signed_at: datetime | None = None
 
 
 class SignatureStatusResponse(BaseModel):
     id: str
     transport_request_id: str
     signature_request_id: str
-    embedded_sign_url: Optional[str] = None
+    embedded_sign_url: str | None = None
     status: str
     signers: list[SignerStatusResponse]
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     created_at: datetime
 
 
 class ReadinessGate(BaseModel):
     gate: str
     passed: bool
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class ReadinessStateResponse(BaseModel):
@@ -225,9 +224,9 @@ class FacilityResponse(BaseModel):
     city: str
     state: str
     zip_code: str
-    contact_name: Optional[str] = None
-    contact_phone: Optional[str] = None
-    contact_email: Optional[str] = None
+    contact_name: str | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
     active: bool
     created_at: datetime
 
@@ -235,7 +234,7 @@ class FacilityResponse(BaseModel):
 class CadPushRequest(BaseModel):
     trip_id: str
     force: bool = False
-    operator_note: Optional[str] = Field(default=None, max_length=500)
+    operator_note: str | None = Field(default=None, max_length=500)
 
 
 class CadPushResponse(BaseModel):
@@ -261,7 +260,7 @@ class TripScheduledEvent(BaseModel):
     request_id: str
     tenant_id: str
     scheduled_pickup_at: datetime
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     created_at: datetime
 
 
@@ -279,11 +278,11 @@ class CadPushRequestedEvent(BaseModel):
     trip_id: str
     request_id: str
     tenant_id: str
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     # Added in 5.28.0: the vehicle TransportLink assigned to the trip
     # (TransportRequest.assigned_vehicle_id). Without it vehicle identity was
     # lost at the TransportLink -> CAD hop, so the EncounterLineage could never
     # name the vehicle a billed transport used. Optional: older producers omit it.
-    vehicle_id: Optional[str] = None
+    vehicle_id: str | None = None
     crew_ids: list[str] = Field(default_factory=list)
     pushed_at: datetime

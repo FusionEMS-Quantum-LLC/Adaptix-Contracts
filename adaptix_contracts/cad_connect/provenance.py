@@ -14,7 +14,6 @@ Contract-enforced non-negotiables:
 
 from __future__ import annotations
 
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -30,25 +29,25 @@ class CadConnectSourceRef(BaseModel):
     cell, pasted text has a char span).
     """
 
-    page: Optional[int] = Field(
+    page: int | None = Field(
         default=None, description="1-based page number (PDF/image)."
     )
-    line: Optional[int] = Field(
+    line: int | None = Field(
         default=None, description="1-based line number (text/PDF)."
     )
-    cell: Optional[str] = Field(
+    cell: str | None = Field(
         default=None,
         description="Cell/column reference (CSV/XLSX), e.g. 'DSP' or 'C4'.",
     )
-    bbox: Optional[list[float]] = Field(
+    bbox: list[float] | None = Field(
         default=None,
         description="Bounding box [x0,y0,x1,y1] in the source image/PDF, if available.",
     )
-    char_span: Optional[list[int]] = Field(
+    char_span: list[int] | None = Field(
         default=None,
         description="[start,end] character offsets in pasted/extracted text.",
     )
-    raw_text: Optional[str] = Field(
+    raw_text: str | None = Field(
         default=None,
         description="The exact source text this value was read from (may be redacted for logs).",
     )
@@ -69,34 +68,34 @@ class CadConnectProvenance(BaseModel):
     it. Enough to reconstruct 'where did this value come from?' for every field.
     """
 
-    source_vendor: Optional[str] = Field(
+    source_vendor: str | None = Field(
         default=None,
         description="Detected CAD/source vendor (e.g. 'motorola','centralsquare'); None if unknown.",
     )
-    source_product: Optional[str] = Field(
+    source_product: str | None = Field(
         default=None, description="CAD product/name when known (e.g. 'premierone')."
     )
-    source_version: Optional[str] = Field(
+    source_version: str | None = Field(
         default=None, description="Source product/schema version when known."
     )
-    external_incident_id: Optional[str] = Field(
+    external_incident_id: str | None = Field(
         default=None, description="The source system's incident id, if present."
     )
-    external_event_id: Optional[str] = Field(
+    external_event_id: str | None = Field(
         default=None, description="The source system's event/update id, if present."
     )
     ingestion_method: IngestionMethod = Field(
         ..., description="How this payload entered the Universal CAD Gateway."
     )
-    mapping_profile_version: Optional[int] = Field(
+    mapping_profile_version: int | None = Field(
         default=None,
         description="Version of the agency mapping profile applied, if one matched.",
     )
-    cortex_capability_key: Optional[str] = Field(
+    cortex_capability_key: str | None = Field(
         default=None,
         description="AI-Service capability key that interpreted the payload (attribution).",
     )
-    cortex_model_id: Optional[str] = Field(
+    cortex_model_id: str | None = Field(
         default=None,
         description="Model id that produced Cortex-derived values (attribution).",
     )
@@ -117,14 +116,14 @@ class FieldValue(BaseModel):
     - ``CONFIRMED``/``REVIEW`` => ``value`` MUST be present.
     """
 
-    value: Optional[str] = Field(
+    value: str | None = Field(
         default=None,
         description="Normalized canonical value (ISO-8601 for times); None if missing.",
     )
-    raw_text: Optional[str] = Field(
+    raw_text: str | None = Field(
         default=None, description="The value exactly as it appeared in the source."
     )
-    confidence: Optional[float] = Field(
+    confidence: float | None = Field(
         default=None,
         ge=0.0,
         le=1.0,
@@ -133,19 +132,19 @@ class FieldValue(BaseModel):
     status: FieldStatus = Field(
         ..., description="Confirmed / Review / Missing / Conflict."
     )
-    extraction_method: Optional[ExtractionMethod] = Field(
+    extraction_method: ExtractionMethod | None = Field(
         default=None, description="deterministic | profile | cortex."
     )
-    source_ref: Optional[CadConnectSourceRef] = Field(
+    source_ref: CadConnectSourceRef | None = Field(
         default=None, description="Where in the source artifact this value was found."
     )
-    candidates: list["FieldValue"] = Field(
+    candidates: list[FieldValue] = Field(
         default_factory=list,
         description="Competing values when status is CONFLICT (firefighter selects the correct one).",
     )
 
     @model_validator(mode="after")
-    def _enforce_status_invariants(self) -> "FieldValue":
+    def _enforce_status_invariants(self) -> FieldValue:
         if self.status is FieldStatus.MISSING and self.value is not None:
             raise ValueError(
                 "FieldStatus.MISSING must not carry a value (no fabrication)."

@@ -103,7 +103,7 @@ class XrSessionNotFoundError(XrErrorEnvelope):
     @classmethod
     def for_session(
         cls, session_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrSessionNotFoundError":
+    ) -> XrSessionNotFoundError:
         return cls(message=f"XR session {session_id} not found", trace=trace)
 
 
@@ -116,7 +116,7 @@ class XrSessionAlreadyActiveError(XrErrorEnvelope):
     @classmethod
     def for_session(
         cls, session_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrSessionAlreadyActiveError":
+    ) -> XrSessionAlreadyActiveError:
         return cls(message=f"XR session {session_id} is already active", trace=trace)
 
 
@@ -133,7 +133,7 @@ class XrSessionInvalidStateTransitionError(XrErrorEnvelope):
         from_status: str,
         to_status: str,
         trace: AdaptixTraceContext | None = None,
-    ) -> "XrSessionInvalidStateTransitionError":
+    ) -> XrSessionInvalidStateTransitionError:
         return cls(
             message=(
                 f"XR session {session_id} cannot transition from {from_status} "
@@ -152,7 +152,7 @@ class XrSessionDeviceUnsupportedError(XrErrorEnvelope):
     @classmethod
     def for_device(
         cls, device: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrSessionDeviceUnsupportedError":
+    ) -> XrSessionDeviceUnsupportedError:
         return cls(message=f"XR device {device} is not supported", trace=trace)
 
 
@@ -165,7 +165,7 @@ class XrSessionPhysicianRequiredError(XrErrorEnvelope):
     @classmethod
     def for_session(
         cls, session_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrSessionPhysicianRequiredError":
+    ) -> XrSessionPhysicianRequiredError:
         return cls(
             message=(
                 f"XR overwatch session {session_id} requires a remote physician "
@@ -184,7 +184,7 @@ class XrAnnotationNotFoundError(XrErrorEnvelope):
     @classmethod
     def for_annotation(
         cls, annotation_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrAnnotationNotFoundError":
+    ) -> XrAnnotationNotFoundError:
         return cls(message=f"XR annotation {annotation_id} not found", trace=trace)
 
 
@@ -197,7 +197,7 @@ class XrAnnotationSessionNotActiveError(XrErrorEnvelope):
     @classmethod
     def for_session(
         cls, session_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrAnnotationSessionNotActiveError":
+    ) -> XrAnnotationSessionNotActiveError:
         return cls(
             message=f"XR session {session_id} is not active; annotations cannot be placed",
             trace=trace,
@@ -213,7 +213,7 @@ class XrRecordingNotFoundError(XrErrorEnvelope):
     @classmethod
     def for_recording(
         cls, recording_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrRecordingNotFoundError":
+    ) -> XrRecordingNotFoundError:
         return cls(message=f"XR recording {recording_id} not found", trace=trace)
 
 
@@ -226,7 +226,7 @@ class XrRecordingConsentRequiredError(XrErrorEnvelope):
     @classmethod
     def for_session(
         cls, session_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrRecordingConsentRequiredError":
+    ) -> XrRecordingConsentRequiredError:
         return cls(
             message=(
                 f"XR session {session_id} cannot record: consent has not been recorded"
@@ -247,7 +247,7 @@ class XrRecordingProcessingFailedError(XrErrorEnvelope):
         recording_id: str,
         detail: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "XrRecordingProcessingFailedError":
+    ) -> XrRecordingProcessingFailedError:
         return cls(
             message=f"XR recording {recording_id} failed to process",
             detail=detail,
@@ -264,7 +264,7 @@ class XrRecordingAlreadyPurgedError(XrErrorEnvelope):
     @classmethod
     def for_recording(
         cls, recording_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrRecordingAlreadyPurgedError":
+    ) -> XrRecordingAlreadyPurgedError:
         return cls(
             message=f"XR recording {recording_id} has already been purged",
             trace=trace,
@@ -280,7 +280,7 @@ class XrTrainingScenarioNotFoundError(XrErrorEnvelope):
     @classmethod
     def for_scenario(
         cls, scenario_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrTrainingScenarioNotFoundError":
+    ) -> XrTrainingScenarioNotFoundError:
         return cls(message=f"XR training scenario {scenario_id} not found", trace=trace)
 
 
@@ -293,7 +293,7 @@ class XrTrainingScenarioInactiveError(XrErrorEnvelope):
     @classmethod
     def for_scenario(
         cls, scenario_id: str, trace: AdaptixTraceContext | None = None
-    ) -> "XrTrainingScenarioInactiveError":
+    ) -> XrTrainingScenarioInactiveError:
         return cls(
             message=f"XR training scenario {scenario_id} is not active",
             trace=trace,

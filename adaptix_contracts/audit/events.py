@@ -1,7 +1,7 @@
 """Audit event contracts for Adaptix services."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 
@@ -12,9 +12,9 @@ class AuditEventEnvelope(BaseModel):
     tenant_id: str
     actor_id: str
     source_service: str
-    correlation_id: Optional[str] = None
-    causation_id: Optional[str] = None
-    idempotency_key: Optional[str] = None
+    correlation_id: str | None = None
+    causation_id: str | None = None
+    idempotency_key: str | None = None
     occurred_at: datetime
     payload: dict[str, Any] = {}
 
@@ -26,7 +26,7 @@ class ManualOverrideRecord(BaseModel):
     resource_type: str
     resource_id: str
     reason: str
-    supervisor_id: Optional[str] = None
+    supervisor_id: str | None = None
     occurred_at: datetime
     audit_trail: list[dict] = []
 
@@ -35,8 +35,8 @@ class WebhookEventRecord(BaseModel):
     webhook_id: str
     provider: str
     event_type: str
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     idempotency_key: str
     received_at: datetime
     processed: bool = False
-    processing_result: Optional[str] = None
+    processing_result: str | None = None

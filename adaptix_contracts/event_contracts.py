@@ -8,7 +8,7 @@ import builtins
 import os
 import warnings
 from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -34,8 +34,8 @@ class EventMetadata:
         tenant_id: str,
         timestamp: str,
         source_service: str,
-        correlation_id: Optional[str] = None,
-        trace_id: Optional[str] = None,
+        correlation_id: str | None = None,
+        trace_id: str | None = None,
     ) -> None:
         self.tenant_id = tenant_id
         self.timestamp = timestamp

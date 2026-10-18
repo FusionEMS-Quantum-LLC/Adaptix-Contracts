@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -49,21 +48,21 @@ class EligibilityRequest(BaseModel):
     payer_id: str
     service_date: datetime
 
-    transport_request_id: Optional[str] = None
-    chart_id: Optional[str] = None
-    requested_by_user_id: Optional[str] = None
+    transport_request_id: str | None = None
+    chart_id: str | None = None
+    requested_by_user_id: str | None = None
 
 
 class EligibilityBenefitSummary(BaseModel):
     """High-level benefit snapshot returned from verification."""
 
-    plan_name: Optional[str] = None
-    member_id: Optional[str] = None
-    group_number: Optional[str] = None
+    plan_name: str | None = None
+    member_id: str | None = None
+    group_number: str | None = None
 
-    copay_cents: Optional[int] = Field(default=None, ge=0)
-    deductible_remaining_cents: Optional[int] = Field(default=None, ge=0)
-    out_of_pocket_remaining_cents: Optional[int] = Field(default=None, ge=0)
+    copay_cents: int | None = Field(default=None, ge=0)
+    deductible_remaining_cents: int | None = Field(default=None, ge=0)
+    out_of_pocket_remaining_cents: int | None = Field(default=None, ge=0)
 
 
 class EligibilityResponse(BaseModel):
@@ -75,11 +74,11 @@ class EligibilityResponse(BaseModel):
     payer_id: str
 
     status: EligibilityStatus
-    coverage_level: Optional[CoverageLevel] = None
+    coverage_level: CoverageLevel | None = None
     authorization_status: AuthorizationStatus = AuthorizationStatus.UNKNOWN
 
-    benefit_summary: Optional[EligibilityBenefitSummary] = None
-    message: Optional[str] = None
+    benefit_summary: EligibilityBenefitSummary | None = None
+    message: str | None = None
 
     verified_at: datetime
 

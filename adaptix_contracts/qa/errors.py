@@ -104,7 +104,7 @@ class QaError(Exception):
         self,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "QaErrorEnvelope":
+    ) -> QaErrorEnvelope:
         """Render this exception as a :class:`QaErrorEnvelope`.
 
         No stack trace or raw exception text is emitted — only the
@@ -212,7 +212,7 @@ class QaErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         tenant_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "QaErrorEnvelope":
+    ) -> QaErrorEnvelope:
         return cls(
             error_code=QaErrorCode.QA_REVIEW_NOT_FOUND,
             message=f"Chart review not found: {review_id}",
@@ -231,7 +231,7 @@ class QaErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         detail: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "QaErrorEnvelope":
+    ) -> QaErrorEnvelope:
         return cls(
             error_code=QaErrorCode.QA_REVIEW_ALREADY_COMPLETED,
             message=f"Chart review already completed: {review_id}",
@@ -246,7 +246,7 @@ class QaErrorEnvelope(AdaptixErrorEnvelopeBase):
         checklist_id: str,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "QaErrorEnvelope":
+    ) -> QaErrorEnvelope:
         return cls(
             error_code=QaErrorCode.QA_CHECKLIST_NOT_FOUND,
             message=f"QA checklist not found: {checklist_id}",
@@ -261,7 +261,7 @@ class QaErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         review_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "QaErrorEnvelope":
+    ) -> QaErrorEnvelope:
         return cls(
             error_code=QaErrorCode.QA_FINDING_NOT_FOUND,
             message=f"Review finding not found: {finding_id}",
@@ -284,7 +284,7 @@ class QaErrorEnvelope(AdaptixErrorEnvelopeBase):
         actual_tenant_id: str,
         review_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "QaErrorEnvelope":
+    ) -> QaErrorEnvelope:
         return cls(
             error_code=QaErrorCode.QA_TENANT_MISMATCH,
             message="QA record belongs to a different tenant",

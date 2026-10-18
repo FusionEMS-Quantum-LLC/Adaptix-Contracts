@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -106,11 +105,11 @@ class MappingDecision(BaseModel):
     migration_run_id: str
     decision_id: str
     proposal: FieldMappingProposal
-    field_class: Optional[DeterministicFieldClass] = None
+    field_class: DeterministicFieldClass | None = None
     confidence_band: MappingConfidenceBand = MappingConfidenceBand.ABSENT
     human_review_required: bool = True
-    decided_by_user_id: Optional[str] = None
-    decided_at: Optional[datetime] = None
+    decided_by_user_id: str | None = None
+    decided_at: datetime | None = None
     schema_version: str = PLATFORM_MIGRATION_CONTRACT_SCHEMA_VERSION
-    correlation_id: Optional[str] = None
-    record_version: Optional[int] = Field(default=None, ge=0)
+    correlation_id: str | None = None
+    record_version: int | None = Field(default=None, ge=0)

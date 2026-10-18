@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,14 +41,14 @@ class RTCSession(BaseModel):
     tenant_id: UUID
     room_name: str = Field(..., min_length=1, max_length=200)
     status: RTCRoomStatus = RTCRoomStatus.PENDING
-    correlation_id: Optional[str] = None
-    created_by: Optional[UUID] = None
-    max_participants: Optional[int] = Field(default=None, ge=1)
-    reference_type: Optional[str] = Field(default=None, max_length=120)
-    reference_id: Optional[str] = Field(default=None, max_length=255)
+    correlation_id: str | None = None
+    created_by: UUID | None = None
+    max_participants: int | None = Field(default=None, ge=1)
+    reference_type: str | None = Field(default=None, max_length=120)
+    reference_id: str | None = Field(default=None, max_length=255)
     created_at: datetime
-    started_at: Optional[datetime] = None
-    ended_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
 
 
 class RTCParticipantToken(BaseModel):
@@ -59,9 +58,9 @@ class RTCParticipantToken(BaseModel):
     session_id: UUID
     room_name: str = Field(..., min_length=1, max_length=200)
     participant_identity: str = Field(..., min_length=1, max_length=200)
-    participant_name: Optional[str] = Field(default=None, max_length=200)
+    participant_name: str | None = Field(default=None, max_length=200)
     token: str = Field(..., min_length=1)
-    url: Optional[str] = Field(default=None, max_length=2000)
+    url: str | None = Field(default=None, max_length=2000)
     can_publish: bool = True
     can_subscribe: bool = True
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None

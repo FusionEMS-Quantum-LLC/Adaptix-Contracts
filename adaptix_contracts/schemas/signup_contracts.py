@@ -100,7 +100,7 @@ class SignupApplicationCreateResponse(BaseModel):  # pylint: disable=too-few-pub
     idempotent_replay: bool = False
 
     @model_validator(mode="after")
-    def identifiers_must_match(self) -> "SignupApplicationCreateResponse":
+    def identifiers_must_match(self) -> SignupApplicationCreateResponse:
         """Reject a response whose compatibility alias has drifted.
 
         ``id`` is a temporary duplicate of ``application_id``. If the two ever

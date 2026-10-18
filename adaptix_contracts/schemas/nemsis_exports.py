@@ -291,7 +291,7 @@ class ExportAttemptDetail(BaseModel):
     completed_at: datetime | None = None
 
     @model_validator(mode="after")
-    def validate_lifecycle_consistency(self) -> "ExportAttemptDetail":
+    def validate_lifecycle_consistency(self) -> ExportAttemptDetail:
         success_states = {
             ExportLifecycleStatus.COMPLETED,
             ExportLifecycleStatus.SUBMISSION_ACCEPTED,

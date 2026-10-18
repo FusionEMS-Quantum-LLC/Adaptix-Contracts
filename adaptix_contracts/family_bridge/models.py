@@ -98,7 +98,7 @@ class NoKConsent(BaseModel):
     notes: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
-    def _revocation_consistency(self) -> "NoKConsent":
+    def _revocation_consistency(self) -> NoKConsent:
         if self.status is ConsentStatus.REVOKED and self.revoked_at is None:
             raise ValueError("REVOKED consent must carry revoked_at")
         if self.status is not ConsentStatus.REVOKED and self.revoked_at is not None:
@@ -137,7 +137,7 @@ class NoKContact(_FamilyBridgeBase):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @model_validator(mode="after")
-    def _channel_requires_address(self) -> "NoKContact":
+    def _channel_requires_address(self) -> NoKContact:
         if self.preferred_channel in (PreferredChannel.SMS, PreferredChannel.VOICE):
             if not self.phone_e164:
                 raise ValueError(
@@ -184,7 +184,7 @@ class FamilyPortalToken(_FamilyBridgeBase):
     view_count: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
-    def _expiry_after_issue(self) -> "FamilyPortalToken":
+    def _expiry_after_issue(self) -> FamilyPortalToken:
         if self.expires_at <= self.issued_at:
             raise ValueError("expires_at must be after issued_at")
         return self
@@ -285,7 +285,7 @@ class FamilyBridgeThread(_FamilyBridgeBase):
     events: list[ThreadStatusEvent] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _closed_consistency(self) -> "FamilyBridgeThread":
+    def _closed_consistency(self) -> FamilyBridgeThread:
         if self.stage is ThreadStage.CLOSED:
             if self.closed_at is None or self.close_reason is None:
                 raise ValueError("CLOSED thread must carry closed_at and close_reason")

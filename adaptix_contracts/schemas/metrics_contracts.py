@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -29,7 +28,7 @@ class ServiceHealthStatus(str, Enum):
 class QueueMetric(BaseModel):
     queue_name: str
     depth: int = Field(..., ge=0)
-    oldest_age_seconds: Optional[int] = Field(default=None, ge=0)
+    oldest_age_seconds: int | None = Field(default=None, ge=0)
     measured_at: datetime
 
 
@@ -56,14 +55,14 @@ class ThroughputMetric(BaseModel):
 
 class ServiceHealthSummary(BaseModel):
     service_name: str
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
 
     status: ServiceHealthStatus
     severity: MetricSeverity = MetricSeverity.NORMAL
 
-    uptime_seconds: Optional[int] = Field(default=None, ge=0)
-    version: Optional[str] = None
-    message: Optional[str] = None
+    uptime_seconds: int | None = Field(default=None, ge=0)
+    version: str | None = None
+    message: str | None = None
 
     queue_metrics: list[QueueMetric] = Field(default_factory=list)
     latency_metrics: list[LatencyMetric] = Field(default_factory=list)
@@ -77,7 +76,7 @@ class ServiceHealthReportedEvent(BaseModel):
     event_type: str = "metrics.service_health.reported"
 
     service_name: str
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     status: ServiceHealthStatus
     severity: MetricSeverity = MetricSeverity.NORMAL
 

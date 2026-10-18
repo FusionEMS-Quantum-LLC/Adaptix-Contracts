@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -53,7 +52,7 @@ class DeviceRegistration(BaseModel):
 
     id: UUID
     tenant_id: UUID
-    user_id: Optional[UUID] = None
+    user_id: UUID | None = None
     device_identifier: str = Field(
         ...,
         min_length=1,
@@ -62,11 +61,11 @@ class DeviceRegistration(BaseModel):
     )
     platform: DevicePlatform
     status: DeviceStatus = DeviceStatus.PENDING
-    name: Optional[str] = Field(default=None, max_length=200)
-    os_version: Optional[str] = Field(default=None, max_length=64)
-    app_version: Optional[str] = Field(default=None, max_length=64)
-    push_token: Optional[str] = Field(default=None, max_length=512)
+    name: str | None = Field(default=None, max_length=200)
+    os_version: str | None = Field(default=None, max_length=64)
+    app_version: str | None = Field(default=None, max_length=64)
+    push_token: str | None = Field(default=None, max_length=512)
     mdm_managed: bool = False
-    last_seen_at: Optional[datetime] = None
+    last_seen_at: datetime | None = None
     registered_at: datetime
     updated_at: datetime

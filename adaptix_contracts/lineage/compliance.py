@@ -10,7 +10,6 @@ result envelope so every consumer reads them the same way.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -51,6 +50,6 @@ class ComplianceFactResult(BaseModel):
     evaluated_at: AwareDatetime
     as_of: AwareDatetime
     source_system: str = Field(..., min_length=1)
-    source_record_id: Optional[str] = Field(default=None, min_length=1)
-    source_version: Optional[str] = Field(default=None, min_length=1)
-    reason: Optional[str] = Field(default=None, max_length=500)
+    source_record_id: str | None = Field(default=None, min_length=1)
+    source_version: str | None = Field(default=None, min_length=1)
+    reason: str | None = Field(default=None, max_length=500)

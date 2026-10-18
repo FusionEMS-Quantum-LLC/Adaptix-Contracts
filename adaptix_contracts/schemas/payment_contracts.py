@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -73,9 +73,9 @@ class StripeCustomerRef(BaseModel):
 
     tenant_id: UUID
     stripe_customer_id: str = Field(..., min_length=1, max_length=64)
-    email: Optional[str] = Field(default=None, max_length=320)
-    default_payment_method_id: Optional[str] = Field(default=None, max_length=64)
-    created_at: Optional[datetime] = None
+    email: str | None = Field(default=None, max_length=320)
+    default_payment_method_id: str | None = Field(default=None, max_length=64)
+    created_at: datetime | None = None
 
 
 class SubscriptionRef(BaseModel):
@@ -85,13 +85,13 @@ class SubscriptionRef(BaseModel):
     stripe_subscription_id: str = Field(..., min_length=1, max_length=64)
     stripe_customer_id: str = Field(..., min_length=1, max_length=64)
     status: SubscriptionStatus
-    price_id: Optional[str] = Field(default=None, max_length=64)
-    product_id: Optional[str] = Field(default=None, max_length=64)
+    price_id: str | None = Field(default=None, max_length=64)
+    product_id: str | None = Field(default=None, max_length=64)
     quantity: int = Field(default=1, ge=0)
-    current_period_start: Optional[datetime] = None
-    current_period_end: Optional[datetime] = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
     cancel_at_period_end: bool = False
-    trial_end: Optional[datetime] = None
+    trial_end: datetime | None = None
 
 
 class InvoiceRef(BaseModel):
@@ -100,16 +100,16 @@ class InvoiceRef(BaseModel):
     tenant_id: UUID
     stripe_invoice_id: str = Field(..., min_length=1, max_length=64)
     stripe_customer_id: str = Field(..., min_length=1, max_length=64)
-    stripe_subscription_id: Optional[str] = Field(default=None, max_length=64)
+    stripe_subscription_id: str | None = Field(default=None, max_length=64)
     status: InvoiceStatus
     amount_due: Decimal = Field(..., ge=Decimal("0"))
     amount_paid: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
     currency: str = Field(default="usd", min_length=3, max_length=3)
-    hosted_invoice_url: Optional[str] = None
-    invoice_pdf_url: Optional[str] = None
-    period_start: Optional[datetime] = None
-    period_end: Optional[datetime] = None
-    created_at: Optional[datetime] = None
+    hosted_invoice_url: str | None = None
+    invoice_pdf_url: str | None = None
+    period_start: datetime | None = None
+    period_end: datetime | None = None
+    created_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -121,14 +121,14 @@ class CheckoutSessionRequest(BaseModel):
     """Request to create a Stripe Checkout session for a subscription."""
 
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     price_id: str = Field(..., min_length=1, max_length=64)
     quantity: int = Field(default=1, ge=1)
     success_url: str = Field(..., min_length=1, max_length=2000)
     cancel_url: str = Field(..., min_length=1, max_length=2000)
     mode: str = Field(default="subscription", max_length=32)
-    customer_email: Optional[str] = Field(default=None, max_length=320)
-    stripe_customer_id: Optional[str] = Field(default=None, max_length=64)
+    customer_email: str | None = Field(default=None, max_length=320)
+    stripe_customer_id: str | None = Field(default=None, max_length=64)
     metadata: dict[str, str] = Field(default_factory=dict)
 
 
@@ -138,15 +138,15 @@ class CheckoutSessionResponse(BaseModel):
     tenant_id: UUID
     session_id: str = Field(..., min_length=1, max_length=200)
     checkout_url: str = Field(..., min_length=1, max_length=2000)
-    correlation_id: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    correlation_id: str | None = None
+    expires_at: datetime | None = None
 
 
 class PortalSessionRequest(BaseModel):
     """Request to create a Stripe customer-portal session."""
 
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     stripe_customer_id: str = Field(..., min_length=1, max_length=64)
     return_url: str = Field(..., min_length=1, max_length=2000)
 
@@ -156,8 +156,8 @@ class PortalSessionResponse(BaseModel):
 
     tenant_id: UUID
     portal_url: str = Field(..., min_length=1, max_length=2000)
-    correlation_id: Optional[str] = None
-    created_at: Optional[datetime] = None
+    correlation_id: str | None = None
+    created_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -168,16 +168,16 @@ class PortalSessionResponse(BaseModel):
 class PaymentEvent(BaseModel):
     """A payment lifecycle event derived from a Stripe webhook."""
 
-    event_id: Optional[UUID] = None
+    event_id: UUID | None = None
     tenant_id: UUID
     event_type: PaymentEventType
-    stripe_event_id: Optional[str] = Field(default=None, max_length=64)
-    stripe_customer_id: Optional[str] = Field(default=None, max_length=64)
-    stripe_subscription_id: Optional[str] = Field(default=None, max_length=64)
-    stripe_invoice_id: Optional[str] = Field(default=None, max_length=64)
-    amount: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+    stripe_event_id: str | None = Field(default=None, max_length=64)
+    stripe_customer_id: str | None = Field(default=None, max_length=64)
+    stripe_subscription_id: str | None = Field(default=None, max_length=64)
+    stripe_invoice_id: str | None = Field(default=None, max_length=64)
+    amount: Decimal | None = Field(default=None, ge=Decimal("0"))
     currency: str = Field(default="usd", min_length=3, max_length=3)
-    correlation_id: Optional[str] = None
-    idempotency_key: Optional[str] = None
+    correlation_id: str | None = None
+    idempotency_key: str | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime

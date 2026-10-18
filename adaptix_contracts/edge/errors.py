@@ -110,7 +110,7 @@ class EdgeError(Exception):
         self,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "EdgeErrorEnvelope":
+    ) -> EdgeErrorEnvelope:
         """Render this exception as an :class:`EdgeErrorEnvelope`.
 
         No stack trace or raw exception text is emitted — only the
@@ -229,7 +229,7 @@ class EdgeErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         tenant_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "EdgeErrorEnvelope":
+    ) -> EdgeErrorEnvelope:
         return cls(
             error_code=EdgeErrorCode.EDGE_NODE_NOT_FOUND,
             message=f"Edge node not found: {node_id}",
@@ -248,7 +248,7 @@ class EdgeErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         detail: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "EdgeErrorEnvelope":
+    ) -> EdgeErrorEnvelope:
         return cls(
             error_code=EdgeErrorCode.EDGE_IMAGE_SIGNATURE_INVALID,
             message=f"Edge image signature failed verification: {image_id}",
@@ -265,7 +265,7 @@ class EdgeErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         node_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "EdgeErrorEnvelope":
+    ) -> EdgeErrorEnvelope:
         return cls(
             error_code=EdgeErrorCode.EDGE_DEPLOYMENT_FAILED,
             message=f"Edge deployment {deployment_id} failed",
@@ -288,7 +288,7 @@ class EdgeErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         detail: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "EdgeErrorEnvelope":
+    ) -> EdgeErrorEnvelope:
         return cls(
             error_code=EdgeErrorCode.EDGE_UPLINK_UNAVAILABLE,
             message=f"Edge node {node_id} has no working uplink",
@@ -305,7 +305,7 @@ class EdgeErrorEnvelope(AdaptixErrorEnvelopeBase):
         *,
         detail: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "EdgeErrorEnvelope":
+    ) -> EdgeErrorEnvelope:
         return cls(
             error_code=EdgeErrorCode.EDGE_CRDT_CONFLICT,
             message=f"CRDT sync conflict on {dataset}@{node_id}",
@@ -322,7 +322,7 @@ class EdgeErrorEnvelope(AdaptixErrorEnvelopeBase):
         actual_tenant_id: str,
         node_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "EdgeErrorEnvelope":
+    ) -> EdgeErrorEnvelope:
         return cls(
             error_code=EdgeErrorCode.EDGE_TENANT_MISMATCH,
             message="Edge node belongs to a different tenant",

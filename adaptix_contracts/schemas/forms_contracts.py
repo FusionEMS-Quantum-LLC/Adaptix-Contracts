@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -60,11 +60,11 @@ class FormValidationRule(BaseModel):
         max_length=64,
         description="e.g. required, min_length, max_length, regex, min, max.",
     )
-    value: Optional[str] = Field(
+    value: str | None = Field(
         default=None,
         description="Rule parameter serialized as a string, when applicable.",
     )
-    message: Optional[str] = Field(default=None, max_length=500)
+    message: str | None = Field(default=None, max_length=500)
 
 
 class FormFieldDefinition(BaseModel):
@@ -74,12 +74,12 @@ class FormFieldDefinition(BaseModel):
     label: str = Field(..., min_length=1, max_length=255)
     field_type: FormFieldType
     required: bool = False
-    placeholder: Optional[str] = Field(default=None, max_length=255)
-    help_text: Optional[str] = Field(default=None, max_length=1000)
+    placeholder: str | None = Field(default=None, max_length=255)
+    help_text: str | None = Field(default=None, max_length=1000)
     options: list[str] = Field(
         default_factory=list, description="Choices for select/radio/multiselect."
     )
-    default_value: Optional[str] = None
+    default_value: str | None = None
     validation_rules: list[FormValidationRule] = Field(default_factory=list)
     order: int = Field(default=0, ge=0)
 
@@ -92,8 +92,8 @@ class FormFieldDefinition(BaseModel):
 class FormSchema(BaseModel):
     """An ordered set of field definitions describing a form."""
 
-    title: Optional[str] = Field(default=None, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
+    title: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
     fields: list[FormFieldDefinition] = Field(default_factory=list)
 
 
@@ -107,9 +107,9 @@ class FormVersion(BaseModel):
     version: int = Field(..., ge=1)
     form_schema: FormSchema
     is_published: bool = False
-    created_by: Optional[UUID] = None
+    created_by: UUID | None = None
     created_at: datetime
-    published_at: Optional[datetime] = None
+    published_at: datetime | None = None
 
 
 class FormTemplate(BaseModel):
@@ -121,10 +121,10 @@ class FormTemplate(BaseModel):
     tenant_id: UUID
     key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000)
     status: FormStatus = FormStatus.DRAFT
     current_version: int = Field(default=1, ge=1)
-    latest_version: Optional[FormVersion] = None
+    latest_version: FormVersion | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -139,7 +139,7 @@ class FormValidationError(BaseModel):
 
     field_key: str = Field(..., min_length=1, max_length=160)
     message: str = Field(..., min_length=1, max_length=500)
-    rule_type: Optional[str] = Field(default=None, max_length=64)
+    rule_type: str | None = Field(default=None, max_length=64)
 
 
 class FormSubmission(BaseModel):
@@ -152,7 +152,7 @@ class FormSubmission(BaseModel):
     template_id: UUID
     version_id: UUID
     version: int = Field(..., ge=1)
-    submitted_by: Optional[UUID] = None
+    submitted_by: UUID | None = None
     values: dict[str, Any] = Field(default_factory=dict)
     is_valid: bool = True
     validation_errors: list[FormValidationError] = Field(default_factory=list)
@@ -169,31 +169,31 @@ class FormTemplateCreateRequest(BaseModel):
 
     key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=2000)
     form_schema: FormSchema
 
 
 class FormTemplateUpdateRequest(BaseModel):
     """Partial update of a form template's metadata / lifecycle status."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    status: Optional[FormStatus] = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    status: FormStatus | None = None
 
 
 class FormVersionCreateRequest(BaseModel):
     """Request to create a new immutable version of a form's schema."""
 
     form_schema: FormSchema
-    created_by: Optional[UUID] = None
+    created_by: UUID | None = None
 
 
 class FormSubmissionCreateRequest(BaseModel):
     """Request to validate and persist a submission for a form."""
 
     values: dict[str, Any] = Field(default_factory=dict)
-    submitted_by: Optional[UUID] = None
-    idempotency_key: Optional[str] = Field(default=None, max_length=255)
+    submitted_by: UUID | None = None
+    idempotency_key: str | None = Field(default=None, max_length=255)
 
 
 # ---------------------------------------------------------------------------

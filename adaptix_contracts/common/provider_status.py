@@ -1,7 +1,6 @@
 """Provider health status contracts."""
 
 from enum import Enum
-from typing import Optional
 from pydantic import BaseModel
 
 
@@ -16,8 +15,8 @@ class ProviderHealthState(str, Enum):
 class ProviderHealthStatus(BaseModel):
     provider: str
     state: ProviderHealthState
-    reason: Optional[str] = None
-    last_checked: Optional[str] = None
+    reason: str | None = None
+    last_checked: str | None = None
     features_affected: list[str] = []
 
 

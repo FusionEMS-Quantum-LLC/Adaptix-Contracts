@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime, date, time
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -138,11 +137,11 @@ class WorkforceShiftContract(BaseModel):
     name: str
     start_time: datetime
     end_time: datetime
-    location: Optional[str] = None
+    location: str | None = None
     minimum_staff: int = 1
     status: ShiftStatus = ShiftStatus.DRAFT
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class WorkforceShiftAssignmentContract(BaseModel):
@@ -157,7 +156,7 @@ class WorkforceShiftAssignmentContract(BaseModel):
     tenant_id: UUID
     shift_id: UUID
     user_id: UUID
-    role: Optional[str] = None
+    role: str | None = None
     status: str = "assigned"
     assigned_at: datetime
 
@@ -174,8 +173,8 @@ class WorkforceAvailabilityContract(BaseModel):
     id: UUID
     tenant_id: UUID
     user_id: UUID
-    day_of_week: Optional[int] = None
-    specific_date: Optional[date] = None
+    day_of_week: int | None = None
+    specific_date: date | None = None
     start_time: time
     end_time: time
     availability_type: AvailabilityType
@@ -195,10 +194,10 @@ class WorkforceTimeOffContract(BaseModel):
     user_id: UUID
     start_date: date
     end_date: date
-    reason: Optional[str] = None
+    reason: str | None = None
     status: TimeOffStatus = TimeOffStatus.PENDING
-    reviewed_by: Optional[UUID] = None
-    reviewed_at: Optional[datetime] = None
+    reviewed_by: UUID | None = None
+    reviewed_at: datetime | None = None
     created_at: datetime
 
 
@@ -217,13 +216,13 @@ class WorkforceFatigueEventContract(BaseModel):
     hours_worked_last_48: float
     fatigue_level: FatigueLevel
     restriction_applied: bool = False
-    restriction_reason: Optional[str] = None
+    restriction_reason: str | None = None
     created_at: datetime
 
 
 class WorkforceReadinessContract(BaseModel):
     tenant_id: UUID
-    shift_id: Optional[UUID] = None
+    shift_id: UUID | None = None
     total_required: int
     total_assigned: int
     total_available: int

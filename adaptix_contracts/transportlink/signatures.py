@@ -6,7 +6,7 @@ Covers PCS, AOB, ABN, and combined signature packet workflows.
 from __future__ import annotations
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 
@@ -43,8 +43,8 @@ class SignaturePacketRequest(BaseModel):
     actor_id: str
     document_types: list[SignatureDocumentType]
     patient_name: str
-    payer: Optional[str] = None
-    idempotency_key: Optional[str] = None
+    payer: str | None = None
+    idempotency_key: str | None = None
 
 
 class SignaturePacketResponse(BaseModel):
@@ -52,12 +52,12 @@ class SignaturePacketResponse(BaseModel):
     request_id: str
     tenant_id: str
     status: SignaturePacketStatus
-    provider_request_id: Optional[str] = None
-    sign_url: Optional[str] = None
+    provider_request_id: str | None = None
+    sign_url: str | None = None
     document_types: list[SignatureDocumentType]
     created_at: datetime
     credential_gated: bool = False
-    credential_gated_reason: Optional[str] = None
+    credential_gated_reason: str | None = None
 
 
 class SignatureStatusResponse(BaseModel):
@@ -66,8 +66,8 @@ class SignatureStatusResponse(BaseModel):
     tenant_id: str
     status: SignaturePacketStatus
     signers: list[dict] = []
-    signed_document_url: Optional[str] = None
-    completed_at: Optional[datetime] = None
+    signed_document_url: str | None = None
+    completed_at: datetime | None = None
     ready_for_cad: bool = False
     ready_for_billing: bool = False
     blocking_reasons: list[str] = []
@@ -77,7 +77,7 @@ class SignatureManualOverrideRequest(BaseModel):
     request_id: str
     tenant_id: str
     actor_id: str
-    supervisor_id: Optional[str] = None
+    supervisor_id: str | None = None
     reason: str
     document_type: SignatureDocumentType
     override_justification: str
@@ -98,7 +98,7 @@ class SignatureWebhookEvent(BaseModel):
     event_type: str
     provider: str = "dropbox_sign"
     provider_request_id: str
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     idempotency_key: str
     received_at: datetime
     payload: dict[str, Any] = {}

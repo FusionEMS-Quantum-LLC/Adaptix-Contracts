@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -97,7 +97,7 @@ class AdaptixPlatformEvent(BaseModel):
 
     event_type: AdaptixEventType
     event_id: str = Field(..., description="UUID; unique per event emission")
-    tenant_id: Optional[str] = Field(
+    tenant_id: str | None = Field(
         default=None,
         description="None only for platform-wide events (e.g. agency.activated)",
     )
@@ -136,6 +136,6 @@ class PulseMessage(BaseModel):
     """Envelope for messages pushed over the /ws/pulse WebSocket."""
 
     message_type: PulseMessageType
-    tenant_id: Optional[str] = None
+    tenant_id: str | None = None
     payload: dict[str, Any]
     sent_at: datetime

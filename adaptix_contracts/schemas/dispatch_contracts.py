@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -48,7 +47,7 @@ class DispatchGpsCoordinate(BaseModel):
 
     lat: float = Field(..., ge=-90.0, le=90.0)
     lon: float = Field(..., ge=-180.0, le=180.0)
-    accuracy_meters: Optional[float] = None
+    accuracy_meters: float | None = None
     captured_at: datetime
 
 
@@ -63,11 +62,11 @@ class DispatchContract(BaseModel):
     status: DispatchStatus
     priority: DispatchPriority
 
-    pickup_address: Optional[str] = None
-    destination_facility: Optional[str] = None
+    pickup_address: str | None = None
+    destination_facility: str | None = None
 
-    crew_count: Optional[int] = None
-    vehicle_identifier: Optional[str] = None
+    crew_count: int | None = None
+    vehicle_identifier: str | None = None
 
     created_at: datetime
     updated_at: datetime
@@ -87,11 +86,11 @@ class DispatchStatusUpdateEvent(BaseModel):
     unit_id: str
     tenant_id: str
 
-    old_status: Optional[DispatchStatus] = None
+    old_status: DispatchStatus | None = None
     new_status: DispatchStatus
 
-    gps_lat: Optional[float] = None
-    gps_lon: Optional[float] = None
+    gps_lat: float | None = None
+    gps_lon: float | None = None
 
     timestamp: datetime
 
@@ -107,7 +106,7 @@ class DispatchCreatedEvent(BaseModel):
     tenant_id: str
 
     priority: DispatchPriority
-    pickup_address: Optional[str] = None
+    pickup_address: str | None = None
 
     created_at: datetime
 
@@ -122,7 +121,7 @@ class DispatchClosedEvent(BaseModel):
     tenant_id: str
 
     final_status: DispatchStatus
-    destination_facility: Optional[str] = None
+    destination_facility: str | None = None
 
     closed_at: datetime
 
@@ -138,6 +137,6 @@ class DispatchUnitGpsPingEvent(BaseModel):
 
     lat: float = Field(..., ge=-90.0, le=90.0)
     lon: float = Field(..., ge=-180.0, le=180.0)
-    speed_mph: Optional[float] = None
+    speed_mph: float | None = None
 
     pinged_at: datetime

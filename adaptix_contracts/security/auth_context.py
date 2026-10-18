@@ -15,7 +15,6 @@ DeprecationWarning) until the next major version.
 """
 
 import warnings
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -36,13 +35,13 @@ class TenantAuthContext(BaseModel):
     session_id: str
     issued_at: str
     expires_at: str
-    source_service: Optional[str] = None
+    source_service: str | None = None
 
 
 class RolePermissionDecision(BaseModel):
     allowed: bool
     role: str
     permission: str
-    reason: Optional[str] = None
+    reason: str | None = None
     tenant_id: str
     user_id: str

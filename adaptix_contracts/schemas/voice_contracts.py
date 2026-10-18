@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -17,7 +16,7 @@ class VoiceRoomCreatedEvent(BaseModel):
     room_id: UUID
     tenant_id: UUID
     incident_id: UUID
-    case_id: Optional[UUID] = None
+    case_id: UUID | None = None
     room_name: str
     created_at: datetime
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -35,22 +35,22 @@ class AIRunContract(BaseModel):
     provider: str
     model: str
     status: AIRunStatus
-    structured_output: Optional[dict[str, Any]] = None
-    error_message: Optional[str] = None
-    confidence_score: Optional[float] = None
-    prompt_version: Optional[str] = None
-    token_count_input: Optional[int] = None
-    token_count_output: Optional[int] = None
-    cost_usd: Optional[float] = None
+    structured_output: dict[str, Any] | None = None
+    error_message: str | None = None
+    confidence_score: float | None = None
+    prompt_version: str | None = None
+    token_count_input: int | None = None
+    token_count_output: int | None = None
+    cost_usd: float | None = None
     created_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
 
 class AIRunCreateRequest(BaseModel):
     workflow_name: AIWorkflowType
     input_data: dict[str, Any]
-    provider: Optional[str] = None
-    model: Optional[str] = None
+    provider: str | None = None
+    model: str | None = None
 
 
 class AIRunResponse(BaseModel):
@@ -58,11 +58,11 @@ class AIRunResponse(BaseModel):
     tenant_id: UUID
     workflow_name: AIWorkflowType
     status: AIRunStatus
-    structured_output: Optional[dict[str, Any]] = None
-    confidence_score: Optional[float] = None
-    error_message: Optional[str] = None
+    structured_output: dict[str, Any] | None = None
+    confidence_score: float | None = None
+    error_message: str | None = None
     created_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
 
 class BillingCopilotRiskScoreContract(BaseModel):
@@ -99,7 +99,7 @@ class TranscriptSummaryContract(BaseModel):
     summary: str
     action_items: list[str] = Field(default_factory=list)
     deadlines: list[str] = Field(default_factory=list)
-    linked_claim_id: Optional[UUID] = None
+    linked_claim_id: UUID | None = None
     confidence: float = Field(ge=0.0, le=1.0)
     ai_run_id: UUID
 

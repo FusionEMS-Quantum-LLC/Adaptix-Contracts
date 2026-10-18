@@ -16,7 +16,6 @@ Section provenance rules:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -33,15 +32,15 @@ class _ACINSectionBase(ACINProvenanceMixin):
     """Common section envelope fields (per-section human review state)."""
 
     human_review_state: ACINClaimReviewState = ACINClaimReviewState.PENDING_REVIEW
-    reviewer_id: Optional[str] = None
-    reviewed_at: Optional[datetime] = None
+    reviewer_id: str | None = None
+    reviewed_at: datetime | None = None
 
 
 class ACINTimelineEntryDTO(BaseModel):
     """A single CAD/response timeline entry (grounded)."""
 
     label: str
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
     source_field_refs: list[ACINSourceRef] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
@@ -55,7 +54,7 @@ class ACINWitnessStatementDTO(BaseModel):
     """
 
     statement: str
-    attributed_to: Optional[str] = Field(
+    attributed_to: str | None = Field(
         default=None,
         description="Who stated it (e.g. 'patient', 'bystander', 'family') — stated, not observed.",
     )
@@ -73,18 +72,18 @@ class ACINContradictionFlagDTO(BaseModel):
 
     contradiction_id: str
     message: str
-    field_a: Optional[str] = None
-    field_b: Optional[str] = None
+    field_a: str | None = None
+    field_b: str | None = None
     severity: ACINReviewSeverity = ACINReviewSeverity.WARNING
     source_field_refs: list[ACINSourceRef] = Field(default_factory=list)
-    resolution: Optional[str] = Field(
+    resolution: str | None = Field(
         default=None,
         description="Always None — ACIN flags contradictions, it does not resolve them.",
     )
     requires_human_review: bool = True
 
     @model_validator(mode="after")
-    def _never_resolve(self) -> "ACINContradictionFlagDTO":
+    def _never_resolve(self) -> ACINContradictionFlagDTO:
         if self.resolution is not None:
             raise ValueError(
                 "ACIN contradictions are flagged, not resolved (resolution must be None)"
@@ -118,15 +117,15 @@ class ACINActivationDTO(_ACINSectionBase):
     section: ACINSection = ACINSection.ACTIVATION
     ai_generated: bool = False  # dispatch facts are structured-derived by default
 
-    dispatch_time: Optional[datetime] = None
-    dispatch_priority: Optional[str] = None
-    request_source: Optional[str] = None
-    cad_determinant: Optional[str] = None
-    initial_complaint: Optional[str] = None
-    caller_type: Optional[str] = None
-    response_mode: Optional[str] = None
+    dispatch_time: datetime | None = None
+    dispatch_priority: str | None = None
+    request_source: str | None = None
+    cad_determinant: str | None = None
+    initial_complaint: str | None = None
+    caller_type: str | None = None
+    response_mode: str | None = None
     crew_ids: list[str] = Field(default_factory=list)
-    weather: Optional[str] = None
+    weather: str | None = None
     scene_hazards: list[str] = Field(default_factory=list)
     cad_timeline: list[ACINTimelineEntryDTO] = Field(default_factory=list)
 
@@ -142,16 +141,16 @@ class ACINClinicalPictureDTO(_ACINSectionBase):
     section: ACINSection = ACINSection.CLINICAL_PICTURE
     ai_generated: bool = False  # observed findings are provider-documented by default
 
-    general_appearance: Optional[str] = None
-    mental_status: Optional[str] = None
-    airway: Optional[str] = None
-    breathing: Optional[str] = None
-    circulation: Optional[str] = None
-    skin: Optional[str] = None
-    pain_score: Optional[int] = Field(default=None, ge=0, le=10)
-    chief_complaint: Optional[str] = None
-    hpi: Optional[str] = None
-    mechanism: Optional[str] = None
+    general_appearance: str | None = None
+    mental_status: str | None = None
+    airway: str | None = None
+    breathing: str | None = None
+    circulation: str | None = None
+    skin: str | None = None
+    pain_score: int | None = Field(default=None, ge=0, le=10)
+    chief_complaint: str | None = None
+    hpi: str | None = None
+    mechanism: str | None = None
     witness_statements: list[ACINWitnessStatementDTO] = Field(default_factory=list)
     pertinent_negatives: list[str] = Field(default_factory=list)
     risk_factors: list[str] = Field(default_factory=list)
@@ -168,7 +167,7 @@ class ACINClinicalPictureDTO(_ACINSectionBase):
 class ACINDifferentialDTO(ACINClaimDTO):
     """A generated differential diagnosis (grounded + Terminology-coded)."""
 
-    likelihood: Optional[str] = Field(
+    likelihood: str | None = Field(
         default=None,
         description="Qualitative likelihood (e.g. 'high', 'moderate', 'low').",
     )
@@ -185,24 +184,24 @@ class ACINIntelligenceDTO(_ACINSectionBase):
     ai_generated: bool = True
 
     differentials: list[ACINDifferentialDTO] = Field(default_factory=list)
-    protocol_triggered: Optional[str] = None
+    protocol_triggered: str | None = None
     condition_flags: ACINConditionFlagsDTO = Field(
         default_factory=ACINConditionFlagsDTO
     )
     medication_interactions: list[ACINClaimDTO] = Field(default_factory=list)
     high_risk_factors: list[ACINClaimDTO] = Field(default_factory=list)
-    cms_medical_necessity_score: Optional[float] = Field(default=None, ge=0.0, le=100.0)
-    transport_risk: Optional[str] = None
-    hospital_capability_match: Optional[str] = None
-    recommended_destination: Optional[str] = None
-    protocol_compliance: Optional[str] = None
+    cms_medical_necessity_score: float | None = Field(default=None, ge=0.0, le=100.0)
+    transport_risk: str | None = None
+    hospital_capability_match: str | None = None
+    recommended_destination: str | None = None
+    protocol_compliance: str | None = None
     documentation_gaps: list[str] = Field(default_factory=list)
     advisory_only: bool = Field(
         default=True, description="Section I is always advisory."
     )
 
     @model_validator(mode="after")
-    def _force_advisory(self) -> "ACINIntelligenceDTO":
+    def _force_advisory(self) -> ACINIntelligenceDTO:
         if not self.advisory_only:
             raise ValueError(
                 "ACIN Intelligence (I) is advisory only and cannot be authoritative"
@@ -221,20 +220,20 @@ class ACINNarrativeDTO(_ACINSectionBase):
     section: ACINSection = ACINSection.NARRATIVE
     ai_generated: bool = True
 
-    generated_prose: Optional[str] = Field(
+    generated_prose: str | None = Field(
         default=None,
         description="AI-generated narrative prose (returned to caller; not for logs).",
     )
-    provider_edited_prose: Optional[str] = Field(
+    provider_edited_prose: str | None = Field(
         default=None, description="Human-edited narrative, if the provider revised it."
     )
-    generation_prompt_version: Optional[str] = None
+    generation_prompt_version: str | None = None
     is_authoritative_truth: bool = Field(
         default=False, description="Always False — the narrative is derived output."
     )
 
     @model_validator(mode="after")
-    def _never_authoritative(self) -> "ACINNarrativeDTO":
+    def _never_authoritative(self) -> ACINNarrativeDTO:
         if self.is_authoritative_truth:
             raise ValueError(
                 "ACIN narrative is derived output and is never authoritative truth"
@@ -285,20 +284,20 @@ class ACINLogicDTO(_ACINSectionBase):
     section: ACINSection = ACINSection.LOGIC
     ai_generated: bool = True
 
-    medical_necessity: Optional[ACINClaimDTO] = None
-    pcs_validation: Optional[ACINClaimDTO] = None
-    medicare_compliance: Optional[ACINClaimDTO] = None
-    lcd_match: Optional[ACINClaimDTO] = None
-    ncd_match: Optional[ACINClaimDTO] = None
-    commercial_policy_match: Optional[ACINClaimDTO] = None
-    destination_justification: Optional[ACINClaimDTO] = None
-    als_bls_justification: Optional[ACINClaimDTO] = None
-    mileage_justification: Optional[ACINClaimDTO] = None
-    procedure_justification: Optional[ACINClaimDTO] = None
-    diagnosis_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    coding_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    documentation_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    billing_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    medical_necessity: ACINClaimDTO | None = None
+    pcs_validation: ACINClaimDTO | None = None
+    medicare_compliance: ACINClaimDTO | None = None
+    lcd_match: ACINClaimDTO | None = None
+    ncd_match: ACINClaimDTO | None = None
+    commercial_policy_match: ACINClaimDTO | None = None
+    destination_justification: ACINClaimDTO | None = None
+    als_bls_justification: ACINClaimDTO | None = None
+    mileage_justification: ACINClaimDTO | None = None
+    procedure_justification: ACINClaimDTO | None = None
+    diagnosis_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    coding_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    documentation_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    billing_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 # ===========================================================================
@@ -312,21 +311,21 @@ class ACINSummaryDTO(_ACINSectionBase):
     section: ACINSection = ACINSection.SUMMARY
     ai_generated: bool = True
 
-    disposition: Optional[str] = None
-    condition: Optional[str] = None
-    response_to_treatment: Optional[str] = None
-    transfer_of_care: Optional[str] = None
-    receiving_facility: Optional[str] = None
-    receiving_nurse: Optional[str] = None
-    final_impression: Optional[str] = None
-    crew_recommendation: Optional[str] = None
-    generated_paragraph: Optional[str] = None
+    disposition: str | None = None
+    condition: str | None = None
+    response_to_treatment: str | None = None
+    transfer_of_care: str | None = None
+    receiving_facility: str | None = None
+    receiving_nurse: str | None = None
+    final_impression: str | None = None
+    crew_recommendation: str | None = None
+    generated_paragraph: str | None = None
     is_authoritative_truth: bool = Field(
         default=False, description="Always False — the summary is derived output."
     )
 
     @model_validator(mode="after")
-    def _never_authoritative(self) -> "ACINSummaryDTO":
+    def _never_authoritative(self) -> ACINSummaryDTO:
         if self.is_authoritative_truth:
             raise ValueError(
                 "ACIN summary is derived output and is never authoritative truth"

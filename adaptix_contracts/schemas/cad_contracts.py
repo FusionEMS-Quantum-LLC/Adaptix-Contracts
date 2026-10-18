@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -18,8 +17,8 @@ class CadCaseCreatedEvent(BaseModel):
     call_type: str
     priority: str
 
-    pickup_address: Optional[str] = None
-    destination_facility: Optional[str] = None
+    pickup_address: str | None = None
+    destination_facility: str | None = None
 
     created_at: datetime
 
@@ -46,9 +45,9 @@ class CadCaseContract(BaseModel):
     status: str
     priority: str
 
-    gravity_score: Optional[float] = None
-    pickup_address: Optional[str] = None
-    destination_facility: Optional[str] = None
+    gravity_score: float | None = None
+    pickup_address: str | None = None
+    destination_facility: str | None = None
 
     created_at: datetime
     updated_at: datetime

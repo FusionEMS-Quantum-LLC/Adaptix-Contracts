@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -81,7 +80,7 @@ class SearchQueryRequest(BaseModel):
 
     sort_order: SearchSortOrder = SearchSortOrder.RELEVANCE
 
-    requested_by_user_id: Optional[str] = None
+    requested_by_user_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -99,16 +98,16 @@ class SearchResultItem(BaseModel):
     domain: SearchDomain
 
     title: str
-    subtitle: Optional[str] = None
-    description: Optional[str] = None
+    subtitle: str | None = None
+    description: str | None = None
 
-    reference_id: Optional[str] = None
-    reference_type: Optional[str] = None
+    reference_id: str | None = None
+    reference_type: str | None = None
 
     score: float = Field(..., ge=0.0)
 
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class SearchResponse(BaseModel):
@@ -153,7 +152,7 @@ class IndexDocumentResponse(BaseModel):
 
     document_id: str
     indexed: bool
-    message: Optional[str] = None
+    message: str | None = None
     indexed_at: datetime
 
 

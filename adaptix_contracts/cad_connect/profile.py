@@ -15,7 +15,6 @@ Contract rules (mirrors the way ACIN records version):
 
 from __future__ import annotations
 
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,11 +32,11 @@ class CadFieldMappingRule(BaseModel):
         ...,
         description="How to find it in this layout (column header, label, cell, or region key).",
     )
-    transform: Optional[str] = Field(
+    transform: str | None = Field(
         default=None,
         description="Optional normalization hint (e.g. 'time:12h', 'date_from_context').",
     )
-    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class AgencyCadMappingProfile(BaseModel):
@@ -47,7 +46,7 @@ class AgencyCadMappingProfile(BaseModel):
     display_name: str = Field(
         ..., description="Human label, e.g. 'Jefferson County CAD run sheet'."
     )
-    connector_key: Optional[str] = Field(
+    connector_key: str | None = Field(
         default=None,
         description="Connector this profile binds to (None for generic manual/upload).",
     )

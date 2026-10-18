@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -71,7 +70,7 @@ class BillingSignInContext(BaseModel):
 
     mfa_requirement: MFARequirement
     anomaly_state: SessionAnomalyState
-    anomaly_detail: Optional[str] = None
+    anomaly_detail: str | None = None
 
     session_token: str
     session_expires_at: datetime
@@ -98,7 +97,7 @@ class BillingAccessResolution(BaseModel):
     destination_route: BillingPostAuthRoute
 
     access_blocked: bool
-    block_reason: Optional[str] = None
+    block_reason: str | None = None
 
     feature_flags: dict[str, bool] = Field(
         default_factory=dict,
@@ -118,4 +117,4 @@ class BillingOrgSelectorEntry(BaseModel):
         description="production | staging | sandbox",
     )
 
-    last_accessed_at: Optional[datetime] = None
+    last_accessed_at: datetime | None = None

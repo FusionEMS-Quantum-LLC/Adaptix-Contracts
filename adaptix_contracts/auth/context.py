@@ -165,7 +165,7 @@ class AdaptixAuthContext(BaseModel):
         cls,
         payload: dict[str, Any],
         trusted_tenant_id: str | None = None,
-    ) -> "AdaptixAuthContext":
+    ) -> AdaptixAuthContext:
         """Construct from verified JWT payload."""
         tenant_id = payload.get("tenant_id")
         user_id = payload.get("sub")

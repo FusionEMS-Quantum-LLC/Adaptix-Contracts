@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,8 +49,8 @@ class SignalCoreEvent(BaseModel):
     source_entity_id: str = Field(..., min_length=1, max_length=255)
     event_type: str = Field(..., min_length=1, max_length=160)
     payload: dict[str, Any] = Field(default_factory=dict)
-    correlation_id: Optional[str] = None
-    idempotency_key: Optional[str] = None
+    correlation_id: str | None = None
+    idempotency_key: str | None = None
     schema_version: str = Field(default="1.0", max_length=16)
     occurred_at: datetime
 
@@ -68,14 +68,14 @@ class SignalCoreTrigger(BaseModel):
     id: UUID
     tenant_id: UUID
     name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = Field(default=None, max_length=1000)
+    description: str | None = Field(default=None, max_length=1000)
     event_type_pattern: str = Field(
         ...,
         min_length=1,
         max_length=200,
         description="Exact or glob pattern matched against event_type.",
     )
-    source_service: Optional[str] = Field(default=None, max_length=64)
+    source_service: str | None = Field(default=None, max_length=64)
     target_service: str = Field(..., min_length=1, max_length=64)
     target_action: str = Field(..., min_length=1, max_length=160)
     is_active: bool = True

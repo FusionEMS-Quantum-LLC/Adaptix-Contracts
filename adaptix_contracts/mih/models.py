@@ -419,7 +419,7 @@ class MihMonitoringThreshold(_MihBase):
         return _require_aware(value)
 
     @model_validator(mode="after")
-    def _bounds(self) -> "MihMonitoringThreshold":
+    def _bounds(self) -> MihMonitoringThreshold:
         if self.min_value is None and self.max_value is None:
             raise ValueError("at least one of min_value / max_value is required")
         if (
@@ -494,7 +494,7 @@ class MihEscalation(_MihBase):
         return _require_aware_optional(value)
 
     @model_validator(mode="after")
-    def _acknowledgement_recorded(self) -> "MihEscalation":
+    def _acknowledgement_recorded(self) -> MihEscalation:
         if self.state == MihEscalationState.ACKNOWLEDGED and not (
             self.acknowledged_by and self.acknowledged_at
         ):
@@ -562,7 +562,7 @@ class MihUtilizationPolicy(_MihBase):
         )
 
     @model_validator(mode="after")
-    def _reachable(self) -> "MihUtilizationPolicy":
+    def _reachable(self) -> MihUtilizationPolicy:
         enabled = self.enabled_dimensions
         if not enabled:
             raise ValueError("at least one utilization dimension must be enabled")
@@ -574,7 +574,7 @@ class MihUtilizationPolicy(_MihBase):
         return self
 
     @model_validator(mode="after")
-    def _supersession_recorded(self) -> "MihUtilizationPolicy":
+    def _supersession_recorded(self) -> MihUtilizationPolicy:
         superseded = self.status == UtilizationPolicyStatus.SUPERSEDED
         recorded = self.superseded_at is not None and (
             self.superseded_by_policy_id is not None
@@ -687,7 +687,7 @@ class HighUtilizerSignal(_MihBase):
         )
 
     @model_validator(mode="after")
-    def _score_is_the_count(self) -> "HighUtilizerSignal":
+    def _score_is_the_count(self) -> HighUtilizerSignal:
         if self.trigger_score != self.satisfied_dimensions:
             raise ValueError(
                 f"trigger_score {self.trigger_score} does not equal the number of "
@@ -696,13 +696,13 @@ class HighUtilizerSignal(_MihBase):
         return self
 
     @model_validator(mode="after")
-    def _window_ordered(self) -> "HighUtilizerSignal":
+    def _window_ordered(self) -> HighUtilizerSignal:
         if self.window_end <= self.window_start:
             raise ValueError("window_end must be after window_start")
         return self
 
     @model_validator(mode="after")
-    def _action_follows_flags(self) -> "HighUtilizerSignal":
+    def _action_follows_flags(self) -> HighUtilizerSignal:
         allowed = expected_recommended_action(
             recommendation_triggered=self.recommendation_triggered,
             already_enrolled=self.already_enrolled,
@@ -761,7 +761,7 @@ class MihEnrollmentRecommendation(_MihBase):
         return _require_aware_optional(value)
 
     @model_validator(mode="after")
-    def _dismissal_recorded(self) -> "MihEnrollmentRecommendation":
+    def _dismissal_recorded(self) -> MihEnrollmentRecommendation:
         if self.status != EnrollmentRecommendationStatus.DISMISSED:
             return self
         has_reason = bool(self.dismissal_reason and self.dismissal_reason.strip())
@@ -773,7 +773,7 @@ class MihEnrollmentRecommendation(_MihBase):
         return self
 
     @model_validator(mode="after")
-    def _resolution_recorded(self) -> "MihEnrollmentRecommendation":
+    def _resolution_recorded(self) -> MihEnrollmentRecommendation:
         enrolled = self.status == EnrollmentRecommendationStatus.ENROLLED
         resolved = (
             self.resolved_patient_id is not None

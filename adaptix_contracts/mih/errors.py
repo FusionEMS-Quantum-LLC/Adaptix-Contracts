@@ -16,7 +16,6 @@ envelope.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import Field
 
@@ -167,7 +166,7 @@ MIH_SERVICE_ERROR_CODES: dict[str, MihErrorCode] = {
 }
 
 
-def from_service_error_code(error_code: str) -> Optional[MihErrorCode]:
+def from_service_error_code(error_code: str) -> MihErrorCode | None:
     """Classify a bare Adaptix-MIH-Service ``error_code``; ``None`` if unknown.
 
     Unknown is returned rather than guessed: a consumer must not invent a
@@ -203,11 +202,11 @@ class MihErrorEnvelope(AdaptixErrorEnvelope):
         mih_code: MihErrorCode,
         *,
         message: str,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "MihErrorEnvelope":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> MihErrorEnvelope:
         return cls(
             error_code=to_adaptix_error_code(mih_code),
             mih_error_code=mih_code,
@@ -240,11 +239,11 @@ class MihServiceError(Exception):
         *,
         message: str,
         http_status: int = 400,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "MihServiceError":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> MihServiceError:
         envelope = MihErrorEnvelope.from_mih_code(
             mih_code,
             message=message,
@@ -263,7 +262,7 @@ class MihServiceError(Exception):
 
 def enrollment_not_found(
     enrollment_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.ENROLLMENT_NOT_FOUND,
@@ -274,7 +273,7 @@ def enrollment_not_found(
 
 def enrollment_consent_required(
     enrollment_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.ENROLLMENT_CONSENT_REQUIRED,
@@ -290,7 +289,7 @@ def visit_invalid_state_transition(
     visit_id: str,
     from_status: str,
     to_status: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.VISIT_INVALID_STATE_TRANSITION,
@@ -304,7 +303,7 @@ def visit_invalid_state_transition(
 def payer_not_authorized_for_program(
     program_id: str,
     payer: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.PAYER_NOT_AUTHORIZED_FOR_PROGRAM,
@@ -314,7 +313,7 @@ def payer_not_authorized_for_program(
 
 
 def utilization_policy_not_configured(
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.UTILIZATION_POLICY_NOT_CONFIGURED,
@@ -327,7 +326,7 @@ def utilization_policy_not_configured(
 
 def recommendation_not_found(
     recommendation_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.RECOMMENDATION_NOT_FOUND,
@@ -340,7 +339,7 @@ def recommendation_invalid_transition(
     recommendation_id: str,
     current_status: str,
     action: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> MihErrorEnvelope:
     return MihErrorEnvelope.from_mih_code(
         MihErrorCode.RECOMMENDATION_INVALID_TRANSITION,

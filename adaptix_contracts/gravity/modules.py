@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel, Field
 
 # ─── Enums ───────────────────────────────────────────────────────────────────
@@ -101,8 +101,8 @@ class GravityAuditEventPayload(BaseModel):
     action: str
     resource_type: str
     resource_id: str
-    changes: Optional[dict[str, Any]] = None
-    metadata: Optional[dict[str, Any]] = None
+    changes: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
     timestamp: datetime
     version: int = 1
 

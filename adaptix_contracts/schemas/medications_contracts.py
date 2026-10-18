@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -39,37 +38,37 @@ class MedicationCatalogContract(BaseModel):
     id: UUID
     tenant_id: UUID
     name: str
-    generic_name: Optional[str] = None
-    rxcui: Optional[str] = None
-    ndc: Optional[str] = None
-    drug_class: Optional[str] = None
+    generic_name: str | None = None
+    rxcui: str | None = None
+    ndc: str | None = None
+    drug_class: str | None = None
     controlled_substance: bool = False
-    dea_schedule: Optional[str] = None
-    default_dose: Optional[str] = None
-    default_unit: Optional[str] = None
-    default_route: Optional[MedicationRouteOfAdmin] = None
+    dea_schedule: str | None = None
+    default_dose: str | None = None
+    default_unit: str | None = None
+    default_route: MedicationRouteOfAdmin | None = None
     is_active: bool = True
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
 
 class MedicationAdministrationContract(BaseModel):
     id: UUID
     tenant_id: UUID
     medication_id: UUID
-    patient_id: Optional[UUID] = None
-    incident_id: Optional[UUID] = None
-    chart_id: Optional[UUID] = None
+    patient_id: UUID | None = None
+    incident_id: UUID | None = None
+    chart_id: UUID | None = None
     administered_by: UUID
     dose: str
     unit: str
     route: MedicationRouteOfAdmin
     administered_at: datetime
-    site: Optional[str] = None
-    response: Optional[str] = None
-    notes: Optional[str] = None
-    lot_number: Optional[str] = None
-    expiration_date: Optional[datetime] = None
+    site: str | None = None
+    response: str | None = None
+    notes: str | None = None
+    lot_number: str | None = None
+    expiration_date: datetime | None = None
     created_at: datetime
 
 
@@ -79,25 +78,25 @@ class MedicationProtocolRuleContract(BaseModel):
     medication_id: UUID
     protocol_name: str
     indication: str
-    min_dose: Optional[str] = None
-    max_dose: Optional[str] = None
+    min_dose: str | None = None
+    max_dose: str | None = None
     allowed_routes: list[MedicationRouteOfAdmin] = Field(default_factory=list)
     contraindications: list[str] = Field(default_factory=list)
     requires_medical_control: bool = False
-    age_restriction_min: Optional[int] = None
-    age_restriction_max: Optional[int] = None
+    age_restriction_min: int | None = None
+    age_restriction_max: int | None = None
     weight_based: bool = False
     is_active: bool = True
 
 
 class DoseSafetyCheckRequest(BaseModel):
     medication_id: UUID
-    patient_id: Optional[UUID] = None
+    patient_id: UUID | None = None
     dose: str
     unit: str
     route: MedicationRouteOfAdmin
-    patient_weight_kg: Optional[float] = None
-    patient_age_years: Optional[int] = None
+    patient_weight_kg: float | None = None
+    patient_age_years: int | None = None
 
 
 class DoseSafetyCheckResponse(BaseModel):
@@ -115,8 +114,8 @@ class MedicationExpirationAlertContract(BaseModel):
     lot_number: str
     expiration_date: datetime
     days_until_expiration: int
-    location: Optional[str] = None
-    unit_id: Optional[UUID] = None
+    location: str | None = None
+    unit_id: UUID | None = None
 
 
 class UnitMedicationReadinessContract(BaseModel):
@@ -134,7 +133,7 @@ class MedicationAdministeredEvent(BaseModel):
     administration_id: UUID
     tenant_id: UUID
     medication_id: UUID
-    patient_id: Optional[UUID] = None
+    patient_id: UUID | None = None
     administered_by: UUID
     administered_at: datetime
 

@@ -11,7 +11,6 @@ Crew or Workforce about the resources actually used on a claim.
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 
 from pydantic import (
     AwareDatetime,
@@ -61,25 +60,25 @@ class EncounterLineage(BaseModel):
 
     tenant_id: str = Field(..., min_length=1)
 
-    dispatch_id: Optional[str] = Field(default=None, min_length=1)
-    transport_request_id: Optional[str] = Field(default=None, min_length=1)
-    trip_id: Optional[str] = Field(default=None, min_length=1)
-    epcr_id: Optional[str] = Field(default=None, min_length=1)
-    encounter_id: Optional[str] = Field(default=None, min_length=1)
-    unit_id: Optional[str] = Field(default=None, min_length=1)
-    vehicle_id: Optional[str] = Field(default=None, min_length=1)
+    dispatch_id: str | None = Field(default=None, min_length=1)
+    transport_request_id: str | None = Field(default=None, min_length=1)
+    trip_id: str | None = Field(default=None, min_length=1)
+    epcr_id: str | None = Field(default=None, min_length=1)
+    encounter_id: str | None = Field(default=None, min_length=1)
+    unit_id: str | None = Field(default=None, min_length=1)
+    vehicle_id: str | None = Field(default=None, min_length=1)
     crew_member_ids: list[str] = Field(default_factory=list)
-    patient_id: Optional[str] = Field(default=None, min_length=1)
-    payer_id: Optional[str] = Field(default=None, min_length=1)
+    patient_id: str | None = Field(default=None, min_length=1)
+    payer_id: str | None = Field(default=None, min_length=1)
 
-    service_started_at: Optional[AwareDatetime] = None
-    service_completed_at: Optional[AwareDatetime] = None
-    date_of_service: Optional[date] = None
+    service_started_at: AwareDatetime | None = None
+    service_completed_at: AwareDatetime | None = None
+    date_of_service: date | None = None
 
-    requested_level_of_care: Optional[LevelOfCare] = None
-    dispatched_level_of_care: Optional[LevelOfCare] = None
-    documented_level_of_care: Optional[LevelOfCare] = None
-    billed_level_of_care: Optional[LevelOfCare] = None
+    requested_level_of_care: LevelOfCare | None = None
+    dispatched_level_of_care: LevelOfCare | None = None
+    documented_level_of_care: LevelOfCare | None = None
+    billed_level_of_care: LevelOfCare | None = None
 
     @field_validator("crew_member_ids")
     @classmethod

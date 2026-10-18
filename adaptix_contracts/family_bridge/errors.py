@@ -15,7 +15,6 @@ may wrap ``FamilyBridgeServiceError`` around an envelope.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import Field
 
@@ -100,11 +99,11 @@ class FamilyBridgeErrorEnvelope(AdaptixErrorEnvelope):
         bridge_code: FamilyBridgeErrorCode,
         *,
         message: str,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "FamilyBridgeErrorEnvelope":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> FamilyBridgeErrorEnvelope:
         return cls(
             error_code=to_adaptix_error_code(bridge_code),
             bridge_error_code=bridge_code,
@@ -133,11 +132,11 @@ class FamilyBridgeServiceError(Exception):
         *,
         message: str,
         http_status: int = 400,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "FamilyBridgeServiceError":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> FamilyBridgeServiceError:
         envelope = FamilyBridgeErrorEnvelope.from_bridge_code(
             bridge_code,
             message=message,
@@ -156,7 +155,7 @@ class FamilyBridgeServiceError(Exception):
 
 def consent_required(
     patient_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> FamilyBridgeErrorEnvelope:
     return FamilyBridgeErrorEnvelope.from_bridge_code(
         FamilyBridgeErrorCode.CONSENT_REQUIRED,
@@ -170,7 +169,7 @@ def consent_required(
 
 def thread_not_found(
     thread_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> FamilyBridgeErrorEnvelope:
     return FamilyBridgeErrorEnvelope.from_bridge_code(
         FamilyBridgeErrorCode.THREAD_NOT_FOUND,
@@ -183,7 +182,7 @@ def thread_invalid_stage_transition(
     thread_id: str,
     from_stage: str,
     to_stage: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> FamilyBridgeErrorEnvelope:
     return FamilyBridgeErrorEnvelope.from_bridge_code(
         FamilyBridgeErrorCode.THREAD_INVALID_STAGE_TRANSITION,
@@ -196,7 +195,7 @@ def thread_invalid_stage_transition(
 
 
 def portal_token_invalid(
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> FamilyBridgeErrorEnvelope:
     # Deliberately does not echo the token or any identifier — the public
     # portal returns this generically to avoid oracle behaviour.
@@ -208,7 +207,7 @@ def portal_token_invalid(
 
 
 def portal_token_expired(
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> FamilyBridgeErrorEnvelope:
     return FamilyBridgeErrorEnvelope.from_bridge_code(
         FamilyBridgeErrorCode.PORTAL_TOKEN_EXPIRED,
@@ -219,8 +218,8 @@ def portal_token_expired(
 
 def sms_delivery_failed(
     thread_id: str,
-    provider_error: Optional[AdaptixProviderErrorDetail] = None,
-    trace: Optional[AdaptixTraceContext] = None,
+    provider_error: AdaptixProviderErrorDetail | None = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> FamilyBridgeErrorEnvelope:
     return FamilyBridgeErrorEnvelope.from_bridge_code(
         FamilyBridgeErrorCode.SMS_DELIVERY_FAILED,

@@ -28,7 +28,7 @@ ePCR service. Billing subscribes as a consumer.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Final, Literal, Optional
+from typing import Final, Literal
 
 from pydantic import BaseModel, Field
 
@@ -100,7 +100,7 @@ class ChartLockBlockedEvent(BaseModel):
         description="Findings with ``blocks_submission=True`` that produced the block",
     )
     mac_region: MacRegion
-    attempted_by_user_id: Optional[str] = Field(
+    attempted_by_user_id: str | None = Field(
         default=None, description="ePCR user who attempted the lock"
     )
     occurred_at: datetime

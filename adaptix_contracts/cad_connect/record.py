@@ -15,7 +15,6 @@ absent field as :class:`FieldStatus.MISSING`).
 
 from __future__ import annotations
 
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,16 +25,16 @@ from .provenance import CadConnectProvenance, FieldValue
 class CadConnectAddress(BaseModel):
     """Normalized incident location. Each part is an independently reviewable value."""
 
-    full: Optional[FieldValue] = None
-    street: Optional[FieldValue] = None
-    apt_unit: Optional[FieldValue] = None
-    municipality: Optional[FieldValue] = None
-    county: Optional[FieldValue] = None
-    postal_code: Optional[FieldValue] = None
-    cross_streets: Optional[FieldValue] = None
-    business_or_location_name: Optional[FieldValue] = None
-    latitude: Optional[FieldValue] = None
-    longitude: Optional[FieldValue] = None
+    full: FieldValue | None = None
+    street: FieldValue | None = None
+    apt_unit: FieldValue | None = None
+    municipality: FieldValue | None = None
+    county: FieldValue | None = None
+    postal_code: FieldValue | None = None
+    cross_streets: FieldValue | None = None
+    business_or_location_name: FieldValue | None = None
+    latitude: FieldValue | None = None
+    longitude: FieldValue | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -43,9 +42,9 @@ class CadConnectAddress(BaseModel):
 class CadConnectCaller(BaseModel):
     """Caller information, captured only when present/appropriate."""
 
-    name: Optional[FieldValue] = None
-    phone: Optional[FieldValue] = None
-    notes: Optional[FieldValue] = None
+    name: FieldValue | None = None
+    phone: FieldValue | None = None
+    notes: FieldValue | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,12 +52,12 @@ class CadConnectCaller(BaseModel):
 class CadConnectIncidentDetails(BaseModel):
     """Incident identity + description + location + caller."""
 
-    cad_incident_number: Optional[FieldValue] = None
-    incident_number: Optional[FieldValue] = None
-    call_type: Optional[FieldValue] = None
-    dispatch_description: Optional[FieldValue] = None
-    dispatch_determinant_code: Optional[FieldValue] = None
-    dispatch_notes: Optional[FieldValue] = None
+    cad_incident_number: FieldValue | None = None
+    incident_number: FieldValue | None = None
+    call_type: FieldValue | None = None
+    dispatch_description: FieldValue | None = None
+    dispatch_determinant_code: FieldValue | None = None
+    dispatch_notes: FieldValue | None = None
     address: CadConnectAddress = Field(default_factory=CadConnectAddress)
     caller: CadConnectCaller = Field(default_factory=CadConnectCaller)
 
@@ -68,20 +67,20 @@ class CadConnectIncidentDetails(BaseModel):
 class CadConnectIncidentTimes(BaseModel):
     """The 14 incident-level time points, each normalized to ISO-8601 in FieldValue.value."""
 
-    call_received: Optional[FieldValue] = None
-    call_entered: Optional[FieldValue] = None
-    dispatch: Optional[FieldValue] = None
-    station_alert: Optional[FieldValue] = None
-    unit_notified: Optional[FieldValue] = None
-    unit_acknowledged: Optional[FieldValue] = None
-    en_route: Optional[FieldValue] = None
-    arrived_on_scene: Optional[FieldValue] = None
-    patient_contact: Optional[FieldValue] = None
-    transport: Optional[FieldValue] = None
-    destination_arrival: Optional[FieldValue] = None
-    available: Optional[FieldValue] = None
-    cleared: Optional[FieldValue] = None
-    back_in_service: Optional[FieldValue] = None
+    call_received: FieldValue | None = None
+    call_entered: FieldValue | None = None
+    dispatch: FieldValue | None = None
+    station_alert: FieldValue | None = None
+    unit_notified: FieldValue | None = None
+    unit_acknowledged: FieldValue | None = None
+    en_route: FieldValue | None = None
+    arrived_on_scene: FieldValue | None = None
+    patient_contact: FieldValue | None = None
+    transport: FieldValue | None = None
+    destination_arrival: FieldValue | None = None
+    available: FieldValue | None = None
+    cleared: FieldValue | None = None
+    back_in_service: FieldValue | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -89,15 +88,15 @@ class CadConnectIncidentTimes(BaseModel):
 class CadConnectUnitTimes(BaseModel):
     """Per-unit response timeline. Kept distinct from incident-level first-unit times."""
 
-    dispatched: Optional[FieldValue] = None
-    en_route: Optional[FieldValue] = None
-    arrived: Optional[FieldValue] = None
-    at_patient: Optional[FieldValue] = None
-    transport: Optional[FieldValue] = None
-    at_destination: Optional[FieldValue] = None
-    cleared: Optional[FieldValue] = None
-    available: Optional[FieldValue] = None
-    back_in_service: Optional[FieldValue] = None
+    dispatched: FieldValue | None = None
+    en_route: FieldValue | None = None
+    arrived: FieldValue | None = None
+    at_patient: FieldValue | None = None
+    transport: FieldValue | None = None
+    at_destination: FieldValue | None = None
+    cleared: FieldValue | None = None
+    available: FieldValue | None = None
+    back_in_service: FieldValue | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -114,10 +113,10 @@ class CadConnectUnit(BaseModel):
     designation_raw: str = Field(
         ..., description="The unit token exactly as in the source (e.g. 'E1')."
     )
-    designation: Optional[FieldValue] = Field(
+    designation: FieldValue | None = Field(
         default=None, description="Normalized display designation (e.g. 'Engine 1')."
     )
-    unit_type: Optional[FieldValue] = Field(
+    unit_type: FieldValue | None = Field(
         default=None,
         description="engine|medic|truck|battalion|rescue|... (best effort).",
     )
@@ -132,11 +131,11 @@ class CadConnectSource(BaseModel):
     input_format: str = Field(
         ..., description="pdf|image|csv|xlsx|xml|json|txt|nfirs|eido|eidd|..."
     )
-    original_filename: Optional[str] = None
-    byte_sha256: Optional[str] = Field(
+    original_filename: str | None = None
+    byte_sha256: str | None = Field(
         default=None, description="SHA-256 of the raw artifact (dedup/idempotency)."
     )
-    layout_signature: Optional[str] = Field(
+    layout_signature: str | None = Field(
         default=None,
         description="Fingerprint of the source layout (matches an agency mapping profile).",
     )
@@ -148,7 +147,7 @@ class CadConnectSource(BaseModel):
 class CadConnectSummary(BaseModel):
     """Roll-up of review state across the record (drives the review-screen counts)."""
 
-    overall_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    overall_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     confirmed_count: int = 0
     review_count: int = 0
     missing_count: int = 0
@@ -173,7 +172,7 @@ class CadConnectIncident(BaseModel):
     @classmethod
     def empty(
         cls, input_format: str, ingestion_method: IngestionMethod
-    ) -> "CadConnectIncident":
+    ) -> CadConnectIncident:
         """Construct a minimal record shell (a payload received but not yet extracted)."""
         return cls(
             source=CadConnectSource(

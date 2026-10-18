@@ -12,7 +12,6 @@ Non-negotiable ACIN rules enforced here at the contract layer:
 
 from __future__ import annotations
 
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -31,11 +30,11 @@ class ACINSourceRef(BaseModel):
             "or a structured chart field ('epcr_vitals.<uuid>.heart_rate')."
         ),
     )
-    source_model: Optional[str] = Field(
+    source_model: str | None = Field(
         default=None,
         description="Originating ORM/table name (e.g. 'epcr_vitals'), if applicable.",
     )
-    source_pk: Optional[str] = Field(
+    source_pk: str | None = Field(
         default=None,
         description="Primary key of the originating row, if applicable.",
     )
@@ -70,19 +69,19 @@ class ACINProvenanceMixin(BaseModel):
         default_factory=list,
         description="Grounding source references for this content.",
     )
-    model_name: Optional[str] = Field(
+    model_name: str | None = Field(
         default=None, description="Model that generated this content (attribution)."
     )
-    model_version: Optional[str] = Field(
+    model_version: str | None = Field(
         default=None, description="Version of the generating model (attribution)."
     )
-    capability_key: Optional[str] = Field(
+    capability_key: str | None = Field(
         default=None,
         description="AI-Service capability key used to generate this content (attribution).",
     )
 
     @model_validator(mode="after")
-    def _enforce_review_when_ai(self) -> "ACINProvenanceMixin":
+    def _enforce_review_when_ai(self) -> ACINProvenanceMixin:
         if self.ai_generated and not self.requires_human_review:
             raise ValueError(
                 "ai_generated content must set requires_human_review=True "
@@ -115,9 +114,9 @@ class ACINClaimDTO(ACINProvenanceMixin):
     ai_generated: bool = True
     requires_human_review: bool = True
     # Terminology grounding (optional; populated via Terminology-Service crosswalk).
-    snomed_code: Optional[str] = None
-    icd10_code: Optional[str] = None
-    confidence: Optional[float] = Field(
+    snomed_code: str | None = None
+    icd10_code: str | None = None
+    confidence: float | None = Field(
         default=None,
         ge=0.0,
         le=1.0,
@@ -125,7 +124,7 @@ class ACINClaimDTO(ACINProvenanceMixin):
     )
 
     @model_validator(mode="after")
-    def _enforce_grounding(self) -> "ACINClaimDTO":
+    def _enforce_grounding(self) -> ACINClaimDTO:
         if self.ai_generated and len(self.source_field_refs) < 1:
             raise ValueError(
                 "ai_generated ACIN claim must cite at least one source_field_ref "

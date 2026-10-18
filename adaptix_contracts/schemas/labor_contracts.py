@@ -28,7 +28,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -216,8 +215,8 @@ class LaborShiftContract(BaseModel):
     shift_date: date
     start_time: str
     end_time: str
-    station_id: Optional[str] = None
-    unit_id: Optional[str] = None
+    station_id: str | None = None
+    unit_id: str | None = None
     minimum_staffing: int
     is_locked: bool
     created_at: datetime
@@ -238,7 +237,7 @@ class LaborAssignmentContract(BaseModel):
     slot_id: str
     employee_id: str
     status: AssignmentStatus
-    override_reason: Optional[str] = None
+    override_reason: str | None = None
     assigned_by: str
     assigned_at: datetime
 
@@ -253,7 +252,7 @@ class LaborEmployeeReadinessContract(BaseModel):
 
     employee_id: str
     tenant_id: str
-    unit_id: Optional[str] = None
+    unit_id: str | None = None
     readiness_score: float
     cert_valid: bool
     rest_valid: bool
@@ -279,8 +278,8 @@ class LaborShiftPublishedEvent(BaseModel):
     shift_date: date
     start_time: str
     end_time: str
-    station_id: Optional[str] = None
-    unit_id: Optional[str] = None
+    station_id: str | None = None
+    unit_id: str | None = None
     published_by: str
     occurred_at: datetime
 
@@ -308,9 +307,9 @@ class LaborAssignmentCommittedEvent(BaseModel):
     employee_id: str
     command_posture: CommandPosture
     override_occurred: bool
-    override_reason: Optional[str] = None
+    override_reason: str | None = None
     assigned_by: str
-    total_distortion_score: Optional[float] = None
+    total_distortion_score: float | None = None
     occurred_at: datetime
 
 
@@ -323,8 +322,8 @@ class LaborOpenShiftClaimSubmittedEvent(BaseModel):
     open_shift_id: str
     tenant_id: str
     employee_id: str
-    fatigue_score_at_claim: Optional[float] = None
-    ot_impact_hours: Optional[float] = None
+    fatigue_score_at_claim: float | None = None
+    ot_impact_hours: float | None = None
     occurred_at: datetime
 
 
@@ -365,7 +364,7 @@ class LaborComplianceViolationCreatedEvent(BaseModel):
     violation_id: str
     tenant_id: str
     employee_id: str
-    shift_id: Optional[str] = None
+    shift_id: str | None = None
     rule_code: str
     severity: str
     detected_at: datetime

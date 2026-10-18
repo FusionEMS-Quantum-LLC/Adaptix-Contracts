@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -69,9 +68,9 @@ class MailRecipient(BaseModel):
     """Destination address for a mail packet."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    company: Optional[str] = Field(default=None, max_length=255)
+    company: str | None = Field(default=None, max_length=255)
     address_line1: str = Field(..., min_length=1, max_length=255)
-    address_line2: Optional[str] = Field(default=None, max_length=255)
+    address_line2: str | None = Field(default=None, max_length=255)
     city: str = Field(..., min_length=1, max_length=120)
     state: str = Field(..., min_length=2, max_length=2)
     postal_code: str = Field(..., min_length=1, max_length=16)
@@ -82,9 +81,9 @@ class MailSender(BaseModel):
     """Return address for a mail packet."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    company: Optional[str] = Field(default=None, max_length=255)
+    company: str | None = Field(default=None, max_length=255)
     address_line1: str = Field(..., min_length=1, max_length=255)
-    address_line2: Optional[str] = Field(default=None, max_length=255)
+    address_line2: str | None = Field(default=None, max_length=255)
     city: str = Field(..., min_length=1, max_length=120)
     state: str = Field(..., min_length=2, max_length=2)
     postal_code: str = Field(..., min_length=1, max_length=16)
@@ -103,20 +102,20 @@ class MailPacket(BaseModel):
 
     id: UUID
     tenant_id: UUID
-    correlation_id: Optional[str] = None
+    correlation_id: str | None = None
     sender: MailSender
     recipient: MailRecipient
     mail_class: MailClass = MailClass.FIRST_CLASS
     status: MailStatus = MailStatus.DRAFT
-    template_id: Optional[str] = Field(default=None, max_length=160)
-    document_url: Optional[str] = Field(default=None, max_length=2000)
-    description: Optional[str] = Field(default=None, max_length=1000)
-    page_count: Optional[int] = Field(default=None, ge=1)
+    template_id: str | None = Field(default=None, max_length=160)
+    document_url: str | None = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=1000)
+    page_count: int | None = Field(default=None, ge=1)
     color: bool = False
     double_sided: bool = True
-    postgrid_id: Optional[str] = Field(default=None, max_length=128)
-    reference_type: Optional[str] = Field(default=None, max_length=120)
-    reference_id: Optional[str] = Field(default=None, max_length=255)
+    postgrid_id: str | None = Field(default=None, max_length=128)
+    reference_type: str | None = Field(default=None, max_length=120)
+    reference_id: str | None = Field(default=None, max_length=255)
     created_at: datetime
     updated_at: datetime
 
@@ -129,11 +128,11 @@ class MailDeliveryStatus(BaseModel):
     packet_id: UUID
     tenant_id: UUID
     status: MailStatus
-    postgrid_id: Optional[str] = Field(default=None, max_length=128)
-    tracking_number: Optional[str] = Field(default=None, max_length=128)
-    mailed_at: Optional[datetime] = None
-    expected_delivery_date: Optional[date] = None
-    delivered_at: Optional[datetime] = None
+    postgrid_id: str | None = Field(default=None, max_length=128)
+    tracking_number: str | None = Field(default=None, max_length=128)
+    mailed_at: datetime | None = None
+    expected_delivery_date: date | None = None
+    delivered_at: datetime | None = None
     updated_at: datetime
 
 
@@ -146,7 +145,7 @@ class MailReturnStatus(BaseModel):
     tenant_id: UUID
     returned: bool = True
     reason: MailReturnReason
-    postgrid_id: Optional[str] = Field(default=None, max_length=128)
-    returned_at: Optional[datetime] = None
+    postgrid_id: str | None = Field(default=None, max_length=128)
+    returned_at: datetime | None = None
     requires_review: bool = True
-    notes: Optional[str] = Field(default=None, max_length=1000)
+    notes: str | None = Field(default=None, max_length=1000)

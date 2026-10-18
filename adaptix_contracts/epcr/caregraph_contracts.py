@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -65,19 +64,19 @@ class CareGraphNodeDTO(BaseModel):
     tenant_id: str
     node_type: CareGraphNodeTypeDTO
     label: str
-    description: Optional[str] = None
+    description: str | None = None
     evidence_strength: EvidenceStrengthDTO
-    evidence_source_ids: Optional[list[str]] = None
-    snomed_code: Optional[str] = None
-    snomed_display: Optional[str] = None
-    icd10_code: Optional[str] = None
-    icd10_display: Optional[str] = None
-    rxnorm_code: Optional[str] = None
-    nemsis_element: Optional[str] = None
-    nemsis_value: Optional[str] = None
-    clinical_payload: Optional[dict] = None
+    evidence_source_ids: list[str] | None = None
+    snomed_code: str | None = None
+    snomed_display: str | None = None
+    icd10_code: str | None = None
+    icd10_display: str | None = None
+    rxnorm_code: str | None = None
+    nemsis_element: str | None = None
+    nemsis_value: str | None = None
+    clinical_payload: dict | None = None
     provider_id: str
-    provider_role: Optional[str] = None
+    provider_role: str | None = None
     sync_state: str
     occurred_at: datetime
     created_at: datetime
@@ -95,8 +94,8 @@ class CareGraphEdgeDTO(BaseModel):
     source_node_id: str
     target_node_id: str
     edge_type: CareGraphEdgeTypeDTO
-    weight: Optional[float] = None
-    metadata: Optional[dict] = None
+    weight: float | None = None
+    metadata: dict | None = None
     provider_id: str
     created_at: datetime
 
@@ -109,22 +108,22 @@ class OPQRSTSymptomDTO(BaseModel):
     id: str
     chart_id: str
     tenant_id: str
-    caregraph_node_id: Optional[str] = None
+    caregraph_node_id: str | None = None
     symptom_category: str
     symptom_label: str
-    onset_description: Optional[str] = None
-    onset_time: Optional[datetime] = None
-    onset_sudden: Optional[bool] = None
-    provocation_factors: Optional[list[str]] = None
-    palliation_factors: Optional[list[str]] = None
-    quality_descriptors: Optional[list[str]] = None
-    radiation_present: Optional[bool] = None
-    radiation_locations: Optional[list[str]] = None
-    region_primary: Optional[str] = None
-    severity_scale: Optional[int] = Field(default=None, ge=0, le=10)
-    time_duration_minutes: Optional[int] = None
-    time_progression: Optional[str] = None
-    associated_symptoms: Optional[list[str]] = None
+    onset_description: str | None = None
+    onset_time: datetime | None = None
+    onset_sudden: bool | None = None
+    provocation_factors: list[str] | None = None
+    palliation_factors: list[str] | None = None
+    quality_descriptors: list[str] | None = None
+    radiation_present: bool | None = None
+    radiation_locations: list[str] | None = None
+    region_primary: str | None = None
+    severity_scale: int | None = Field(default=None, ge=0, le=10)
+    time_duration_minutes: int | None = None
+    time_progression: str | None = None
+    associated_symptoms: list[str] | None = None
     provider_id: str
     documented_at: datetime
 
@@ -141,7 +140,7 @@ class ReassessmentDeltaDTO(BaseModel):
     reassessment_node_id: str
     delta_type: str
     delta_description: str
-    intervention_trigger_id: Optional[str] = None
+    intervention_trigger_id: str | None = None
     reassessed_at: datetime
     provider_id: str
 

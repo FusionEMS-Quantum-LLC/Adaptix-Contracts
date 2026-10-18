@@ -40,7 +40,7 @@ import logging
 import os
 from collections.abc import Awaitable, Mapping
 from functools import lru_cache
-from typing import Annotated, Optional, Protocol, TypeAlias
+from typing import Annotated, Protocol, TypeAlias
 
 import jwt as pyjwt
 from fastapi import Header, HTTPException, Request, status
@@ -295,7 +295,7 @@ def _bearer_unauthorized(code: str, message: str) -> HTTPException:
 
 
 @lru_cache(maxsize=8)
-def _jwks_client(jwks_url: str) -> "pyjwt.PyJWKClient":
+def _jwks_client(jwks_url: str) -> pyjwt.PyJWKClient:
     """Cache one JWKS client per pool URL so keys are not re-fetched per request.
 
     ``PyJWKClient`` caches the signing keys for its own lifetime, so we keep the
@@ -484,7 +484,7 @@ def _verify_direct_bearer_claims(token: str) -> dict[str, object]:
     return claims
 
 
-def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+def _extract_bearer_token(authorization: str | None) -> str | None:
     if not authorization:
         return None
     parts = authorization.split(" ", 1)
@@ -495,7 +495,7 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
 
 
 def _resolve_gate_claims(
-    request: Request, authorization: Optional[str]
+    request: Request, authorization: str | None
 ) -> tuple[_Claims, bool]:
     """Resolve the claims the gate decides on, gateway-context-first.
 
@@ -604,7 +604,7 @@ def require_module_entitlement(module_slug: str) -> EntitlementGate:
 
     async def _gate(
         request: Request,
-        authorization: Annotated[Optional[str], Header(alias="Authorization")] = None,
+        authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     ) -> None:
         claims, is_platform = _resolve_gate_claims(request, authorization)
 
@@ -669,7 +669,7 @@ def require_any_module_entitlement(*module_slugs: str) -> EntitlementGate:
 
     async def _gate(
         request: Request,
-        authorization: Annotated[Optional[str], Header(alias="Authorization")] = None,
+        authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     ) -> None:
         claims, is_platform = _resolve_gate_claims(request, authorization)
         if is_platform or _claims_carry_founder(claims):

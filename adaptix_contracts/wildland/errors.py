@@ -107,7 +107,7 @@ class WildlandError(Exception):
         self,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "WildlandErrorEnvelope":
+    ) -> WildlandErrorEnvelope:
         """Render this exception as a :class:`WildlandErrorEnvelope`.
 
         No stack trace or raw exception text is emitted — only the
@@ -217,7 +217,7 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         *,
         tenant_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "WildlandErrorEnvelope":
+    ) -> WildlandErrorEnvelope:
         return cls(
             error_code=AdaptixErrorCode.NOT_FOUND,
             wildland_error_code=WildlandErrorCode.WILDLAND_ASSIGNMENT_NOT_FOUND,
@@ -240,7 +240,7 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         reason: str,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "WildlandErrorEnvelope":
+    ) -> WildlandErrorEnvelope:
         return cls(
             error_code=AdaptixErrorCode.PROVIDER_ERROR,
             wildland_error_code=WildlandErrorCode.WILDLAND_IROC_SYNC_FAILED,
@@ -257,7 +257,7 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         reason: str,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "WildlandErrorEnvelope":
+    ) -> WildlandErrorEnvelope:
         return cls(
             error_code=AdaptixErrorCode.PROVIDER_ERROR,
             wildland_error_code=WildlandErrorCode.WILDLAND_IRWIN_SYNC_FAILED,
@@ -274,7 +274,7 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         reason: str,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "WildlandErrorEnvelope":
+    ) -> WildlandErrorEnvelope:
         return cls(
             error_code=AdaptixErrorCode.PROVIDER_ERROR,
             wildland_error_code=WildlandErrorCode.WILDLAND_WFDSS_SYNC_FAILED,
@@ -291,7 +291,7 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         section: str,
         *,
         trace: AdaptixTraceContext | None = None,
-    ) -> "WildlandErrorEnvelope":
+    ) -> WildlandErrorEnvelope:
         return cls(
             error_code=AdaptixErrorCode.VALIDATION_FAILED,
             wildland_error_code=WildlandErrorCode.WILDLAND_ICS209_SECTION_INCOMPLETE,
@@ -308,7 +308,7 @@ class WildlandErrorEnvelope(AdaptixErrorEnvelope):
         actual_tenant_id: str,
         assignment_id: str | None = None,
         trace: AdaptixTraceContext | None = None,
-    ) -> "WildlandErrorEnvelope":
+    ) -> WildlandErrorEnvelope:
         return cls(
             error_code=AdaptixErrorCode.FORBIDDEN,
             wildland_error_code=WildlandErrorCode.WILDLAND_ASSIGNMENT_TENANT_MISMATCH,

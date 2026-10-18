@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional, Any
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -53,7 +53,7 @@ class MedicationLotEvent(BaseModel):
 
     event_type: MedicationEventType = Field(...)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
+    unit_id: str | None = Field(default=None, description="Unit/station ID")
 
     medication_id: str = Field(..., description="Medication UUID")
     medication_name: str = Field(..., description="Medication name")
@@ -65,20 +65,20 @@ class MedicationLotEvent(BaseModel):
     current_quantity: int = Field(..., description="Current remaining quantity")
 
     storage_location: str = Field(..., description="Storage location")
-    storage_temperature: Optional[str] = Field(
+    storage_temperature: str | None = Field(
         default=None, description="Storage conditions"
     )
     unit_of_measure: str = Field(..., description="Unit of measure")
     cost_per_unit: Decimal = Field(..., description="Cost per unit")
 
     # Before/after for updates
-    before_state: Optional[dict[str, Any]] = Field(default=None)
-    after_state: Optional[dict[str, Any]] = Field(default=None)
+    before_state: dict[str, Any] | None = Field(default=None)
+    after_state: dict[str, Any] | None = Field(default=None)
 
-    actor_user_id: Optional[str] = Field(default=None)
+    actor_user_id: str | None = Field(default=None)
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(default=None)
-    trace_id: Optional[str] = Field(default=None)
+    correlation_id: str | None = Field(default=None)
+    trace_id: str | None = Field(default=None)
 
 
 class MedicationAdministrationEvent(BaseModel):
@@ -88,29 +88,25 @@ class MedicationAdministrationEvent(BaseModel):
         default=MedicationEventType.ADMINISTRATION_RECORDED
     )
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
+    unit_id: str | None = Field(default=None, description="Unit/station ID")
 
     medication_id: str = Field(..., description="Medication UUID")
     medication_name: str = Field(..., description="Medication name")
     lot_id: str = Field(..., description="Lot/batch ID")
-    patient_id: Optional[str] = Field(
-        default=None, description="Patient (if applicable)"
-    )
+    patient_id: str | None = Field(default=None, description="Patient (if applicable)")
 
     quantity_administered: int = Field(..., description="Amount given")
     unit_of_measure: str = Field(...)
     cost_per_unit: Decimal = Field(...)
     total_cost: Decimal = Field(..., description="Cost of administration")
 
-    administered_by: Optional[str] = Field(default=None, description="Clinician")
+    administered_by: str | None = Field(default=None, description="Clinician")
     administered_date: datetime = Field(...)
-    protocol_id: Optional[str] = Field(
-        default=None, description="Protocol being followed"
-    )
+    protocol_id: str | None = Field(default=None, description="Protocol being followed")
 
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(default=None)
-    trace_id: Optional[str] = Field(default=None)
+    correlation_id: str | None = Field(default=None)
+    trace_id: str | None = Field(default=None)
 
 
 class MedicationWasteEvent(BaseModel):
@@ -118,7 +114,7 @@ class MedicationWasteEvent(BaseModel):
 
     event_type: MedicationEventType = Field(...)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
+    unit_id: str | None = Field(default=None, description="Unit/station ID")
 
     medication_id: str = Field(..., description="Medication UUID")
     medication_name: str = Field(..., description="Medication name")
@@ -132,20 +128,20 @@ class MedicationWasteEvent(BaseModel):
     cost_per_unit: Decimal = Field(...)
     waste_cost: Decimal = Field(..., description="Value of wasted medication")
 
-    disposed_by: Optional[str] = Field(
+    disposed_by: str | None = Field(
         default=None, description="Person performing disposal"
     )
-    witness: Optional[str] = Field(
+    witness: str | None = Field(
         default=None, description="Witness to disposal (if required)"
     )
-    witness_signature: Optional[str] = Field(
+    witness_signature: str | None = Field(
         default=None, description="Witness signature blob key"
     )
 
     disposal_date: datetime = Field(...)
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(default=None)
-    trace_id: Optional[str] = Field(default=None)
+    correlation_id: str | None = Field(default=None)
+    trace_id: str | None = Field(default=None)
 
 
 class MedicationRecallAlert(BaseModel):
@@ -153,7 +149,7 @@ class MedicationRecallAlert(BaseModel):
 
     event_type: MedicationEventType = Field(default=MedicationEventType.RECALL_ALERT)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
+    unit_id: str | None = Field(default=None, description="Unit/station ID")
 
     medication_id: str = Field(..., description="Medication UUID")
     medication_name: str = Field(..., description="Medication name")
@@ -165,15 +161,15 @@ class MedicationRecallAlert(BaseModel):
     severity: str = Field(..., description="Severity: low/medium/high/critical")
 
     recommended_action: str = Field(..., description="Recommended action")
-    affected_patients: Optional[list[str]] = Field(
+    affected_patients: list[str] | None = Field(
         default=None, description="Patient IDs affected"
     )
 
     notify_role: str = Field(default="pharmacy_manager", description="Role to notify")
 
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(default=None)
-    trace_id: Optional[str] = Field(default=None)
+    correlation_id: str | None = Field(default=None)
+    trace_id: str | None = Field(default=None)
 
 
 class MedicationExpirationAlert(BaseModel):
@@ -183,7 +179,7 @@ class MedicationExpirationAlert(BaseModel):
         default=MedicationEventType.EXPIRATION_ALERT
     )
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
+    unit_id: str | None = Field(default=None, description="Unit/station ID")
 
     medication_id: str = Field(..., description="Medication UUID")
     medication_name: str = Field(..., description="Medication name")
@@ -199,8 +195,8 @@ class MedicationExpirationAlert(BaseModel):
     severity: str = Field(..., description="Severity: low/medium/high")
 
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(default=None)
-    trace_id: Optional[str] = Field(default=None)
+    correlation_id: str | None = Field(default=None)
+    trace_id: str | None = Field(default=None)
 
 
 class MedicationShortageAlert(BaseModel):
@@ -215,7 +211,7 @@ class MedicationShortageAlert(BaseModel):
 
     event_type: MedicationEventType = Field(default=MedicationEventType.SHORTAGE_ALERT)
     tenant_id: UUID = Field(..., description="Tenant context")
-    unit_id: Optional[str] = Field(default=None, description="Unit/station ID")
+    unit_id: str | None = Field(default=None, description="Unit/station ID")
 
     match_id: str = Field(..., description="tenant_drug_shortage_matches row id")
     medication_id: str = Field(..., description="Medication UUID (tenant catalog row)")
@@ -223,18 +219,14 @@ class MedicationShortageAlert(BaseModel):
 
     shortage_entry_id: str = Field(..., description="drug_shortage_entries row id")
     shortage_generic_name: str = Field(..., description="FDA listing generic name")
-    company_name: Optional[str] = Field(default=None, description="Reporting company")
-    package_ndc: Optional[str] = Field(
-        default=None, description="Package NDC as listed"
-    )
-    presentation: Optional[str] = Field(
-        default=None, description="Presentation as listed"
-    )
+    company_name: str | None = Field(default=None, description="Reporting company")
+    package_ndc: str | None = Field(default=None, description="Package NDC as listed")
+    presentation: str | None = Field(default=None, description="Presentation as listed")
     status: str = Field(..., description="FDA status as published, e.g. Current")
-    availability: Optional[str] = Field(
+    availability: str | None = Field(
         default=None, description="Availability as published"
     )
-    shortage_reason: Optional[str] = Field(
+    shortage_reason: str | None = Field(
         default=None, description="Shortage reason as published"
     )
 
@@ -242,18 +234,18 @@ class MedicationShortageAlert(BaseModel):
     matched_value: str = Field(
         ..., description="The RxCUI or normalised name that matched"
     )
-    on_hand_units: Optional[int] = Field(
+    on_hand_units: int | None = Field(
         default=None,
         description="Tenant on-hand units at evaluation; None when unknown",
     )
-    source_update_date: Optional[str] = Field(
+    source_update_date: str | None = Field(
         default=None, description="FDA update_date (ISO date)"
     )
     detected_at: datetime = Field(..., description="When the match was first made")
 
     timestamp: datetime = Field(...)
-    correlation_id: Optional[str] = Field(default=None)
-    trace_id: Optional[str] = Field(default=None)
+    correlation_id: str | None = Field(default=None)
+    trace_id: str | None = Field(default=None)
 
 
 class MedicationAnalyticsEvent(BaseModel):
@@ -261,20 +253,20 @@ class MedicationAnalyticsEvent(BaseModel):
 
     event_type: MedicationEventType = Field(...)
     tenant_id: UUID = Field(...)
-    unit_id: Optional[str] = Field(default=None)
+    unit_id: str | None = Field(default=None)
 
     timestamp: datetime = Field(...)
     category: str = Field(..., description="Event category")
 
     # Generic metrics
-    quantity: Optional[int] = Field(default=None)
-    cost: Optional[Decimal] = Field(default=None)
+    quantity: int | None = Field(default=None)
+    cost: Decimal | None = Field(default=None)
 
     # Custom metadata
-    metadata: Optional[dict[str, Any]] = Field(default=None)
+    metadata: dict[str, Any] | None = Field(default=None)
 
-    correlation_id: Optional[str] = Field(default=None)
-    trace_id: Optional[str] = Field(default=None)
+    correlation_id: str | None = Field(default=None)
+    trace_id: str | None = Field(default=None)
 
 
 __all__ = [

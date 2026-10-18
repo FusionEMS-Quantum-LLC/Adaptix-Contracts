@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,11 +48,11 @@ class FacilityStatus(str, Enum):
 class FacilityContact(BaseModel):
     """A point of contact at a facility."""
 
-    name: Optional[str] = Field(default=None, max_length=200)
-    role: Optional[str] = Field(default=None, max_length=120)
-    phone: Optional[str] = Field(default=None, max_length=32)
-    fax: Optional[str] = Field(default=None, max_length=32)
-    email: Optional[str] = Field(default=None, max_length=320)
+    name: str | None = Field(default=None, max_length=200)
+    role: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=32)
+    fax: str | None = Field(default=None, max_length=32)
+    email: str | None = Field(default=None, max_length=320)
 
 
 class FacilityAlias(BaseModel):
@@ -64,7 +63,7 @@ class FacilityAlias(BaseModel):
     id: UUID
     facility_id: UUID
     alias: str = Field(..., min_length=1, max_length=255)
-    source: Optional[str] = Field(
+    source: str | None = Field(
         default=None,
         max_length=64,
         description="Origin of the alias, e.g. nemsis, state.",
@@ -76,15 +75,15 @@ class FacilityMapping(BaseModel):
     """External-system identifiers for a facility."""
 
     facility_id: UUID
-    cms_certification_number: Optional[str] = Field(
+    cms_certification_number: str | None = Field(
         default=None, max_length=32, description="CMS CCN."
     )
-    npi: Optional[str] = Field(default=None, max_length=10, description="10-digit NPI.")
-    nemsis_facility_id: Optional[str] = Field(default=None, max_length=64)
-    state_facility_id: Optional[str] = Field(default=None, max_length=64)
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    external_system: Optional[str] = Field(default=None, max_length=64)
-    external_id: Optional[str] = Field(default=None, max_length=128)
+    npi: str | None = Field(default=None, max_length=10, description="10-digit NPI.")
+    nemsis_facility_id: str | None = Field(default=None, max_length=64)
+    state_facility_id: str | None = Field(default=None, max_length=64)
+    state: str | None = Field(default=None, min_length=2, max_length=2)
+    external_system: str | None = Field(default=None, max_length=64)
+    external_id: str | None = Field(default=None, max_length=128)
 
 
 class FacilityCapability(BaseModel):
@@ -96,9 +95,9 @@ class FacilityCapability(BaseModel):
 
     code: str = Field(..., min_length=1, max_length=64)
     name: str = Field(..., min_length=1, max_length=160)
-    category: Optional[str] = Field(default=None, max_length=64)
+    category: str | None = Field(default=None, max_length=64)
     is_available: bool = True
-    detail: Optional[str] = Field(default=None, max_length=500)
+    detail: str | None = Field(default=None, max_length=500)
 
 
 # ---------------------------------------------------------------------------
@@ -112,24 +111,24 @@ class FacilityRecord(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    tenant_id: Optional[UUID] = Field(
+    tenant_id: UUID | None = Field(
         default=None, description="None for platform-shared facilities."
     )
     name: str = Field(..., min_length=1, max_length=255)
     facility_type: FacilityType
     status: FacilityStatus = FacilityStatus.ACTIVE
-    address_line1: Optional[str] = Field(default=None, max_length=255)
-    address_line2: Optional[str] = Field(default=None, max_length=255)
-    city: Optional[str] = Field(default=None, max_length=120)
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    postal_code: Optional[str] = Field(default=None, max_length=16)
+    address_line1: str | None = Field(default=None, max_length=255)
+    address_line2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=120)
+    state: str | None = Field(default=None, min_length=2, max_length=2)
+    postal_code: str | None = Field(default=None, max_length=16)
     country: str = Field(default="US", min_length=2, max_length=2)
-    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
-    phone: Optional[str] = Field(default=None, max_length=32)
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    phone: str | None = Field(default=None, max_length=32)
     contacts: list[FacilityContact] = Field(default_factory=list)
     capabilities: list[FacilityCapability] = Field(default_factory=list)
-    mapping: Optional[FacilityMapping] = None
+    mapping: FacilityMapping | None = None
     aliases: list[FacilityAlias] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
@@ -143,17 +142,17 @@ class FacilityRecord(BaseModel):
 class FacilitySearchRequest(BaseModel):
     """Query parameters for the facility directory."""
 
-    tenant_id: Optional[UUID] = Field(
+    tenant_id: UUID | None = Field(
         default=None, description="None searches only platform-shared facilities."
     )
-    query: Optional[str] = Field(
+    query: str | None = Field(
         default=None, max_length=255, description="Free-text name/alias match."
     )
-    facility_type: Optional[FacilityType] = None
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    near_latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
-    near_longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
-    radius_miles: Optional[float] = Field(default=None, ge=0.0)
+    facility_type: FacilityType | None = None
+    state: str | None = Field(default=None, min_length=2, max_length=2)
+    near_latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    near_longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    radius_miles: float | None = Field(default=None, ge=0.0)
     include_inactive: bool = False
     include_platform_shared: bool = True
     limit: int = Field(default=50, ge=1, le=500)
@@ -177,63 +176,63 @@ class FacilitySearchResponse(BaseModel):
 class FacilityCreateRequest(BaseModel):
     """Request to register a new facility."""
 
-    tenant_id: Optional[UUID] = Field(
+    tenant_id: UUID | None = Field(
         default=None,
         description="None registers a platform-shared facility (founder-only).",
     )
     name: str = Field(..., min_length=1, max_length=255)
     facility_type: FacilityType
     status: FacilityStatus = FacilityStatus.ACTIVE
-    address_line1: Optional[str] = Field(default=None, max_length=255)
-    address_line2: Optional[str] = Field(default=None, max_length=255)
-    city: Optional[str] = Field(default=None, max_length=120)
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    postal_code: Optional[str] = Field(default=None, max_length=16)
+    address_line1: str | None = Field(default=None, max_length=255)
+    address_line2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=120)
+    state: str | None = Field(default=None, min_length=2, max_length=2)
+    postal_code: str | None = Field(default=None, max_length=16)
     country: str = Field(default="US", min_length=2, max_length=2)
-    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
-    phone: Optional[str] = Field(default=None, max_length=32)
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    phone: str | None = Field(default=None, max_length=32)
     contacts: list[FacilityContact] = Field(default_factory=list)
     capabilities: list[FacilityCapability] = Field(default_factory=list)
-    mapping: Optional[FacilityMapping] = None
+    mapping: FacilityMapping | None = None
 
 
 class FacilityUpdateRequest(BaseModel):
     """Partial update of a facility record."""
 
-    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
-    facility_type: Optional[FacilityType] = None
-    status: Optional[FacilityStatus] = None
-    address_line1: Optional[str] = Field(default=None, max_length=255)
-    address_line2: Optional[str] = Field(default=None, max_length=255)
-    city: Optional[str] = Field(default=None, max_length=120)
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    postal_code: Optional[str] = Field(default=None, max_length=16)
-    country: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0)
-    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0)
-    phone: Optional[str] = Field(default=None, max_length=32)
-    contacts: Optional[list[FacilityContact]] = None
-    capabilities: Optional[list[FacilityCapability]] = None
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    facility_type: FacilityType | None = None
+    status: FacilityStatus | None = None
+    address_line1: str | None = Field(default=None, max_length=255)
+    address_line2: str | None = Field(default=None, max_length=255)
+    city: str | None = Field(default=None, max_length=120)
+    state: str | None = Field(default=None, min_length=2, max_length=2)
+    postal_code: str | None = Field(default=None, max_length=16)
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    phone: str | None = Field(default=None, max_length=32)
+    contacts: list[FacilityContact] | None = None
+    capabilities: list[FacilityCapability] | None = None
 
 
 class FacilityAliasCreateRequest(BaseModel):
     """Request to add an alternate name to a facility."""
 
     alias: str = Field(..., min_length=1, max_length=255)
-    source: Optional[str] = Field(default=None, max_length=64)
+    source: str | None = Field(default=None, max_length=64)
 
 
 class FacilityMappingUpsertRequest(BaseModel):
     """Request to set external-system identifiers for a facility."""
 
-    cms_certification_number: Optional[str] = Field(default=None, max_length=32)
-    npi: Optional[str] = Field(default=None, max_length=10)
-    nemsis_facility_id: Optional[str] = Field(default=None, max_length=64)
-    state_facility_id: Optional[str] = Field(default=None, max_length=64)
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
-    external_system: Optional[str] = Field(default=None, max_length=64)
-    external_id: Optional[str] = Field(default=None, max_length=128)
+    cms_certification_number: str | None = Field(default=None, max_length=32)
+    npi: str | None = Field(default=None, max_length=10)
+    nemsis_facility_id: str | None = Field(default=None, max_length=64)
+    state_facility_id: str | None = Field(default=None, max_length=64)
+    state: str | None = Field(default=None, min_length=2, max_length=2)
+    external_system: str | None = Field(default=None, max_length=64)
+    external_id: str | None = Field(default=None, max_length=128)
 
 
 # ---------------------------------------------------------------------------
@@ -244,19 +243,19 @@ class FacilityMappingUpsertRequest(BaseModel):
 class CmsNpiSyncRequest(BaseModel):
     """Request to resolve/sync a facility against the CMS NPPES registry."""
 
-    npi: Optional[str] = Field(default=None, min_length=10, max_length=10)
-    cms_certification_number: Optional[str] = Field(default=None, max_length=32)
-    name: Optional[str] = Field(default=None, max_length=255)
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
+    npi: str | None = Field(default=None, min_length=10, max_length=10)
+    cms_certification_number: str | None = Field(default=None, max_length=32)
+    name: str | None = Field(default=None, max_length=255)
+    state: str | None = Field(default=None, min_length=2, max_length=2)
 
 
 class CmsNpiSyncResult(BaseModel):
     """Result of a CMS/NPI directory lookup."""
 
     matched: bool
-    facility_id: Optional[UUID] = None
-    npi: Optional[str] = Field(default=None, max_length=10)
-    name: Optional[str] = Field(default=None, max_length=255)
+    facility_id: UUID | None = None
+    npi: str | None = Field(default=None, max_length=10)
+    name: str | None = Field(default=None, max_length=255)
     source: str = Field(default="nppes", max_length=64)
 
 
@@ -271,7 +270,7 @@ class FacilityRegisteredEvent(BaseModel):
     event_type: str = "facility.registered"
 
     facility_id: UUID
-    tenant_id: Optional[UUID] = None
+    tenant_id: UUID | None = None
     facility_type: FacilityType
     registered_at: datetime
 
@@ -282,7 +281,7 @@ class FacilityUpdatedEvent(BaseModel):
     event_type: str = "facility.updated"
 
     facility_id: UUID
-    tenant_id: Optional[UUID] = None
+    tenant_id: UUID | None = None
     updated_at: datetime
 
 
@@ -293,5 +292,5 @@ class FacilityMergedEvent(BaseModel):
 
     source_facility_id: UUID
     target_facility_id: UUID
-    tenant_id: Optional[UUID] = None
+    tenant_id: UUID | None = None
     merged_at: datetime

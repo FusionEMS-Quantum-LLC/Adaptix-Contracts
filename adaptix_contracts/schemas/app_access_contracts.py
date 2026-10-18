@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -41,11 +40,11 @@ class AppAccessPolicy(BaseModel):
     tenant_id: UUID
     app_key: str = Field(..., min_length=1, max_length=160)
     name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(default=None, max_length=1000)
+    description: str | None = Field(default=None, max_length=1000)
     required_roles: list[str] = Field(default_factory=list)
     required_module_entitlements: list[str] = Field(default_factory=list)
     allowed_platforms: list[str] = Field(default_factory=list)
-    min_app_version: Optional[str] = Field(default=None, max_length=64)
+    min_app_version: str | None = Field(default=None, max_length=64)
     mfa_required: bool = False
     is_active: bool = True
     created_at: datetime
@@ -60,8 +59,8 @@ class AppAccessDecision(BaseModel):
     app_key: str = Field(..., min_length=1, max_length=160)
     effect: AppAccessEffect
     allowed: bool
-    correlation_id: Optional[str] = None
-    matched_policy_id: Optional[UUID] = None
-    device_id: Optional[UUID] = None
+    correlation_id: str | None = None
+    matched_policy_id: UUID | None = None
+    device_id: UUID | None = None
     reasons: list[str] = Field(default_factory=list)
     evaluated_at: datetime

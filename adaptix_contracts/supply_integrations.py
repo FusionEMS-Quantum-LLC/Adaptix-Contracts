@@ -72,7 +72,7 @@ import asyncio
 import logging
 import os
 from decimal import Decimal
-from typing import Optional, Any
+from typing import Any
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -146,7 +146,7 @@ class NotificationClient:
         par_level: int,
         recommended_quantity: int,
         unit: str = "units",
-        cost_estimate: Optional[float] = None,
+        cost_estimate: float | None = None,
     ) -> bool:
         """Send low-stock alert to Supply Officer.
 
@@ -313,11 +313,11 @@ class AnalyticsClient:
         cls,
         *,
         tenant_id: UUID,
-        unit_id: Optional[str],
+        unit_id: str | None,
         event_type: str,
         quantity: int,
-        cost: Optional[float] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        cost: float | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Publish usage event to Analytics Service."""
         payload = {
@@ -336,7 +336,7 @@ class AnalyticsClient:
         cls,
         *,
         tenant_id: UUID,
-        unit_id: Optional[str],
+        unit_id: str | None,
         waste_reason: str,
         quantity: int,
         cost: Decimal,
@@ -371,7 +371,7 @@ class AnalyticsClient:
         risk_type: str,
         risk_score: float,
         risk_level: str,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Publish risk event (expiration risk, diversion risk, etc)."""
         payload = {
@@ -472,14 +472,14 @@ class AuditClient:
         return float(os.environ.get(_AUDIT_TIMEOUT_ENV, "5"))
 
     @staticmethod
-    def _source_service() -> Optional[str]:
+    def _source_service() -> str | None:
         value = os.environ.get(_AUDIT_SOURCE_SERVICE_ENV, "").strip()
         return value or None
 
     @staticmethod
     def _coerce_actor(
-        actor_user_id: Optional[str],
-    ) -> tuple[Optional[UUID], AuditActorType, dict[str, Any]]:
+        actor_user_id: str | None,
+    ) -> tuple[UUID | None, AuditActorType, dict[str, Any]]:
         """Map a legacy string actor onto the typed contract without inventing one.
 
         ``AuditIngestRequest.actor_user_id`` is a UUID. Callers in this package
@@ -507,14 +507,14 @@ class AuditClient:
         entity_type: str,
         entity_id: str,
         action: str,
-        actor_user_id: Optional[str] = None,
-        before_state: Optional[dict[str, Any]] = None,
-        after_state: Optional[dict[str, Any]] = None,
-        reason: Optional[str] = None,
+        actor_user_id: str | None = None,
+        before_state: dict[str, Any] | None = None,
+        after_state: dict[str, Any] | None = None,
+        reason: str | None = None,
         severity: AuditSeverity = AuditSeverity.LOW,
         outcome: AuditOutcome = AuditOutcome.SUCCESS,
-        correlation_id: Optional[str] = None,
-        idempotency_key: Optional[str] = None,
+        correlation_id: str | None = None,
+        idempotency_key: str | None = None,
         raise_on_error: bool = False,
     ) -> bool:
         """Append an immutable audit event for a domain mutation."""
@@ -542,14 +542,14 @@ class AuditClient:
         entity_type: str,
         entity_id: str,
         action: str,
-        actor_user_id: Optional[str],
-        before_state: Optional[dict[str, Any]],
-        after_state: Optional[dict[str, Any]],
-        reason: Optional[str],
+        actor_user_id: str | None,
+        before_state: dict[str, Any] | None,
+        after_state: dict[str, Any] | None,
+        reason: str | None,
         severity: AuditSeverity,
         outcome: AuditOutcome,
-        correlation_id: Optional[str],
-        idempotency_key: Optional[str],
+        correlation_id: str | None,
+        idempotency_key: str | None,
     ) -> AuditIngestRequest:
         """Normalise legacy mutation arguments into the typed ingest contract.
 
@@ -561,7 +561,7 @@ class AuditClient:
         # ``changes`` is the structured before/after diff; ``metadata`` is
         # producer context. AuditIngestRequest documents that conflating them
         # is a defect, so ``reason`` goes to metadata and states go to changes.
-        changes: Optional[dict[str, Any]] = None
+        changes: dict[str, Any] | None = None
         if before_state is not None or after_state is not None:
             changes = {"before": before_state, "after": after_state}
 
@@ -595,9 +595,9 @@ class AuditClient:
         entity_id: str,
         approver_user_id: str,
         approval_type: str,
-        reason: Optional[str] = None,
-        correlation_id: Optional[str] = None,
-        idempotency_key: Optional[str] = None,
+        reason: str | None = None,
+        correlation_id: str | None = None,
+        idempotency_key: str | None = None,
         raise_on_error: bool = False,
     ) -> bool:
         """Append an immutable audit event for an approval/confirmation."""
@@ -674,7 +674,7 @@ class AuditClient:
     @classmethod
     def _classify(
         cls, request: AuditIngestRequest, resp: httpx.Response
-    ) -> Optional[bool]:
+    ) -> bool | None:
         """Return True on acceptance, False on producer defect, None to retry."""
         if 200 <= resp.status_code < 300:
             logger.info(

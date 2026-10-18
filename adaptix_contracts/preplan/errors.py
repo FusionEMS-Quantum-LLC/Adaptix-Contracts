@@ -17,7 +17,6 @@ envelope.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import Field
 
@@ -110,11 +109,11 @@ class PreplanErrorEnvelope(AdaptixErrorEnvelope):
         preplan_code: PreplanErrorCode,
         *,
         message: str,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "PreplanErrorEnvelope":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> PreplanErrorEnvelope:
         return cls(
             error_code=to_adaptix_error_code(preplan_code),
             preplan_error_code=preplan_code,
@@ -147,11 +146,11 @@ class PreplanServiceError(Exception):
         *,
         message: str,
         http_status: int = 400,
-        detail: Optional[str] = None,
-        validation_errors: Optional[list[AdaptixValidationErrorDetail]] = None,
-        provider_error: Optional[AdaptixProviderErrorDetail] = None,
-        trace: Optional[AdaptixTraceContext] = None,
-    ) -> "PreplanServiceError":
+        detail: str | None = None,
+        validation_errors: list[AdaptixValidationErrorDetail] | None = None,
+        provider_error: AdaptixProviderErrorDetail | None = None,
+        trace: AdaptixTraceContext | None = None,
+    ) -> PreplanServiceError:
         envelope = PreplanErrorEnvelope.from_preplan_code(
             preplan_code,
             message=message,
@@ -170,7 +169,7 @@ class PreplanServiceError(Exception):
 
 def occupancy_not_found(
     occupancy_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> PreplanErrorEnvelope:
     return PreplanErrorEnvelope.from_preplan_code(
         PreplanErrorCode.OCCUPANCY_NOT_FOUND,
@@ -181,7 +180,7 @@ def occupancy_not_found(
 
 def preplan_not_found(
     preplan_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> PreplanErrorEnvelope:
     return PreplanErrorEnvelope.from_preplan_code(
         PreplanErrorCode.PREPLAN_NOT_FOUND,
@@ -193,7 +192,7 @@ def preplan_not_found(
 def preplan_not_ready_for_response(
     preplan_id: str,
     reason: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> PreplanErrorEnvelope:
     return PreplanErrorEnvelope.from_preplan_code(
         PreplanErrorCode.PREPLAN_NOT_READY_FOR_RESPONSE,
@@ -204,7 +203,7 @@ def preplan_not_ready_for_response(
 
 def knox_box_missing(
     preplan_id: str,
-    trace: Optional[AdaptixTraceContext] = None,
+    trace: AdaptixTraceContext | None = None,
 ) -> PreplanErrorEnvelope:
     return PreplanErrorEnvelope.from_preplan_code(
         PreplanErrorCode.KNOX_BOX_MISSING,
