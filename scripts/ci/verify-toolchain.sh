@@ -58,6 +58,13 @@ if [[ -f pyproject.toml && -f uv.lock ]]; then
   if [[ -f validate_contracts.py ]]; then
     uv run python validate_contracts.py
   fi
+
+  # Contracts #397: refuse new uses of the verifier whose name hides that it
+  # skips the route binding. The allowlist count is printed on every run.
+  if [[ -f scripts/check_unbound_gateway_verifier.py ]]; then
+    uv run python scripts/check_unbound_gateway_verifier.py . \
+      --allowlist scripts/unbound_gateway_verifier_allowlist.txt
+  fi
 fi
 
 if find . -name '*.tf' -not -path '*/.terraform/*' -print -quit | grep -q .; then

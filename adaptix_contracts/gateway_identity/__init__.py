@@ -38,6 +38,8 @@ from adaptix_contracts.gateway_signature import (
     require_int_seconds,
     has_gateway_signature,
     verify_gateway_signature,
+    verify_gateway_signature_for_request,
+    verify_gateway_signature_without_request_binding,
 )
 from adaptix_contracts.gateway_signing import (
     HEADER_AUTH_CONTEXT,
@@ -233,7 +235,10 @@ def verify_legacy_identity(
 
 
 # Back-compat aliases the correctly named: sign() / verify() for the modern
-# context scheme, plus the legacy pair above.
+# context scheme, plus the legacy pair above. ``verify`` is the deprecated
+# unbound verifier under an even shorter name (Contracts #397): it is kept
+# for the overlap period and goes with ``verify_gateway_signature`` in the
+# next major release. New code uses ``verify_gateway_signature_for_request``.
 sign = sign_gateway_context
 verify = verify_gateway_signature
 
@@ -267,5 +272,7 @@ __all__ = [
     "sign_legacy_identity",
     "verify",
     "verify_gateway_signature",
+    "verify_gateway_signature_for_request",
+    "verify_gateway_signature_without_request_binding",
     "verify_legacy_identity",
 ]

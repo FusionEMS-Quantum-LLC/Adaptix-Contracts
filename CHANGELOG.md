@@ -12,6 +12,62 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **`adaptix_contracts.intelligence`: shared Frontier Intelligence contracts**
+  (work package C01). Nine envelopes the engines exchange, each pointing at
+  records the canonical owning service still holds: `EvidenceReference`,
+  `IncidentRelationship`, `GovernedAction`, `InvariantViolation`,
+  `RecoveryAttempt`, `ClinicalEvidenceProposal`, `OptimizationScenario`,
+  `OptimizationRecommendation` and `EngineeringProofManifest`. The validators
+  enforce the safety rules at construction: only a human approves a governed
+  action and never their own; an AI agent's request, a high or critical risk
+  action and a founder-reserved action always need approval; a clinical
+  proposal yields a chart value only after human review; a recommendation is
+  always advisory and is adopted only through a governed action; a violation
+  resolves and a recovery succeeds only with evidence; and Tier 5 is derived
+  from runtime claims on the exact commit covering every proof category,
+  never asserted. Storage and execution are not part of this package.
+
+### Deprecated
+
+- **`verify_gateway_signature` is deprecated; removal is in the next major**
+  (Contracts #397). It checks the signed `method`/`path` claims only when its
+  caller passes `request_method`/`request_path`, and its name does not say so.
+  AssetOps #163 showed the cost: a context signed for `/work-orders/` resolved
+  an identity on `/vendors/`. The `gateway_identity.verify` alias is deprecated
+  with it.
+  - Replacement for HTTP code: `verify_gateway_signature_for_request(request, ...)`,
+    which binds the real method and path and verifies once per request.
+  - Replacement for code no route can reach (workers, CLIs):
+    `verify_gateway_signature_without_request_binding(...)`.
+  - There is no runtime `DeprecationWarning`, because consumers run their tests
+    with `-W error`. Enforcement is `scripts/check_unbound_gateway_verifier.py`.
+  - Downstream uses on each default branch as of 2026-10-18 (94 repositories
+    scanned): Audit `backend/audit_app/api/gateway_auth.py:252` (an HTTP auth
+    path, to bind); Core `core/backend/core_app/auth/gateway_context.py:238`
+    (the no-request arm, to rename). Twelve more call `get_auth_context` by
+    hand without `request=`, several through an import alias: Billing,
+    Calendar, Device, Finance, HL7, HR, Imports, Media, NEMSIS, Partner,
+    Training and Voice. Those are tracked as lanes in Governance #345 (Device
+    by Device #298), not by this change.
+
+### Added
+
+- **`verify_gateway_signature_without_request_binding`** in
+  `gateway_signature` and `gateway_identity`, the explicit name for the
+  no-request verifier (Contracts #397). It cannot take a request method or
+  path, and under `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` a bound context
+  fails closed. `gateway_identity` now also re-exports
+  `verify_gateway_signature_for_request`.
+- **`scripts/check_unbound_gateway_verifier.py`**, run by
+  `scripts/ci/verify-toolchain.sh`. It parses Python with `ast` and reports any
+  use of the deprecated name or its alias, and any plain `get_auth_context(...)`
+  call without `request=`, including calls through an import alias. Accepted sites go in
+  `scripts/unbound_gateway_verifier_allowlist.txt` with a required reason; the
+  count and stale entries print on every run. Services can run the same script
+  against their own tree.
+
 ## [5.44.0] - 2026-10-18
 
 ### Added
