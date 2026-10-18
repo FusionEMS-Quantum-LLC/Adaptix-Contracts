@@ -12,6 +12,34 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.45.0] - 2026-10-18
+
+### Fixed
+
+- **`get_auth_context`'s `request` parameter is typed as what it is, with no
+  suppression** (fix-forward of #404, from Lane R's independent review). It was
+  `request: Request = None  # type: ignore[assignment]`. That comment hid a real
+  finding: Pyright `reportArgumentType` and mypy `assignment`, because `None` is
+  not a `Request`. It is now
+  `request: Annotated[Request | None, Depends(_inbound_request)] = None`, where
+  the private `_inbound_request(request: Request) -> Request` dependency takes
+  the request under the bare `Request` annotation FastAPI injects into, and
+  hands it on. Adaptix-Calendar-Service `require_auth` uses the same pattern.
+  - No behaviour changed. Mounted, a routed request still reaches the
+    verifier. Called directly, `request=` is still optional, and with
+    `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` on, a bound context with no request
+    still fails closed. `tests/test_auth_context_inbound_request.py` pins all
+    three, and passes against the previous code too.
+  - That test also catches a dependency that hands the verifier `None`. The
+    existing `test_get_auth_context_mounts_as_fastapi_dependency` does not,
+    because it only proves that the route registers.
+  - Callers are unaffected: the signature still accepts the same arguments,
+    and its type now also admits an explicit `None`.
+- **Correction to the 5.44.0 entry below.** It said `auth_contracts` was at
+  zero under the reference set. That was true only because of the
+  suppression above. From this release the file reads zero with nothing
+  suppressed.
+
 ### Added
 
 - **`adaptix_contracts.intelligence`: shared Frontier Intelligence contracts**
@@ -28,6 +56,19 @@ from the installed package metadata).
   resolves and a recovery succeeds only with evidence; and Tier 5 is derived
   from runtime claims on the exact commit covering every proof category,
   never asserted. Storage and execution are not part of this package.
+- **`verify_gateway_signature_without_request_binding`** in
+  `gateway_signature` and `gateway_identity`, the explicit name for the
+  no-request verifier (Contracts #397). It cannot take a request method or
+  path, and under `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` a bound context
+  fails closed. `gateway_identity` now also re-exports
+  `verify_gateway_signature_for_request`.
+- **`scripts/check_unbound_gateway_verifier.py`**, run by
+  `scripts/ci/verify-toolchain.sh`. It parses Python with `ast` and reports any
+  use of the deprecated name or its alias, and any plain `get_auth_context(...)`
+  call without `request=`, including calls through an import alias. Accepted sites go in
+  `scripts/unbound_gateway_verifier_allowlist.txt` with a required reason; the
+  count and stale entries print on every run. Services can run the same script
+  against their own tree.
 
 ### Deprecated
 
@@ -51,22 +92,13 @@ from the installed package metadata).
     Calendar, Device, Finance, HL7, HR, Imports, Media, NEMSIS, Partner,
     Training and Voice. Those are tracked as lanes in Governance #345 (Device
     by Device #298), not by this change.
-
-### Added
-
-- **`verify_gateway_signature_without_request_binding`** in
-  `gateway_signature` and `gateway_identity`, the explicit name for the
-  no-request verifier (Contracts #397). It cannot take a request method or
-  path, and under `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` a bound context
-  fails closed. `gateway_identity` now also re-exports
-  `verify_gateway_signature_for_request`.
-- **`scripts/check_unbound_gateway_verifier.py`**, run by
-  `scripts/ci/verify-toolchain.sh`. It parses Python with `ast` and reports any
-  use of the deprecated name or its alias, and any plain `get_auth_context(...)`
-  call without `request=`, including calls through an import alias. Accepted sites go in
-  `scripts/unbound_gateway_verifier_allowlist.txt` with a required reason; the
-  count and stale entries print on every run. Services can run the same script
-  against their own tree.
+  - This deprecation first ships in **5.45.0**. Two docstrings in
+    `gateway_signature.py` still say "since 5.44.0": the module docstring at
+    line 115 and `verify_gateway_signature`'s at line 1083. They came in with
+    #402 after 5.44.0 was set. Correcting them makes that file a modified file
+    under ADX-ZD-001, and it is not yet at zero (its public verifiers return
+    `dict[str, Any]`), so they are corrected in #408 with that file's typing and
+    its own version.
 
 ## [5.44.0] - 2026-10-18
 
@@ -117,7 +149,8 @@ from the installed package metadata).
 ### Changed
 
 - **`auth_contracts` is at zero under the ADX-ZD-001 reference set** (Contracts
-  #403): Pyright strict, mypy `--strict`, the engine Ruff selection. No
+  #403; not quite: one `# type: ignore[assignment]` remained, removed in
+  5.45.0): Pyright strict, mypy `--strict`, the engine Ruff selection. No
   behaviour changed:
   - the decoded gateway payload is typed `Mapping[str, object]`, and a signed
     `roles`/`scopes` claim is read only when it is a JSON array, exactly as
