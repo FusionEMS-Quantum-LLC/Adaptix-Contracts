@@ -12,7 +12,42 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`verify_gateway_signature` is deprecated; removal is in the next major**
+  (Contracts #397). It checks the signed `method`/`path` claims only when its
+  caller passes `request_method`/`request_path`, and its name does not say so.
+  AssetOps #163 showed the cost: a context signed for `/work-orders/` resolved
+  an identity on `/vendors/`. The `gateway_identity.verify` alias is deprecated
+  with it.
+  - Replacement for HTTP code: `verify_gateway_signature_for_request(request, ...)`,
+    which binds the real method and path and verifies once per request.
+  - Replacement for code no route can reach (workers, CLIs):
+    `verify_gateway_signature_without_request_binding(...)`.
+  - There is no runtime `DeprecationWarning`, because consumers run their tests
+    with `-W error`. Enforcement is `scripts/check_unbound_gateway_verifier.py`.
+  - Downstream uses on each default branch as of 2026-10-18 (94 repositories
+    scanned): Audit `backend/audit_app/api/gateway_auth.py:252` (an HTTP auth
+    path, to bind); Core `core/backend/core_app/auth/gateway_context.py:238`
+    (the no-request arm, to rename); Billing `api/cortex_tools.py:157` and
+    `api/dependencies.py:938`, and Device `routes_app_releases.py:291`, call
+    their local `get_auth_context` without `request=` and need triage.
+
 ### Added
+
+- **`verify_gateway_signature_without_request_binding`** in
+  `gateway_signature` and `gateway_identity`, the explicit name for the
+  no-request verifier (Contracts #397). It cannot take a request method or
+  path, and under `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` a bound context
+  fails closed. `gateway_identity` now also re-exports
+  `verify_gateway_signature_for_request`.
+- **`scripts/check_unbound_gateway_verifier.py`**, run by
+  `scripts/ci/verify-toolchain.sh`. It parses Python with `ast` and reports any
+  use of the deprecated name or its alias, and any plain `get_auth_context(...)`
+  call without `request=`. Accepted sites go in
+  `scripts/unbound_gateway_verifier_allowlist.txt` with a required reason; the
+  count and stale entries print on every run. Services can run the same script
+  against their own tree.
 
 - **`air.mission.authorized` and `air.mission.authorization_invalidated` are
   registered** (AIR-09), producer `air`.

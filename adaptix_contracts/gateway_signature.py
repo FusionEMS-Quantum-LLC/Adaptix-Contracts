@@ -105,6 +105,17 @@ checked against the actual request when the caller supplies one — independent
 of the flag — because verifying a claim the payload already makes never
 widens what is accepted.
 
+Choosing a verifier (Contracts #397)
+------------------------------------
+* :func:`verify_gateway_signature_for_request` is the HTTP verifier. It takes
+  the method and path from the served request, so the binding above is always
+  checked, and it verifies once per request.
+* :func:`verify_gateway_signature_without_request_binding` is for callers that
+  no route can reach. Its name says what it does not check.
+* :func:`verify_gateway_signature` is deprecated since 5.44.0. Its short name
+  hid that it skips the binding when called without the request's method and
+  path. It stays, unchanged, until the next major release.
+
 Replay protection (ledger item 1, gap 2)
 -----------------------------------------
 A captured, still-valid signed context could be replayed verbatim within its
@@ -912,7 +923,7 @@ def _check_and_record_replay(payload: dict[str, Any]) -> None:
         heapq.heappush(_replay_expiry_heap, (exp, jti))
 
 
-def verify_gateway_signature(
+def _verify_gateway_signature(
     *,
     context_b64: str,
     signature_hex: str,
@@ -924,6 +935,10 @@ def verify_gateway_signature(
     request_path: str | None = None,
 ) -> dict[str, Any]:
     """Verify a signed gateway auth context. Raises on any failure.
+
+    The single implementation behind the three public verifiers. Which public
+    name a caller uses decides whether the method/path binding can be checked;
+    see "Choosing a verifier" in the module docstring.
 
     Scheme selection is by ``auth_path``/``key_id`` (see :func:`_is_v2_request`)
     and is then gated by :func:`gateway_trust_mode`, so a header can only ever
@@ -1012,6 +1027,88 @@ def verify_gateway_signature(
     return payload
 
 
+def verify_gateway_signature_without_request_binding(
+    *,
+    context_b64: str,
+    signature_hex: str,
+    shared_secret: str | None = None,
+    auth_path: str | None = None,
+    key_id: str | None = None,
+    clock_skew_seconds: int = GATEWAY_CLOCK_SKEW_SECONDS,
+) -> dict[str, Any]:
+    """Verify a gateway context WITHOUT checking which route it was signed for.
+
+    The name is long on purpose (Contracts #397). This verifier never compares
+    the signed ``method``/``path`` claims with anything, so a context the
+    gateway signed for ``GET /a`` verifies identically when it is presented to
+    ``DELETE /b`` of the same audience. That is only sound where no HTTP route
+    can deliver the headers: an in-process caller, a worker, a one-off tool.
+
+    An HTTP request-authentication path must use
+    :func:`verify_gateway_signature_for_request` instead, or resolve
+    ``get_auth_context`` as a FastAPI dependency so FastAPI supplies the
+    request. A call site that uses this name should say in a comment why no
+    route reaches it.
+
+    Every other check still runs: signature, issuer, audience, replay window,
+    identity claims and the single-use replay record. When
+    ``ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH`` is set on the service, a context
+    that carries a binding is refused with
+    :class:`GatewayVerifierConfigurationError`, because this caller can never
+    check it.
+    """
+    return _verify_gateway_signature(
+        context_b64=context_b64,
+        signature_hex=signature_hex,
+        shared_secret=shared_secret,
+        auth_path=auth_path,
+        key_id=key_id,
+        clock_skew_seconds=clock_skew_seconds,
+    )
+
+
+def verify_gateway_signature(
+    *,
+    context_b64: str,
+    signature_hex: str,
+    shared_secret: str | None = None,
+    auth_path: str | None = None,
+    key_id: str | None = None,
+    clock_skew_seconds: int = GATEWAY_CLOCK_SKEW_SECONDS,
+    request_method: str | None = None,
+    request_path: str | None = None,
+) -> dict[str, Any]:
+    """Deprecated: use a verifier whose name says whether the route is bound.
+
+    Deprecated since 5.44.0 and removed in the next major release (Contracts
+    #397, ``DEPRECATION_POLICY.md``). Behaviour is unchanged during the overlap.
+
+    The trap this closes: called without ``request_method``/``request_path``,
+    this function skips the method/path binding, and its name does not say so.
+    AssetOps #163 proved a context signed for ``/work-orders/`` resolving an
+    identity on ``/vendors/`` through exactly that call. Migrate to:
+
+    * :func:`verify_gateway_signature_for_request` for any HTTP route. It takes
+      the method and path from the request and also verifies once per request.
+    * :func:`verify_gateway_signature_without_request_binding` only where no
+      route can reach the call, with a comment saying why.
+
+    No runtime ``DeprecationWarning`` is raised: consumers that run their suites
+    under ``-W error`` would fail on repin, which the overlap exists to avoid.
+    ``scripts/check_unbound_gateway_verifier.py`` is the enforcement instead.
+    """
+    return _verify_gateway_signature(
+        context_b64=context_b64,
+        signature_hex=signature_hex,
+        shared_secret=shared_secret,
+        auth_path=auth_path,
+        key_id=key_id,
+        clock_skew_seconds=clock_skew_seconds,
+        request_method=request_method,
+        request_path=request_path,
+    )
+
+
 #: Attribute name under which the per-request verified-assertion cache lives on
 #: ``request.state``. Starlette creates a fresh ``state`` for every request, so
 #: this cache is inherently request-scoped: it cannot outlive, leak into, or be
@@ -1085,7 +1182,7 @@ def verify_gateway_signature_for_request(
     This is the request-authentication boundary. The FIRST
     authentication-dependent check in a request (whichever of the module
     entitlement gate or ``get_auth_context`` runs first) performs the full
-    :func:`verify_gateway_signature` -- signature, issuer, audience, replay
+    verification -- signature, issuer, audience, replay
     window, identity, method/path binding, AND the single-use replay recording
     -- and binds the verified payload to ``request.state``. Every later check in
     the SAME request that presents the SAME assertion receives that verified
@@ -1103,7 +1200,7 @@ def verify_gateway_signature_for_request(
     REPLAY PROTECTION IS UNCHANGED ACROSS REQUESTS, AND THAT IS THE POINT.
     ``request.state`` is created fresh by Starlette for every request, so a
     genuinely separate request -- including one that replays an assertion --
-    has an empty cache, calls :func:`verify_gateway_signature` itself, and is
+    has an empty cache, verifies again itself, and is
     rejected by the single-use replay guard exactly as before. The reuse here
     is confined to repeated cryptographic verification WITHIN one already
     authenticated request; it can never span requests, users, tenants,
@@ -1116,10 +1213,10 @@ def verify_gateway_signature_for_request(
     ``request`` is required for the once-per-request guarantee. When it is
     ``None`` -- a non-HTTP caller with no request scope, e.g. a worker or a unit
     test invoking the dependency directly -- this performs the full verification
-    directly, identical to calling :func:`verify_gateway_signature`, because
+    directly, identical to the unbound verifier, because
     there is no request boundary to fold a second verification into.
 
-    ``clock_skew_seconds`` is checked first, as :func:`verify_gateway_signature`
+    ``clock_skew_seconds`` is checked first, as the unbound verifier
     checks it, so a bad bound raises ``ValueError`` even when this request
     already holds a verified principal for the same assertion.
     """
@@ -1127,7 +1224,7 @@ def verify_gateway_signature_for_request(
     method, path, state = _request_scope(request)
 
     def _verify() -> dict[str, Any]:
-        return verify_gateway_signature(
+        return _verify_gateway_signature(
             context_b64=context_b64,
             signature_hex=signature_hex,
             shared_secret=shared_secret,
@@ -1241,4 +1338,5 @@ __all__ = [
     "reset_gateway_replay_cache_for_tests",
     "verify_gateway_signature",
     "verify_gateway_signature_for_request",
+    "verify_gateway_signature_without_request_binding",
 ]

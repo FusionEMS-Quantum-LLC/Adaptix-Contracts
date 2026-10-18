@@ -1523,9 +1523,9 @@ def test_get_auth_context_passes_request_method_and_path_to_verifier(
     monkeypatch.setattr(auth_contracts, "has_gateway_signature", signature_present)
     monkeypatch.setattr(auth_contracts, "gateway_shared_secret", lambda: "s3cret")
     # verify-once-per-request routes the crypto verify through the wrapper, which
-    # calls gateway_signature.verify_gateway_signature; patch it there so this
+    # calls gateway_signature._verify_gateway_signature; patch it there so this
     # still pins that the request's method/path reach the verifier.
-    monkeypatch.setattr(gateway_signature, "verify_gateway_signature", fake_verify)
+    monkeypatch.setattr(gateway_signature, "_verify_gateway_signature", fake_verify)
     scope: Scope = {
         "type": "http",
         "method": "POST",

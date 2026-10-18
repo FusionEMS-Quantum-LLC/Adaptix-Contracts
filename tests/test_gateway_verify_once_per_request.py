@@ -122,13 +122,13 @@ def _hmac_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 def _count_verifications(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
     """Spy that counts REAL cryptographic verifications, delegating to the real one."""
     calls = {"n": 0}
-    real = gateway_signature.verify_gateway_signature
+    real = gateway_signature._verify_gateway_signature
 
     def counting(**kw: Any) -> dict[str, Any]:
         calls["n"] += 1
         return real(**kw)
 
-    monkeypatch.setattr(gateway_signature, "verify_gateway_signature", counting)
+    monkeypatch.setattr(gateway_signature, "_verify_gateway_signature", counting)
     return calls
 
 
