@@ -12,6 +12,23 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **`adaptix_contracts.intelligence`: shared Frontier Intelligence contracts**
+  (work package C01). Nine envelopes the engines exchange, each pointing at
+  records the canonical owning service still holds: `EvidenceReference`,
+  `IncidentRelationship`, `GovernedAction`, `InvariantViolation`,
+  `RecoveryAttempt`, `ClinicalEvidenceProposal`, `OptimizationScenario`,
+  `OptimizationRecommendation` and `EngineeringProofManifest`. The validators
+  enforce the safety rules at construction: only a human approves a governed
+  action and never their own; an AI agent's request, a high or critical risk
+  action and a founder-reserved action always need approval; a clinical
+  proposal yields a chart value only after human review; a recommendation is
+  always advisory and is adopted only through a governed action; a violation
+  resolves and a recovery succeeds only with evidence; and Tier 5 is derived
+  from runtime claims on the exact commit covering every proof category,
+  never asserted. Storage and execution are not part of this package.
+
 ### Deprecated
 
 - **`verify_gateway_signature` is deprecated; removal is in the next major**
