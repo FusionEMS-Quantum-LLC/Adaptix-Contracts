@@ -46,6 +46,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import JsonValue
 from sqlalchemy import DateTime, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,8 +86,12 @@ class AuditLogEntry(_AuditBase):
     action: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    changes_before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    changes_after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    changes_before: Mapped[dict[str, JsonValue] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    changes_after: Mapped[dict[str, JsonValue] | None] = mapped_column(
+        JSON, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
