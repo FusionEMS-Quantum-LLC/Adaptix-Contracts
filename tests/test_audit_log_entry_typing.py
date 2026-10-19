@@ -1,38 +1,33 @@
-"""The audit JSON snapshots are declared as what the column stores (Contracts #407).
-
-``AuditLogEntry.changes_before`` / ``changes_after`` were ``Mapped[dict | None]``.
-A bare ``dict`` is ``dict[Unknown, Unknown]`` to Pyright strict and
-``dict[Any, Any]`` to mypy, so every strict consumer that read the columns got
-unknown types at the read (CAD #732 had to go through
-``sqlalchemy.inspect(entry).attrs.<column>.value`` to reach zero). The writer,
-``AuditServiceClient.log_action``, took ``dict[str, Any]``: the two sides did
-not agree.
-
-Both now declare ``dict[str, JsonValue] | None`` with pydantic's ``JsonValue``,
-the alias this package already uses for JSON values. This is the declared type
-only; nothing about what is stored or returned changed.
-"""
-
-from __future__ import annotations
-
 import inspect
-from typing import get_type_hints
+from typing import get_args, get_origin, get_type_hints
 
 from pydantic import JsonValue
-from sqlalchemy.orm import Mapped
 
 from adaptix_contracts.audit_contracts import AuditLogEntry, AuditServiceClient
+
+
+def test_audit_log_snapshots_are_typed_json_objects() -> None:
+    annotations = get_type_hints(AuditLogEntry)
+
+    for column in ("changes_before", "changes_after"):
+        snapshot_type = get_args(annotations[column])[0]
+        object_type = next(
+            item for item in get_args(snapshot_type) if item is not type(None)
+        )
+
+        assert get_origin(object_type) is dict
+        assert get_args(object_type) == (str, JsonValue)
+
 
 SNAPSHOT_TYPE = dict[str, JsonValue] | None
 
 
-def test_changes_columns_declare_a_json_object_or_none() -> None:
-    hints = get_type_hints(AuditLogEntry)
-    assert hints["changes_before"] == Mapped[SNAPSHOT_TYPE]
-    assert hints["changes_after"] == Mapped[SNAPSHOT_TYPE]
-
-
 def test_writer_parameters_agree_with_the_columns() -> None:
+    """``log_action`` takes the type the columns store (Contracts #407).
+
+    It took ``dict[str, Any]`` while the columns held ``dict``; the two sides of
+    the same value did not agree, and ``Any`` hid that from every checker.
+    """
     hints = get_type_hints(AuditServiceClient.log_action)
     assert hints["changes_before"] == SNAPSHOT_TYPE
     assert hints["changes_after"] == SNAPSHOT_TYPE

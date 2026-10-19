@@ -49,7 +49,6 @@ from pydantic import JsonValue
 from sqlalchemy import DateTime, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing_extensions import override
 
 logger = logging.getLogger(__name__)
 
@@ -71,10 +70,8 @@ class AuditLogEntry(_AuditBase):
         action: Dot-namespaced action string e.g. ``cad.case.created``.
         resource_type: Entity type e.g. ``case``, ``unit``, ``assignment``.
         resource_id: Entity identifier string.
-        changes_before: JSON snapshot of relevant fields before the mutation:
-            a JSON object (``dict[str, JsonValue]``), or ``None``.
-        changes_after: JSON snapshot of relevant fields after the mutation,
-            the same shape.
+        changes_before: JSON snapshot of relevant fields before the mutation.
+        changes_after: JSON snapshot of relevant fields after the mutation.
         created_at: UTC timestamp of the audit event.
     """
 
@@ -86,11 +83,6 @@ class AuditLogEntry(_AuditBase):
     action: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # The stored value is what the ``JSON`` column round-trips: a JSON object
-    # whose values are JSON values. ``dict`` alone read as ``dict[Unknown,
-    # Unknown]`` to every strict consumer (Contracts #407); ``JsonValue`` is
-    # pydantic's recursive alias for exactly that value set, and is the alias
-    # the rest of this package already uses (``adaptix_contracts.intelligence``).
     changes_before: Mapped[dict[str, JsonValue] | None] = mapped_column(
         JSON, nullable=True
     )
@@ -101,7 +93,6 @@ class AuditLogEntry(_AuditBase):
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
-    @override
     def __repr__(self) -> str:
         return (
             f"<AuditLogEntry {self.id} ({self.action} on {self.resource_type} "
@@ -155,12 +146,12 @@ class AuditServiceClient:
                 system-initiated actions.
             resource_id: String representation of the entity primary key.
             changes_before: Field snapshot before the mutation, a JSON object
-                (``dict[str, JsonValue]``). Typed as the column it is stored
-                in, so what a caller passes is what a reader gets back.
+                (``dict[str, JsonValue]``): the type of the column it is stored in.
             changes_after: Field snapshot after the mutation, the same shape.
-            ip_address: Source IP of the HTTP request (HIPAA §164.312(b)).
-                Extracted from X-Forwarded-For or direct client address.
-            user_agent: HTTP User-Agent header value (HIPAA §164.312(b)).
+            ip_address: Legacy request metadata accepted for compatibility but
+                not persisted by this deprecated client.
+            user_agent: Legacy request metadata accepted for compatibility but
+                not persisted by this deprecated client.
             **_ignored_kwargs: Additional keyword arguments are silently ignored
                 to allow callers to pass domain-specific metadata without
                 raising TypeError.
@@ -171,6 +162,12 @@ class AuditServiceClient:
         Raises:
             SQLAlchemyError: If the database write fails.
         """
+        if ip_address is not None or user_agent is not None:
+            message = (
+                "legacy AuditServiceClient does not persist ip_address or "
+                "user_agent; migrate to the Audit service to retain request metadata"
+            )
+            logger.warning(message)
         entry = AuditLogEntry(
             tenant_id=tenant_id,
             actor_user_id=actor_user_id,

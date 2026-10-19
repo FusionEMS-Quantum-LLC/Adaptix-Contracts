@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from pydantic import BaseModel
+import pytest
+from pydantic import BaseModel, ValidationError
 
 from adaptix_contracts.part5_sms import (
     PART5_SMS_EVENTS,
@@ -121,13 +122,8 @@ def test_risk_assessment_bounds_likelihood_score_to_one_through_five() -> None:
     )
     assert RiskAssessment(likelihood_score=3, **kwargs).likelihood_score == 3
     for out_of_range in (0, 6):
-        try:
+        with pytest.raises(ValidationError):
             RiskAssessment(likelihood_score=out_of_range, **kwargs)
-        except Exception:
-            continue
-        raise AssertionError(
-            f"likelihood_score={out_of_range} should have been rejected"
-        )
 
 
 def test_mitigation_defaults_to_proposed_and_srm_pillar() -> None:

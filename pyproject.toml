@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "adaptix-contracts"
-version = "5.47.0"
+version = "5.46.0"
 description = "Shared cross-domain schemas and contracts for the Adaptix platform"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
@@ -31,12 +31,6 @@ dependencies = [
     # among them) run on the asyncio layer; without the extra the first
     # AsyncSession fails with "No module named greenlet".
     "SQLAlchemy[asyncio]",
-    # ``typing_extensions.override`` marks the one method this package overrides
-    # (``AuditLogEntry.__repr__``) on the 3.11 floor, where ``typing.override``
-    # does not exist (it is 3.12+). Declared, not assumed: fastapi and pydantic
-    # above both require typing-extensions, so no consumer's resolved graph
-    # changes; 4.4.0 is the release that added ``override``.
-    "typing-extensions>=4.4.0",
 ]
 
 # NOT base dependencies:

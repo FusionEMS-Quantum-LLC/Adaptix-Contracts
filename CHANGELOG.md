@@ -12,43 +12,93 @@ from the installed package metadata).
 
 ## [Unreleased]
 
-## [5.47.0] - 2026-10-19
+### Added
+
+- **`adaptix_contracts.validation_errors.install_input_free_validation_errors(app)`**
+  (#375). One call in an app factory makes that FastAPI app answer a refused
+  request (422) without repeating what the caller sent. FastAPI's default
+  answer carries each error's `input` (the rejected value, or the whole body
+  when a required field is missing or a model validator refuses it) and `ctx`.
+  In Adaptix those bodies hold patient and payment data. Each error keeps
+  `type`, `loc` and `msg` in FastAPI's own `{"detail": [...]}` shape, so no
+  client that reads `loc` and `msg` changes; this is the answer Gateway,
+  Integrations and Transport already give. WebSocket routes are covered too:
+  FastAPI's default closes a refused socket (1008) with every error, `input`
+  included, as the close reason; the installer keeps the 1008 close with the
+  input-free errors. The handlers and the allow-list function are exported.
+  Additive; nothing changes until a service calls the installer. A custom validator that quotes its input in `msg` is still
+  the validator's own defect.
+
+### Fixed
+
+- **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
+  objects** (`dict[str, JsonValue] | None`) instead of bare dictionaries.
+  This is a type-only contract correction; stored values and runtime behavior
+  are unchanged. Audit-log readers, including CAD, can consume the snapshots
+  without unknown dictionary key or value types. Unreleased by design: the
+  version is bumped when the release that ships this is tagged, so `main`
+  never declares a version that has no tag (see Version Tag Drift).
+- **`AuditServiceClient.log_action` takes the type the columns store** (Contracts
+  #407, the writer half). `changes_before` / `changes_after` are
+  `dict[str, JsonValue] | None`, where they were `dict[str, Any] | None`, so the
+  writer and the `AuditLogEntry` columns now declare one type; the discarded
+  `**_ignored_kwargs` are `object`, not `Any`. Declared types only: what is
+  stored and returned is unchanged. A caller passing a literal, or a value typed
+  `dict[str, Any]` (CAD's `audit_service.py` does both), is unaffected; a caller
+  holding a `dict[str, str]` or `dict[str, object]` variable gains an
+  invariance finding under strict checking and spells it
+  `dict[str, JsonValue]`. Org code search 2026-10-19 found the one consumer of
+  this module, Adaptix-CAD-Service, and no such variable.
+  - Classification: MINOR for the release that ships it (a parameter type
+    visible to strict consumers changed; nothing removed or renamed). Unreleased
+    by design: the version is bumped when that release is tagged.
+  - `audit_contracts.py` still carries one reference-set finding: `__repr__`
+    overrides `object.__repr__` without `@override` (Pyright
+    `reportImplicitOverride`, mypy `explicit-override`). The marker is
+    `typing_extensions.override` on this library's 3.11 floor
+    (`typing.override` is 3.12+), and the engine's toolchain policy does not
+    approve `typing-extensions` as a Python dependency (measured: `unapproved
+    Python dependency typing-extensions ([project] dependencies)`), so it is
+    not taken here. It needs that policy decision.
+
+## [5.46.0] - 2026-10-19
 
 ### Changed
 
-- **`AuditLogEntry.changes_before` / `changes_after` are declared as the JSON
-  object the column stores** (Contracts #407): `Mapped[dict[str, JsonValue] |
-  None]`, with pydantic's `JsonValue` (the alias `adaptix_contracts.intelligence`
-  already uses), instead of `Mapped[dict | None]`. A bare `dict` read as
-  `dict[Unknown, Unknown]` to Pyright strict and `dict[Any, Any]` to mypy, so
-  every strict reader of the two columns got unknown types at the read; CAD
-  (#732) had to reach them through `sqlalchemy.inspect(entry).attrs` to get to
-  zero. Declared type only: what is stored, returned or serialised is unchanged.
-  - `AuditServiceClient.log_action` now takes `changes_before` /
-    `changes_after` as the same `dict[str, JsonValue] | None` it stores, where
-    it took `dict[str, Any] | None`, and types its discarded `**_ignored_kwargs`
-    as `object`. A caller passing a literal, or a value typed `dict[str, Any]`
-    (CAD's `audit_service.py` does both), is unaffected. A caller holding a
-    variable typed `dict[str, str]` or `dict[str, object]` gains an invariance
-    finding under strict checking and spells the variable
-    `dict[str, JsonValue]`; the org code search found no such caller.
-  - Classification: MINOR. A field type visible to strict consumers changed,
-    which is more than a PATCH; nothing is removed or renamed and runtime is
-    unchanged, so it is not MAJOR. Consumers of this module (org code search
-    2026-10-19, `adaptix_contracts.audit_contracts`): Adaptix-CAD-Service only
-    (`cad_app/audit_service.py`, `cad_app/router.py`, migration
-    `019_add_audit_log_entries`, and its tests); every other `changes_before`
-    hit in the organisation is a service's own audit model. Integrations'
-    hits are archived documents.
-  - `audit_contracts.py` reads zero under the reference set with this change:
-    its `__repr__` is marked `@override`, and that marker is
-    `typing_extensions.override`, because `typing.override` is Python 3.12+
-    and this library's floor is 3.11. **`typing-extensions>=4.4.0` is therefore
-    declared as a dependency.** fastapi and pydantic, both base dependencies
-    here, already require it, so no consumer's resolved graph changes.
-  - `tests/test_audit_log_entry_typing.py` pins the column and parameter
-    annotations and the absence of `Any` in the module; all four tests fail
-    against the previous declaration.
+- **MINOR type-contract change for gateway verification.** The three public
+  verifiers now return `VerifiedGatewayPayload` instead of `dict[str, Any]`,
+  and `verify_gateway_signature_for_request` accepts a structural `GatewayRequest`
+  Protocol describing `method`, `url.path` and `state`. Runtime verification
+  behavior is unchanged. Unchecked claim values are typed as `object`; strict
+  consumers must narrow them before relying on their shape.
+  - The issue's initial search names 17 direct call sites in 13 repositories:
+    AssetOps `auth.py:326`; Audit `api/gateway_auth.py:252`; CAD
+    `demo/context.py:247`; Core `auth/gateway_context.py:237-238`; Device
+    `auth/__init__.py:288`; EPCR `auth/auth_context.py:238`,
+    `demo/context.py:127`, `services/chart_fields_commit_service.py:202`;
+    Founder `auth.py:347`, `founder_actions/s2s.py:135`; Labor
+    `employee_identity.py:315`; Medications `dependencies.py:134`; Narcotics
+    `core_app/main.py:284`; QHIN `auth.py:52`; SignalCore
+    `security/identity.py:165`; TrustSign `auth.py:134`.
+  - The per-consumer strict type-check results are **UNKNOWN**, not zero: this
+    checkout contains only Adaptix-Contracts, and repository/code search in this
+    session exposed no consumer repositories. Multiline imports, aliases and
+    `gateway_identity.verify` callers therefore remain unenumerated and
+    unmeasured. The MINOR classification follows the public type-surface change;
+    the fleet impact sweep remains incomplete pending consumer checkouts.
+- Correct the verifier deprecation docstrings to say it was deprecated in
+  5.45.0, its first shipping version.
+
+### Fixed
+
+- **`VerifiedGatewayPayload` declares `module_entitlements` and `session_jti`.**
+  The gateway's own producer (`adaptix-gateway` `cognito_auth.py`) always
+  emits both, and `module_entitlement_gate` reads `module_entitlements` off the
+  verified payload. The undeclared read was Qodana's one High finding on main
+  (`PyTypedDictInspection`, `module_entitlement_gate.py:201`), which kept
+  `qodana-security` red and blocked cutting this release. Both are optional
+  `object` keys, like the other unchecked claims. A test now fails if the gate
+  reads a payload key the TypedDict does not declare.
 
 ## [5.45.0] - 2026-10-18
 
