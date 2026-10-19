@@ -57,8 +57,6 @@ logger = logging.getLogger(__name__)
 class _AuditBase(DeclarativeBase):
     """Isolated declarative base for audit log model."""
 
-    pass
-
 
 class AuditLogEntry(_AuditBase):
     """Immutable audit log entry written by AuditServiceClient.
@@ -199,4 +197,4 @@ class AuditServiceClient:
 # (the standalone Audit service surface). Retained for backward compatibility.
 __deprecated__ = True
 
-__all__ = ["AuditServiceClient", "AuditLogEntry"]
+__all__ = ["AuditLogEntry", "AuditServiceClient"]
