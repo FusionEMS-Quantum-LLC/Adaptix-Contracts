@@ -12,6 +12,23 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **`adaptix_contracts.validation_errors.install_input_free_validation_errors(app)`**
+  (#375). One call in an app factory makes that FastAPI app answer a refused
+  request (422) without repeating what the caller sent. FastAPI's default
+  answer carries each error's `input` (the rejected value, or the whole body
+  when a required field is missing or a model validator refuses it) and `ctx`.
+  In Adaptix those bodies hold patient and payment data. Each error keeps
+  `type`, `loc` and `msg` in FastAPI's own `{"detail": [...]}` shape, so no
+  client that reads `loc` and `msg` changes; this is the answer Gateway,
+  Integrations and Transport already give. WebSocket routes are covered too:
+  FastAPI's default closes a refused socket (1008) with every error, `input`
+  included, as the close reason; the installer keeps the 1008 close with the
+  input-free errors. The handlers and the allow-list function are exported.
+  Additive; nothing changes until a service calls the installer. A custom validator that quotes its input in `msg` is still
+  the validator's own defect.
+
 ### Fixed
 
 - **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
