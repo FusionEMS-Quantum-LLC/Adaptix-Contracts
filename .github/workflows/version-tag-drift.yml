@@ -1,0 +1,110 @@
+name: Version Tag Drift
+
+# Analysis-only, per CONTRIBUTING.md: "Treat GitHub Actions as analysis-only.
+# Authoritative release/publish automation for this repo runs through CodeBuild."
+# This workflow creates no tag, cuts no release, publishes nothing and deploys
+# nothing. It only READS the declared version and the existing tags and reports
+# a disagreement. Creating the tag remains the CodeBuild release path's job.
+#
+# Why this exists. Consumers do not read this repository's pyproject version
+# directly; they pin a Contracts target that adaptix-ops declares in
+# config/platform-standard.yaml, and adaptix-ops' required `config:validate`
+# gate asserts that the newest semver TAG, the version on this repo's default
+# branch, and that pin all agree. So an untagged version bump here is not a
+# local cosmetic issue: it fails that gate in every adaptix-ops pull request
+# and merge-queue entry, and adaptix-ops is the control plane for 108
+# repositories.
+#
+# This is not hypothetical. On 2026-10-18 pyproject went to 5.44.0 (#404) and
+# then 5.45.0 (#406) with no tag cut for either. adaptix-ops' merge queue took
+# 12 consecutive identical failures at "Validate config authorities" and main
+# sat frozen from 07:41Z until a tag was created by hand the next day. Nothing
+# in this repository reported the cause, because nothing here was watching for
+# it -- the failure surfaced two repositories away, named only the pin.
+#
+# The gate that fails needs a token to reach the public tag list, so it
+# degrades to a warning in any local run and only fails in CI. That is why the
+# bump passed every pre-merge check here and still froze the fleet.
+
+on:
+  push:
+    branches: [main]
+  # A bump can also be noticed late -- for instance when the release path ran
+  # but the tag push failed. Re-check on a schedule so drift cannot sit
+  # unnoticed between merges to main.
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: version-tag-drift-${{ github.ref }}
+  # Never cancel: each run is a fresh judgement about the current state of main,
+  # and a cancelled run leaves that state unjudged.
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Tags are fetched explicitly below; a shallow checkout is enough.
+          fetch-depth: 1
+
+      - name: Compare the declared version against the newest release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          declared="$(
+            python3 - <<'PY'
+          import re, pathlib, sys
+          text = pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
+          # The [project] version, not a dependency pin: first top-level
+          # `version = "..."` at column zero.
+          match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', text)
+          if match is None:
+              sys.exit("could not find a top-level version in pyproject.toml")
+          print(match.group(1))
+          PY
+          )"
+          echo "pyproject declares: ${declared}"
+
+          # Read tags from the API rather than `git tag`, so the result does not
+          # depend on what this checkout happened to fetch.
+          newest="$(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/tags" --jq '.[].name' \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sed 's/^v//' \
+              | sort -t. -k1,1n -k2,2n -k3,3n \
+              | tail -1 || true
+          )"
+
+          if [ -z "${newest}" ]; then
+            echo "::error title=No release tag::This repository has no vX.Y.Z tag at all, so adaptix-ops' contracts freshness gate reports STALE for every consumer. The CodeBuild release path must cut v${declared}."
+            exit 1
+          fi
+          echo "newest semver tag:  v${newest}"
+
+          if [ "${declared}" = "${newest}" ]; then
+            echo "OK -- v${declared} is tagged and is the newest release tag."
+            exit 0
+          fi
+
+          # Which way the disagreement runs changes who has to act, so report
+          # them separately instead of collapsing both into "mismatch".
+          higher="$(printf '%s\n%s\n' "${declared}" "${newest}" \
+            | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)"
+
+          if [ "${higher}" = "${declared}" ]; then
+            echo "::error title=Untagged version bump::pyproject declares ${declared} but the newest release tag is v${newest}. Until v${declared} is cut, adaptix-ops' required config:validate gate fails on every pull request and merge-queue entry across the fleet. The CodeBuild release path owns creating this tag; GitHub Actions is analysis-only here."
+          else
+            echo "::error title=Tag ahead of declared version::The newest release tag is v${newest} but pyproject declares ${declared}. A tag exists for a version this branch does not claim, so the two upstream signals disagree and the freshness gate refuses both."
+          fi
+          exit 1
