@@ -313,6 +313,12 @@ def rbac_decorator(
         async def list_items(rbac: RBACContext, ...):
             ...
     """
+    logger.warning(
+        "rbac_decorator(permission=%s, module=%s) is a deprecated no-op; "
+        "no authorization is enforced",
+        permission,
+        module,
+    )
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
