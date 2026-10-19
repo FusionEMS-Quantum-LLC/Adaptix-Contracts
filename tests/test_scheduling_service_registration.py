@@ -16,11 +16,15 @@ from __future__ import annotations
 
 import importlib
 import json
+from enum import Enum
 from pathlib import Path
+from types import ModuleType
+from uuid import UUID
 
 import pytest
 
 import adaptix_contracts
+from adaptix_contracts._json_narrowing import is_json_list, is_json_object
 from adaptix_contracts.events.registry import ALL_EVENTS, resolve_source_service
 from adaptix_contracts.scheduling.events import ALL_SCHEDULING_EVENTS
 from adaptix_contracts.schemas.service_registry import (
@@ -40,10 +44,23 @@ _MANIFEST_PATH = (
 _MANIFEST_METADATA_KEYS = frozenset({"manifest_version", "generated"})
 
 
-def _load_manifest() -> dict[str, dict]:
+def _load_manifest() -> dict[str, dict[str, object]]:
+    """The manifest's service entries, each proven to be a JSON object.
+
+    ``json.load`` returns an untyped value; the guards say what was checked,
+    so every reader below works on ``dict[str, object]`` and narrows the
+    fields it uses.
+    """
     with _MANIFEST_PATH.open(encoding="utf-8") as handle:
-        raw = json.load(handle)
-    return {k: v for k, v in raw.items() if k not in _MANIFEST_METADATA_KEYS}
+        raw: object = json.load(handle)
+    assert is_json_object(raw), "ownership_manifest.json is not a JSON object"
+    entries: dict[str, dict[str, object]] = {}
+    for key, value in raw.items():
+        if key in _MANIFEST_METADATA_KEYS:
+            continue
+        assert is_json_object(value), f"manifest entry {key!r} is not an object"
+        entries[key] = value
+    return entries
 
 
 def _resolve_source_service(source_service: str) -> ServiceDefinition | None:
@@ -71,11 +88,19 @@ def test_scheduling_service_is_registered() -> None:
     assert SCHEDULING_SERVICE.domain_owner is True
 
 
-def test_service_registry_slugs_and_ports_are_unique() -> None:
+def test_service_registry_slugs_are_unique() -> None:
+    """Slugs are the registry's key, so each must appear once.
+
+    Until Contracts #373 this test also required every ``port`` to be unique.
+    That invariant was never true of production: services are addressed by
+    host (``<slug>.adaptix.internal``), and Adaptix-Infra's production task
+    definitions and gateway ``*_SERVICE_URL`` values put most services on
+    8000. Requiring uniqueness is what kept 17 wrong ports (8001-8009,
+    8040-8047) in the registry. ``tests/test_service_registry_ports.py`` now
+    pins each port to the value Infra declares instead.
+    """
     slugs = [service.slug for service in ALL_SERVICES]
-    ports = [service.port for service in ALL_SERVICES]
     assert len(set(slugs)) == len(slugs), "duplicate slug in ALL_SERVICES"
-    assert len(set(ports)) == len(ports), "duplicate port in ALL_SERVICES"
 
 
 # ---------------------------------------------------------------------------
@@ -88,9 +113,10 @@ def test_every_event_source_service_resolves_to_registered_service() -> None:
     unresolved: dict[str, str] = {}
     for event_type, meta in ALL_EVENTS.items():
         source_service = meta["source_service"]
-        assert isinstance(source_service, str) and source_service, (
-            f"{event_type} has an empty source_service"
+        assert isinstance(source_service, str), (
+            f"{event_type} source_service is not a string"
         )
+        assert source_service, f"{event_type} has an empty source_service"
         if _resolve_source_service(source_service) is None:
             unresolved[event_type] = source_service
 
@@ -104,8 +130,10 @@ def test_scheduling_events_resolve_to_scheduling_service() -> None:
     assert ALL_SCHEDULING_EVENTS, "ALL_SCHEDULING_EVENTS is empty"
     for event_type in ALL_SCHEDULING_EVENTS:
         meta = ALL_EVENTS[event_type]
-        assert meta["source_service"] == "scheduling"
-        assert _resolve_source_service(meta["source_service"]) is SCHEDULING_SERVICE
+        source_service = meta["source_service"]
+        assert isinstance(source_service, str)
+        assert source_service == "scheduling"
+        assert _resolve_source_service(source_service) is SCHEDULING_SERVICE
     # The previously-published value must keep resolving for consumers holding a
     # persisted event row or a pinned older adaptix-contracts.
     assert _resolve_source_service("adaptix-scheduling") is SCHEDULING_SERVICE
@@ -120,7 +148,6 @@ def test_ownership_manifest_is_valid_json_with_service_entries() -> None:
     manifest = _load_manifest()
     assert manifest, "ownership_manifest.json contains no service entries"
     for slug, entry in manifest.items():
-        assert isinstance(entry, dict), f"manifest entry {slug!r} is not an object"
         assert "api_prefixes" in entry, f"manifest entry {slug!r} has no api_prefixes"
         assert isinstance(entry["api_prefixes"], list)
 
@@ -132,7 +159,7 @@ def test_service_registry_route_prefix_matches_ownership_manifest() -> None:
     ``test_registry_slugs_absent_from_ownership_manifest_is_frozen`` below.
     """
     manifest = _load_manifest()
-    mismatches: dict[str, tuple[str, list[str]]] = {}
+    mismatches: dict[str, tuple[str, list[object]]] = {}
     checked = 0
     for service in ALL_SERVICES:
         entry = manifest.get(service.slug)
@@ -140,6 +167,7 @@ def test_service_registry_route_prefix_matches_ownership_manifest() -> None:
             continue
         checked += 1
         prefixes = entry["api_prefixes"]
+        assert is_json_list(prefixes), f"{service.slug!r} api_prefixes is not a list"
         if service.route_prefix not in prefixes:
             mismatches[service.slug] = (service.route_prefix, prefixes)
 
@@ -155,7 +183,11 @@ def test_ownership_manifest_scheduling_entry_owns_all_scheduling_events() -> Non
     entry = manifest["scheduling"]
     assert entry["api_prefixes"] == [SCHEDULING_SERVICE.route_prefix]
     assert entry["service_name"] == "adaptix-scheduling"
-    assert sorted(entry["owned_events"]) == sorted(ALL_SCHEDULING_EVENTS)
+    owned = entry["owned_events"]
+    assert is_json_list(owned)
+    owned_events = [event for event in owned if isinstance(event, str)]
+    assert len(owned_events) == len(owned), "owned_events has a non-string entry"
+    assert sorted(owned_events) == sorted(ALL_SCHEDULING_EVENTS)
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +294,9 @@ def test_crew_service_has_ownership_manifest_entry() -> None:
     manifest = _load_manifest()
     entry = manifest.get("crew")
     assert entry is not None, "ownership_manifest.json has no 'crew' entry"
-    assert SERVICE_BY_SLUG["crew"].route_prefix in entry["api_prefixes"]
+    prefixes = entry["api_prefixes"]
+    assert is_json_list(prefixes)
+    assert SERVICE_BY_SLUG["crew"].route_prefix in prefixes
 
 
 def test_narcotics_manifest_prefix_matches_gateway_routable_plural() -> None:
@@ -277,6 +311,7 @@ def test_narcotics_manifest_prefix_matches_gateway_routable_plural() -> None:
     """
     manifest = _load_manifest()
     prefixes = manifest["narcotics"]["api_prefixes"]
+    assert is_json_list(prefixes)
     assert prefixes[0] == "/api/v1/narcotics"
     assert prefixes[0] == SERVICE_BY_SLUG["narcotics"].route_prefix
     assert "/api/v1/narcotic" in prefixes, (
@@ -320,24 +355,39 @@ def test_deprecated_names_and_replacements_both_resolve(
         )
 
 
+def _exposed(module: ModuleType, name: str) -> object:
+    """The object ``module`` exposes under ``name`` at runtime.
+
+    The legacy modules re-export the canonical names implicitly (no ``__all__``
+    entry and no ``import ... as ...`` form), so a typed attribute access is
+    an ``attr-defined`` error under strict mypy. The runtime fact this test
+    asserts is exactly "the name resolves on the module", which is what
+    ``getattr`` reads. A missing name raises ``AttributeError`` and fails.
+    """
+    return getattr(module, name)
+
+
 def test_canonical_scheduling_models_are_reexported_from_legacy_modules() -> None:
     """Callers may adopt the canonical names from the legacy module paths."""
     from adaptix_contracts.scheduling import models as canonical
     from adaptix_contracts.schemas import labor_contracts, workforce_contracts
     from adaptix_contracts.workforce import models as workforce_models
 
-    assert workforce_contracts.ShiftInstance is canonical.ShiftInstance
-    assert workforce_contracts.ShiftAssignment is canonical.ShiftAssignment
-    assert workforce_contracts.AvailabilityWindow is canonical.AvailabilityWindow
-    assert workforce_contracts.TimeOffRequest is canonical.TimeOffRequest
-    assert workforce_contracts.RiskLevel is canonical.RiskLevel
+    assert _exposed(workforce_contracts, "ShiftInstance") is canonical.ShiftInstance
+    assert _exposed(workforce_contracts, "ShiftAssignment") is canonical.ShiftAssignment
+    assert (
+        _exposed(workforce_contracts, "AvailabilityWindow")
+        is canonical.AvailabilityWindow
+    )
+    assert _exposed(workforce_contracts, "TimeOffRequest") is canonical.TimeOffRequest
+    assert _exposed(workforce_contracts, "RiskLevel") is canonical.RiskLevel
 
-    assert labor_contracts.ShiftInstance is canonical.ShiftInstance
-    assert labor_contracts.ShiftAssignment is canonical.ShiftAssignment
-    assert labor_contracts.ShiftSwapRequest is canonical.ShiftSwapRequest
-    assert labor_contracts.TimeOffRequest is canonical.TimeOffRequest
+    assert _exposed(labor_contracts, "ShiftInstance") is canonical.ShiftInstance
+    assert _exposed(labor_contracts, "ShiftAssignment") is canonical.ShiftAssignment
+    assert _exposed(labor_contracts, "ShiftSwapRequest") is canonical.ShiftSwapRequest
+    assert _exposed(labor_contracts, "TimeOffRequest") is canonical.TimeOffRequest
 
-    assert workforce_models.RiskLevel is canonical.RiskLevel
+    assert _exposed(workforce_models, "RiskLevel") is canonical.RiskLevel
 
 
 # ---------------------------------------------------------------------------
@@ -363,7 +413,7 @@ def test_legacy_enum_value_sets_are_unchanged() -> None:
     CanonicalSwapStatus = canonical.SwapStatus
     CanonicalTimeOffStatus = canonical.TimeOffStatus
 
-    def values(enum_cls) -> set[str]:
+    def values(enum_cls: type[Enum]) -> set[str]:
         return {member.value for member in enum_cls}
 
     # Canonical.
@@ -463,8 +513,8 @@ def test_fatigue_risk_score_carries_folded_assessment_fields() -> None:
 
     # Carried-over fields are optional, so existing producers are unaffected.
     score = FatigueRiskScore(
-        person_id="00000000-0000-0000-0000-000000000001",
-        shift_id="00000000-0000-0000-0000-000000000002",
+        person_id=UUID("00000000-0000-0000-0000-000000000001"),
+        shift_id=UUID("00000000-0000-0000-0000-000000000002"),
         hours_worked_last_24h=12.0,
         hours_worked_last_48h=20.0,
         hours_worked_last_7d=48.0,
