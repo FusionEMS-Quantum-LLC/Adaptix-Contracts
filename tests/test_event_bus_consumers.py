@@ -16,6 +16,7 @@ from adaptix_contracts.event_consumers import (
     EPCR_SERVICE_CONSUMER,
     HOSPITAL_SERVICE_CONSUMER,
     KNOWN_EVENT_BUS_CONSUMERS,
+    QA_SERVICE_CONSUMER,
     TRANSPORT_SERVICE_CONSUMER,
     is_known_event_bus_consumer,
 )
@@ -29,6 +30,7 @@ def test_known_event_bus_consumer_registry_is_exactly_the_current_audited_set() 
         COMMUNICATIONS_SERVICE_CONSUMER,
         EPCR_SERVICE_CONSUMER,
         HOSPITAL_SERVICE_CONSUMER,
+        QA_SERVICE_CONSUMER,
         TRANSPORT_SERVICE_CONSUMER,
     }
 
@@ -39,6 +41,10 @@ def test_is_known_event_bus_consumer_recognizes_canonical_names() -> None:
     assert COMMUNICATIONS_SERVICE_CONSUMER == "communications-service"
     assert is_known_event_bus_consumer(TRANSPORT_SERVICE_CONSUMER) is True
     assert TRANSPORT_SERVICE_CONSUMER == "transport-service"
+    # Adaptix-QA-Service polls as "qa-service" and Core binds QA's credential
+    # to that name; the registry must name it too (Contracts #184).
+    assert is_known_event_bus_consumer(QA_SERVICE_CONSUMER) is True
+    assert QA_SERVICE_CONSUMER == "qa-service"
     assert is_known_event_bus_consumer(f"  {EPCR_SERVICE_CONSUMER}  ") is True
     assert is_known_event_bus_consumer("unknown-service") is False
     assert is_known_event_bus_consumer(None) is False

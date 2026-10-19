@@ -23,6 +23,7 @@ event-bus consumer identifiers. The currently audited names are:
 - `CAD_SERVICE_CONSUMER = "cad-service"`
 - `EPCR_SERVICE_CONSUMER = "epcr-service"`
 - `HOSPITAL_SERVICE_CONSUMER = "hospital-service"`
+- `QA_SERVICE_CONSUMER = "qa-service"`
 - `COMMUNICATIONS_SERVICE_CONSUMER = "communications-service"`
 - `TRANSPORT_SERVICE_CONSUMER = "transport-service"`
 

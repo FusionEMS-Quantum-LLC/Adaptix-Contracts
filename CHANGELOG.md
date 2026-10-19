@@ -14,6 +14,19 @@ from the installed package metadata).
 
 ### Added
 
+- **`adaptix_contracts.event_consumers.QA_SERVICE_CONSUMER`** (`"qa-service"`)
+  (#184), added to `KnownEventBusConsumerName`, `KNOWN_EVENT_BUS_CONSUMERS`,
+  `README.md` and `event_subscriptions.EVENT_BUS_CONSUMER_DECLARATIONS`.
+  Adaptix-QA-Service already polls Core's fan-out under this name for
+  `epcr.chart.amended` and `epcr.chart.finalized`
+  (`backend/qa_app/background_worker.py` line 79, `backend/qa_app/main.py`
+  lines 117-120 and 210 at `b4dee5da404f`), and Core already binds QA's
+  event-bus credential to it (`core_app/auth/event_bus_credentials.py`,
+  `EVENT_BUS_CONSUMER_BY_SERVICE`). This registry was the one place that left
+  it out, so `subscribers_of("epcr.chart.finalized")` and
+  `subscribers_of("epcr.chart.amended")` did not report QA. Additive: no
+  existing name, contract or behavior changes.
+
 - **`adaptix_contracts.validation_errors.install_input_free_validation_errors(app)`**
   (#375). One call in an app factory makes that FastAPI app answer a refused
   request (422) without repeating what the caller sent. FastAPI's default
