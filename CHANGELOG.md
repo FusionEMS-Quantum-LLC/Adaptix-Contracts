@@ -12,6 +12,34 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.46.0] - 2026-10-19
+
+### Changed
+
+- **MINOR type-contract change for gateway verification.** The three public
+  verifiers now return `VerifiedGatewayPayload` instead of `dict[str, Any]`,
+  and `verify_gateway_signature_for_request` accepts a structural `GatewayRequest`
+  Protocol describing `method`, `url.path` and `state`. Runtime verification
+  behavior is unchanged. Strict consumers must narrow optional payload claims
+  before relying on them.
+  - The issue's initial search names 17 direct call sites in 13 repositories:
+    AssetOps `auth.py:326`; Audit `api/gateway_auth.py:252`; CAD
+    `demo/context.py:247`; Core `auth/gateway_context.py:237-238`; Device
+    `auth/__init__.py:288`; EPCR `auth/auth_context.py:238`,
+    `demo/context.py:127`, `services/chart_fields_commit_service.py:202`;
+    Founder `auth.py:347`, `founder_actions/s2s.py:135`; Labor
+    `employee_identity.py:315`; Medications `dependencies.py:134`; Narcotics
+    `core_app/main.py:284`; QHIN `auth.py:52`; SignalCore
+    `security/identity.py:165`; TrustSign `auth.py:134`.
+  - The per-consumer strict type-check results are **UNKNOWN**, not zero: this
+    checkout contains only Adaptix-Contracts, and repository/code search in this
+    session exposed no consumer repositories. Multiline imports, aliases and
+    `gateway_identity.verify` callers therefore remain unenumerated and
+    unmeasured. The MINOR classification follows the public type-surface change;
+    the fleet impact sweep remains incomplete pending consumer checkouts.
+- Correct the verifier deprecation docstrings to say it was deprecated in
+  5.45.0, its first shipping version.
+
 ## [5.45.0] - 2026-10-18
 
 ### Fixed
