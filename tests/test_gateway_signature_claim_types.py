@@ -116,7 +116,7 @@ def test_the_verifier_fails_closed_if_the_payload_proof_is_lost(
     had no such guard to patch.
     """
 
-    def _never_verified(payload: Mapping[str, object]) -> bool:
+    def _never_verified(_payload: Mapping[str, object]) -> bool:
         return False
 
     # Patch the module object the imported verifier runs in. A dotted-string
