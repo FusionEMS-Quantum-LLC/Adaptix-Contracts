@@ -77,13 +77,17 @@ jobs:
           echo "pyproject declares: ${declared}"
 
           # Read tags from the API rather than `git tag`, so the result does not
-          # depend on what this checkout happened to fetch.
+          # depend on what this checkout happened to fetch. The API read is its
+          # own step so a failed read stops the job (set -e) instead of being
+          # reported as "no release tag". `sed -n .../p` selects the semver tags
+          # and, unlike grep, exits 0 when none match, so an untagged repository
+          # still reaches the explicit error below.
+          tags="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/tags" --jq '.[].name')"
           newest="$(
-            gh api --paginate "repos/${GITHUB_REPOSITORY}/tags" --jq '.[].name' \
-              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-              | sed 's/^v//' \
+            printf '%s\n' "${tags}" \
+              | sed -n -E 's/^v([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' \
               | sort -t. -k1,1n -k2,2n -k3,3n \
-              | tail -1 || true
+              | tail -1
           )"
 
           if [ -z "${newest}" ]; then
