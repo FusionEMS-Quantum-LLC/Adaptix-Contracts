@@ -113,9 +113,10 @@ def test_every_event_source_service_resolves_to_registered_service() -> None:
     unresolved: dict[str, str] = {}
     for event_type, meta in ALL_EVENTS.items():
         source_service = meta["source_service"]
-        assert isinstance(source_service, str) and source_service, (
-            f"{event_type} has an empty source_service"
+        assert isinstance(source_service, str), (
+            f"{event_type} source_service is not a string"
         )
+        assert source_service, f"{event_type} has an empty source_service"
         if _resolve_source_service(source_service) is None:
             unresolved[event_type] = source_service
 
@@ -130,7 +131,8 @@ def test_scheduling_events_resolve_to_scheduling_service() -> None:
     for event_type in ALL_SCHEDULING_EVENTS:
         meta = ALL_EVENTS[event_type]
         source_service = meta["source_service"]
-        assert isinstance(source_service, str) and source_service == "scheduling"
+        assert isinstance(source_service, str)
+        assert source_service == "scheduling"
         assert _resolve_source_service(source_service) is SCHEDULING_SERVICE
     # The previously-published value must keep resolving for consumers holding a
     # persisted event row or a pinned older adaptix-contracts.
