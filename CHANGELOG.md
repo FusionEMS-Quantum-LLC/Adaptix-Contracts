@@ -20,8 +20,8 @@ from the installed package metadata).
   verifiers now return `VerifiedGatewayPayload` instead of `dict[str, Any]`,
   and `verify_gateway_signature_for_request` accepts a structural `GatewayRequest`
   Protocol describing `method`, `url.path` and `state`. Runtime verification
-  behavior is unchanged. Strict consumers must narrow optional payload claims
-  before relying on them.
+  behavior is unchanged. Unchecked claim values are typed as `object`; strict
+  consumers must narrow them before relying on their shape.
   - The issue's initial search names 17 direct call sites in 13 repositories:
     AssetOps `auth.py:326`; Audit `api/gateway_auth.py:252`; CAD
     `demo/context.py:247`; Core `auth/gateway_context.py:237-238`; Device

@@ -144,7 +144,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Mapping
-from typing import Literal, NotRequired, Protocol, TypedDict, cast
+from typing import Literal, Protocol, Required, TypedDict, cast
 
 from adaptix_contracts._json_narrowing import is_json_list, is_json_object
 from adaptix_contracts.environment import ENVIRONMENT_ENV, is_production
@@ -279,30 +279,30 @@ class GatewayVerifierConfigurationError(GatewaySignatureError):
     """
 
 
-class VerifiedGatewayPayload(TypedDict):
-    """Claims carried by a verified gateway auth context."""
+class VerifiedGatewayPayload(TypedDict, total=False):
+    """Known claims; values stay broad where the verifier does not validate them."""
 
-    iss: Literal["adaptix-gateway"]
-    aud: str | list[str]
-    user_id: str
-    tenant_id: str
-    iat: int
-    exp: int
-    sub: NotRequired[str]
-    agency_id: NotRequired[str]
-    email: NotRequired[str]
-    roles: NotRequired[list[str]]
-    scopes: NotRequired[list[str]]
-    jti: NotRequired[str]
-    method: NotRequired[str]
-    path: NotRequired[str]
-    is_founder: NotRequired[bool]
-    mfa_verified: NotRequired[bool]
-    is_demo: NotRequired[bool]
-    demo_session_id: NotRequired[str]
-    demo_lease_id: NotRequired[str]
-    demo_persona: NotRequired[str]
-    demo_agency_id: NotRequired[str]
+    iss: Required[Literal["adaptix-gateway"]]
+    aud: Required[str | list[object]]
+    user_id: Required[object]
+    tenant_id: Required[object]
+    iat: Required[_TimestampValue]
+    exp: Required[_TimestampValue]
+    sub: object
+    agency_id: object
+    email: object
+    roles: object
+    scopes: object
+    jti: object
+    method: object
+    path: object
+    is_founder: object
+    mfa_verified: object
+    is_demo: object
+    demo_session_id: object
+    demo_lease_id: object
+    demo_persona: object
+    demo_agency_id: object
 
 
 class _GatewayRequestURL(Protocol):
