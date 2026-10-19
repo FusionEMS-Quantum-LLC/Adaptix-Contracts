@@ -191,8 +191,11 @@ class EventBusPublisherClient:
     LEGACY_SHARED_QUEUE_DEPRECATION_VERSION = "2.8.0"
     # Removing the omitted-consumer path NARROWS accepted values, which
     # DEPRECATION_POLICY.md reserves for a major release. 2.9.0 shipped without
-    # the hard break; the removal target is the next major.
-    LEGACY_SHARED_QUEUE_REMOVAL_VERSION = "3.0.0"
+    # the hard break, and so did 3.0.0, 4.0.0 and 5.0.0, so the warning named a
+    # release that had already passed. The target is the next major after 5.x.
+    # tests/test_event_bus_consumers.py fails a major bump that neither removes
+    # the path nor moves this target on purpose (Contracts #184).
+    LEGACY_SHARED_QUEUE_REMOVAL_VERSION = "6.0.0"
 
     @staticmethod
     def _consumer_param(

@@ -31,6 +31,20 @@ from the installed package metadata).
 
 ### Fixed
 
+- **The omitted-consumer `FutureWarning` no longer names a release that
+  already shipped** (#184). `EventBusPublisherClient.get_pending_events_unfiltered`,
+  `mark_delivered` and `mark_failed` warned that omitting `consumer` "will raise
+  ValueError in adaptix-contracts 3.0.0". 3.0.0, 4.0.0 and 5.0.0 all shipped
+  with the omitted-consumer path still accepted, so the warning promised a
+  break that had already not happened. `LEGACY_SHARED_QUEUE_REMOVAL_VERSION`,
+  `event_consumers.py` and `README.md` now name `6.0.0`, the next major
+  (`DEPRECATION_POLICY.md` reserves narrowing accepted values for a major).
+  `README.md` also lists the two registered consumer names it was missing
+  (`communications-service`, `transport-service`). No behavior changed:
+  omitting `consumer` still works and still warns. New tests in
+  `tests/test_event_bus_consumers.py` fail a major version bump that neither
+  removes the path nor moves the target, and fail when `README.md` drops a
+  registered consumer name or names a different removal target.
 - **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
   objects** (`dict[str, JsonValue] | None`) instead of bare dictionaries.
   This is a type-only contract correction; stored values and runtime behavior
