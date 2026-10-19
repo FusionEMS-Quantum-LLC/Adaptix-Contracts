@@ -12,7 +12,22 @@ from the installed package metadata).
 
 ## [Unreleased]
 
-## [5.46.0] - 2026-10-19
+### Added
+
+- **`adaptix_contracts.validation_errors.install_input_free_validation_errors(app)`**
+  (#375). One call in an app factory makes that FastAPI app answer a refused
+  request (422) without repeating what the caller sent. FastAPI's default
+  answer carries each error's `input` (the rejected value, or the whole body
+  when a required field is missing or a model validator refuses it) and `ctx`.
+  In Adaptix those bodies hold patient and payment data. Each error keeps
+  `type`, `loc` and `msg` in FastAPI's own `{"detail": [...]}` shape, so no
+  client that reads `loc` and `msg` changes; this is the answer Gateway,
+  Integrations and Transport already give. WebSocket routes are covered too:
+  FastAPI's default closes a refused socket (1008) with every error, `input`
+  included, as the close reason; the installer keeps the 1008 close with the
+  input-free errors. The handlers and the allow-list function are exported.
+  Additive; nothing changes until a service calls the installer. A custom validator that quotes its input in `msg` is still
+  the validator's own defect.
 
 ### Fixed
 
@@ -41,14 +56,63 @@ from the installed package metadata).
     pins all 49 ports to the Infra commit above and fails when a new service
     is registered without an Infra-read port.
   - Classification: a published constant's values changed, which a strict
-    consumer comparing against the old number would see, so this is released
-    as a MINOR version rather than a PATCH; it adds no field and removes
-    nothing. No consumer outside this repository reads `ServiceDefinition.port`
-    (org code search 2026-10-19: the per-repository address tables in Billing,
+    consumer comparing against the old number would see, so this ships as a
+    MINOR release rather than a PATCH; it adds no field and removes nothing.
+    No consumer outside this repository reads `ServiceDefinition.port` (org
+    code search 2026-10-19: the per-repository address tables in Billing,
     NEMSIS, Core and Founder are hand-typed copies, not readers). Having those
     tables consume this registry, and an Adaptix-Infra test that compares its
     task definitions and `gateway.json` with it, are the remaining halves of
     #373 and live in those repositories.
+  - Unreleased by design, as the entry above: the version is bumped when the
+    release that ships this is tagged.
+
+- **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
+  objects** (`dict[str, JsonValue] | None`) instead of bare dictionaries.
+  This is a type-only contract correction; stored values and runtime behavior
+  are unchanged. Audit-log readers, including CAD, can consume the snapshots
+  without unknown dictionary key or value types. Unreleased by design: the
+  version is bumped when the release that ships this is tagged, so `main`
+  never declares a version that has no tag (see Version Tag Drift).
+
+## [5.46.0] - 2026-10-19
+
+### Changed
+
+- **MINOR type-contract change for gateway verification.** The three public
+  verifiers now return `VerifiedGatewayPayload` instead of `dict[str, Any]`,
+  and `verify_gateway_signature_for_request` accepts a structural `GatewayRequest`
+  Protocol describing `method`, `url.path` and `state`. Runtime verification
+  behavior is unchanged. Unchecked claim values are typed as `object`; strict
+  consumers must narrow them before relying on their shape.
+  - The issue's initial search names 17 direct call sites in 13 repositories:
+    AssetOps `auth.py:326`; Audit `api/gateway_auth.py:252`; CAD
+    `demo/context.py:247`; Core `auth/gateway_context.py:237-238`; Device
+    `auth/__init__.py:288`; EPCR `auth/auth_context.py:238`,
+    `demo/context.py:127`, `services/chart_fields_commit_service.py:202`;
+    Founder `auth.py:347`, `founder_actions/s2s.py:135`; Labor
+    `employee_identity.py:315`; Medications `dependencies.py:134`; Narcotics
+    `core_app/main.py:284`; QHIN `auth.py:52`; SignalCore
+    `security/identity.py:165`; TrustSign `auth.py:134`.
+  - The per-consumer strict type-check results are **UNKNOWN**, not zero: this
+    checkout contains only Adaptix-Contracts, and repository/code search in this
+    session exposed no consumer repositories. Multiline imports, aliases and
+    `gateway_identity.verify` callers therefore remain unenumerated and
+    unmeasured. The MINOR classification follows the public type-surface change;
+    the fleet impact sweep remains incomplete pending consumer checkouts.
+- Correct the verifier deprecation docstrings to say it was deprecated in
+  5.45.0, its first shipping version.
+
+### Fixed
+
+- **`VerifiedGatewayPayload` declares `module_entitlements` and `session_jti`.**
+  The gateway's own producer (`adaptix-gateway` `cognito_auth.py`) always
+  emits both, and `module_entitlement_gate` reads `module_entitlements` off the
+  verified payload. The undeclared read was Qodana's one High finding on main
+  (`PyTypedDictInspection`, `module_entitlement_gate.py:201`), which kept
+  `qodana-security` red and blocked cutting this release. Both are optional
+  `object` keys, like the other unchecked claims. A test now fails if the gate
+  reads a payload key the TypedDict does not declare.
 
 ## [5.45.0] - 2026-10-18
 

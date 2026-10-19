@@ -46,6 +46,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import JsonValue
 from sqlalchemy import DateTime, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,8 +86,12 @@ class AuditLogEntry(_AuditBase):
     action: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    changes_before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    changes_after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    changes_before: Mapped[dict[str, JsonValue] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    changes_after: Mapped[dict[str, JsonValue] | None] = mapped_column(
+        JSON, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
@@ -145,9 +150,10 @@ class AuditServiceClient:
             resource_id: String representation of the entity primary key.
             changes_before: Field snapshot before the mutation.
             changes_after: Field snapshot after the mutation.
-            ip_address: Source IP of the HTTP request (HIPAA §164.312(b)).
-                Extracted from X-Forwarded-For or direct client address.
-            user_agent: HTTP User-Agent header value (HIPAA §164.312(b)).
+            ip_address: Legacy request metadata accepted for compatibility but
+                not persisted by this deprecated client.
+            user_agent: Legacy request metadata accepted for compatibility but
+                not persisted by this deprecated client.
             **_ignored_kwargs: Additional keyword arguments are silently ignored
                 to allow callers to pass domain-specific metadata without
                 raising TypeError.
@@ -158,6 +164,11 @@ class AuditServiceClient:
         Raises:
             SQLAlchemyError: If the database write fails.
         """
+        if ip_address is not None or user_agent is not None:
+            logger.warning(
+                "legacy AuditServiceClient does not persist ip_address or "
+                "user_agent; migrate to the Audit service to retain request metadata"
+            )
         entry = AuditLogEntry(
             tenant_id=tenant_id,
             actor_user_id=actor_user_id,
