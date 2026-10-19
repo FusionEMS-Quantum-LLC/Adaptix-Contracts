@@ -12,6 +12,44 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.47.0] - 2026-10-19
+
+### Changed
+
+- **`AuditLogEntry.changes_before` / `changes_after` are declared as the JSON
+  object the column stores** (Contracts #407): `Mapped[dict[str, JsonValue] |
+  None]`, with pydantic's `JsonValue` (the alias `adaptix_contracts.intelligence`
+  already uses), instead of `Mapped[dict | None]`. A bare `dict` read as
+  `dict[Unknown, Unknown]` to Pyright strict and `dict[Any, Any]` to mypy, so
+  every strict reader of the two columns got unknown types at the read; CAD
+  (#732) had to reach them through `sqlalchemy.inspect(entry).attrs` to get to
+  zero. Declared type only: what is stored, returned or serialised is unchanged.
+  - `AuditServiceClient.log_action` now takes `changes_before` /
+    `changes_after` as the same `dict[str, JsonValue] | None` it stores, where
+    it took `dict[str, Any] | None`, and types its discarded `**_ignored_kwargs`
+    as `object`. A caller passing a literal, or a value typed `dict[str, Any]`
+    (CAD's `audit_service.py` does both), is unaffected. A caller holding a
+    variable typed `dict[str, str]` or `dict[str, object]` gains an invariance
+    finding under strict checking and spells the variable
+    `dict[str, JsonValue]`; the org code search found no such caller.
+  - Classification: MINOR. A field type visible to strict consumers changed,
+    which is more than a PATCH; nothing is removed or renamed and runtime is
+    unchanged, so it is not MAJOR. Consumers of this module (org code search
+    2026-10-19, `adaptix_contracts.audit_contracts`): Adaptix-CAD-Service only
+    (`cad_app/audit_service.py`, `cad_app/router.py`, migration
+    `019_add_audit_log_entries`, and its tests); every other `changes_before`
+    hit in the organisation is a service's own audit model. Integrations'
+    hits are archived documents.
+  - `audit_contracts.py` reads zero under the reference set with this change:
+    its `__repr__` is marked `@override`, and that marker is
+    `typing_extensions.override`, because `typing.override` is Python 3.12+
+    and this library's floor is 3.11. **`typing-extensions>=4.4.0` is therefore
+    declared as a dependency.** fastapi and pydantic, both base dependencies
+    here, already require it, so no consumer's resolved graph changes.
+  - `tests/test_audit_log_entry_typing.py` pins the column and parameter
+    annotations and the absence of `Any` in the module; all four tests fail
+    against the previous declaration.
+
 ## [5.45.0] - 2026-10-18
 
 ### Fixed

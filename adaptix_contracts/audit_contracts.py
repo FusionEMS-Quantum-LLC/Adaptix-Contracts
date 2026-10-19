@@ -43,12 +43,13 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import JsonValue
 from sqlalchemy import DateTime, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing_extensions import override
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +73,10 @@ class AuditLogEntry(_AuditBase):
         action: Dot-namespaced action string e.g. ``cad.case.created``.
         resource_type: Entity type e.g. ``case``, ``unit``, ``assignment``.
         resource_id: Entity identifier string.
-        changes_before: JSON snapshot of relevant fields before the mutation.
-        changes_after: JSON snapshot of relevant fields after the mutation.
+        changes_before: JSON snapshot of relevant fields before the mutation:
+            a JSON object (``dict[str, JsonValue]``), or ``None``.
+        changes_after: JSON snapshot of relevant fields after the mutation,
+            the same shape.
         created_at: UTC timestamp of the audit event.
     """
 
@@ -85,12 +88,22 @@ class AuditLogEntry(_AuditBase):
     action: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    changes_before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    changes_after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # The stored value is what the ``JSON`` column round-trips: a JSON object
+    # whose values are JSON values. ``dict`` alone read as ``dict[Unknown,
+    # Unknown]`` to every strict consumer (Contracts #407); ``JsonValue`` is
+    # pydantic's recursive alias for exactly that value set, and is the alias
+    # the rest of this package already uses (``adaptix_contracts.intelligence``).
+    changes_before: Mapped[dict[str, JsonValue] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    changes_after: Mapped[dict[str, JsonValue] | None] = mapped_column(
+        JSON, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
+    @override
     def __repr__(self) -> str:
         return (
             f"<AuditLogEntry {self.id} ({self.action} on {self.resource_type} "
@@ -127,11 +140,11 @@ class AuditServiceClient:
         session: AsyncSession,
         actor_user_id: UUID | None = None,
         resource_id: str | None = None,
-        changes_before: dict[str, Any] | None = None,
-        changes_after: dict[str, Any] | None = None,
+        changes_before: dict[str, JsonValue] | None = None,
+        changes_after: dict[str, JsonValue] | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-        **_ignored_kwargs: Any,
+        **_ignored_kwargs: object,
     ) -> AuditLogEntry:
         """Write a structured audit record for a domain mutation.
 
@@ -143,8 +156,10 @@ class AuditServiceClient:
             actor_user_id: UUID of the user performing the action. Nullable for
                 system-initiated actions.
             resource_id: String representation of the entity primary key.
-            changes_before: Field snapshot before the mutation.
-            changes_after: Field snapshot after the mutation.
+            changes_before: Field snapshot before the mutation, a JSON object
+                (``dict[str, JsonValue]``). Typed as the column it is stored
+                in, so what a caller passes is what a reader gets back.
+            changes_after: Field snapshot after the mutation, the same shape.
             ip_address: Source IP of the HTTP request (HIPAA §164.312(b)).
                 Extracted from X-Forwarded-For or direct client address.
             user_agent: HTTP User-Agent header value (HIPAA §164.312(b)).
