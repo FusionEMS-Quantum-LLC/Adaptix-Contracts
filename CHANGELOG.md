@@ -12,6 +12,44 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.46.0] - 2026-10-19
+
+### Fixed
+
+- **`schemas.service_registry` names the port production actually uses for
+  every service** (Contracts #373). Seventeen entries carried ports nothing in
+  production listens on: cad 8001, epcr 8002, fire 8003, billing 8004, crew
+  8005, workforce 8006, transport 8007, communications 8008, telephony 8009,
+  inventory 8040, medications 8041, narcotics 8042, labor 8043, graph 8044,
+  air 8045, scheduling 8046 and audit 8047. Each now reads **8000**, the
+  `containerPort` of its Adaptix-Infra production task definition and the port
+  in the gateway's `*_SERVICE_URL`, both read on Infra `origin/main`
+  `6f5d90972b494148f4bf3cd68025f4dc25692a6e` (2026-10-19). The other 32 entries
+  already agreed with Infra and are unchanged.
+  - `scheduling` has no task definition or gateway URL; the gateway proxies
+    `/api/v1/scheduling` to Labor (Adaptix-Gateway `routes.py` at
+    `02fb20f1a6700e62891b193029c30b8501f91038`), so 8000 is the port the
+    prefix is served on. `qhin` (8048) and `qa` (8049) are not deployed at
+    all; their values are unchanged and are recorded as unverified rather
+    than presented as production.
+  - `ServiceDefinition.port` now documents what it is: a per-host
+    `containerPort` (services are addressed as `<slug>.adaptix.internal`),
+    so ports repeat across the registry. The test that required every port
+    to be unique (`test_service_registry_slugs_and_ports_are_unique`) encoded
+    an invariant production never had and is what kept the wrong values in
+    place; it now checks slugs only. `tests/test_service_registry_ports.py`
+    pins all 49 ports to the Infra commit above and fails when a new service
+    is registered without an Infra-read port.
+  - Classification: a published constant's values changed, which a strict
+    consumer comparing against the old number would see, so this is released
+    as a MINOR version rather than a PATCH; it adds no field and removes
+    nothing. No consumer outside this repository reads `ServiceDefinition.port`
+    (org code search 2026-10-19: the per-repository address tables in Billing,
+    NEMSIS, Core and Founder are hand-typed copies, not readers). Having those
+    tables consume this registry, and an Adaptix-Infra test that compares its
+    task definitions and `gateway.json` with it, are the remaining halves of
+    #373 and live in those repositories.
+
 ## [5.45.0] - 2026-10-18
 
 ### Fixed
