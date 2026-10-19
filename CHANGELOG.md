@@ -12,6 +12,16 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.46.0] - 2026-10-19
+
+### Fixed
+
+- **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
+  objects** (`dict[str, JsonValue] | None`) instead of bare dictionaries.
+  This is a type-only contract correction; stored values and runtime behavior
+  are unchanged. Audit-log readers, including CAD, can consume the snapshots
+  without unknown dictionary key or value types.
+
 ## [5.45.0] - 2026-10-18
 
 ### Fixed
