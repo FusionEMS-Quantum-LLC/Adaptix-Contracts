@@ -35,6 +35,18 @@ def test_rbac_dependencies_emits_deprecation_warning() -> None:
     assert hasattr(mod, "require_billing_access")
 
 
+def test_rbac_decorator_warns_that_it_enforces_nothing(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with pytest.warns(DeprecationWarning, match="rbac_dependencies is deprecated"):
+        mod = _fresh_import("adaptix_contracts.auth.rbac_dependencies")
+
+    with caplog.at_level("WARNING", logger=mod.logger.name):
+        mod.rbac_decorator("inventory:read_items", module="inventory")
+
+    assert "no authorization is enforced" in caplog.text
+
+
 def test_canonical_surfaces_do_not_warn() -> None:
     # The canonical auth surfaces must import clean — no deprecation noise.
     import warnings as _w

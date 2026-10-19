@@ -518,6 +518,8 @@ async def get_auth_context(
             attacker-controlled and can only ever select a STRICTER scheme;
             ``verify_gateway_signature`` gates the final choice on this
             service's trust mode, so no header downgrades a verifier.
+        request: Inbound HTTP request used to bind the signature to its method
+            and path; ``None`` for direct non-HTTP callers.
 
     Returns:
         AuthContext with verified identity.

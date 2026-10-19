@@ -150,9 +150,10 @@ class AuditServiceClient:
             resource_id: String representation of the entity primary key.
             changes_before: Field snapshot before the mutation.
             changes_after: Field snapshot after the mutation.
-            ip_address: Source IP of the HTTP request (HIPAA §164.312(b)).
-                Extracted from X-Forwarded-For or direct client address.
-            user_agent: HTTP User-Agent header value (HIPAA §164.312(b)).
+            ip_address: Legacy request metadata accepted for compatibility but
+                not persisted by this deprecated client.
+            user_agent: Legacy request metadata accepted for compatibility but
+                not persisted by this deprecated client.
             **_ignored_kwargs: Additional keyword arguments are silently ignored
                 to allow callers to pass domain-specific metadata without
                 raising TypeError.
@@ -163,6 +164,11 @@ class AuditServiceClient:
         Raises:
             SQLAlchemyError: If the database write fails.
         """
+        if ip_address is not None or user_agent is not None:
+            logger.warning(
+                "legacy AuditServiceClient does not persist ip_address or "
+                "user_agent; migrate to the Audit service to retain request metadata"
+            )
         entry = AuditLogEntry(
             tenant_id=tenant_id,
             actor_user_id=actor_user_id,
