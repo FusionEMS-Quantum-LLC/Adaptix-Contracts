@@ -25,9 +25,19 @@ from the installed package metadata).
   Integrations and Transport already give. WebSocket routes are covered too:
   FastAPI's default closes a refused socket (1008) with every error, `input`
   included, as the close reason; the installer keeps the 1008 close with the
-  input-free errors. The handlers and the allow-list function are exported. Additive; nothing changes until a service calls
-  the installer. A custom validator that quotes its input in `msg` is still
+  input-free errors. The handlers and the allow-list function are exported.
+  Additive; nothing changes until a service calls the installer. A custom validator that quotes its input in `msg` is still
   the validator's own defect.
+
+### Fixed
+
+- **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
+  objects** (`dict[str, JsonValue] | None`) instead of bare dictionaries.
+  This is a type-only contract correction; stored values and runtime behavior
+  are unchanged. Audit-log readers, including CAD, can consume the snapshots
+  without unknown dictionary key or value types. Unreleased by design: the
+  version is bumped when the release that ships this is tagged, so `main`
+  never declares a version that has no tag (see Version Tag Drift).
 
 ## [5.46.0] - 2026-10-19
 
