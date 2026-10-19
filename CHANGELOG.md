@@ -40,6 +40,17 @@ from the installed package metadata).
 - Correct the verifier deprecation docstrings to say it was deprecated in
   5.45.0, its first shipping version.
 
+### Fixed
+
+- **`VerifiedGatewayPayload` declares `module_entitlements` and `session_jti`.**
+  The gateway's own producer (`adaptix-gateway` `cognito_auth.py`) always
+  emits both, and `module_entitlement_gate` reads `module_entitlements` off the
+  verified payload. The undeclared read was Qodana's one High finding on main
+  (`PyTypedDictInspection`, `module_entitlement_gate.py:201`), which kept
+  `qodana-security` red and blocked cutting this release. Both are optional
+  `object` keys, like the other unchecked claims. A test now fails if the gate
+  reads a payload key the TypedDict does not declare.
+
 ## [5.45.0] - 2026-10-18
 
 ### Fixed

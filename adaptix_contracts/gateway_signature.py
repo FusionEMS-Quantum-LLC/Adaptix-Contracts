@@ -303,6 +303,10 @@ class VerifiedGatewayPayload(TypedDict, total=False):
     demo_lease_id: object
     demo_persona: object
     demo_agency_id: object
+    # The gateway's own producer (adaptix-gateway cognito_auth.py) always emits
+    # these two; module_entitlement_gate reads module_entitlements off this type.
+    session_jti: object
+    module_entitlements: object
 
 
 class _GatewayRequestURL(Protocol):
