@@ -1,5 +1,9 @@
 import inspect
+import sys
 from typing import get_args, get_origin, get_type_hints
+from uuid import UUID
+
+import pytest
 
 from pydantic import JsonValue
 
@@ -46,3 +50,41 @@ def test_module_source_carries_no_any() -> None:
 
     source = inspect.getsource(module)
     assert "Any" not in source.replace("JsonValue", "")
+
+
+def test_audit_log_entry_repr_text_is_unchanged() -> None:
+    """The text a log line or debugger shows for an entry (Contracts #407).
+
+    ``__repr__`` is a custom override, not the ``<AuditLogEntry object at ...>``
+    default, so consumers can read who did what from it. Marking it ``@override``
+    must not change it.
+    """
+    entry = AuditLogEntry(
+        id=UUID("00000000-0000-0000-0000-0000000000a1"),
+        tenant_id=UUID("00000000-0000-0000-0000-0000000000b2"),
+        actor_user_id=UUID("00000000-0000-0000-0000-0000000000c3"),
+        action="cad.case.created",
+        resource_type="case",
+        resource_id="case-1",
+    )
+    assert repr(entry) == (
+        "<AuditLogEntry 00000000-0000-0000-0000-0000000000a1 "
+        "(cad.case.created on case case-1 by "
+        "00000000-0000-0000-0000-0000000000c3)>"
+    )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason=(
+        "typing.override sets __override__ from 3.12; on the 3.11 floor the "
+        "marker is an identity decorator (CI runs 3.12)"
+    ),
+)
+def test_repr_override_is_marked_with_the_stdlib_marker() -> None:
+    """The override is declared, not implicit (reportImplicitOverride).
+
+    ``typing.override`` records ``__override__ = True`` on the function, so the
+    marker is observable at runtime on 3.12+ and the type checkers read it.
+    """
+    assert getattr(AuditLogEntry.__repr__, "__override__", False) is True
