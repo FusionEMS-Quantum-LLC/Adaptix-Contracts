@@ -213,7 +213,7 @@ jobs:
 
       - name: Archive the Trivy evidence
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: adaptix-trivy-security-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/trivy/out/
@@ -224,7 +224,7 @@ jobs:
       # Never from a merge group: see NO CODE-SCANNING UPLOAD FROM A MERGE GROUP.
       - name: Publish the SARIF evidence to code scanning
         if: ${{ !cancelled() && true && github.event_name != 'merge_group' }}
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: ${{ runner.temp }}/trivy/out/trivy.sarif
           category: trivy
