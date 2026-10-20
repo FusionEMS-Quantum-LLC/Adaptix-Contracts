@@ -132,14 +132,15 @@ from the installed package metadata).
   - Classification: MINOR for the release that ships it (a parameter type
     visible to strict consumers changed; nothing removed or renamed). Unreleased
     by design: the version is bumped when that release is tagged.
-  - `audit_contracts.py` still carries one reference-set finding: `__repr__`
-    overrides `object.__repr__` without `@override` (Pyright
-    `reportImplicitOverride`, mypy `explicit-override`). The marker is
-    `typing_extensions.override` on this library's 3.11 floor
-    (`typing.override` is 3.12+), and the engine's toolchain policy does not
-    approve `typing-extensions` as a Python dependency (measured: `unapproved
-    Python dependency typing-extensions ([project] dependencies)`), so it is
-    not taken here. It needs that policy decision.
+  - `AuditLogEntry.__repr__` carries an override marker, with no new
+    dependency. The marker is `typing.override` on Python 3.12+ and an identity
+    decorator on this library's 3.11 floor, because `typing.override` is 3.12+
+    and the engine's toolchain policy rejects `typing-extensions` as a Python
+    dependency (`unapproved Python dependency typing-extensions ([project]
+    dependencies)`). The repr text is unchanged (it is not the default, so it is
+    not removed) and is pinned by a test. `audit_contracts.py` reads zero under
+    the reference set at the 3.12 target; a mypy run pointed at 3.11 reports the
+    one `explicit-override` that only `typing-extensions` could clear.
 - **`gateway_signature.py` reaches zero without joined literals or casts**
   (Contracts #408, residue of #410). The typed public surface (`VerifiedGatewayPayload`,
   `GatewayRequest`) shipped in 5.46.0; the file read zero under Pyright strict and
