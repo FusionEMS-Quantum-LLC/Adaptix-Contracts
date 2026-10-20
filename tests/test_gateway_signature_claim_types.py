@@ -28,6 +28,7 @@ import pytest
 from adaptix_contracts import gateway_signature
 from adaptix_contracts.gateway_signature import (
     GatewaySignatureError,
+    require_int_seconds,
     verify_gateway_signature_without_request_binding,
 )
 
@@ -128,3 +129,43 @@ def test_the_verifier_fails_closed_if_the_payload_proof_is_lost(
     context, signature = _signed()
     with pytest.raises(GatewaySignatureError, match="lost a required claim"):
         _ = _verify(context, signature)
+
+
+@pytest.mark.parametrize(
+    "value", [None, "5", 1.5, float("inf"), float("nan"), True, False, [], b"5"]
+)
+def test_a_bound_that_is_not_an_int_is_a_plain_valueerror(value: object) -> None:
+    """The wrong-type branch is exactly ``ValueError`` (Contracts #408).
+
+    That is the documented contract: "a plain ``ValueError`` and not any
+    verifier's own error class", asserted by ``test_verifier_leeway_bounds``
+    for every verifier. The engine's TRY004 prefers ``TypeError`` here; a
+    subclass of both was tried and changes the exact type those tests pin
+    (55 failures), so the rule is left to a predicate helper and the type stays.
+    ``bool`` is an ``int`` subclass and is refused too.
+    """
+    with pytest.raises(ValueError, match="must be an int number of seconds") as caught:
+        require_int_seconds(value, "leeway_seconds")
+    assert type(caught.value) is ValueError
+
+
+@pytest.mark.parametrize(
+    ("value", "positive", "message"),
+    [
+        (-1, False, "must not be negative"),
+        (0, True, "must be a positive number of seconds"),
+        (-5, True, "must be a positive number of seconds"),
+    ],
+)
+def test_a_range_violation_stays_a_plain_valueerror_and_not_a_typeerror(
+    value: int, positive: bool, message: str
+) -> None:
+    """A value of the right type that is out of range is not a type error."""
+    with pytest.raises(ValueError, match=message) as caught:
+        require_int_seconds(value, "leeway_seconds", positive=positive)
+    assert not isinstance(caught.value, TypeError)
+
+
+@pytest.mark.parametrize(("value", "positive"), [(0, False), (1, True), (300, False)])
+def test_a_valid_bound_is_accepted(value: int, positive: bool) -> None:
+    require_int_seconds(value, "leeway_seconds", positive=positive)
