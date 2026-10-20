@@ -42,13 +42,35 @@ session; no cross-service network call is made.
 from __future__ import annotations
 
 import logging
+import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import ParamSpec, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import JsonValue
 from sqlalchemy import DateTime, JSON, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    _Params = ParamSpec("_Params")
+    _Result = TypeVar("_Result")
+
+    def override(method: Callable[_Params, _Result], /) -> Callable[_Params, _Result]:
+        """``typing.override`` for the Python 3.11 floor of this library.
+
+        ``typing.override`` is 3.12+, and ``typing-extensions`` is not an
+        approved dependency here (the engine toolchain policy rejects it as an
+        unapproved Python dependency), so on 3.11 the marker is an identity
+        decorator. On 3.12+, where the type checkers recognise the real one,
+        the override below is checked; at runtime ``typing.override`` would
+        only set ``__override__``, which nothing here reads.
+        """
+        return method
+
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +115,7 @@ class AuditLogEntry(_AuditBase):
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
+    @override
     def __repr__(self) -> str:
         return (
             f"<AuditLogEntry {self.id} ({self.action} on {self.resource_type} "
