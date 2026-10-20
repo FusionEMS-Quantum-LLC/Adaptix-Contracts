@@ -8,9 +8,9 @@ not invent speculative placeholders.
 The 2.8.0 migration path keeps the legacy "omit consumer => shared queue" shape
 temporarily for not-yet-migrated callers, and 2.9.0 still keeps it: removing it
 narrows accepted values, which ``DEPRECATION_POLICY.md`` reserves for a major
-release, so the hard break moved to 3.0.0. Omitting the consumer still emits
-``FutureWarning`` today, so callers should import one of these constants and
-pass it explicitly now.
+release. 3.0.0, 4.0.0 and 5.0.0 shipped without removing it, so the hard break
+moved to 6.0.0. Omitting the consumer still emits ``FutureWarning`` today, so
+callers should import one of these constants and pass it explicitly now.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ __all__ = [
     "HOSPITAL_SERVICE_CONSUMER",
     "KNOWN_EVENT_BUS_CONSUMERS",
     "KnownEventBusConsumerName",
+    "QA_SERVICE_CONSUMER",
     "TRANSPORT_SERVICE_CONSUMER",
     "is_known_event_bus_consumer",
 ]
@@ -40,6 +41,13 @@ CAD_SERVICE_CONSUMER: Final[str] = "cad-service"
 COMMUNICATIONS_SERVICE_CONSUMER: Final[str] = "communications-service"
 EPCR_SERVICE_CONSUMER: Final[str] = "epcr-service"
 HOSPITAL_SERVICE_CONSUMER: Final[str] = "hospital-service"
+# Adaptix-QA-Service polls the fan-out under this name for
+# ``epcr.chart.amended`` and ``epcr.chart.finalized``
+# (backend/qa_app/background_worker.py line 79, backend/qa_app/main.py lines
+# 117-118 at b4dee5da404f). Core already binds QA's event-bus credential to it
+# (core_app/auth/event_bus_credentials.py ``EVENT_BUS_CONSUMER_BY_SERVICE``);
+# this registry was the one place that did not name it (Contracts #184).
+QA_SERVICE_CONSUMER: Final[str] = "qa-service"
 # Adaptix-Transport-Service polls the fan-out under this name for
 # ``cad.case.created`` (backend/transportlink_app/background_worker.py lines
 # 100 and 147 at bf98ccbc8873, started from main.py line 380). It already
@@ -53,6 +61,7 @@ KnownEventBusConsumerName = Literal[
     "communications-service",
     "epcr-service",
     "hospital-service",
+    "qa-service",
     "transport-service",
 ]
 
@@ -63,6 +72,7 @@ KNOWN_EVENT_BUS_CONSUMERS: frozenset[str] = frozenset(
         COMMUNICATIONS_SERVICE_CONSUMER,
         EPCR_SERVICE_CONSUMER,
         HOSPITAL_SERVICE_CONSUMER,
+        QA_SERVICE_CONSUMER,
         TRANSPORT_SERVICE_CONSUMER,
     }
 )

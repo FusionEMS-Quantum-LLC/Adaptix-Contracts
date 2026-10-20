@@ -14,6 +14,19 @@ from the installed package metadata).
 
 ### Added
 
+- **`adaptix_contracts.event_consumers.QA_SERVICE_CONSUMER`** (`"qa-service"`)
+  (#184), added to `KnownEventBusConsumerName`, `KNOWN_EVENT_BUS_CONSUMERS`,
+  `README.md` and `event_subscriptions.EVENT_BUS_CONSUMER_DECLARATIONS`.
+  Adaptix-QA-Service already polls Core's fan-out under this name for
+  `epcr.chart.amended` and `epcr.chart.finalized`
+  (`backend/qa_app/background_worker.py` line 79, `backend/qa_app/main.py`
+  lines 117-120 and 210 at `b4dee5da404f`), and Core already binds QA's
+  event-bus credential to it (`core_app/auth/event_bus_credentials.py`,
+  `EVENT_BUS_CONSUMER_BY_SERVICE`). This registry was the one place that left
+  it out, so `subscribers_of("epcr.chart.finalized")` and
+  `subscribers_of("epcr.chart.amended")` did not report QA. Additive: no
+  existing name, contract or behavior changes.
+
 - **`adaptix_contracts.validation_errors.install_input_free_validation_errors(app)`**
   (#375). One call in an app factory makes that FastAPI app answer a refused
   request (422) without repeating what the caller sent. FastAPI's default
@@ -31,6 +44,20 @@ from the installed package metadata).
 
 ### Fixed
 
+- **The omitted-consumer `FutureWarning` no longer names a release that
+  already shipped** (#184). `EventBusPublisherClient.get_pending_events_unfiltered`,
+  `mark_delivered` and `mark_failed` warned that omitting `consumer` "will raise
+  ValueError in adaptix-contracts 3.0.0". 3.0.0, 4.0.0 and 5.0.0 all shipped
+  with the omitted-consumer path still accepted, so the warning promised a
+  break that had already not happened. `LEGACY_SHARED_QUEUE_REMOVAL_VERSION`,
+  `event_consumers.py` and `README.md` now name `6.0.0`, the next major
+  (`DEPRECATION_POLICY.md` reserves narrowing accepted values for a major).
+  `README.md` also lists the two registered consumer names it was missing
+  (`communications-service`, `transport-service`). No behavior changed:
+  omitting `consumer` still works and still warns. New tests in
+  `tests/test_event_bus_consumers.py` fail a major version bump that neither
+  removes the path nor moves the target, and fail when `README.md` drops a
+  registered consumer name or names a different removal target.
 - **`schemas.service_registry` names the port production actually uses for
   every service** (Contracts #373). Seventeen entries carried ports nothing in
   production listens on: cad 8001, epcr 8002, fire 8003, billing 8004, crew

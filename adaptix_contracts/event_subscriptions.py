@@ -41,7 +41,7 @@ What this declaration claims, and what it does not
 
 Audited 2026-09-10 against each repository's ``main`` at the commit recorded in
 every citation; CAD was re-audited 2026-09-26 after it retired its CrewLink page
-listener. Core's push-delivery registry (``EVENT_BUS_SERVICE_REGISTRY_JSON``
+listener, and QA was added 2026-10-19 from its ``main`` (Contracts #184). Core's push-delivery registry (``EVENT_BUS_SERVICE_REGISTRY_JSON``
 in ``core_app/event_bus.py``) is a runtime environment value, not code, so
 nothing is declared from it.
 """
@@ -61,6 +61,7 @@ from adaptix_contracts.event_consumers import (
     EPCR_SERVICE_CONSUMER,
     HOSPITAL_SERVICE_CONSUMER,
     KNOWN_EVENT_BUS_CONSUMERS,
+    QA_SERVICE_CONSUMER,
     TRANSPORT_SERVICE_CONSUMER,
 )
 from adaptix_contracts.events.registry import ALL_EVENTS, producer_of
@@ -181,6 +182,10 @@ _EPCR: Final[_AuditedCheckout] = _AuditedCheckout(
 _HOSPITAL: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-Hospital-Service",
     "1a802bc1a585c429b954077335d45a3016ba04ae",
+)
+_QA: Final[_AuditedCheckout] = _AuditedCheckout(
+    "FusionEMS-Quantum-LLC/Adaptix-QA-Service",
+    "b4dee5da404f4771ac3a5f1d8b10f0639a088cfc",
 )
 _TRANSPORT: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-Transport-Service",
@@ -407,6 +412,41 @@ _HOSPITAL_DECLARATION: Final[EventBusConsumerDeclaration] = EventBusConsumerDecl
 )
 
 # ---------------------------------------------------------------------------
+# QA: main.py registers both handlers, builds the worker and starts it from the
+# lifespan; the worker routes by event_type through the registry. Audited
+# 2026-10-19 (Contracts #184).
+# ---------------------------------------------------------------------------
+_QA_WORKER: Final[str] = "backend/qa_app/background_worker.py"
+_QA_MAIN: Final[str] = "backend/qa_app/main.py"
+_QA_CONSUMERS: Final[str] = "backend/qa_app/services/event_consumers.py"
+
+_QA_DECLARATION: Final[EventBusConsumerDeclaration] = EventBusConsumerDeclaration(
+    consumer=QA_SERVICE_CONSUMER,
+    repository=_QA.repository,
+    service_slug="qa",
+    unmapped_reason=None,
+    consumer_name_evidence=_QA.cite(_QA_WORKER, 79),
+    dispatch_evidence=_QA.cite(_QA_WORKER, 421),
+    worker_start_evidence=(
+        _QA.cite(_QA_MAIN, 119),
+        _QA.cite(_QA_MAIN, 120),
+        _QA.cite(_QA_MAIN, 210),
+    ),
+    subscriptions=(
+        _subscription(
+            "epcr.chart.amended",
+            _QA.cite(_QA_MAIN, 117),
+            _QA.cite(_QA_CONSUMERS, 362),
+        ),
+        _subscription(
+            "epcr.chart.finalized",
+            _QA.cite(_QA_MAIN, 118),
+            _QA.cite(_QA_CONSUMERS, 394),
+        ),
+    ),
+)
+
+# ---------------------------------------------------------------------------
 # Transport: background_worker.build_event_registry, started in main.py.
 # ---------------------------------------------------------------------------
 _TRANSPORT_WORKER: Final[str] = "backend/transportlink_app/background_worker.py"
@@ -436,6 +476,7 @@ EVENT_BUS_CONSUMER_DECLARATIONS: Final[tuple[EventBusConsumerDeclaration, ...]] 
     _COMMUNICATIONS_DECLARATION,
     _EPCR_DECLARATION,
     _HOSPITAL_DECLARATION,
+    _QA_DECLARATION,
     _TRANSPORT_DECLARATION,
 )
 """Every Core event-bus consumer whose subscriptions are proven from code."""

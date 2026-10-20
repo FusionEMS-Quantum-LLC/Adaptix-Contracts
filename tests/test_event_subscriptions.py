@@ -18,6 +18,7 @@ from adaptix_contracts.event_consumers import (
     CAD_SERVICE_CONSUMER,
     HOSPITAL_SERVICE_CONSUMER,
     KNOWN_EVENT_BUS_CONSUMERS,
+    QA_SERVICE_CONSUMER,
     TRANSPORT_SERVICE_CONSUMER,
 )
 from adaptix_contracts.event_subscriptions import (
@@ -143,6 +144,7 @@ def test_consumer_to_service_slug_mapping() -> None:
         "communications-service": "communications",
         "epcr-service": "epcr",
         "hospital-service": None,
+        "qa-service": "qa",
         "transport-service": "transport",
     }
 
@@ -159,6 +161,11 @@ def test_subscribers_of_returns_every_consumer_of_a_topic() -> None:
     assert subscribers_of("epcr.chart.finalized") == {
         BILLING_SERVICE_CONSUMER,
         HOSPITAL_SERVICE_CONSUMER,
+        QA_SERVICE_CONSUMER,
+    }
+    assert subscribers_of("epcr.chart.amended") == {
+        BILLING_SERVICE_CONSUMER,
+        QA_SERVICE_CONSUMER,
     }
     assert subscribers_of("cad.case.created") == {TRANSPORT_SERVICE_CONSUMER}
     assert subscribers_of("not.a.subscribed.topic") == frozenset()
@@ -174,6 +181,8 @@ def test_subscription_edges_carry_the_registered_producer_or_none() -> None:
     expected = {
         SubscriptionEdge("epcr", "epcr.chart.finalized", "billing-service", "billing"),
         SubscriptionEdge("epcr", "epcr.chart.finalized", "hospital-service", None),
+        SubscriptionEdge("epcr", "epcr.chart.finalized", "qa-service", "qa"),
+        SubscriptionEdge("epcr", "epcr.chart.amended", "qa-service", "qa"),
         SubscriptionEdge("cad", "cad.case.created", "transport-service", "transport"),
         SubscriptionEdge(
             "billing", "billing.claim.status_updated", "epcr-service", "epcr"
