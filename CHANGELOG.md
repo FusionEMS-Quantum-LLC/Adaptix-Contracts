@@ -74,6 +74,28 @@ from the installed package metadata).
   without unknown dictionary key or value types. Unreleased by design: the
   version is bumped when the release that ships this is tagged, so `main`
   never declares a version that has no tag (see Version Tag Drift).
+- **`AuditServiceClient.log_action` takes the type the columns store** (Contracts
+  #407, the writer half). `changes_before` / `changes_after` are
+  `dict[str, JsonValue] | None`, where they were `dict[str, Any] | None`, so the
+  writer and the `AuditLogEntry` columns now declare one type; the discarded
+  `**_ignored_kwargs` are `object`, not `Any`. Declared types only: what is
+  stored and returned is unchanged. A caller passing a literal, or a value typed
+  `dict[str, Any]` (CAD's `audit_service.py` does both), is unaffected; a caller
+  holding a `dict[str, str]` or `dict[str, object]` variable gains an
+  invariance finding under strict checking and spells it
+  `dict[str, JsonValue]`. Org code search 2026-10-19 found the one consumer of
+  this module, Adaptix-CAD-Service, and no such variable.
+  - Classification: MINOR for the release that ships it (a parameter type
+    visible to strict consumers changed; nothing removed or renamed). Unreleased
+    by design: the version is bumped when that release is tagged.
+  - `audit_contracts.py` still carries one reference-set finding: `__repr__`
+    overrides `object.__repr__` without `@override` (Pyright
+    `reportImplicitOverride`, mypy `explicit-override`). The marker is
+    `typing_extensions.override` on this library's 3.11 floor
+    (`typing.override` is 3.12+), and the engine's toolchain policy does not
+    approve `typing-extensions` as a Python dependency (measured: `unapproved
+    Python dependency typing-extensions ([project] dependencies)`), so it is
+    not taken here. It needs that policy decision.
 
 ## [5.46.0] - 2026-10-19
 
