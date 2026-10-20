@@ -6,7 +6,7 @@ name: qodana-security
 # repository, so this repository carries the scan job itself. The job below
 # is the scan job of that reusable workflow at the commit named here, with
 # its inputs resolved to the values named here and nothing else changed:
-# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/qodana-reusable.yml@e9101c166a862233ef2acfcddb73206b5f8b449c
+# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/qodana-reusable.yml@d1f03ddaf3deae258f8007a74d657de8fe936246
 # inputs: {"baseline-path":"","config-path":"qodana.yaml","linter":"qodana-python","runner":"ubuntu-latest","scan-budget-minutes":15,"working-directory":"."}
 # It publishes the check
 # "adaptix/qodana-security / scan".
@@ -17,8 +17,11 @@ on:
   # queue stalls instead of failing.
   merge_group:
     types: [checks_requested]
-  push:
-    branches: [main]
+  # The full analysis of the default branch: once a day, never on every
+  # push (QODANA-DAILY-FULL-001). GitHub runs a schedule on the default
+  # branch's head, at this minute in UTC.
+  schedule:
+    - cron: "10 13 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -46,10 +49,12 @@ jobs:
     #     QUEUE above) without the license audit (THE CHANGE-ANALYSIS
     #     CONFIGURATION above); a slow scan is made faster first, and only
     #     the four largest services are given a longer ceiling, with numbers.
-    #   push, workflow_dispatch    60. A full analysis of the default branch
-    #     or of a dispatched revision, which no merge waits on; the push run
-    #     populates the Qodana Cloud project report. The merge-queue budget
-    #     does not bind it, and 15 is too short
+    #   schedule, workflow_dispatch  60. A full analysis of the default
+    #     branch, once a day (THE DAILY FULL ANALYSIS above), or of a
+    #     dispatched revision, which no merge waits on; the scheduled run
+    #     populates the Qodana Cloud project report. (push, from a carrier
+    #     pinned before QODANA-DAILY-FULL-001, is the same full analysis.)
+    #     The merge-queue budget does not bind it, and 15 is too short
     #     for the largest repositories: a full Adaptix-Web-App analysis was
     #     cancelled at 15 minutes with no report (run 36077763272), and the
     #     same analysis needed a 29-minute Qodana scan step under a 90-minute
@@ -76,10 +81,13 @@ jobs:
           RUNNER: ${{ 'ubuntu-latest' }}
         run: |
           set -euo pipefail
+          # schedule is the daily full analysis of the default branch
+          # (QODANA-DAILY-FULL-001); push is the same full analysis from a
+          # carrier pinned before it.
           case "${EVENT}" in
-            pull_request|merge_group|push|workflow_dispatch) ;;
+            pull_request|merge_group|schedule|push|workflow_dispatch) ;;
             *)
-              echo "::error title=adaptix/qodana-security::event ${EVENT} is refused; only pull_request, merge_group, push and workflow_dispatch may run the Qodana scan (never pull_request_target)."
+              echo "::error title=adaptix/qodana-security::event ${EVENT} is refused; only pull_request, merge_group, schedule, push and workflow_dispatch may run the Qodana scan (never pull_request_target)."
               exit 1
               ;;
           esac
@@ -128,8 +136,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The pull request's HEAD, not GitHub's synthetic merge commit; the
-          # merge group's own commit for merge_group; the pushed or dispatched
-          # commit otherwise.
+          # merge group's own commit for merge_group; the default branch's head
+          # for schedule; the pushed or dispatched commit otherwise.
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           # Full history: a pull request diffs against its merge base, a
           # merge group against its base commit.
@@ -459,6 +467,15 @@ jobs:
               echo "${EVENT}: this change alters what every file is judged by (${definition_changes% }), so it gets a full analysis of $(git rev-parse HEAD), the analysis the default branch will run"
             elif [ -n "${typescript_7}" ]; then
               echo "${EVENT}: ${lock_in_repository} resolves TypeScript 7 or later (${typescript_7%, }), which a second, warm analysis pass type-checks with the wrong service first, so this change gets a full analysis of $(git rev-parse HEAD), which opens the project once"
+            elif [ "${LINTER}" = "qodana-android" ] || [ "${LINTER}" = "qodana-jvm" ]; then
+              # A GRADLE PROJECT IS ANALYSED IN ONE PASS (above). The head pass
+              # of a change analysis judges the head tree with the project
+              # model the base pass imported, so a source root, module or
+              # dependency the change adds is not in it (Adaptix-Android-
+              # Founder-Command #159: 0 problems on the pull request, 1 High on
+              # main). The full analysis imports the model of the tree it
+              # judges, and costs no more than the two passes.
+              echo "${EVENT}: ${LINTER} analyses a Gradle project, and a change analysis would judge $(git rev-parse HEAD) with the project model imported at ${base_name} ${base}, which lacks whatever source root, module or dependency this change adds; so it gets a full analysis of $(git rev-parse HEAD), which imports the model of the tree it judges"
             else
               pr_mode=true
               echo "QODANA_PR_SHA=${base}" >> "${GITHUB_ENV}"
@@ -467,7 +484,7 @@ jobs:
           else
             echo "${EVENT}: full analysis of $(git rev-parse HEAD)"
           fi
-          # --config is the repository's qodana.yaml on push and
+          # --config is the repository's qodana.yaml on schedule, push and
           # workflow_dispatch, and the derived configuration on the merge-queue
           # path, a change analysis or a full one (THE CHANGE-ANALYSIS
           # CONFIGURATION above): the checked qodana.yaml with the license
@@ -489,21 +506,6 @@ jobs:
             if ! raise_license="$(yq eval '.raiseLicenseProblems // false' "${config_file}")"; then
               echo "::error title=adaptix/qodana-security::${config_file} could not be read as YAML, so the change-analysis configuration cannot be derived from it."
               exit 1
-            fi
-          fi
-          if [ "${pr_mode}" = "true" ] && [ "${LINTER}" = "qodana-android" ]; then
-            # THE ANDROID PROJECT MODEL OF A CHANGE ANALYSIS (above): where the
-            # repository opens an AGP newer than the IDE's Android plugin
-            # knows, the head pass attaches the model the base pass imported
-            # instead of re-syncing while it analyses. A full analysis has one
-            # pass and imports the model once.
-            if ! future_agp="$(yq eval '.properties["gradle.ide.support.future.agp.versions"] // ""' "${config_file}")"; then
-              echo "::error title=adaptix/qodana-security::${config_file} could not be read as YAML, so the change analysis cannot tell how its head pass reopens the Android project."
-              exit 1
-            fi
-            if [ "$(printf '%s' "${future_agp}" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
-              args="${args} --property studio.skip.agp.upgrade=true"
-              echo "change analysis: ${config_file} opens a newer AGP (gradle.ide.support.future.agp.versions), so the head pass reopens the project with studio.skip.agp.upgrade=true and attaches the model the base pass imported instead of re-syncing during its analysis"
             fi
           fi
           if [ -n "${base}" ] && [ "${raise_license}" = "true" ]; then

@@ -6,7 +6,7 @@ name: semgrep-security
 # repository, so this repository carries the gate's one job itself. The job
 # below is the scan job of that reusable workflow, unchanged, at the commit
 # named here:
-# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/semgrep-reusable.yml@0baf90c27e46f83a2d18ff02bce7c77ad403570e
+# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/semgrep-reusable.yml@27dd867d7dd9ad3b895fb4a1b3d58f8d31593a8e
 # It publishes the check
 # "adaptix/semgrep-security / scan".
 
@@ -153,7 +153,22 @@ jobs:
           zipp==4.1.0 --hash=sha256:25ad4e16390cd314347dd8f1de67a2ac538ae658ed4ab9db16029c07c188e97f
           ADAPTIX_SEMGREP_LOCK
           python -m venv "${venv}"
-          "${venv}/bin/python" -m pip install --disable-pip-version-check --no-input --no-deps --only-binary=:all: --require-hashes -r "${lock}"
+          # One attempt is one cold install of the 66 wheels. A stalled index read is bounded per socket
+          # by pip (--timeout 20, --retries 2) and per attempt by `timeout 120`; a failed attempt is tried
+          # again, twice, after 15 s and 30 s: at most 3 x 120 s + 45 s = 405 s of the job's 15-minute
+          # budget, so an index outage ends as a stated install failure with its attempt count, never as
+          # a truncated job timeout that reads like a flake. The hash lock is the authority on every
+          # attempt: a changed file on the index still fails the install, three times, then the gate.
+          attempt=1
+          until timeout 120 "${venv}/bin/python" -m pip install --disable-pip-version-check --no-input --timeout 20 --retries 2 --no-deps --only-binary=:all: --require-hashes -r "${lock}"; do
+            if [ "${attempt}" -ge 3 ]; then
+              echo "::error title=adaptix/semgrep-security::the pinned Semgrep could not be installed from the index in ${attempt} attempts (an index read timed out, or a wheel no longer matches its hash); the gate fails closed and nothing was scanned."
+              exit 1
+            fi
+            echo "::warning title=adaptix/semgrep-security::install attempt ${attempt} of 3 failed; retrying in $((attempt * 15)) s."
+            sleep $((attempt * 15))
+            attempt=$((attempt + 1))
+          done
           "${venv}/bin/python" -m pip check
           installed="$("${venv}/bin/semgrep" --version)"
           if [ "${installed}" != "${SEMGREP_VERSION}" ]; then
@@ -1843,7 +1858,7 @@ jobs:
       # Never from a merge group: see NO CODE-SCANNING UPLOAD FROM A MERGE GROUP.
       - name: Publish the SARIF evidence to code scanning
         if: ${{ !cancelled() && true && github.event_name != 'merge_group' }}
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           sarif_file: ${{ runner.temp }}/semgrep/out/semgrep.code-scanning.sarif
           category: semgrep
