@@ -155,10 +155,12 @@ from the installed package metadata).
   casting. `__all__` is sorted. **No public name, signature, exception type or
   message text changes**, so this carries no contract-version increment
   (internal refactor).
-  - One engine Ruff finding is left on purpose: `require_int_seconds` raises
-    `ValueError` for a value that is not an int (TRY004 prefers `TypeError`).
-    `ValueError` is its documented contract and the tests assert it; changing
-    the exception type is a MAJOR change.
+  - `require_int_seconds` states its int rule once, as
+    `_is_int_seconds(value) -> TypeGuard[int]`, with a single raise. That
+    clears the engine's TRY004 ("prefer `TypeError`") without changing the
+    exception: it is still exactly `ValueError` (the documented contract, pinned
+    by `tests/test_verifier_leeway_bounds.py` for every verifier), with the same
+    message, and `bool` is still refused.
   - `tests/test_gateway_signature_claim_types.py` pins a non-numeric `exp`/`iat`
     as `GatewaySignatureError` (14 cases pass identically on the previous code)
     and the fail-closed branch (fails on the previous code, which has no guard).

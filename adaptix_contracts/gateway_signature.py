@@ -217,6 +217,16 @@ _MAX_CONTEXT_LIFETIME_SECONDS = 300
 _TimestampValue = int | float | str
 
 
+def _is_int_seconds(value: object) -> TypeGuard[int]:
+    """True for an ``int`` that is not a ``bool``.
+
+    ``bool`` is an ``int`` subclass, so ``True`` would otherwise read as one
+    second. A predicate, so :func:`require_int_seconds` states the rule once and
+    narrows ``value`` for the range checks that follow it.
+    """
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def require_int_seconds(value: object, name: str, *, positive: bool = False) -> None:
     """Refuse a time bound that is not a whole, in-range number of seconds.
 
@@ -246,7 +256,7 @@ def require_int_seconds(value: object, name: str, *, positive: bool = False) -> 
             error, never an authentication failure, so it is a plain
             ``ValueError`` and not any verifier's own error class.
     """
-    if isinstance(value, bool) or not isinstance(value, int):
+    if not _is_int_seconds(value):
         message = (
             f"{name} must be an int number of seconds, got "
             f"{type(value).__name__}; a non-int bound could switch the time "
