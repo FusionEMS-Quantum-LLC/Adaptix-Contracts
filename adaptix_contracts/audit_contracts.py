@@ -43,7 +43,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import JsonValue
@@ -56,8 +55,6 @@ logger = logging.getLogger(__name__)
 
 class _AuditBase(DeclarativeBase):
     """Isolated declarative base for audit log model."""
-
-    pass
 
 
 class AuditLogEntry(_AuditBase):
@@ -132,11 +129,11 @@ class AuditServiceClient:
         session: AsyncSession,
         actor_user_id: UUID | None = None,
         resource_id: str | None = None,
-        changes_before: dict[str, Any] | None = None,
-        changes_after: dict[str, Any] | None = None,
+        changes_before: dict[str, JsonValue] | None = None,
+        changes_after: dict[str, JsonValue] | None = None,
         ip_address: str | None = None,
         user_agent: str | None = None,
-        **_ignored_kwargs: Any,
+        **_ignored_kwargs: object,
     ) -> AuditLogEntry:
         """Write a structured audit record for a domain mutation.
 
@@ -148,8 +145,9 @@ class AuditServiceClient:
             actor_user_id: UUID of the user performing the action. Nullable for
                 system-initiated actions.
             resource_id: String representation of the entity primary key.
-            changes_before: Field snapshot before the mutation.
-            changes_after: Field snapshot after the mutation.
+            changes_before: Field snapshot before the mutation, a JSON object
+                (``dict[str, JsonValue]``): the type of the column it is stored in.
+            changes_after: Field snapshot after the mutation, the same shape.
             ip_address: Legacy request metadata accepted for compatibility but
                 not persisted by this deprecated client.
             user_agent: Legacy request metadata accepted for compatibility but
@@ -165,10 +163,11 @@ class AuditServiceClient:
             SQLAlchemyError: If the database write fails.
         """
         if ip_address is not None or user_agent is not None:
-            logger.warning(
+            message = (
                 "legacy AuditServiceClient does not persist ip_address or "
                 "user_agent; migrate to the Audit service to retain request metadata"
             )
+            logger.warning(message)
         entry = AuditLogEntry(
             tenant_id=tenant_id,
             actor_user_id=actor_user_id,
@@ -195,4 +194,4 @@ class AuditServiceClient:
 # (the standalone Audit service surface). Retained for backward compatibility.
 __deprecated__ = True
 
-__all__ = ["AuditServiceClient", "AuditLogEntry"]
+__all__ = ["AuditLogEntry", "AuditServiceClient"]
