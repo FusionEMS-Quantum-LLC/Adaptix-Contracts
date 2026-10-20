@@ -12,6 +12,23 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.47.0] - 2026-10-20
+
+### Added
+
+- **`EpcrBillingTransportBlock.dispatch_priority_code`** (NEMSIS eDispatch.05)
+  and **`adaptix_contracts.epcr.dispatch_priority`** (Billing #1620, owner
+  decision T1). Medicare decides an ambulance emergency response by "the nature
+  of the call at the time of dispatch" (Benefit Policy Manual, Chapter 10,
+  30.1.1), and eDispatch.05 is the charted record of that dispatch triage. The
+  block had no field for it, so pydantic dropped the key and Billing could not
+  read it. The new module holds the four codes of the NEMSIS 3.5.1
+  `DispatchPriority` list with the schema's labels and
+  `is_emergency_dispatch()`: Critical and Emergent are an emergency dispatch,
+  Lower Acuity and Non-Acute are not (Terminology #226), and any other value
+  answers `None`. It never states a service level. Additive: an event without
+  the field still validates.
+
 ### Added
 
 - **`adaptix_contracts.event_consumers.QA_SERVICE_CONSUMER`** (`"qa-service"`)
