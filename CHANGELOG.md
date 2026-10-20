@@ -140,6 +140,28 @@ from the installed package metadata).
     approve `typing-extensions` as a Python dependency (measured: `unapproved
     Python dependency typing-extensions ([project] dependencies)`), so it is
     not taken here. It needs that policy decision.
+- **`gateway_signature.py` reaches zero without joined literals or casts**
+  (Contracts #408, residue of #410). The typed public surface (`VerifiedGatewayPayload`,
+  `GatewayRequest`) shipped in 5.46.0; the file read zero under Pyright strict and
+  mypy only because 29 messages were built with `+` between string literals and
+  7 values were asserted with `cast(...)`, one of them
+  `cast(VerifiedGatewayPayload, payload)` with nothing proving it. Now each
+  message is one parenthesised group bound to a name, the `exp`/`iat` claims are
+  checked with `isinstance` before `int()` (the `TypeError` branch it replaces
+  is the same refusal, `GatewaySignatureError("exp/iat claims are not
+  integers")`), the returned payload is proven by a `TypeGuard`
+  (`_is_verified_gateway_payload`) and the verifier fails closed if that proof
+  were ever lost, and `_request_scope` annotates what it reads instead of
+  casting. `__all__` is sorted. **No public name, signature, exception type or
+  message text changes**, so this carries no contract-version increment
+  (internal refactor).
+  - One engine Ruff finding is left on purpose: `require_int_seconds` raises
+    `ValueError` for a value that is not an int (TRY004 prefers `TypeError`).
+    `ValueError` is its documented contract and the tests assert it; changing
+    the exception type is a MAJOR change.
+  - `tests/test_gateway_signature_claim_types.py` pins a non-numeric `exp`/`iat`
+    as `GatewaySignatureError` (14 cases pass identically on the previous code)
+    and the fail-closed branch (fails on the previous code, which has no guard).
 
 ## [5.46.0] - 2026-10-19
 
