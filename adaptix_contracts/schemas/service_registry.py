@@ -3,6 +3,13 @@ Adaptix Service Registry — canonical service names, route prefixes, and ports.
 
 This is the single source of truth for all Adaptix platform services.
 All services must be registered here before being used in contracts or clients.
+
+Ports are read from Adaptix-Infra, never invented here. Each ``port`` is the
+production task definition's ``containerPort`` and the port in the gateway's
+``*_SERVICE_URL`` (Contracts #373: 17 entries carried ports that production
+never used). ``tests/test_service_registry_ports.py`` pins every value to the
+Infra commit it was read from; a service that Infra does not deploy says so
+beside its entry.
 """
 
 from __future__ import annotations
@@ -17,6 +24,11 @@ class ServiceDefinition:
     name: str
     slug: str
     route_prefix: str
+    #: The ``containerPort`` of the service's production ECS task definition
+    #: (Adaptix-Infra ``terraform/task_definitions/production/<slug>.json``),
+    #: which is also the port in the gateway's ``<SLUG>_SERVICE_URL``. Services
+    #: are addressed by host (``<slug>.adaptix.internal``), so a port is unique
+    #: per host, not across this registry: most services listen on 8000.
     port: int
     description: str
     domain_owner: bool = True  # True = owns its domain data
@@ -43,7 +55,7 @@ CAD_SERVICE = ServiceDefinition(
     name="Adaptix-CAD-Service",
     slug="cad",
     route_prefix="/api/v1/cad",
-    port=8001,
+    port=8000,
     description="Computer-aided dispatch, incident management",
 )
 
@@ -51,7 +63,7 @@ EPCR_SERVICE = ServiceDefinition(
     name="Adaptix-EPCR-Service",
     slug="epcr",
     route_prefix="/api/v1/epcr",
-    port=8002,
+    port=8000,
     description="Electronic patient care reports, NEMSIS data collection",
 )
 
@@ -59,7 +71,7 @@ FIRE_SERVICE = ServiceDefinition(
     name="Adaptix-Fire-Service",
     slug="fire",
     route_prefix="/api/v1/fire",
-    port=8003,
+    port=8000,
     description="Fire incident reporting, NERIS data collection",
 )
 
@@ -67,7 +79,7 @@ BILLING_SERVICE = ServiceDefinition(
     name="Adaptix-Billing-Service",
     slug="billing",
     route_prefix="/api/v1/billing",
-    port=8004,
+    port=8000,
     description="Claims, payments, invoices, billing lifecycle",
 )
 
@@ -75,7 +87,7 @@ CREW_SERVICE = ServiceDefinition(
     name="Adaptix-Crew-Service",
     slug="crew",
     route_prefix="/api/v1/crew",
-    port=8005,
+    port=8000,
     description="Crew management, CrewLink mobile",
 )
 
@@ -83,7 +95,7 @@ WORKFORCE_SERVICE = ServiceDefinition(
     name="Adaptix-Workforce-Service",
     slug="workforce",
     route_prefix="/api/v1/workforce",
-    port=8006,
+    port=8000,
     description="Workforce scheduling, staffing",
 )
 
@@ -91,7 +103,7 @@ TRANSPORT_SERVICE = ServiceDefinition(
     name="Adaptix-Transport-Service",
     slug="transport",
     route_prefix="/api/v1/transport",
-    port=8007,
+    port=8000,
     description="Transport trips, MDT, TransportLink",
 )
 
@@ -99,7 +111,7 @@ COMMUNICATIONS_SERVICE = ServiceDefinition(
     name="Adaptix-Communications-Service",
     slug="communications",
     route_prefix="/api/v1/communications",
-    port=8008,
+    port=8000,
     description="SMS, email, push notifications",
 )
 
@@ -107,7 +119,7 @@ TELEPHONY_SERVICE = ServiceDefinition(
     name="Adaptix-Telephony-Service",
     slug="telephony",
     route_prefix="/api/v1/telephony",
-    port=8009,
+    port=8000,
     description="Voice, fax, Telnyx integration",
 )
 
@@ -115,7 +127,7 @@ INVENTORY_SERVICE = ServiceDefinition(
     name="Adaptix-Inventory-Service",
     slug="inventory",
     route_prefix="/api/v1/inventory",
-    port=8040,
+    port=8000,
     description="Inventory management",
 )
 
@@ -123,7 +135,7 @@ MEDICATIONS_SERVICE = ServiceDefinition(
     name="Adaptix-Medications-Service",
     slug="medications",
     route_prefix="/api/v1/medications",
-    port=8041,
+    port=8000,
     description="Medication management",
 )
 
@@ -131,7 +143,7 @@ NARCOTICS_SERVICE = ServiceDefinition(
     name="Adaptix-Narcotics-Service",
     slug="narcotics",
     route_prefix="/api/v1/narcotics",
-    port=8042,
+    port=8000,
     description="Narcotics tracking, DEA compliance",
 )
 
@@ -139,7 +151,7 @@ LABOR_SERVICE = ServiceDefinition(
     name="Adaptix-Labor-Service",
     slug="labor",
     route_prefix="/api/v1/labor",
-    port=8043,
+    port=8000,
     description="Labor tracking, timekeeping",
 )
 
@@ -147,7 +159,7 @@ GRAPH_SERVICE = ServiceDefinition(
     name="Adaptix-Graph-Service",
     slug="graph",
     route_prefix="/api/v1/graph",
-    port=8044,
+    port=8000,
     description="Graph relationships, Microsoft Graph integration",
 )
 
@@ -155,7 +167,7 @@ AIR_SERVICE = ServiceDefinition(
     name="Adaptix-Air-Service",
     slug="air",
     route_prefix="/api/v1/air",
-    port=8045,
+    port=8000,
     description="Air transport operations",
 )
 
@@ -172,11 +184,18 @@ AIR_SERVICE = ServiceDefinition(
 # standalone Adaptix-Scheduling-Service repository or ECS service exists yet. This
 # definition declares the canonical contract-level owner of the scheduling domain
 # per SCHEDULING_ARCHITECTURE_LOCK.md; it does not assert a deployed service.
+#
+# Port: there is no scheduling task definition or ``SCHEDULING_SERVICE_URL`` in
+# Adaptix-Infra. The gateway proxies ``/api/v1/scheduling`` to Labor
+# (Adaptix-Gateway ``backend/app/config/routes.py``, the ``/api/v1/scheduling``
+# RouteEntry with ``upstream_url=settings.labor_service_url``), and Labor
+# listens on 8000, so 8000 is the port the prefix is served on today
+# (Contracts #373; it was 8046, which nothing in production ever used).
 SCHEDULING_SERVICE = ServiceDefinition(
     name="Adaptix-Scheduling-Service",
     slug="scheduling",
     route_prefix="/api/v1/scheduling",
-    port=8046,
+    port=8000,
     description=(
         "Workforce scheduling: schedules, shift templates/instances, assignments, "
         "availability, time off, overtime, swaps, holdovers, coverage rules"
@@ -437,13 +456,17 @@ AUDIT_SERVICE = ServiceDefinition(
     name="Adaptix-Audit-Service",
     slug="audit",
     route_prefix="/api/v1/audit",
-    port=8047,
+    port=8000,
     description=(
         "Cross-service audit ingestion, immutable hash-chained event trails, "
         "PHI-access records, compliance review, and the Evidence Graph"
     ),
 )
 
+# Not deployed: Adaptix-Infra production has no ``qhin`` task definition and the
+# gateway has no ``QHIN_SERVICE_URL`` (read at Infra ``6f5d9097``, Contracts
+# #373). The port is the declared plan for the service, not a production value;
+# ``tests/test_service_registry_ports.py`` records it as unverified.
 QHIN_SERVICE = ServiceDefinition(
     name="Adaptix-QHIN-Service",
     slug="qhin",
@@ -455,6 +478,9 @@ QHIN_SERVICE = ServiceDefinition(
     ),
 )
 
+# Not deployed: no ``qa`` task definition and no ``QA_SERVICE_URL`` in
+# Adaptix-Infra production at ``6f5d9097`` (Contracts #373). Declared plan,
+# recorded as unverified by ``tests/test_service_registry_ports.py``.
 QA_SERVICE = ServiceDefinition(
     name="Adaptix-QA-Service",
     slug="qa",

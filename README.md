@@ -23,14 +23,18 @@ event-bus consumer identifiers. The currently audited names are:
 - `CAD_SERVICE_CONSUMER = "cad-service"`
 - `EPCR_SERVICE_CONSUMER = "epcr-service"`
 - `HOSPITAL_SERVICE_CONSUMER = "hospital-service"`
+- `QA_SERVICE_CONSUMER = "qa-service"`
+- `COMMUNICATIONS_SERVICE_CONSUMER = "communications-service"`
+- `TRANSPORT_SERVICE_CONSUMER = "transport-service"`
 
 Pass one of those constants to
 `EventBusPublisherClient.get_pending_events_unfiltered`,
 `.mark_delivered`, and `.mark_failed`. Omitted `consumer=None` still works for
 migration lanes but emits `FutureWarning`. The hard break did **not** ship in
 `2.9.0`: rejecting a previously accepted call narrows accepted values, which
-[`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) reserves for a major release,
-so the removal target is `3.0.0`.
+[`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) reserves for a major release.
+It did not ship in `3.0.0`, `4.0.0` or `5.0.0` either, so the removal target is
+`6.0.0`.
 
 ## Package Structure
 

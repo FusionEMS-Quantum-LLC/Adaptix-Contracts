@@ -12,7 +12,37 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.47.0] - 2026-10-20
+
 ### Added
+
+- **`EpcrBillingTransportBlock.dispatch_priority_code`** (NEMSIS eDispatch.05)
+  and **`adaptix_contracts.epcr.dispatch_priority`** (Billing #1620, owner
+  decision T1). Medicare decides an ambulance emergency response by "the nature
+  of the call at the time of dispatch" (Benefit Policy Manual, Chapter 10,
+  30.1.1), and eDispatch.05 is the charted record of that dispatch triage. The
+  block had no field for it, so pydantic dropped the key and Billing could not
+  read it. The new module holds the four codes of the NEMSIS 3.5.1
+  `DispatchPriority` list with the schema's labels and
+  `is_emergency_dispatch()`: Critical and Emergent are an emergency dispatch,
+  Lower Acuity and Non-Acute are not (Terminology #226), and any other value
+  answers `None`. It never states a service level. Additive: an event without
+  the field still validates.
+
+### Added
+
+- **`adaptix_contracts.event_consumers.QA_SERVICE_CONSUMER`** (`"qa-service"`)
+  (#184), added to `KnownEventBusConsumerName`, `KNOWN_EVENT_BUS_CONSUMERS`,
+  `README.md` and `event_subscriptions.EVENT_BUS_CONSUMER_DECLARATIONS`.
+  Adaptix-QA-Service already polls Core's fan-out under this name for
+  `epcr.chart.amended` and `epcr.chart.finalized`
+  (`backend/qa_app/background_worker.py` line 79, `backend/qa_app/main.py`
+  lines 117-120 and 210 at `b4dee5da404f`), and Core already binds QA's
+  event-bus credential to it (`core_app/auth/event_bus_credentials.py`,
+  `EVENT_BUS_CONSUMER_BY_SERVICE`). This registry was the one place that left
+  it out, so `subscribers_of("epcr.chart.finalized")` and
+  `subscribers_of("epcr.chart.amended")` did not report QA. Additive: no
+  existing name, contract or behavior changes.
 
 - **`adaptix_contracts.validation_errors.install_input_free_validation_errors(app)`**
   (#375). One call in an app factory makes that FastAPI app answer a refused
@@ -31,6 +61,56 @@ from the installed package metadata).
 
 ### Fixed
 
+- **The omitted-consumer `FutureWarning` no longer names a release that
+  already shipped** (#184). `EventBusPublisherClient.get_pending_events_unfiltered`,
+  `mark_delivered` and `mark_failed` warned that omitting `consumer` "will raise
+  ValueError in adaptix-contracts 3.0.0". 3.0.0, 4.0.0 and 5.0.0 all shipped
+  with the omitted-consumer path still accepted, so the warning promised a
+  break that had already not happened. `LEGACY_SHARED_QUEUE_REMOVAL_VERSION`,
+  `event_consumers.py` and `README.md` now name `6.0.0`, the next major
+  (`DEPRECATION_POLICY.md` reserves narrowing accepted values for a major).
+  `README.md` also lists the two registered consumer names it was missing
+  (`communications-service`, `transport-service`). No behavior changed:
+  omitting `consumer` still works and still warns. New tests in
+  `tests/test_event_bus_consumers.py` fail a major version bump that neither
+  removes the path nor moves the target, and fail when `README.md` drops a
+  registered consumer name or names a different removal target.
+- **`schemas.service_registry` names the port production actually uses for
+  every service** (Contracts #373). Seventeen entries carried ports nothing in
+  production listens on: cad 8001, epcr 8002, fire 8003, billing 8004, crew
+  8005, workforce 8006, transport 8007, communications 8008, telephony 8009,
+  inventory 8040, medications 8041, narcotics 8042, labor 8043, graph 8044,
+  air 8045, scheduling 8046 and audit 8047. Each now reads **8000**, the
+  `containerPort` of its Adaptix-Infra production task definition and the port
+  in the gateway's `*_SERVICE_URL`, both read on Infra `origin/main`
+  `6f5d90972b494148f4bf3cd68025f4dc25692a6e` (2026-10-19). The other 32 entries
+  already agreed with Infra and are unchanged.
+  - `scheduling` has no task definition or gateway URL; the gateway proxies
+    `/api/v1/scheduling` to Labor (Adaptix-Gateway `routes.py` at
+    `02fb20f1a6700e62891b193029c30b8501f91038`), so 8000 is the port the
+    prefix is served on. `qhin` (8048) and `qa` (8049) are not deployed at
+    all; their values are unchanged and are recorded as unverified rather
+    than presented as production.
+  - `ServiceDefinition.port` now documents what it is: a per-host
+    `containerPort` (services are addressed as `<slug>.adaptix.internal`),
+    so ports repeat across the registry. The test that required every port
+    to be unique (`test_service_registry_slugs_and_ports_are_unique`) encoded
+    an invariant production never had and is what kept the wrong values in
+    place; it now checks slugs only. `tests/test_service_registry_ports.py`
+    pins all 49 ports to the Infra commit above and fails when a new service
+    is registered without an Infra-read port.
+  - Classification: a published constant's values changed, which a strict
+    consumer comparing against the old number would see, so this ships as a
+    MINOR release rather than a PATCH; it adds no field and removes nothing.
+    No consumer outside this repository reads `ServiceDefinition.port` (org
+    code search 2026-10-19: the per-repository address tables in Billing,
+    NEMSIS, Core and Founder are hand-typed copies, not readers). Having those
+    tables consume this registry, and an Adaptix-Infra test that compares its
+    task definitions and `gateway.json` with it, are the remaining halves of
+    #373 and live in those repositories.
+  - Unreleased by design, as the entry above: the version is bumped when the
+    release that ships this is tagged.
+
 - **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
   objects** (`dict[str, JsonValue] | None`) instead of bare dictionaries.
   This is a type-only contract correction; stored values and runtime behavior
@@ -38,6 +118,28 @@ from the installed package metadata).
   without unknown dictionary key or value types. Unreleased by design: the
   version is bumped when the release that ships this is tagged, so `main`
   never declares a version that has no tag (see Version Tag Drift).
+- **`AuditServiceClient.log_action` takes the type the columns store** (Contracts
+  #407, the writer half). `changes_before` / `changes_after` are
+  `dict[str, JsonValue] | None`, where they were `dict[str, Any] | None`, so the
+  writer and the `AuditLogEntry` columns now declare one type; the discarded
+  `**_ignored_kwargs` are `object`, not `Any`. Declared types only: what is
+  stored and returned is unchanged. A caller passing a literal, or a value typed
+  `dict[str, Any]` (CAD's `audit_service.py` does both), is unaffected; a caller
+  holding a `dict[str, str]` or `dict[str, object]` variable gains an
+  invariance finding under strict checking and spells it
+  `dict[str, JsonValue]`. Org code search 2026-10-19 found the one consumer of
+  this module, Adaptix-CAD-Service, and no such variable.
+  - Classification: MINOR for the release that ships it (a parameter type
+    visible to strict consumers changed; nothing removed or renamed). Unreleased
+    by design: the version is bumped when that release is tagged.
+  - `audit_contracts.py` still carries one reference-set finding: `__repr__`
+    overrides `object.__repr__` without `@override` (Pyright
+    `reportImplicitOverride`, mypy `explicit-override`). The marker is
+    `typing_extensions.override` on this library's 3.11 floor
+    (`typing.override` is 3.12+), and the engine's toolchain policy does not
+    approve `typing-extensions` as a Python dependency (measured: `unapproved
+    Python dependency typing-extensions ([project] dependencies)`), so it is
+    not taken here. It needs that policy decision.
 - **`gateway_signature.py` reaches zero without joined literals or casts**
   (Contracts #408, residue of #410). The typed public surface (`VerifiedGatewayPayload`,
   `GatewayRequest`) shipped in 5.46.0; the file read zero under Pyright strict and
