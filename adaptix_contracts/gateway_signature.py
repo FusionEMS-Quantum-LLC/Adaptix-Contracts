@@ -144,7 +144,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Mapping
-from typing import Literal, Protocol, Required, TypedDict, cast
+from typing import Literal, Protocol, Required, TypedDict, TypeGuard
 
 from adaptix_contracts._json_narrowing import is_json_list, is_json_object
 from adaptix_contracts.environment import ENVIRONMENT_ENV, is_production
@@ -217,6 +217,16 @@ _MAX_CONTEXT_LIFETIME_SECONDS = 300
 _TimestampValue = int | float | str
 
 
+def _is_int_seconds(value: object) -> TypeGuard[int]:
+    """True for an ``int`` that is not a ``bool``.
+
+    ``bool`` is an ``int`` subclass, so ``True`` would otherwise read as one
+    second. A predicate, so :func:`require_int_seconds` states the rule once and
+    narrows ``value`` for the range checks that follow it.
+    """
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def require_int_seconds(value: object, name: str, *, positive: bool = False) -> None:
     """Refuse a time bound that is not a whole, in-range number of seconds.
 
@@ -246,12 +256,13 @@ def require_int_seconds(value: object, name: str, *, positive: bool = False) -> 
             error, never an authentication failure, so it is a plain
             ``ValueError`` and not any verifier's own error class.
     """
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(
+    if not _is_int_seconds(value):
+        message = (
             f"{name} must be an int number of seconds, got "
-            + f"{type(value).__name__}; a non-int bound could switch the time "
-            + "check off"
+            f"{type(value).__name__}; a non-int bound could switch the time "
+            "check off"
         )
+        raise ValueError(message)
     if positive and value <= 0:
         raise ValueError(f"{name} must be a positive number of seconds")
     if value < 0:
@@ -358,10 +369,11 @@ def gateway_trust_mode() -> str:
     if not raw:
         return TRUST_MODE_DUAL if has_verification_keys() else TRUST_MODE_HMAC
     if raw not in _TRUST_MODES:
-        raise GatewayVerifierConfigurationError(
+        message = (
             f"{GATEWAY_TRUST_MODE_ENV}={raw!r} is not a known trust mode "
-            + f"(expected one of {sorted(_TRUST_MODES)})"
+            f"(expected one of {sorted(_TRUST_MODES)})"
         )
+        raise GatewayVerifierConfigurationError(message)
     return raw
 
 
@@ -386,20 +398,22 @@ def _expected_audience() -> str | None:
     aud = os.environ.get(GATEWAY_EXPECTED_AUDIENCE_ENV, "").strip()
     if not aud:
         if is_production():
-            raise GatewayVerifierConfigurationError(
+            message = (
                 f"{GATEWAY_EXPECTED_AUDIENCE_ENV} is required in production. "
-                + "Without it a signed context minted for another Adaptix service "
-                + "is accepted here (cross-service replay). Set it to this "
-                + "service's own audience in the task definition."
+                "Without it a signed context minted for another Adaptix service "
+                "is accepted here (cross-service replay). Set it to this "
+                "service's own audience in the task definition."
             )
+            raise GatewayVerifierConfigurationError(message)
         return None
     if not is_known_service_audience(aud):
-        raise GatewayVerifierConfigurationError(
+        message = (
             f"{GATEWAY_EXPECTED_AUDIENCE_ENV}={aud!r} does not name a live "
-            + "Adaptix service audience (see adaptix_contracts.service_audiences."
-            + "KNOWN_SERVICE_AUDIENCES). Every request would fail the audience "
-            + "check with this value."
+            "Adaptix service audience (see adaptix_contracts.service_audiences."
+            "KNOWN_SERVICE_AUDIENCES). Every request would fail the audience "
+            "check with this value."
         )
+        raise GatewayVerifierConfigurationError(message)
     return aud
 
 
@@ -428,11 +442,12 @@ def _assert_public_keys_ready(mode: str) -> None:
         return
     if not has_verification_keys():
         if mode == TRUST_MODE_ASYMMETRIC:
-            raise GatewayVerifierConfigurationError(
+            message = (
                 f"{GATEWAY_TRUST_MODE_ENV}={mode!r} requires "
-                + f"{GATEWAY_PUBLIC_KEYS_ENV} but it is not configured; this "
-                + "service would reject every gateway request"
+                f"{GATEWAY_PUBLIC_KEYS_ENV} but it is not configured; this "
+                "service would reject every gateway request"
             )
+            raise GatewayVerifierConfigurationError(message)
         return
     try:
         _ = load_public_keyset()
@@ -447,11 +462,12 @@ def _assert_shared_secret_ready(mode: str) -> None:
         GatewayVerifierConfigurationError: if the secret is not configured.
     """
     if mode in (TRUST_MODE_HMAC, TRUST_MODE_DUAL) and gateway_shared_secret() is None:
-        raise GatewayVerifierConfigurationError(
+        message = (
             f"{GATEWAY_TRUST_MODE_ENV}={mode!r} requires "
-            + f"{GATEWAY_SHARED_SECRET_ENV} to verify legacy gateway-v1 contexts, "
-            + "but it is not configured"
+            f"{GATEWAY_SHARED_SECRET_ENV} to verify legacy gateway-v1 contexts, "
+            "but it is not configured"
         )
+        raise GatewayVerifierConfigurationError(message)
 
 
 def _warn_if_symmetric_in_production(mode: str) -> None:
@@ -462,11 +478,14 @@ def _warn_if_symmetric_in_production(mode: str) -> None:
     evidence rather than from a spreadsheet.
     """
     if is_production() and mode != TRUST_MODE_ASYMMETRIC:
-        logger.warning(
+        message = (
             "gateway verifier running in %s=%r in production: legacy symmetric "
-            + "gateway-v1 contexts are still accepted, so any holder of %s can "
-            + "still mint an identity this service trusts (D-053). Move to %r "
-            + "once every caller signs gateway-v2.",
+            "gateway-v1 contexts are still accepted, so any holder of %s can "
+            "still mint an identity this service trusts (D-053). Move to %r "
+            "once every caller signs gateway-v2."
+        )
+        logger.warning(
+            message,
             GATEWAY_TRUST_MODE_ENV,
             mode,
             GATEWAY_SHARED_SECRET_ENV,
@@ -597,10 +616,11 @@ def _verify_asymmetric(
 
     signature = _decoded_v2_signature(signature_b64)
     if not public_key.verify(signature=signature, message=context_b64.encode("ascii")):
-        raise GatewaySignatureError(
+        message = (
             f"{GATEWAY_SIGNING_ALGORITHM} signature mismatch — context may be "
-            + f"tampered, or was not signed by the gateway key {kid!r}"
+            f"tampered, or was not signed by the gateway key {kid!r}"
         )
+        raise GatewaySignatureError(message)
 
 
 def _verify_hmac(
@@ -614,10 +634,11 @@ def _verify_hmac(
     """
     secret = (shared_secret or "").strip() or (gateway_shared_secret() or "")
     if not secret:
-        raise GatewayVerifierConfigurationError(
+        message = (
             f"{GATEWAY_SHARED_SECRET_ENV} is not configured; this service cannot "
-            + "verify legacy gateway-v1 contexts"
+            "verify legacy gateway-v1 contexts"
         )
+        raise GatewayVerifierConfigurationError(message)
     signature = signature_hex.strip()
     if not _HEX_DIGEST.match(signature):
         # compare_digest raises TypeError on a str with any non-ASCII
@@ -654,23 +675,25 @@ def _verify_signature_for_scheme(
     mode = gateway_trust_mode()
     if is_v2:
         if mode == TRUST_MODE_HMAC:
-            raise GatewayVerifierConfigurationError(
+            message = (
                 "a gateway-v2 (asymmetric) context was presented but this "
-                + f"service runs {GATEWAY_TRUST_MODE_ENV}={mode!r}; install "
-                + f"{GATEWAY_PUBLIC_KEYS_ENV} so it can be verified"
+                f"service runs {GATEWAY_TRUST_MODE_ENV}={mode!r}; install "
+                f"{GATEWAY_PUBLIC_KEYS_ENV} so it can be verified"
             )
+            raise GatewayVerifierConfigurationError(message)
         _verify_asymmetric(
             context_b64=context_b64, signature_b64=signature_value, key_id=key_id
         )
         return
 
     if mode == TRUST_MODE_ASYMMETRIC:
-        raise GatewaySignatureError(
+        message = (
             "legacy gateway-v1 (symmetric HMAC) context rejected: this "
-            + f"service runs {GATEWAY_TRUST_MODE_ENV}="
-            + f"{TRUST_MODE_ASYMMETRIC!r} and accepts only contexts signed by "
-            + "the gateway's private key (D-053)"
+            f"service runs {GATEWAY_TRUST_MODE_ENV}="
+            f"{TRUST_MODE_ASYMMETRIC!r} and accepts only contexts signed by "
+            "the gateway's private key (D-053)"
         )
+        raise GatewaySignatureError(message)
     path = (auth_path or "").strip()
     if path and path != _GATEWAY_V1_PATH:
         raise GatewaySignatureError(f"auth path not gateway-v1 (got {path!r})")
@@ -725,9 +748,13 @@ def _verify_replay_window(
     exp, iat = payload.get("exp"), payload.get("iat")
     if exp is None or iat is None:
         raise GatewaySignatureError("context missing exp or iat claim")
+    # A JSON array or object is not a number; ``int()`` would raise TypeError.
+    # Said as a check, so the claim's type is known before the conversion.
+    if not isinstance(exp, _TimestampValue) or not isinstance(iat, _TimestampValue):
+        raise GatewaySignatureError("exp/iat claims are not integers")
     try:
-        exp_i, iat_i = int(cast(_TimestampValue, exp)), int(cast(_TimestampValue, iat))
-    except (TypeError, ValueError, OverflowError) as exc:
+        exp_i, iat_i = int(exp), int(iat)
+    except (ValueError, OverflowError) as exc:
         # OverflowError is int(float("inf")). Unreachable now that the decoder
         # rejects those constants, but this cast is the load-bearing one and an
         # uncaught type here is an unauthenticated 500 rather than a 401.
@@ -742,10 +769,11 @@ def _verify_replay_window(
             f"context exp precedes iat (exp={exp_i}, iat={iat_i})"
         )
     if exp_i - iat_i > _MAX_CONTEXT_LIFETIME_SECONDS:
-        raise GatewaySignatureError(
+        message = (
             f"context lifetime {exp_i - iat_i}s exceeds the maximum "
-            + f"{_MAX_CONTEXT_LIFETIME_SECONDS}s (exp={exp_i}, iat={iat_i})"
+            f"{_MAX_CONTEXT_LIFETIME_SECONDS}s (exp={exp_i}, iat={iat_i})"
         )
+        raise GatewaySignatureError(message)
 
     now = int(time.time())
     if now > exp_i + clock_skew_seconds:
@@ -835,12 +863,13 @@ def _verify_method_path_binding(
         return
     if request_method is None or request_path is None:
         if require:
-            raise GatewayVerifierConfigurationError(
+            message = (
                 f"{GATEWAY_SIGNATURE_REQUIRE_PATH_ENV} is enabled but this "
-                + "verifier was not given request_method/request_path to check "
-                + "the signed binding against; pass the inbound request's method "
-                + "and path"
+                "verifier was not given request_method/request_path to check "
+                "the signed binding against; pass the inbound request's method "
+                "and path"
             )
+            raise GatewayVerifierConfigurationError(message)
         return
     _compare_method_path(signed_method, signed_path, request_method, request_path)
 
@@ -848,10 +877,11 @@ def _verify_method_path_binding(
 def _reject_if_binding_required(require: bool, reason: str) -> None:
     """Fail closed when the require-path flag is set but no binding is present."""
     if require:
-        raise GatewaySignatureError(
+        message = (
             f"{GATEWAY_SIGNATURE_REQUIRE_PATH_ENV} is enabled but {reason}; "
-            + "the gateway producer must be upgraded before this service can require it"
+            "the gateway producer must be upgraded before this service can require it"
         )
+        raise GatewaySignatureError(message)
 
 
 def _compare_method_path(
@@ -863,17 +893,19 @@ def _compare_method_path(
             "context method/path claims are not strings — cannot verify binding"
         )
     if signed_method.upper() != request_method.strip().upper():
-        raise GatewaySignatureError(
+        message = (
             f"signed method {signed_method!r} does not match request method "
-            + f"{request_method!r}"
+            f"{request_method!r}"
         )
+        raise GatewaySignatureError(message)
     normalized_signed = _normalize_path(signed_path)
     normalized_request = _normalize_path(request_path)
     if normalized_signed != normalized_request:
-        raise GatewaySignatureError(
+        message = (
             f"signed path {signed_path!r} does not match request path "
-            + f"{normalized_request!r}"
+            f"{normalized_request!r}"
         )
+        raise GatewaySignatureError(message)
 
 
 #: Bounded in-process replay cache: ``jti`` -> the context's own ``exp``
@@ -929,9 +961,13 @@ def _prune_expired_locked(now: int) -> None:
 
 def _context_expiry(payload: Mapping[str, object], now: int) -> int:
     """The context's ``exp`` as an int, or ``now`` + clock skew when absent/invalid."""
+    exp = payload.get("exp")
+    if not isinstance(exp, _TimestampValue):
+        # Absent, or a JSON value ``int()`` cannot take (it raised TypeError).
+        return now + GATEWAY_CLOCK_SKEW_SECONDS
     try:
-        return int(cast(_TimestampValue, payload["exp"]))
-    except (KeyError, TypeError, ValueError):
+        return int(exp)
+    except ValueError:
         return now + GATEWAY_CLOCK_SKEW_SECONDS
 
 
@@ -966,12 +1002,35 @@ def _check_and_record_replay(payload: Mapping[str, object]) -> None:
             # closed here is deliberate: silently skipping the record would
             # look like normal operation while quietly disabling replay
             # protection for every request that follows.
-            raise GatewaySignatureError(
+            message = (
                 "gateway signature replay cache is full; refusing to verify "
-                + "without replay protection"
+                "without replay protection"
             )
+            raise GatewaySignatureError(message)
         _replay_seen[jti] = exp
         heapq.heappush(_replay_expiry_heap, (exp, jti))
+
+
+def _is_verified_gateway_payload(
+    payload: Mapping[str, object],
+) -> TypeGuard[VerifiedGatewayPayload]:
+    """True when ``payload`` carries the claims the verifier checks, as it checks them.
+
+    This is the whole of what :class:`VerifiedGatewayPayload` promises beyond
+    ``object``: the issuer literal, an audience that is a string or a list,
+    ``user_id`` and ``tenant_id`` present, and ``iat``/``exp`` of a type
+    ``int()`` accepts. It inspects exactly those keys, so the narrowing it
+    performs is the narrowing it proved. Every other key stays ``object``.
+    """
+    aud = payload.get("aud")
+    return (
+        payload.get("iss") == _EXPECTED_ISSUER
+        and (isinstance(aud, str) or is_json_list(aud))
+        and payload.get("user_id") is not None
+        and payload.get("tenant_id") is not None
+        and isinstance(payload.get("iat"), _TimestampValue)
+        and isinstance(payload.get("exp"), _TimestampValue)
+    )
 
 
 def _verify_gateway_signature(
@@ -1075,7 +1134,13 @@ def _verify_gateway_signature(
         payload, request_method=request_method, request_path=request_path
     )
     _check_and_record_replay(payload)
-    return cast(VerifiedGatewayPayload, payload)
+    if not _is_verified_gateway_payload(payload):
+        # Every check above has already established these claims, so this
+        # branch is not reached; it stands so the returned type is proven by
+        # the guard that defines it, not asserted by a cast. Failing closed is
+        # the only acceptable behaviour were it ever reached.
+        raise GatewaySignatureError("verified context lost a required claim")
+    return payload
 
 
 def verify_gateway_signature_without_request_binding(
@@ -1180,10 +1245,10 @@ def _request_scope(
     """
     if request is None:
         return None, None, None
-    method = cast(str | None, getattr(request, "method", None))
-    url = getattr(request, "url", None)
-    path = cast(str | None, getattr(url, "path", None) if url is not None else None)
-    state = cast(object | None, getattr(request, "state", None))
+    method: str | None = getattr(request, "method", None)
+    url: _GatewayRequestURL | None = getattr(request, "url", None)
+    path: str | None = getattr(url, "path", None) if url is not None else None
+    state: object = getattr(request, "state", None)
     return method, path, state
 
 
@@ -1330,11 +1395,14 @@ def _warn_audience_unpinned(signed_aud: object) -> None:
     """
     if _WARN_ONCE["audience_unpinned"]:
         return
-    logger.warning(
+    message = (
         "gateway context carries a signed audience %r but %s is not "
-        + "configured, so the audience is NOT verified; a context minted "
-        + "for another service would be accepted here. Set %s to this "
-        + "service's audience to close cross-service replay.",
+        "configured, so the audience is NOT verified; a context minted "
+        "for another service would be accepted here. Set %s to this "
+        "service's audience to close cross-service replay."
+    )
+    logger.warning(
+        message,
         signed_aud,
         GATEWAY_EXPECTED_AUDIENCE_ENV,
         GATEWAY_EXPECTED_AUDIENCE_ENV,
@@ -1382,8 +1450,8 @@ __all__ = [
     "TRUST_MODE_ASYMMETRIC",
     "TRUST_MODE_DUAL",
     "TRUST_MODE_HMAC",
-    "GatewaySignatureError",
     "GatewayRequest",
+    "GatewaySignatureError",
     "GatewayVerifierConfigurationError",
     "VerifiedGatewayPayload",
     "assert_gateway_verifier_ready",

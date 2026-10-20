@@ -12,6 +12,23 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.47.0] - 2026-10-20
+
+### Added
+
+- **`EpcrBillingTransportBlock.dispatch_priority_code`** (NEMSIS eDispatch.05)
+  and **`adaptix_contracts.epcr.dispatch_priority`** (Billing #1620, owner
+  decision T1). Medicare decides an ambulance emergency response by "the nature
+  of the call at the time of dispatch" (Benefit Policy Manual, Chapter 10,
+  30.1.1), and eDispatch.05 is the charted record of that dispatch triage. The
+  block had no field for it, so pydantic dropped the key and Billing could not
+  read it. The new module holds the four codes of the NEMSIS 3.5.1
+  `DispatchPriority` list with the schema's labels and
+  `is_emergency_dispatch()`: Critical and Emergent are an emergency dispatch,
+  Lower Acuity and Non-Acute are not (Terminology #226), and any other value
+  answers `None`. It never states a service level. Additive: an event without
+  the field still validates.
+
 ### Added
 
 - **`adaptix_contracts.event_consumers.QA_SERVICE_CONSUMER`** (`"qa-service"`)
@@ -115,14 +132,39 @@ from the installed package metadata).
   - Classification: MINOR for the release that ships it (a parameter type
     visible to strict consumers changed; nothing removed or renamed). Unreleased
     by design: the version is bumped when that release is tagged.
-  - `audit_contracts.py` still carries one reference-set finding: `__repr__`
-    overrides `object.__repr__` without `@override` (Pyright
-    `reportImplicitOverride`, mypy `explicit-override`). The marker is
-    `typing_extensions.override` on this library's 3.11 floor
-    (`typing.override` is 3.12+), and the engine's toolchain policy does not
-    approve `typing-extensions` as a Python dependency (measured: `unapproved
-    Python dependency typing-extensions ([project] dependencies)`), so it is
-    not taken here. It needs that policy decision.
+  - `AuditLogEntry.__repr__` carries an override marker, with no new
+    dependency. The marker is `typing.override` on Python 3.12+ and an identity
+    decorator on this library's 3.11 floor, because `typing.override` is 3.12+
+    and the engine's toolchain policy rejects `typing-extensions` as a Python
+    dependency (`unapproved Python dependency typing-extensions ([project]
+    dependencies)`). The repr text is unchanged (it is not the default, so it is
+    not removed) and is pinned by a test. `audit_contracts.py` reads zero under
+    the reference set at the 3.12 target; a mypy run pointed at 3.11 reports the
+    one `explicit-override` that only `typing-extensions` could clear.
+- **`gateway_signature.py` reaches zero without joined literals or casts**
+  (Contracts #408, residue of #410). The typed public surface (`VerifiedGatewayPayload`,
+  `GatewayRequest`) shipped in 5.46.0; the file read zero under Pyright strict and
+  mypy only because 29 messages were built with `+` between string literals and
+  7 values were asserted with `cast(...)`, one of them
+  `cast(VerifiedGatewayPayload, payload)` with nothing proving it. Now each
+  message is one parenthesised group bound to a name, the `exp`/`iat` claims are
+  checked with `isinstance` before `int()` (the `TypeError` branch it replaces
+  is the same refusal, `GatewaySignatureError("exp/iat claims are not
+  integers")`), the returned payload is proven by a `TypeGuard`
+  (`_is_verified_gateway_payload`) and the verifier fails closed if that proof
+  were ever lost, and `_request_scope` annotates what it reads instead of
+  casting. `__all__` is sorted. **No public name, signature, exception type or
+  message text changes**, so this carries no contract-version increment
+  (internal refactor).
+  - `require_int_seconds` states its int rule once, as
+    `_is_int_seconds(value) -> TypeGuard[int]`, with a single raise. That
+    clears the engine's TRY004 ("prefer `TypeError`") without changing the
+    exception: it is still exactly `ValueError` (the documented contract, pinned
+    by `tests/test_verifier_leeway_bounds.py` for every verifier), with the same
+    message, and `bool` is still refused.
+  - `tests/test_gateway_signature_claim_types.py` pins a non-numeric `exp`/`iat`
+    as `GatewaySignatureError` (14 cases pass identically on the previous code)
+    and the fail-closed branch (fails on the previous code, which has no guard).
 
 ## [5.46.0] - 2026-10-19
 

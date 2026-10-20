@@ -273,6 +273,16 @@ class EpcrBillingTransportBlock(BaseModel):
     neither is guaranteed to be a display name - and ZIP matches ``NNNNN``,
     ``NNNNN-NNNN`` or a Canadian postal code. Consumers must treat an
     unparseable or absent value as absent and must never geocode a substitute.
+
+    ``dispatch_priority_code`` is NEMSIS eDispatch.05 "Dispatch Priority
+    (Patient Acuity)", passed through verbatim from EPCR's
+    ``ChartDispatch.dispatch_priority_code``: ``2305001`` Critical, ``2305003``
+    Emergent, ``2305005`` Lower Acuity, ``2305007`` Non-Acute. The codes and
+    which of them record an emergency dispatch live in
+    :mod:`adaptix_contracts.epcr.dispatch_priority`. Billing reads it for the
+    claim's emergency indicator (Medicare decides emergency response by the call
+    as dispatched); it never states the service level. It is ``None`` when the
+    chart carries no eDispatch.05.
     """
 
     origin_name: str | None = None
@@ -291,6 +301,7 @@ class EpcrBillingTransportBlock(BaseModel):
     service_type_code: str | None = None
     unit_role_code: str | None = None
     transport_method_code: str | None = None  # eDisposition.16
+    dispatch_priority_code: str | None = None  # eDispatch.05
 
 
 class EpcrBillingInsuranceBlock(BaseModel):
