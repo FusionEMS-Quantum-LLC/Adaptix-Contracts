@@ -106,10 +106,10 @@ from the installed package metadata).
     code search 2026-10-19: the per-repository address tables in Billing,
     NEMSIS, Core and Founder are hand-typed copies, not readers). Having those
     tables consume this registry, and an Adaptix-Infra test that compares its
-    task definitions and `gateway.json` with it, are the remaining halves of
-    #373 and live in those repositories.
-  - Unreleased by design, as the entry above: the version is bumped when the
-    release that ships this is tagged.
+    task definitions and `gateway.json` with it, are outside this package and
+    were not part of the 5.47.0 tag.
+  - Shipped in 5.47.0 (`v5.47.0`, which contains #419). The earlier note that
+    this stayed unreleased until a later tag was stale once that tag was cut.
 
 - **`AuditLogEntry.changes_before` and `changes_after` now expose typed JSON
   objects** (`dict[str, JsonValue] | None`) instead of bare dictionaries.
