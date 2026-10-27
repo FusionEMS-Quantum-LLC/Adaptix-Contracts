@@ -165,7 +165,7 @@ def _subscription(topic: str, *evidence: CodeCitation) -> EventSubscription:
 # ---------------------------------------------------------------------------
 _BILLING: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-Billing-Service",
-    "3683e08d190abd255b12ce664ac02c16d5070dab",
+    "4f6c012f69c8e6c488d823ec7655bdca598f55f2",
 )
 _CAD: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-CAD-Service",
@@ -177,7 +177,7 @@ _COMMUNICATIONS: Final[_AuditedCheckout] = _AuditedCheckout(
 )
 _EPCR: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-EPCR-Service",
-    "658bfda8cf84fde11d2401c330d5f233d819cca5",
+    "bbeb4517220315b5ab967daf75093ced1bb297b2",
 )
 _HOSPITAL: Final[_AuditedCheckout] = _AuditedCheckout(
     "FusionEMS-Quantum-LLC/Adaptix-Hospital-Service",
@@ -210,19 +210,20 @@ _BILLING_DECLARATION: Final[EventBusConsumerDeclaration] = EventBusConsumerDecla
     repository=_BILLING.repository,
     service_slug="billing",
     unmapped_reason=None,
-    consumer_name_evidence=_BILLING.cite(_BILLING_WORKER, 85),
-    dispatch_evidence=_BILLING.cite(_BILLING_WORKER, 300),
+    consumer_name_evidence=_BILLING.cite(_BILLING_WORKER, 112),
+    dispatch_evidence=_BILLING.cite(_BILLING_WORKER, 333),
     worker_start_evidence=(
-        _BILLING.cite(_BILLING_MAIN, 1003),
-        _BILLING.cite(_BILLING_MAIN, 1004),
+        _BILLING.cite(_BILLING_MAIN, 1431),
+        _BILLING.cite(_BILLING_MAIN, 1432),
     ),
     subscriptions=(
-        _subscription("epcr.chart.finalized", _BILLING.cite(_BILLING_MAIN, 992)),
-        _subscription("epcr.chart.billing_handoff", _BILLING.cite(_BILLING_MAIN, 994)),
-        _subscription("epcr.chart.amended", _BILLING.cite(_BILLING_MAIN, 997)),
-        _subscription("call.received", _BILLING.cite(_BILLING_MAIN, 998)),
+        _subscription("epcr.chart.finalized", _BILLING.cite(_BILLING_MAIN, 1418)),
+        _subscription("epcr.chart.billing_handoff", _BILLING.cite(_BILLING_MAIN, 1420)),
+        _subscription("epcr.chart.amended", _BILLING.cite(_BILLING_MAIN, 1423)),
+        _subscription("epcr.chart.query_answered", _BILLING.cite(_BILLING_MAIN, 1425)),
+        _subscription("call.received", _BILLING.cite(_BILLING_MAIN, 1426)),
         _subscription(
-            "cad.dispatch.billing_handoff_ready", _BILLING.cite(_BILLING_MAIN, 1000)
+            "cad.dispatch.billing_handoff_ready", _BILLING.cite(_BILLING_MAIN, 1428)
         ),
     ),
 )
@@ -358,12 +359,34 @@ _EPCR_DECLARATION: Final[EventBusConsumerDeclaration] = EventBusConsumerDeclarat
     repository=_EPCR.repository,
     service_slug="epcr",
     unmapped_reason=None,
-    consumer_name_evidence=_EPCR.cite(_EPCR_WORKER, 90),
-    dispatch_evidence=_EPCR.cite(_EPCR_WORKER, 271),
-    worker_start_evidence=(_EPCR.cite(_EPCR_MAIN, 352), _EPCR.cite(_EPCR_MAIN, 354)),
+    consumer_name_evidence=_EPCR.cite(_EPCR_WORKER, 93),
+    dispatch_evidence=_EPCR.cite(_EPCR_WORKER, 358),
+    worker_start_evidence=(
+        _EPCR.cite(_EPCR_MAIN, 502),
+        _EPCR.cite(_EPCR_MAIN, 570),
+        _EPCR.cite(_EPCR_MAIN, 572),
+    ),
     subscriptions=(
-        _subscription("fire.incident.created", _EPCR.cite(_EPCR_MAIN, 342)),
-        _subscription("billing.claim.status_updated", _EPCR.cite(_EPCR_MAIN, 349)),
+        _subscription("fire.incident.created", _EPCR.cite(_EPCR_MAIN, 476)),
+        _subscription("billing.claim.status_updated", _EPCR.cite(_EPCR_MAIN, 483)),
+        _subscription("billing.eligibility.result.v1", _EPCR.cite(_EPCR_MAIN, 492)),
+        _subscription(
+            "billing.chart.query_opened",
+            _EPCR.cite("backend/epcr_app/billing_chart_queries.py", 70),
+            _EPCR.cite(_EPCR_MAIN, 499),
+        ),
+        _subscription(
+            "billing.chart.query_withdrawn",
+            _EPCR.cite("backend/epcr_app/billing_chart_queries.py", 71),
+            _EPCR.cite(_EPCR_MAIN, 500),
+            _EPCR.cite(_EPCR_MAIN, 501),
+        ),
+        _subscription(
+            "billing.chart.query_resolved",
+            _EPCR.cite("backend/epcr_app/billing_chart_queries.py", 72),
+            _EPCR.cite(_EPCR_MAIN, 500),
+            _EPCR.cite(_EPCR_MAIN, 501),
+        ),
     ),
 )
 
@@ -517,8 +540,8 @@ _HOSPITAL_NO_SLUG: Final[str] = (
     "direct-slug rule in events/registry.py."
 )
 _WORKFORCE_NO_PRODUCER: Final[str] = (
-    "No service in the workspace emits this string; Adaptix-CAD-Service only "
-    "consumes it (cad_app/workforce_event_consumer.py). " + _NOT_IN_REGISTRY
+    "No service in the workspace emits this string; Adaptix-CAD-Service only consumes it (cad_app/workforce_event_consumer.py). "
+    + _NOT_IN_REGISTRY
 )
 
 #: Topics a declared consumer subscribes to that ``ALL_EVENTS`` does not
@@ -641,8 +664,7 @@ def _slug_problems(
         )
         if owners:
             problems.append(
-                f"{consumer!r} is unmapped, but ServiceDefinition slug(s) {owners} "
-                f"name {repository_name}; map it"
+                f"{consumer!r} is unmapped, but ServiceDefinition slug(s) {owners} name {repository_name}; map it"
             )
         return problems
     if declaration.unmapped_reason is not None:
@@ -656,8 +678,7 @@ def _slug_problems(
         )
     elif owner != repository_name:
         problems.append(
-            f"{consumer!r} polls from {repository_name}, but slug {slug!r} "
-            f"names {owner}"
+            f"{consumer!r} polls from {repository_name}, but slug {slug!r} names {owner}"
         )
     return problems
 
@@ -705,13 +726,11 @@ def _subscription_problems(
         explained = topic in unregistered_topics
         if not registered and not explained:
             problems.append(
-                f"{consumer!r} subscribes to unknown topic {topic!r}: not in "
-                "ALL_EVENTS and not in UNREGISTERED_SUBSCRIBED_TOPICS"
+                f"{consumer!r} subscribes to unknown topic {topic!r}: not in ALL_EVENTS and not in UNREGISTERED_SUBSCRIBED_TOPICS"
             )
         elif registered and explained:
             problems.append(
-                f"{topic!r} is registered in ALL_EVENTS; remove it from "
-                "UNREGISTERED_SUBSCRIBED_TOPICS"
+                f"{topic!r} is registered in ALL_EVENTS; remove it from UNREGISTERED_SUBSCRIBED_TOPICS"
             )
         if not subscription.evidence:
             problems.append(f"{where} has no evidence")
@@ -769,14 +788,12 @@ def validate_declarations(
     for consumer in sorted(known_consumers):
         if consumer not in declared and consumer not in unproven_consumers:
             problems.append(
-                f"known consumer {consumer!r} is neither declared nor listed as "
-                "unproven"
+                f"known consumer {consumer!r} is neither declared nor listed as unproven"
             )
     for topic, reason in unregistered_topics.items():
         if topic not in subscribed:
             problems.append(
-                f"UNREGISTERED_SUBSCRIBED_TOPICS lists {topic!r}, which no declared "
-                "consumer subscribes to"
+                f"UNREGISTERED_SUBSCRIBED_TOPICS lists {topic!r}, which no declared consumer subscribes to"
             )
         if not reason.strip():
             problems.append(f"UNREGISTERED_SUBSCRIBED_TOPICS[{topic!r}] has no reason")
