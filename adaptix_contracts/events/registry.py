@@ -79,6 +79,18 @@ from adaptix_contracts.schemas.service_registry import (
 BILLING_CLAIM_UPDATED: Final[str] = "billing.claim.updated"
 EPCR_CHART_UPDATED: Final[str] = "epcr.chart.updated"
 
+# Billing's crew-query outbox, audited at Billing main
+# 4f6c012f69c8e6c488d823ec7655bdca598f55f2:
+# backend/billing_app/services/chart_queries.py:66-68,346,600,625,647.
+# ePCR's answer outbox, audited at ePCR main
+# bbeb4517220315b5ab967daf75093ced1bb297b2:
+# backend/epcr_app/billing_chart_queries.py:74,372.
+# These are existing wire names, not a second event vocabulary (ePCR #916).
+BILLING_CHART_QUERY_OPENED: Final[str] = "billing.chart.query_opened"
+BILLING_CHART_QUERY_WITHDRAWN: Final[str] = "billing.chart.query_withdrawn"
+BILLING_CHART_QUERY_RESOLVED: Final[str] = "billing.chart.query_resolved"
+EPCR_CHART_QUERY_ANSWERED: Final[str] = "epcr.chart.query_answered"
+
 # ---------------------------------------------------------------------------
 # Workforce-named shift facts (producer: Adaptix-Labor-Service, slug ``labor``)
 # ---------------------------------------------------------------------------
@@ -674,6 +686,9 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
         "source_service": "transport",
     },
     BILLING_CLAIM_UPDATED: {"version": "1.0", "source_service": "billing"},
+    BILLING_CHART_QUERY_OPENED: {"version": "1.0", "source_service": "billing"},
+    BILLING_CHART_QUERY_WITHDRAWN: {"version": "1.0", "source_service": "billing"},
+    BILLING_CHART_QUERY_RESOLVED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_CREATED: {"version": "1.0", "source_service": "billing"},
     BILLING_CLAIM_STATUS_CHANGED: {"version": "1.0", "source_service": "billing"},
     # billing_app/services/claim_service.py:178 (outbox row relayed by
@@ -720,6 +735,7 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
         "source_service": QA_SERVICE_SLUG,
     },
     EPCR_CHART_UPDATED: {"version": "1.0", "source_service": "epcr"},
+    EPCR_CHART_QUERY_ANSWERED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_CREATED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_FINALIZED: {"version": "1.0", "source_service": "epcr"},
     EPCR_CHART_SIGNED: {"version": "1.0", "source_service": "epcr"},
@@ -970,6 +986,9 @@ __all__ = [
     "ALL_EVENTS",
     "ALL_REGISTERED_EVENTS",
     "BILLING_CALL_CONTEXT_ASSEMBLED",
+    "BILLING_CHART_QUERY_OPENED",
+    "BILLING_CHART_QUERY_RESOLVED",
+    "BILLING_CHART_QUERY_WITHDRAWN",
     "BILLING_CLAIM_CREATED",
     "BILLING_CLAIM_STATUS_CHANGED",
     "BILLING_CLAIM_STATUS_UPDATED",
@@ -1007,6 +1026,7 @@ __all__ = [
     "EPCR_CHART_LOCKED",
     "EPCR_CHART_NEMSIS_EXPORT_COMPLETED",
     "EPCR_CHART_NEMSIS_VALIDATION_COMPLETED",
+    "EPCR_CHART_QUERY_ANSWERED",
     "EPCR_CHART_SIGNED",
     "EPCR_CHART_UNLOCKED",
     "EPCR_CHART_UPDATED",
