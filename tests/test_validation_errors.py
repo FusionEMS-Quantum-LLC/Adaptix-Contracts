@@ -5,12 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
 
 import pytest
 
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -21,6 +22,7 @@ from pydantic import (
 
 from _asgi_client import ASGIClient
 from adaptix_contracts.validation_errors import (
+    LOGGED_SERVER_SIDE_ERRORS,
     SERVER_SIDE_VALIDATION_ERROR_DETAIL,
     input_free_server_side_validation_error_handler,
     input_free_validation_error_handler,
@@ -311,6 +313,19 @@ def _server_side_app(*, input_free: bool) -> FastAPI:
     async def echo() -> dict[str, str]:
         return {"mrn": _Echoing.model_validate({"mrn": _MRN}).mrn}
 
+    @app.get("/rows", response_model=list[_Record])
+    async def rows() -> list[dict[str, str]]:
+        # One error per bad row: the shape that makes an unbounded record.
+        return [{"mrn": f"{_MRN}-{i}"} for i in range(500)]
+
+    @app.get("/stream")
+    async def stream() -> StreamingResponse:
+        async def chunks() -> AsyncIterator[bytes]:
+            yield b"first chunk\n"
+            _Record.model_validate({"mrn": _MRN})
+
+        return StreamingResponse(chunks())
+
     if input_free:
         install_input_free_validation_errors(app)
     return app
@@ -403,6 +418,39 @@ def test_custom_validator_message_that_echoes_the_value_is_not_logged(
     assert "msg" not in message
 
 
+def test_log_is_bounded_and_puts_the_traceback_before_the_list(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    status, text = _get_unraised(_server_side_app(input_free=True), "/rows")
+
+    assert status == 500 and _MRN not in text
+    message = _only_server_side_record(caplog).getMessage()
+    assert _MRN not in message
+    head, _, listed = message.partition(
+        f"first {LOGGED_SERVER_SIDE_ERRORS} error type(s) and location(s): "
+    )
+    assert head.startswith("ResponseValidationError on GET /rows: 500 error(s)\n")
+    assert "Traceback" not in head and 'File "' in head  # the frames come first
+    entries = json.loads(listed)
+    assert len(entries) == LOGGED_SERVER_SIDE_ERRORS == 20
+    assert entries[0] == {"type": "int_parsing", "loc": ["response", 0, "mrn"]}
+    assert len(message) < 20_000
+
+
+def test_handler_does_not_cover_an_exception_after_the_response_started() -> None:
+    # The limit, pinned: Starlette dispatches exception handlers only before
+    # http.response.start. A ValidationError raised in a streaming generator
+    # after its first chunk (likewise in a BackgroundTask) is re-raised to
+    # the server as the __cause__ of a RuntimeError, value included, so a
+    # service must catch it there itself.
+    with pytest.raises(RuntimeError, match="response already started") as caught:
+        ASGIClient(_server_side_app(input_free=True)).get("/stream")
+    assert isinstance(caught.value.__cause__, ValidationError)
+    assert _MRN in str(caught.value.__cause__)
+
+
 def _ws_server_side_app(*, input_free: bool) -> FastAPI:
     app = FastAPI()
 
@@ -412,6 +460,14 @@ def _ws_server_side_app(*, input_free: bool) -> FastAPI:
         # A frame parsed by hand: the usual way a pydantic ValidationError is
         # raised inside a WebSocket endpoint.
         _Record.model_validate_json(await websocket.receive_text())
+
+    @app.websocket("/closed/{mrn}")
+    async def closed(websocket: WebSocket, mrn: str) -> None:
+        await websocket.accept()
+        frame = await websocket.receive_text()
+        await websocket.close()
+        # Raised after the endpoint closed the socket itself.
+        _Record.model_validate_json(frame)
 
     if input_free:
         install_input_free_validation_errors(app)
@@ -486,6 +542,58 @@ def test_websocket_server_side_failure_closes_1011_without_the_value(
     assert "int_parsing" in message
     logged = "\n".join(record.getMessage() for record in caplog.records)
     assert _MRN not in logged
+
+
+def test_websocket_already_closed_by_the_endpoint_is_not_closed_twice(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    sent = asyncio.run(
+        _ws_frames(
+            _ws_server_side_app(input_free=True),
+            f"/closed/{_MRN}",
+            [json.dumps({"mrn": _MRN})],
+        )
+    )
+
+    assert [m["type"] for m in sent] == ["websocket.accept", "websocket.close"]
+    assert sent[-1]["code"] == 1000  # the endpoint's own close, not a second one
+    message = _only_server_side_record(caplog).getMessage()
+    assert "ValidationError on WEBSOCKET /closed/{mrn}" in message
+    assert _MRN not in message
+
+
+def _exception_envelope_app(*, server_side_errors: bool) -> FastAPI:
+    app = FastAPI()
+
+    @app.exception_handler(Exception)
+    async def envelope(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=500, content={"error": "envelope"})
+
+    @app.get("/record")
+    async def record() -> dict[str, int]:
+        return {"mrn": _Record.model_validate({"mrn": _MRN}).mrn}
+
+    install_input_free_validation_errors(app, server_side_errors=server_side_errors)
+    return app
+
+
+def test_exception_handler_is_pre_empted_unless_opted_out() -> None:
+    # Documented: an Exception/500 handler lives in the outermost
+    # ServerErrorMiddleware; the ValidationError handler in ExceptionMiddleware
+    # answers first.
+    status, text = _get_unraised(
+        _exception_envelope_app(server_side_errors=True), "/record"
+    )
+    assert status == 500
+    assert json.loads(text) == {"detail": SERVER_SIDE_VALIDATION_ERROR_DETAIL}
+
+    status, text = _get_unraised(
+        _exception_envelope_app(server_side_errors=False), "/record"
+    )
+    assert status == 500
+    assert json.loads(text) == {"error": "envelope"}
 
 
 def test_installer_keeps_an_existing_server_side_handler() -> None:

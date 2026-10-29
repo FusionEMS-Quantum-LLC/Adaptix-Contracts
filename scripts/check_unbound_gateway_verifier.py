@@ -17,11 +17,18 @@ docstrings are never counted.
 
 * ``unbound-verifier``: any import or use of ``verify_gateway_signature``, or of
   its ``gateway_identity.verify`` alias.
-* ``get-auth-context-without-request``: a plain call of ``get_auth_context``
-  without ``request=``, including a call through a local alias made by
-  ``from ... import get_auth_context as <name>``. Resolved as ``Depends(get_auth_context)`` FastAPI
-  supplies the request; called by hand without it, the contracts code runs the
-  unbound path. Analytics and Graph were found this way.
+* ``get-auth-context-without-request``: a call of ``get_auth_context``
+  (including through a local alias made by ``from ... import
+  get_auth_context as <name>``) that passes neither ``request=`` nor the
+  request as its first positional argument. Resolved as
+  ``Depends(get_auth_context)`` FastAPI supplies the request; called by hand
+  without it, the contracts code runs the unbound path. Analytics and Graph
+  were found this way. The detail is ``plain call`` (keywords only) or
+  ``positional call``. Not reported: a first positional argument named
+  ``request`` or ``<x>.request`` (a service's own request-first wrapper,
+  Billing's shape; the contracts dependency itself takes ``request`` last, so
+  any other positional call reaches it with ``request=None``), and ``*args``
+  or ``**kwargs`` calls, which cannot be judged from the call site.
 
 Neither finding is automatically a vulnerability. A worker that no route can
 reach may verify without a binding. Such a site is recorded in the allowlist

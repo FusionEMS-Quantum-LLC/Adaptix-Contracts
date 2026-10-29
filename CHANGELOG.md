@@ -33,22 +33,35 @@ from the installed package metadata).
   method (`WEBSOCKET` for a socket), the route template (never the served
   path), each error's `type` and `loc`, and the traceback frames; it carries
   neither `msg` (a custom validator's text can repeat the value) nor
-  `str(exc)`. `loc` can still name a mapping key.
+  `str(exc)`. `loc` can still name a mapping key. The record is bounded: the
+  error count and the traceback frames come first, then `type`/`loc` of the
+  first `LOGGED_SERVER_SIDE_ERRORS` (20) errors, so a `ResponseValidationError`
+  over a long `response_model=list[...]` cannot push the frames past a log
+  pipeline's per-event cap. Like every Starlette exception handler it covers an
+  exception raised before the response starts: a `ValidationError` raised in a
+  `BackgroundTask`, in a `StreamingResponse` generator after its first chunk,
+  or in user middleware is not handled and still reaches the server traceback
+  with the value; services catch it there themselves (a test pins the limit).
 
   This changes the default of a function shipped in 5.47.0: an app that calls
   the installer and relied on those two exceptions reaching its own `ValueError`
   handler (pydantic's `ValidationError` subclasses `ValueError`, and Starlette
-  picks the most specific registered class) now answers them 500 here. The two
+  picks the most specific registered class) or its own `Exception`/500 handler
+  (its error envelope, request id or metrics; Starlette runs that one in the
+  outermost `ServerErrorMiddleware`, behind `ExceptionMiddleware`) now answers
+  them 500 here with `{"detail": "Internal Server Error"}`. The two
   server-side handlers are registered with `setdefault` semantics, so a handler
   the app already registered for exactly `ValidationError` or
   `ResponseValidationError` is kept. `install_input_free_validation_errors(app,
   server_side_errors=False)` keeps the 5.47.0 surface for an app that wants
-  its own routing or whose own handler is known not to log `str(exc)`. New
+  its own routing or envelope, or whose own handler is known not to log
+  `str(exc)`. New
   tests prove a PHI-shaped value in a refused request appears in no log record
   (`caplog`); that both HTTP server-side failures and a WebSocket one answer
   without it; that the log names `/patients/{mrn}` and not the served path;
-  that a validator message echoing the value stays out of the log; and the
-  `setdefault` and `ValueError` pre-emption behaviours.
+  that a validator message echoing the value stays out of the log; the
+  `setdefault`, `ValueError` and `Exception` pre-emption behaviours; the
+  bounded record; and the after-response-start limit.
 - **`verify_gateway_signature` and `gateway_identity.verify` carry the PEP 702
   `@deprecated` marker** (Contracts #397). mypy with
   `enable_error_code = ["deprecated"]` and pyright with `reportDeprecated`
@@ -76,8 +89,10 @@ from the installed package metadata).
   and `get_auth_context` without the request (4 repositories, 8 sites under
   this change's checker rule: Audit, Core, Voice and this package's own
   re-export; the checker on `main` also reported Billing's two request-first
-  wrapper calls, 5 repositories and 10 rows; of Governance #347's thirteen
-  rows only Voice remains open).
+  wrapper calls, 5 repositories and 10 rows; of Governance #347's fourteen
+  file rows in twelve repositories, ten pass `request=` on `main`, Billing's
+  two pass the request positionally to its own wrapper, and Voice's two remain
+  open).
 - The package now imports `typing_extensions` (for PEP 702 `deprecated`). It
   is not added to `dependencies`: `governance/approved-tools.json` does not
   list it, and `pydantic>=2.6.0` already requires `typing-extensions>=4.6.1`,

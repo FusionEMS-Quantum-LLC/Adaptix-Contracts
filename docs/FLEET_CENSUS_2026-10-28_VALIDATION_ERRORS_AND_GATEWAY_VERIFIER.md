@@ -167,8 +167,11 @@ rows that only the rule on `main` reports, marked as such: **5 repositories,
 Reading of each:
 
 - **Adaptix-Audit-Service** `backend/audit_app/api/gateway_auth.py:274`: an
-  HTTP request-authentication path still on the deprecated name. Audit #155
-  (2026-10-18 comment on #397) carries the fix; it is not on `main` yet.
+  HTTP request-authentication path that is bound since Audit #155 (merged
+  2026-10-18, `886f0a6`): at `ff15a0a` the call already passes
+  `request_method=request.method` and `request_path=request.url.path` to the
+  deprecated name, so the signed route is checked. Only the rename to
+  `verify_gateway_signature_for_request` remains.
 - **Adaptix-Core-Service** `core/backend/core_app/auth/gateway_context.py:262`:
   the documented no-request arm; every HTTP caller passes the request
   (`:255-261`). It renames to
@@ -177,23 +180,28 @@ Reading of each:
 - **Adaptix-Voice-Service** `backend/voice_app/api/auth.py:133` and `:178`:
   the contracts `get_auth_context`, imported as `_get_auth_context`, called
   without `request=` from the HTTP dependency and from the WebSocket resolver
-  (`api/calls.py:759` calls the latter). These are the two Voice rows of
-  Governance #347 and are still open.
+  (`api/calls.py:759` calls the latter). These are the two Voice file rows
+  of Governance #347 (`voice_app/api/auth.py`, `voice_app/api/calls.py`) and
+  are still open.
 - **Adaptix-Contracts** `adaptix_contracts/gateway_identity/__init__.py`: the
   overlap-period re-export, on the repository's own allowlist.
 
-The remaining Governance #347 rows were also re-read with the issue's own
-method (a call passing `x_adaptix_auth_signature=` and no `request=`):
-Analytics (`auth.py:218`), Calendar (`auth.py:208`), Device
-(`routes_app_releases.py:339`), Finance (`auth.py:375`), HL7
-(`api/dependencies.py:241`), Labor (`dependencies.py:373`), NEMSIS
+Governance #347 lists **14 file rows in 12 repositories** (a row is a file
+named in the issue: Billing 2, Voice 2, and one each for Calendar, Device,
+Finance, HL7, HR, Imports, Media, NEMSIS, Partner and Training). Re-read with
+the issue's own method (a call passing `x_adaptix_auth_signature=` and no
+`request=`): Calendar (`auth.py:208`), Device (`routes_app_releases.py:339`),
+Finance (`auth.py:375`), HL7 (`api/dependencies.py:241`), NEMSIS
 (`auth.py:230`), Partner (`auth.py:377`) and Training (`auth.py:191`) all
 build a header block and then call the canonical dependency **with**
 `request=request` whenever a request exists (`if request is None:` ...
 `else: ...(**headers, request=request)`); HR (`auth.py:257`), Imports
 (`auth.py:278`) and Media (`auth.py:278`) pass `request=request` directly.
-Those twelve are closed on `main`. Billing's two sites pass the request
-positionally to its own wrapper. **Open from #347: Voice only.**
+**Those ten rows are closed on `main`. Billing's two pass the request
+positionally to its own wrapper. Open from #347: Voice's two.** Analytics
+(`auth.py:218`) and Labor (`dependencies.py:373`) were re-read the same way
+and pass `request=request`; they are not #347 rows (the issue already lists
+them among the callers that pass the request).
 
 ## 3. What this census does not say
 

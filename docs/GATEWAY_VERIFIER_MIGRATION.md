@@ -20,7 +20,7 @@ with more than one task.
 | Where the call runs | Replacement |
 | --- | --- |
 | An HTTP route or dependency (the served `Request` is available) | `verify_gateway_signature_for_request(request, context_b64=..., signature_hex=..., shared_secret=..., auth_path=..., key_id=...)`. It binds the real method and path and verifies once per request. |
-| A FastAPI dependency built on the canonical identity dependency | Resolve `adaptix_contracts.auth_contracts.get_auth_context` through `Depends(...)`, or call it with `request=request`. A plain call without `request=` runs the unbound path (Governance #347). |
+| A FastAPI dependency built on the canonical identity dependency | Resolve `adaptix_contracts.auth_contracts.get_auth_context` through `Depends(...)`, or call it with `request=request`. A call without `request=` runs the unbound path (Governance #347); so does a positional call, because the dependency's `request` parameter is last. |
 | Code no route can reach: a worker, a CLI, an in-process caller | `verify_gateway_signature_without_request_binding(context_b64=..., signature_hex=..., ...)`, with a comment at the call site saying why no route reaches it. Under `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` a bound context fails closed there, because that caller can never check it. |
 
 Both replacements take the same keyword arguments as the deprecated name
