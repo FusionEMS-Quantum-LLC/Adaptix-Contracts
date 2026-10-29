@@ -8,9 +8,16 @@ import logging
 
 import pytest
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
+from fastapi.responses import JSONResponse
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from _asgi_client import ASGIClient
 from adaptix_contracts.validation_errors import (
@@ -269,6 +276,19 @@ class _Record(BaseModel):
     mrn: int
 
 
+class _Echoing(BaseModel):
+    """A model whose own validator repeats the value in ``msg``."""
+
+    mrn: str
+
+    @field_validator("mrn")
+    @classmethod
+    def _numeric(cls, value: str) -> str:
+        if not value.isdigit():
+            raise ValueError(f"{value} is not a numeric MRN")
+        return value
+
+
 def _server_side_app(*, input_free: bool) -> FastAPI:
     app = FastAPI()
 
@@ -281,6 +301,15 @@ def _server_side_app(*, input_free: bool) -> FastAPI:
     @app.get("/typed", response_model=_Record)
     async def typed() -> dict[str, str]:
         return {"mrn": _MRN}
+
+    @app.get("/patients/{mrn}")
+    async def patient(mrn: str) -> dict[str, int]:
+        # The served path carries the identifier; the stored record fails.
+        return {"mrn": _Record.model_validate({"mrn": mrn}).mrn}
+
+    @app.get("/echo")
+    async def echo() -> dict[str, str]:
+        return {"mrn": _Echoing.model_validate({"mrn": _MRN}).mrn}
 
     if input_free:
         install_input_free_validation_errors(app)
@@ -331,6 +360,175 @@ def test_server_side_validation_failure_answers_500_without_the_value(
     assert _MRN not in record.getMessage()
     assert "int_parsing" in record.getMessage()
     assert path in record.getMessage()
+
+
+def _only_server_side_record(caplog: pytest.LogCaptureFixture) -> logging.LogRecord:
+    (record,) = [
+        r for r in caplog.records if r.name == "adaptix_contracts.validation_errors"
+    ]
+    return record
+
+
+def test_log_names_the_route_template_not_the_served_path(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    status, text = _get_unraised(_server_side_app(input_free=True), f"/patients/{_MRN}")
+
+    assert status == 500 and _MRN not in text
+    message = _only_server_side_record(caplog).getMessage()
+    assert "GET /patients/{mrn}" in message
+    assert f"/patients/{_MRN}" not in message
+    assert _MRN not in message
+
+
+def test_custom_validator_message_that_echoes_the_value_is_not_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The defect, pinned: the validator's own text carries the value, in
+    # errors()[...]["msg"] and in str(exc).
+    with pytest.raises(ValidationError) as caught:
+        _Echoing.model_validate({"mrn": _MRN})
+    assert _MRN in caught.value.errors()[0]["msg"]
+    assert _MRN in str(caught.value)
+
+    caplog.set_level(logging.DEBUG)
+    status, text = _get_unraised(_server_side_app(input_free=True), "/echo")
+
+    assert status == 500 and _MRN not in text
+    message = _only_server_side_record(caplog).getMessage()
+    assert _MRN not in message
+    assert "value_error" in message and '["mrn"]' in message
+    assert "msg" not in message
+
+
+def _ws_server_side_app(*, input_free: bool) -> FastAPI:
+    app = FastAPI()
+
+    @app.websocket("/records/{mrn}")
+    async def records(websocket: WebSocket, mrn: str) -> None:
+        await websocket.accept()
+        # A frame parsed by hand: the usual way a pydantic ValidationError is
+        # raised inside a WebSocket endpoint.
+        _Record.model_validate_json(await websocket.receive_text())
+
+    if input_free:
+        install_input_free_validation_errors(app)
+    return app
+
+
+async def _ws_frames(
+    app: FastAPI, path: str, frames: list[str]
+) -> list[dict[str, object]]:
+    sent: list[dict[str, object]] = []
+    messages = iter(
+        [
+            {"type": "websocket.connect"},
+            *({"type": "websocket.receive", "text": frame} for frame in frames),
+        ]
+    )
+
+    async def receive() -> dict[str, object]:
+        return next(messages)
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    scope = {
+        "type": "websocket",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "headers": [],
+        "scheme": "ws",
+        "server": ("testserver", 80),
+        "client": ("testclient", 50000),
+        "root_path": "",
+        "subprotocols": [],
+        "asgi": {"version": "3.0"},
+    }
+    await app(scope, receive, send)
+    return sent
+
+
+def test_websocket_default_lets_the_exception_carry_the_value() -> None:
+    with pytest.raises(ValidationError) as caught:
+        asyncio.run(
+            _ws_frames(
+                _ws_server_side_app(input_free=False),
+                f"/records/{_MRN}",
+                [json.dumps({"mrn": _MRN})],
+            )
+        )
+    assert _MRN in str(caught.value)
+
+
+def test_websocket_server_side_failure_closes_1011_without_the_value(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    sent = asyncio.run(
+        _ws_frames(
+            _ws_server_side_app(input_free=True),
+            f"/records/{_MRN}",
+            [json.dumps({"mrn": _MRN})],
+        )
+    )
+
+    assert [m["type"] for m in sent] == ["websocket.accept", "websocket.close"]
+    assert sent[-1]["code"] == 1011
+    assert _MRN not in json.dumps(sent)
+    message = _only_server_side_record(caplog).getMessage()
+    assert "ValidationError on WEBSOCKET /records/{mrn}" in message
+    assert _MRN not in message
+    assert "int_parsing" in message
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert _MRN not in logged
+
+
+def test_installer_keeps_an_existing_server_side_handler() -> None:
+    app = FastAPI()
+
+    async def own(_request: Request, _exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=500, content={})
+
+    app.add_exception_handler(ValidationError, own)
+
+    install_input_free_validation_errors(app)
+
+    assert app.exception_handlers[ValidationError] is own
+    assert app.exception_handlers[ResponseValidationError] is (
+        input_free_server_side_validation_error_handler
+    )
+
+
+def _value_error_app(*, server_side_errors: bool) -> FastAPI:
+    app = FastAPI()
+
+    @app.exception_handler(ValueError)
+    async def bad_value(_request: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": "bad value"})
+
+    @app.get("/record")
+    async def record() -> dict[str, int]:
+        return {"mrn": _Record.model_validate({"mrn": _MRN}).mrn}
+
+    install_input_free_validation_errors(app, server_side_errors=server_side_errors)
+    return app
+
+
+def test_value_error_handler_is_pre_empted_unless_opted_out() -> None:
+    # Documented: pydantic's ValidationError subclasses ValueError, and
+    # Starlette picks the most specific registered class.
+    status, text = _get_unraised(_value_error_app(server_side_errors=True), "/record")
+    assert status == 500
+    assert json.loads(text) == {"detail": SERVER_SIDE_VALIDATION_ERROR_DETAIL}
+
+    status, text = _get_unraised(_value_error_app(server_side_errors=False), "/record")
+    assert status == 400
+    assert json.loads(text) == {"detail": "bad value"}
 
 
 def test_server_side_handlers_can_be_left_out() -> None:

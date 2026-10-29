@@ -19,17 +19,25 @@ or an upstream answer), and FastAPI's ``ResponseValidationError`` (a return
 value that does not fit ``response_model``), both carry ``input`` in their
 ``errors()`` and quote it in ``str(exc)``. Unhandled, they reach the ASGI
 server's "Exception in ASGI application" traceback with the value in the
-message line. The installer also registers handlers for those two: the
-caller gets a 500 with no detail, and one input-free ``ERROR`` record (the
-error types and locations, the route template and the traceback frames,
-never ``str(exc)``) keeps the defect diagnosable.
+message line. The installer also registers handlers for those two: an HTTP
+caller gets a 500 with no detail, a WebSocket is closed with 1011, and one
+``ERROR`` record (the error types and locations, the route template and the
+traceback frames; never ``msg``, never ``str(exc)``) keeps the defect
+diagnosable. The two server-side handlers are registered only where the app
+has none of its own (``dict.setdefault``), and because pydantic's
+``ValidationError`` subclasses ``ValueError``, an app that handles
+``ValueError`` itself sees pydantic errors raised in routes go to this
+handler instead once the installer runs; ``server_side_errors=False`` keeps
+the app's own routing.
 
 ``msg`` is the validator's own text. Pydantic's built-in messages name the rule,
 not the value, but a custom validator that lets an exception's text through (for
 example ``date.fromisoformat``'s "day 30 must be in range 1..28 for month 2 in
 year 1950") repeats the value in ``msg``. That is the validator's defect, fixed in
 the validator; rewriting every ``msg`` here would also erase the field-level
-guidance callers rely on.
+guidance callers rely on. The server-side ``ERROR`` record has no caller to
+guide, so it drops ``msg`` and keeps only ``type`` and ``loc``; ``loc`` can
+still name a mapping key, which is a value when a model is keyed by one.
 """
 
 from __future__ import annotations
@@ -38,6 +46,7 @@ import json
 import logging
 import traceback
 from collections.abc import Iterable, Mapping
+from typing import overload
 
 from fastapi import FastAPI, Request, WebSocket, status
 from fastapi.exceptions import (
@@ -47,6 +56,7 @@ from fastapi.exceptions import (
 )
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from starlette.websockets import WebSocketState
 
 __all__ = [
     "SERVER_SIDE_VALIDATION_ERROR_DETAIL",
@@ -117,33 +127,62 @@ async def input_free_websocket_validation_error_handler(
     )
 
 
+@overload
 async def input_free_server_side_validation_error_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
-    """Answer a server-side validation failure with a 500 that repeats nothing.
+    connection: Request, exc: Exception
+) -> JSONResponse: ...
+
+
+@overload
+async def input_free_server_side_validation_error_handler(
+    connection: WebSocket, exc: Exception
+) -> None: ...
+
+
+async def input_free_server_side_validation_error_handler(
+    connection: Request | WebSocket, exc: Exception
+) -> JSONResponse | None:
+    """Answer a server-side validation failure without repeating anything.
 
     Registered for pydantic ``ValidationError`` and FastAPI
-    ``ResponseValidationError``. Both are defects in the service, not in the
-    request, so the status stays 500 and the body is only
-    :data:`SERVER_SIDE_VALIDATION_ERROR_DETAIL`.
+    ``ResponseValidationError``. Both are normally defects in the service (a
+    stored record or an upstream answer that no longer fits its model, a
+    return value that does not fit ``response_model``), so the status stays
+    500 and the body is only :data:`SERVER_SIDE_VALIDATION_ERROR_DETAIL`. A
+    route that validates caller input by hand (``Model.model_validate(...)``
+    on a body or frame it read itself) raises the same exception and gets
+    the same 500; such a route should raise ``RequestValidationError`` (or a
+    422 ``HTTPException``) itself if it wants the caller told.
+
+    Starlette dispatches exception handlers for both scope types, so this
+    handler is called with a ``Request`` on an HTTP route and with a
+    ``WebSocket`` on a WebSocket route (a frame parsed by hand with
+    ``Model.model_validate_json(await websocket.receive_text())`` is the usual
+    source). The WebSocket is closed with 1011 (internal error) and nothing
+    is returned; a ``JSONResponse`` cannot be sent on a websocket scope.
 
     One ``ERROR`` record is logged so the defect stays diagnosable: the
-    exception class, the route template (never the served path, which can
-    carry an identifier), the input-free errors and the traceback frames.
-    ``str(exc)`` is never logged; pydantic puts ``input_value=...`` in it.
+    exception class, the method (``WEBSOCKET`` for a socket), the route
+    template (never the served path, which can carry an identifier), each
+    error's ``type`` and ``loc`` and the traceback frames. Neither ``msg``
+    (a custom validator's text can repeat the value) nor ``str(exc)``
+    (pydantic puts ``input_value=...`` in it) is logged.
     """
     if not isinstance(exc, (ValidationError, ResponseValidationError)):
         raise exc
-    errors = input_free_validation_errors(exc.errors())
-    route = request.scope.get("route")
+    route = connection.scope.get("route")
     _logger.error(
         "%s on %s %s: %s\n%s",
         type(exc).__name__,
-        request.method,
+        connection.scope.get("method", "WEBSOCKET"),
         getattr(route, "path", "<unrouted>"),
-        json.dumps(errors),
+        json.dumps(_types_and_locations(exc.errors())),
         "".join(traceback.format_tb(exc.__traceback__)),
     )
+    if isinstance(connection, WebSocket):
+        if connection.application_state is not WebSocketState.DISCONNECTED:
+            await connection.close(code=status.WS_1011_INTERNAL_ERROR)
+        return None
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": SERVER_SIDE_VALIDATION_ERROR_DETAIL},
@@ -159,12 +198,19 @@ def install_input_free_validation_errors(
     default ``RequestValidationError`` and ``WebSocketRequestValidationError``
     handlers for that app only.
 
-    With ``server_side_errors`` (the default) it also registers
+    With ``server_side_errors`` (the default since 5.48.0; 5.47.0 installed
+    only the two above) it also registers
     :func:`input_free_server_side_validation_error_handler` for pydantic
     ``ValidationError`` and FastAPI ``ResponseValidationError``, so neither
     reaches the ASGI server's traceback with the failing value in its message.
-    Pass ``server_side_errors=False`` when the app already routes those two
-    through its own handler that is known not to log ``str(exc)``.
+    Those two are registered only where the app has no handler of its own for
+    exactly that class (``setdefault``; an existing one is kept as it is).
+    Starlette picks a handler by walking the exception's MRO, and pydantic's
+    ``ValidationError`` subclasses ``ValueError``, so an app that handles
+    ``ValueError`` itself (answering 400, for example) stops seeing pydantic
+    errors raised in its routes once this runs: they are answered 500 here.
+    Pass ``server_side_errors=False`` to keep such an app's own routing, or
+    when its own handler for those two is known not to log ``str(exc)``.
     """
     app.add_exception_handler(
         RequestValidationError, input_free_validation_error_handler
@@ -174,12 +220,20 @@ def install_input_free_validation_errors(
         input_free_websocket_validation_error_handler,
     )
     if server_side_errors:
-        app.add_exception_handler(
-            ValidationError, input_free_server_side_validation_error_handler
-        )
-        app.add_exception_handler(
-            ResponseValidationError, input_free_server_side_validation_error_handler
-        )
+        for exc_type in (ValidationError, ResponseValidationError):
+            app.exception_handlers.setdefault(
+                exc_type, input_free_server_side_validation_error_handler
+            )
+
+
+def _types_and_locations(
+    errors: Iterable[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    """What the server-side ``ERROR`` record carries per error: no ``msg``."""
+    return [
+        {"type": error["type"], "loc": list(_location(error["loc"]))}
+        for error in errors
+    ]
 
 
 def _location(loc: object) -> Iterable[object]:

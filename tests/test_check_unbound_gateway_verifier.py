@@ -97,12 +97,44 @@ def test_aliased_get_auth_context_with_request_is_not_reported() -> None:
     assert _kinds(src) == []
 
 
-def test_positional_request_to_a_local_wrapper_is_not_reported() -> None:
-    # Billing's own ``get_auth_context(request, ...)`` passes the request as
-    # the first positional argument; only keyword-less-and-positional-less
-    # calls are provably unbound.
-    src = "get_auth_context(request, x_user_id=request.headers.get('X-User-Id'))\n"
+@pytest.mark.parametrize(
+    "src",
+    [
+        # Billing's own wrapper takes the request as its first parameter.
+        "get_auth_context(request, x_user_id=request.headers.get('X-User-Id'))\n",
+        "get_auth_context(self.request, x_user_id='u')\n",
+        "get_auth_context(request)\n",
+    ],
+)
+def test_positional_request_to_a_local_wrapper_is_not_reported(src: str) -> None:
     assert _kinds(src) == []
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        # Header values passed positionally reach the contracts dependency
+        # with request=None (its request parameter is last) and run the
+        # unbound path: still reported.
+        "get_auth_context(user_id, tenant_id)\n",
+        "get_auth_context(headers['X-User-Id'], x_tenant_id='t')\n",
+        "get_auth_context(req, x_user_id='u')\n",
+        (
+            "from adaptix_contracts.auth_contracts import get_auth_context as gac\n"
+            "gac(uid, tid, email, roles, founder, ctx, sig, path, kid)\n"
+        ),
+    ],
+)
+def test_positional_header_values_are_reported(src: str) -> None:
+    findings = check.scan_source(src, "app.py")
+    assert [f.kind for f in findings] == [check.GET_AUTH_CONTEXT_WITHOUT_REQUEST]
+    assert findings[0].detail == "positional call"
+
+
+def test_positional_call_that_binds_the_request_by_keyword_is_not_reported() -> None:
+    assert _kinds("get_auth_context(uid, request=req)\n") == []
+    assert _kinds("get_auth_context(*args)\n") == []
+    assert _kinds("get_auth_context(*args, **kwargs)\n") == []
 
 
 def test_an_unrelated_name_is_not_treated_as_an_alias() -> None:

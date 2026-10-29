@@ -246,6 +246,41 @@ def test_alias_still_binds_when_given_the_request() -> None:
         )
 
 
+def test_alias_forwards_every_parameter_by_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: dict[str, object] = {}
+
+    def recorder(**kwargs: object) -> str:
+        received.update(kwargs)
+        return "verified"
+
+    monkeypatch.setattr(gateway_identity, "_verify_gateway_signature", recorder)
+
+    result = gateway_identity.verify(
+        context_b64="ctx",
+        signature_hex="sig",
+        shared_secret=_SECRET,
+        auth_path="/api/v1/vendors/",
+        key_id="k2",
+        clock_skew_seconds=7,
+        request_method="GET",
+        request_path="/api/v1/vendors/",
+    )
+
+    assert result == "verified"
+    assert received == {
+        "context_b64": "ctx",
+        "signature_hex": "sig",
+        "shared_secret": _SECRET,
+        "auth_path": "/api/v1/vendors/",
+        "key_id": "k2",
+        "clock_skew_seconds": 7,
+        "request_method": "GET",
+        "request_path": "/api/v1/vendors/",
+    }
+
+
 def test_env_var_name_is_exported() -> None:
     assert (
         gateway_signature.GATEWAY_WARN_UNBOUND_VERIFIER_ENV
@@ -309,9 +344,12 @@ def test_type_checker_reports_every_reference_to_the_unbound_verifier(
         line for line in completed.stdout.splitlines() if "[deprecated]" in line
     ]
     assert completed.returncode == 1, completed.stdout + completed.stderr
-    # mypy names each deprecated symbol where it is bound: the import statement
-    # (line 2) and the attribute reference ``gateway_identity.verify`` (line 10).
-    # Line 13, the explicit no-binding replacement, is not reported.
-    assert [line.split(":")[1] for line in reported] == ["2", "10"], reported
+    # mypy names each deprecated symbol at least where it is bound: the import
+    # statement (line 2) and the attribute reference ``gateway_identity.verify``
+    # (line 10). Whether it also names the call site of a from-imported name
+    # (line 9, as pyright does) is the checker's choice, not this package's.
+    # Line 13, the explicit no-binding replacement, is never reported.
+    lines = {line.split(":")[1] for line in reported}
+    assert {"2", "10"} <= lines <= {"2", "9", "10"}, reported
     assert all("#397" in line for line in reported)
     assert all("without_request_binding is deprecated" not in line for line in reported)

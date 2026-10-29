@@ -63,9 +63,11 @@ refused on `GET /b` and served on `GET /a`, failing on the PR's own base.
    deprecated call then warns with `stacklevel` pointing at the caller.
 
 3. **CI.** `scripts/check_unbound_gateway_verifier.py` parses Python with
-   `ast` and refuses any use of the deprecated names, or a plain
-   `get_auth_context(...)` call without `request=` and without a positional
-   argument, unless the site is on an allowlist with a reason. It runs from
+   `ast` and refuses any use of the deprecated names, or a
+   `get_auth_context(...)` call that passes neither `request=` nor the
+   request as its first positional argument (`*args`/`**kwargs` calls are
+   not provable and not reported), unless the site is on an allowlist with a
+   reason. It runs from
    `scripts/ci/verify-toolchain.sh` here, and any service can run it against
    its own tree: `python scripts/check_unbound_gateway_verifier.py <root>`.
 

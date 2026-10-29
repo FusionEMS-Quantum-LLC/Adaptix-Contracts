@@ -132,6 +132,11 @@ def _call_name(func: ast.expr) -> str | None:
     return None
 
 
+def _is_request_name(arg: ast.expr) -> bool:
+    """``request`` or ``<anything>.request``: the shape a request-first wrapper is called with."""
+    return isinstance(arg, (ast.Name, ast.Attribute)) and _call_name(arg) == "request"
+
+
 class _Visitor(ast.NodeVisitor):
     def __init__(self, path: str) -> None:
         self.path = path
@@ -188,14 +193,26 @@ class _Visitor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         if _call_name(node.func) in self._auth_context_names:
             keywords = {kw.arg for kw in node.keywords}
-            # ``**kwargs`` (arg None) may carry request=; it is not provable
-            # either way from the call site, so it is not reported. Nor is a
-            # call with a positional argument: the contracts dependency takes
-            # only header keywords, so a positional call targets a service's
-            # own ``get_auth_context`` wrapper, whose first parameter is
-            # usually the request (Billing's ``get_auth_context(request, ...)``
-            # was reported as unbound by the keyword-only rule).
-            if "request" not in keywords and None not in keywords and not node.args:
+            # ``request=`` binds the request. ``**kwargs`` (arg None) and
+            # ``*args`` may carry it; neither is provable either way from the
+            # call site, so neither is reported. A call whose FIRST positional
+            # argument is named ``request`` (``request``, ``self.request``)
+            # targets a service's own wrapper that takes the request first
+            # (Billing's ``get_auth_context(request, authorization=..., ...)``)
+            # and is not reported either. Every other positional call is: the
+            # contracts dependency's nine header parameters are
+            # positional-or-keyword and ``request`` is deliberately LAST, so
+            # ``get_auth_context(user_id, tenant_id, ...)`` reaches it with
+            # ``request=None`` and runs the unbound path (Governance #347).
+            if "request" in keywords or None in keywords:
+                pass
+            elif any(isinstance(arg, ast.Starred) for arg in node.args):
+                pass
+            elif node.args and _is_request_name(node.args[0]):
+                pass
+            elif node.args:
+                self._add(node, GET_AUTH_CONTEXT_WITHOUT_REQUEST, "positional call")
+            else:
                 self._add(node, GET_AUTH_CONTEXT_WITHOUT_REQUEST, "plain call")
         self.generic_visit(node)
 

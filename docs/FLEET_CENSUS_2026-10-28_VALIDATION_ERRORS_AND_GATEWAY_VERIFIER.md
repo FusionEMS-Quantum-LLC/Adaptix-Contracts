@@ -6,7 +6,7 @@ second column), by exporting that ref with `git archive` and scanning the
 export; no checkout's working tree was read. Test files, `tests/` trees,
 virtual environments and vendored code were excluded. Android, docs,
 governance and other repositories without a `FastAPI(` app or a verifier
-finding are not listed. 108 repositories were exported; 86 appear below.
+finding are not listed. 108 repositories were exported; 85 appear below.
 
 ## 1. Services and their `RequestValidationError` handler (Contracts #375)
 
@@ -27,11 +27,16 @@ A service that only installs `phi_safe_logging` (Communications, Cortex,
 Hospital, OfficeAlly, Payments, Workforce) is **none**: that guards the log
 line, not the 422 body.
 
-**Counts: 86 repositories with a FastAPI app; installer 1 (this repository's
-own test app), own handler 13, none 72.** Of the 72, three are not services
-(adaptix-ops, Adaptix-Web-App, Adaptix-Field-App) and need reading before they
-count, leaving **69 services on the framework default**. Adoption of the
-installer by a service: **0** (an org code search on 2026-10-28 agreed).
+**Counts: 85 repositories with a FastAPI app; installer 0, own handler 13,
+none 72.** Of the 72, three are not services (adaptix-ops, Adaptix-Web-App,
+Adaptix-Field-App) and need reading before they count, leaving **69 services
+on the framework default**. Adoption of the installer by a service: **0** (an
+org code search on 2026-10-28 agreed). Adaptix-Contracts itself is not a row:
+the scan matched `adaptix_contracts/validation_errors.py`, but its only
+`FastAPI(` is the docstring text "after ``FastAPI(...)``" and its installer
+match is the definition of `install_input_free_validation_errors`, not an app
+that calls it (the package's test apps are excluded with every other test
+file).
 
 | Repository | origin/main | `FastAPI(` files | Handler | Where |
 | --- | --- | --- | --- | --- |
@@ -51,7 +56,6 @@ installer by a service: **0** (an org code search on 2026-10-28 agreed).
 | Adaptix-Calendar-Service | `b95092d` | 1 | none |   |
 | Adaptix-Communications-Service | `1088e59` | 2 | none |   |
 | Adaptix-Compliance-Service | `7c2786d` | 1 | none |   |
-| Adaptix-Contracts | `3c13f3a` | 1 | installer | `adaptix_contracts/validation_errors.py`, `adaptix_contracts/validation_errors.py`  |
 | Adaptix-Core-Service | `b067e21` | 3 | own handler | `core/backend/core_app/error_handlers.py`  |
 | Adaptix-Cortex-Service | `324e37d` | 1 | none |   |
 | Adaptix-Crew-Service | `50a1b7d` | 1 | none |   |
@@ -132,20 +136,27 @@ without `input`.
 
 Method: `scripts/check_unbound_gateway_verifier.py` from this change, run
 with no allowlist against each export. It reports any import or use of
-`verify_gateway_signature` or `gateway_identity.verify`, and any plain call
-of `get_auth_context` (or an import alias of it) with no `request=` keyword
-and no positional argument. The positional rule is new in this change: the
-checker on `main` reported Billing's `get_auth_context(request, ...)` as
-unbound although the request is its first positional argument.
+`verify_gateway_signature` or `gateway_identity.verify`, and any call of
+`get_auth_context` (or an import alias of it) that passes neither `request=`
+nor the request as its first positional argument (`request` or
+`<x>.request`); `*args` and `**kwargs` calls are not provable and not
+reported. The request-first exemption is new in this change: the checker on
+`main` reported Billing's `get_auth_context(request, authorization=..., ...)`
+as unbound although the request is its first positional argument. Any other
+positional call is still reported, because the contracts dependency's header
+parameters are positional-or-keyword and its `request` parameter is last.
 
-**Findings on 2026-10-28: 4 repositories, 8 sites.**
+**Findings on 2026-10-28: 4 repositories, 8 sites** under the rule from this
+change (Audit, Contracts, Core, Voice). The table also keeps the two Billing
+rows that only the rule on `main` reports, marked as such: **5 repositories,
+10 rows under that rule.**
 
 | Repository | origin/main | Finding |
 | --- | --- | --- |
 | Adaptix-Audit-Service | `ff15a0a` | `backend/audit_app/api/gateway_auth.py:51: unbound-verifier (import from adaptix_contracts.gateway_signature)` |
 | Adaptix-Audit-Service | `ff15a0a` | `backend/audit_app/api/gateway_auth.py:274: unbound-verifier (use)` |
-| Adaptix-Billing-Service | `eb9fab7` | `backend/billing_app/api/cortex_tools.py:157: get-auth-context-without-request (plain call)` |
-| Adaptix-Billing-Service | `eb9fab7` | `backend/billing_app/api/dependencies.py:956: get-auth-context-without-request (plain call)` |
+| Adaptix-Billing-Service | `eb9fab7` | `backend/billing_app/api/cortex_tools.py:157: get-auth-context-without-request (plain call)` — rule on `main` only; request is the first positional argument, not a finding under this change |
+| Adaptix-Billing-Service | `eb9fab7` | `backend/billing_app/api/dependencies.py:956: get-auth-context-without-request (plain call)` — rule on `main` only; request is the first positional argument, not a finding under this change |
 | Adaptix-Contracts | `3c13f3a` | `adaptix_contracts/gateway_identity/__init__.py:32: unbound-verifier (import from adaptix_contracts.gateway_signature)` |
 | Adaptix-Contracts | `3c13f3a` | `adaptix_contracts/gateway_identity/__init__.py:243: unbound-verifier (use)` |
 | Adaptix-Core-Service | `b067e21` | `core/backend/core_app/auth/gateway_context.py:80: unbound-verifier (import from adaptix_contracts.gateway_signature)` |

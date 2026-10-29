@@ -23,16 +23,32 @@ from the installed package metadata).
   `response_model`) both quote the failing value in `str(exc)` and carry it in
   `errors()`; unhandled, they reach the ASGI server's "Exception in ASGI
   application" traceback with the value in the message line. The installer now
-  registers `input_free_server_side_validation_error_handler` for both: the
-  caller gets a 500 whose body is only
-  `{"detail": "Internal Server Error"}` (`SERVER_SIDE_VALIDATION_ERROR_DETAIL`),
-  and one `ERROR` record on `adaptix_contracts.validation_errors` carries the
-  exception class, the route template, the input-free errors and the traceback
-  frames, never `str(exc)`. `install_input_free_validation_errors(app,
-  server_side_errors=False)` keeps the 5.47.0 behaviour for an app that already
-  routes those two through a handler known not to log `str(exc)`. New tests
-  prove a PHI-shaped value in a refused request appears in no log record
-  (`caplog`), and that both server-side failures answer without it.
+  registers `input_free_server_side_validation_error_handler` for both. An
+  HTTP caller gets a 500 whose body is only
+  `{"detail": "Internal Server Error"}` (`SERVER_SIDE_VALIDATION_ERROR_DETAIL`);
+  a WebSocket route (Starlette dispatches exception handlers for both scope
+  types, and a frame parsed by hand is the usual source) is closed with 1011
+  and nothing is returned. One `ERROR` record on
+  `adaptix_contracts.validation_errors` carries the exception class, the
+  method (`WEBSOCKET` for a socket), the route template (never the served
+  path), each error's `type` and `loc`, and the traceback frames; it carries
+  neither `msg` (a custom validator's text can repeat the value) nor
+  `str(exc)`. `loc` can still name a mapping key.
+
+  This changes the default of a function shipped in 5.47.0: an app that calls
+  the installer and relied on those two exceptions reaching its own `ValueError`
+  handler (pydantic's `ValidationError` subclasses `ValueError`, and Starlette
+  picks the most specific registered class) now answers them 500 here. The two
+  server-side handlers are registered with `setdefault` semantics, so a handler
+  the app already registered for exactly `ValidationError` or
+  `ResponseValidationError` is kept. `install_input_free_validation_errors(app,
+  server_side_errors=False)` keeps the 5.47.0 surface for an app that wants
+  its own routing or whose own handler is known not to log `str(exc)`. New
+  tests prove a PHI-shaped value in a refused request appears in no log record
+  (`caplog`); that both HTTP server-side failures and a WebSocket one answer
+  without it; that the log names `/patients/{mrn}` and not the served path;
+  that a validator message echoing the value stays out of the log; and the
+  `setdefault` and `ValueError` pre-emption behaviours.
 - **`verify_gateway_signature` and `gateway_identity.verify` carry the PEP 702
   `@deprecated` marker** (Contracts #397). mypy with
   `enable_error_code = ["deprecated"]` and pyright with `reportDeprecated`
@@ -55,10 +71,12 @@ from the installed package metadata).
   enforcement layers and a per-lane checklist.
 - **`docs/FLEET_CENSUS_2026-10-28_VALIDATION_ERRORS_AND_GATEWAY_VERIFIER.md`**:
   every repository's `origin/main` on 2026-10-28, scanned for a `FastAPI(` app
-  and a `RequestValidationError` handler (86 with an app: installer 1, own
+  and a `RequestValidationError` handler (85 with an app: installer 0, own
   handler 13, none 72, of which 69 are services), and for the unbound verifier
-  and `get_auth_context` without the request (4 repositories, 8 sites: Audit,
-  Core, Voice and this package's own re-export; of Governance #347's thirteen
+  and `get_auth_context` without the request (4 repositories, 8 sites under
+  this change's checker rule: Audit, Core, Voice and this package's own
+  re-export; the checker on `main` also reported Billing's two request-first
+  wrapper calls, 5 repositories and 10 rows; of Governance #347's thirteen
   rows only Voice remains open).
 - The package now imports `typing_extensions` (for PEP 702 `deprecated`). It
   is not added to `dependencies`: `governance/approved-tools.json` does not
@@ -68,12 +86,18 @@ from the installed package metadata).
 ### Fixed
 
 - **`scripts/check_unbound_gateway_verifier.py` no longer reports a
-  `get_auth_context` call that passes the request positionally** (Contracts
-  #397). The contracts dependency takes only header keywords, so a positional
-  call targets a service's own wrapper whose first parameter is the request
-  (Billing's `get_auth_context(request, ...)`, reported as unbound by the
-  2026-10-18 sweep and by the checker on `main`). Such a call is now, like a
-  `**kwargs` call, not provable from the call site and not reported.
+  `get_auth_context` call whose first positional argument is the request**
+  (Contracts #397). Billing's own wrapper takes the request first
+  (`get_auth_context(request, authorization=..., ...)`) and was reported as
+  unbound by the 2026-10-18 sweep and by the checker on `main`. The exemption
+  is exactly that shape: a first positional argument named `request` or
+  `<x>.request`. Any other positional call is still reported, because the
+  contracts dependency's header parameters are positional-or-keyword and its
+  `request` parameter is deliberately last, so
+  `get_auth_context(user_id, tenant_id, ...)` reaches it with `request=None`
+  and runs the unbound path. `*args` calls join `**kwargs` calls as not
+  provable from the call site. Tests cover both the exempt and the reported
+  shapes.
 
 ## [5.47.0] - 2026-10-20
 

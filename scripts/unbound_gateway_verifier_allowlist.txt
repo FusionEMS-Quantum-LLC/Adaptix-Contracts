@@ -1,3 +1,3 @@
 # Allowlist for scripts/check_unbound_gateway_verifier.py (Contracts #397).
 # Format: <path>:<kind>  # <reason>. Every entry needs a reason.
-adaptix_contracts/gateway_identity/__init__.py:unbound-verifier  # re-exports the deprecated verifier and its `verify` alias for the overlap period; removed in the next major
+adaptix_contracts/gateway_identity/__init__.py:unbound-verifier  # re-exports the deprecated `verify_gateway_signature` and defines the deprecated `gateway_identity.verify` on it for the overlap period; both removed in the next major
