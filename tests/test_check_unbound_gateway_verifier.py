@@ -97,6 +97,14 @@ def test_aliased_get_auth_context_with_request_is_not_reported() -> None:
     assert _kinds(src) == []
 
 
+def test_positional_request_to_a_local_wrapper_is_not_reported() -> None:
+    # Billing's own ``get_auth_context(request, ...)`` passes the request as
+    # the first positional argument; only keyword-less-and-positional-less
+    # calls are provably unbound.
+    src = "get_auth_context(request, x_user_id=request.headers.get('X-User-Id'))\n"
+    assert _kinds(src) == []
+
+
 def test_an_unrelated_name_is_not_treated_as_an_alias() -> None:
     src = "from x import other as gac\ngac(x_user_id='u')\n"
     assert _kinds(src) == []

@@ -13,6 +13,17 @@ app. Each error keeps ``type``, ``loc`` and ``msg`` in FastAPI's own
 change. It is the answer Gateway (#379), Integrations (#335) and Transport
 (#350) already give.
 
+The same leak exists on the server side of a route. A pydantic
+``ValidationError`` raised while the route runs (a model built from a record
+or an upstream answer), and FastAPI's ``ResponseValidationError`` (a return
+value that does not fit ``response_model``), both carry ``input`` in their
+``errors()`` and quote it in ``str(exc)``. Unhandled, they reach the ASGI
+server's "Exception in ASGI application" traceback with the value in the
+message line. The installer also registers handlers for those two: the
+caller gets a 500 with no detail, and one input-free ``ERROR`` record (the
+error types and locations, the route template and the traceback frames,
+never ``str(exc)``) keeps the defect diagnosable.
+
 ``msg`` is the validator's own text. Pydantic's built-in messages name the rule,
 not the value, but a custom validator that lets an exception's text through (for
 example ``date.fromisoformat``'s "day 30 must be in range 1..28 for month 2 in
@@ -24,18 +35,33 @@ guidance callers rely on.
 from __future__ import annotations
 
 import json
+import logging
+import traceback
 from collections.abc import Iterable, Mapping
 
 from fastapi import FastAPI, Request, WebSocket, status
-from fastapi.exceptions import RequestValidationError, WebSocketRequestValidationError
+from fastapi.exceptions import (
+    RequestValidationError,
+    ResponseValidationError,
+    WebSocketRequestValidationError,
+)
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 __all__ = [
+    "SERVER_SIDE_VALIDATION_ERROR_DETAIL",
+    "input_free_server_side_validation_error_handler",
     "input_free_validation_error_handler",
     "input_free_validation_errors",
     "input_free_websocket_validation_error_handler",
     "install_input_free_validation_errors",
 ]
+
+#: The whole body of the 500 answered for a server-side validation failure.
+#: It names nothing about the request or the record that failed.
+SERVER_SIDE_VALIDATION_ERROR_DETAIL = "Internal Server Error"
+
+_logger = logging.getLogger("adaptix_contracts.validation_errors")
 
 
 def input_free_validation_errors(
@@ -91,12 +117,54 @@ async def input_free_websocket_validation_error_handler(
     )
 
 
-def install_input_free_validation_errors(app: FastAPI) -> None:
+async def input_free_server_side_validation_error_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Answer a server-side validation failure with a 500 that repeats nothing.
+
+    Registered for pydantic ``ValidationError`` and FastAPI
+    ``ResponseValidationError``. Both are defects in the service, not in the
+    request, so the status stays 500 and the body is only
+    :data:`SERVER_SIDE_VALIDATION_ERROR_DETAIL`.
+
+    One ``ERROR`` record is logged so the defect stays diagnosable: the
+    exception class, the route template (never the served path, which can
+    carry an identifier), the input-free errors and the traceback frames.
+    ``str(exc)`` is never logged; pydantic puts ``input_value=...`` in it.
+    """
+    if not isinstance(exc, (ValidationError, ResponseValidationError)):
+        raise exc
+    errors = input_free_validation_errors(exc.errors())
+    route = request.scope.get("route")
+    _logger.error(
+        "%s on %s %s: %s\n%s",
+        type(exc).__name__,
+        request.method,
+        getattr(route, "path", "<unrouted>"),
+        json.dumps(errors),
+        "".join(traceback.format_tb(exc.__traceback__)),
+    )
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": SERVER_SIDE_VALIDATION_ERROR_DETAIL},
+    )
+
+
+def install_input_free_validation_errors(
+    app: FastAPI, *, server_side_errors: bool = True
+) -> None:
     """Make ``app`` answer every refused request without the caller's input.
 
     Call once in the app factory, after ``FastAPI(...)``. It replaces FastAPI's
     default ``RequestValidationError`` and ``WebSocketRequestValidationError``
     handlers for that app only.
+
+    With ``server_side_errors`` (the default) it also registers
+    :func:`input_free_server_side_validation_error_handler` for pydantic
+    ``ValidationError`` and FastAPI ``ResponseValidationError``, so neither
+    reaches the ASGI server's traceback with the failing value in its message.
+    Pass ``server_side_errors=False`` when the app already routes those two
+    through its own handler that is known not to log ``str(exc)``.
     """
     app.add_exception_handler(
         RequestValidationError, input_free_validation_error_handler
@@ -105,6 +173,13 @@ def install_input_free_validation_errors(app: FastAPI) -> None:
         WebSocketRequestValidationError,
         input_free_websocket_validation_error_handler,
     )
+    if server_side_errors:
+        app.add_exception_handler(
+            ValidationError, input_free_server_side_validation_error_handler
+        )
+        app.add_exception_handler(
+            ResponseValidationError, input_free_server_side_validation_error_handler
+        )
 
 
 def _location(loc: object) -> Iterable[object]:

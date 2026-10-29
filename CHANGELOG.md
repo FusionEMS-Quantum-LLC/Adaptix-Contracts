@@ -12,6 +12,69 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.48.0] - 2026-10-29
+
+### Added
+
+- **`install_input_free_validation_errors` also covers server-side validation
+  failures** (#375 follow-up). A pydantic `ValidationError` raised while a
+  route runs (a model built from a stored record or an upstream answer) and
+  FastAPI's `ResponseValidationError` (a return value that does not fit
+  `response_model`) both quote the failing value in `str(exc)` and carry it in
+  `errors()`; unhandled, they reach the ASGI server's "Exception in ASGI
+  application" traceback with the value in the message line. The installer now
+  registers `input_free_server_side_validation_error_handler` for both: the
+  caller gets a 500 whose body is only
+  `{"detail": "Internal Server Error"}` (`SERVER_SIDE_VALIDATION_ERROR_DETAIL`),
+  and one `ERROR` record on `adaptix_contracts.validation_errors` carries the
+  exception class, the route template, the input-free errors and the traceback
+  frames, never `str(exc)`. `install_input_free_validation_errors(app,
+  server_side_errors=False)` keeps the 5.47.0 behaviour for an app that already
+  routes those two through a handler known not to log `str(exc)`. New tests
+  prove a PHI-shaped value in a refused request appears in no log record
+  (`caplog`), and that both server-side failures answer without it.
+- **`verify_gateway_signature` and `gateway_identity.verify` carry the PEP 702
+  `@deprecated` marker** (Contracts #397). mypy with
+  `enable_error_code = ["deprecated"]` and pyright with `reportDeprecated`
+  now report every import, alias and attribute reference to the unbound
+  verifier; the message names both replacements. This repository enables the
+  code on itself, so its only remaining reference is the overlap-period
+  re-export in `gateway_identity`, which carries a `# type: ignore[deprecated]`
+  and its reason. `gateway_identity.verify` is a function of its own now (same
+  keyword parameters, same behaviour) because an alias assignment would leave
+  `gateway_identity.verify(...)` unmarked. A test runs mypy on a consumer
+  snippet and pins which lines are reported.
+- **`ADAPTIX_GATEWAY_WARN_UNBOUND_VERIFIER`** (`GATEWAY_WARN_UNBOUND_VERIFIER_ENV`,
+  Contracts #397). Set truthy (`1`/`true`/`yes`/`on`), each call of the
+  deprecated names emits a `DeprecationWarning` whose `stacklevel` names the
+  caller, so a lane can list its own call sites in one test run. Off by
+  default: the deprecation still ships without a runtime warning because
+  consumers run their suites under `-W error`. `UNBOUND_VERIFIER_DEPRECATION`
+  (the text) and `warn_if_unbound_verifier_warning_enabled` are exported.
+- **`docs/GATEWAY_VERIFIER_MIGRATION.md`**: the migration, the three
+  enforcement layers and a per-lane checklist.
+- **`docs/FLEET_CENSUS_2026-10-28_VALIDATION_ERRORS_AND_GATEWAY_VERIFIER.md`**:
+  every repository's `origin/main` on 2026-10-28, scanned for a `FastAPI(` app
+  and a `RequestValidationError` handler (86 with an app: installer 1, own
+  handler 13, none 72, of which 69 are services), and for the unbound verifier
+  and `get_auth_context` without the request (4 repositories, 8 sites: Audit,
+  Core, Voice and this package's own re-export; of Governance #347's thirteen
+  rows only Voice remains open).
+- The package now imports `typing_extensions` (for PEP 702 `deprecated`). It
+  is not added to `dependencies`: `governance/approved-tools.json` does not
+  list it, and `pydantic>=2.6.0` already requires `typing-extensions>=4.6.1`,
+  above the 4.5.0 that added `deprecated`.
+
+### Fixed
+
+- **`scripts/check_unbound_gateway_verifier.py` no longer reports a
+  `get_auth_context` call that passes the request positionally** (Contracts
+  #397). The contracts dependency takes only header keywords, so a positional
+  call targets a service's own wrapper whose first parameter is the request
+  (Billing's `get_auth_context(request, ...)`, reported as unbound by the
+  2026-10-18 sweep and by the checker on `main`). Such a call is now, like a
+  `**kwargs` call, not provable from the call site and not reported.
+
 ## [5.47.0] - 2026-10-20
 
 ### Added

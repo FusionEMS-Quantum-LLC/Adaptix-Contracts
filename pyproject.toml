@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "adaptix-contracts"
-version = "5.47.0"
+version = "5.48.0"
 description = "Shared cross-domain schemas and contracts for the Adaptix platform"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
@@ -26,6 +26,12 @@ dependencies = [
     "email-validator>=2.0.0",
     "PyJWT>=2.8.0",
     "cryptography>=50.0.0",
+    # typing_extensions is imported directly (PEP 702 ``deprecated`` on the
+    # unbound gateway verifier, Contracts #397) but is NOT declared here:
+    # governance/approved-tools.json, the fleet dependency policy, does not list
+    # it, and pydantic>=2.6.0 above already requires typing-extensions>=4.6.1,
+    # above the 4.5.0 that added ``deprecated``. Declaring it would widen the
+    # policy for a package every consumer already has.
     # The asyncio extra is what installs greenlet. SQLAlchemy 2.1 no longer pulls
     # greenlet in by default, and the shared async clients here (the audit client
     # among them) run on the asyncio layer; without the extra the first
@@ -136,6 +142,13 @@ plugins = ["pydantic.mypy"]
 # strict typing to shipped code without hiding any source/production error.
 
 exclude = "(^|/)(tests|build|dist)/"
+
+# PEP 702 deprecations are reported (Contracts #397). Off in mypy by default;
+# on here so the package's own reference to ``verify_gateway_signature`` is
+# exactly the one overlap-period re-export in gateway_identity, which carries
+# a ``# type: ignore[deprecated]`` with its reason. Consumers enable the same
+# code to find their own call sites: see docs/GATEWAY_VERIFIER_MIGRATION.md.
+enable_error_code = ["deprecated"]
 
 # Third-party packages that ship no type information (no stubs, no py.typed).
 # They are named one by one so that any other import mypy cannot resolve

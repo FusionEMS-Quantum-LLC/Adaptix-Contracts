@@ -29,17 +29,29 @@ import re
 import time
 from dataclasses import dataclass
 
+from typing_extensions import deprecated
+
 from adaptix_contracts.gateway_signature import (
     GATEWAY_CLOCK_SKEW_SECONDS,
     GATEWAY_EXPECTED_AUDIENCE_ENV,
     GATEWAY_SHARED_SECRET_ENV,
     GatewaySignatureError,
     GatewayVerifierConfigurationError,
+    VerifiedGatewayPayload,
+    _verify_gateway_signature,
     require_int_seconds,
     has_gateway_signature,
-    verify_gateway_signature,
     verify_gateway_signature_for_request,
     verify_gateway_signature_without_request_binding,
+    warn_if_unbound_verifier_warning_enabled,
+)
+
+# The deprecated unbound verifier is re-exported for the overlap period only
+# (Contracts #397); this is the one import of it the package keeps, listed in
+# scripts/unbound_gateway_verifier_allowlist.txt. The ignore is for the
+# `deprecated` error code this repository enables on itself.
+from adaptix_contracts.gateway_signature import (  # type: ignore[deprecated]
+    verify_gateway_signature,
 )
 from adaptix_contracts.gateway_signing import (
     HEADER_AUTH_CONTEXT,
@@ -240,7 +252,50 @@ def verify_legacy_identity(
 # for the overlap period and goes with ``verify_gateway_signature`` in the
 # next major release. New code uses ``verify_gateway_signature_for_request``.
 sign = sign_gateway_context
-verify = verify_gateway_signature
+
+
+# A function of its own, not ``verify = verify_gateway_signature``: a type
+# checker reports a PEP 702 deprecation at references to the decorated name,
+# and an alias assignment would leave ``gateway_identity.verify(...)`` unmarked.
+# A literal, equal to UNBOUND_VERIFIER_DEPRECATION (pinned by tests): mypy
+# reads ``@deprecated`` statically and ignores a non-literal message.
+@deprecated(
+    "verify_gateway_signature is deprecated (Adaptix-Contracts #397) and is "
+    "removed in the next major release: without request_method/request_path it "
+    "skips the signed method/path binding, and its name does not say so. HTTP "
+    "code uses verify_gateway_signature_for_request(request, ...); code no route "
+    "can reach uses verify_gateway_signature_without_request_binding(...).",
+    category=None,
+)
+def verify(
+    *,
+    context_b64: str,
+    signature_hex: str,
+    shared_secret: str | None = None,
+    auth_path: str | None = None,
+    key_id: str | None = None,
+    clock_skew_seconds: int = GATEWAY_CLOCK_SKEW_SECONDS,
+    request_method: str | None = None,
+    request_path: str | None = None,
+) -> VerifiedGatewayPayload:
+    """Deprecated alias of :func:`verify_gateway_signature`; same parameters.
+
+    Removed with it in the next major release (Contracts #397). The opt-in
+    runtime warning (``ADAPTIX_GATEWAY_WARN_UNBOUND_VERIFIER``) names the
+    caller of this alias, not the alias itself.
+    """
+    warn_if_unbound_verifier_warning_enabled()
+    return _verify_gateway_signature(
+        context_b64=context_b64,
+        signature_hex=signature_hex,
+        shared_secret=shared_secret,
+        auth_path=auth_path,
+        key_id=key_id,
+        clock_skew_seconds=clock_skew_seconds,
+        request_method=request_method,
+        request_path=request_path,
+    )
+
 
 __all__ = [
     "GATEWAY_CLOCK_SKEW_SECONDS",

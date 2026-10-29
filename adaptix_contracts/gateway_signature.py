@@ -114,7 +114,13 @@ Choosing a verifier (Contracts #397)
   no route can reach. Its name says what it does not check.
 * :func:`verify_gateway_signature` is deprecated since 5.45.0. Its short name
   hid that it skips the binding when called without the request's method and
-  path. It stays, unchanged, until the next major release.
+  path. It stays, unchanged in behaviour, until the next major release. Since
+  5.48.0 it is marked ``@deprecated`` (PEP 702) so mypy
+  (``--enable-error-code deprecated``) and pyright (``reportDeprecated``)
+  report every import, alias and call of it; the runtime warning is off by
+  default and opt-in through ``ADAPTIX_GATEWAY_WARN_UNBOUND_VERIFIER``.
+  ``scripts/check_unbound_gateway_verifier.py`` remains the CI enforcement.
+  The migration is written out in ``docs/GATEWAY_VERIFIER_MIGRATION.md``.
 
 Replay protection (ledger item 1, gap 2)
 -----------------------------------------
@@ -143,8 +149,11 @@ import os
 import re
 import threading
 import time
+import warnings
 from collections.abc import Callable, Mapping
 from typing import Literal, Protocol, Required, TypedDict, TypeGuard
+
+from typing_extensions import deprecated
 
 from adaptix_contracts._json_narrowing import is_json_list, is_json_object
 from adaptix_contracts.environment import ENVIRONMENT_ENV, is_production
@@ -183,6 +192,23 @@ GATEWAY_TRUST_MODE_ENV = _GATEWAY_ENV_PREFIX + "TRUST_MODE"
 #: "Method/path binding" section of the module docstring for the required
 #: rollout order before a service may set this.
 GATEWAY_SIGNATURE_REQUIRE_PATH_ENV = _GATEWAY_ENV_PREFIX + "SIGNATURE_REQUIRE_PATH"
+#: Opt-in runtime ``DeprecationWarning`` from the deprecated unbound verifier
+#: (Contracts #397). Default OFF: the deprecation ships without a runtime
+#: warning because consumers run their suites under ``-W error`` and would fail
+#: on repin. A service sets this truthy in its own test run to have every
+#: remaining call site named by file and line, then turns it off again.
+GATEWAY_WARN_UNBOUND_VERIFIER_ENV = _GATEWAY_ENV_PREFIX + "WARN_UNBOUND_VERIFIER"
+
+#: The deprecation text type checkers show at every reference to the unbound
+#: verifier (mypy ``--enable-error-code deprecated``, pyright
+#: ``reportDeprecated``) and that the opt-in runtime warning carries.
+UNBOUND_VERIFIER_DEPRECATION = (
+    "verify_gateway_signature is deprecated (Adaptix-Contracts #397) and is "
+    "removed in the next major release: without request_method/request_path it "
+    "skips the signed method/path binding, and its name does not say so. HTTP "
+    "code uses verify_gateway_signature_for_request(request, ...); code no route "
+    "can reach uses verify_gateway_signature_without_request_binding(...)."
+)
 
 # ENVIRONMENT_ENV and is_production are imported above from
 # adaptix_contracts.environment (the canonical, single-source definition);
@@ -1183,6 +1209,36 @@ def verify_gateway_signature_without_request_binding(
     )
 
 
+def _unbound_verifier_warning_enabled() -> bool:
+    value = os.environ.get(GATEWAY_WARN_UNBOUND_VERIFIER_ENV, "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def warn_if_unbound_verifier_warning_enabled(*, stacklevel: int = 3) -> None:
+    """Emit the opt-in ``DeprecationWarning`` naming the deprecated call site.
+
+    Nothing happens unless ``ADAPTIX_GATEWAY_WARN_UNBOUND_VERIFIER`` is truthy.
+    ``stacklevel`` defaults to the caller of the deprecated public function.
+    """
+    if _unbound_verifier_warning_enabled():
+        warnings.warn(
+            UNBOUND_VERIFIER_DEPRECATION, DeprecationWarning, stacklevel=stacklevel
+        )
+
+
+# ``category=None`` keeps the PEP 702 marker for type checkers and sets no
+# runtime warning: that stays opt-in (see GATEWAY_WARN_UNBOUND_VERIFIER_ENV).
+# The message is a literal, repeated from UNBOUND_VERIFIER_DEPRECATION, because
+# mypy reads ``@deprecated`` statically and ignores a non-literal argument;
+# tests pin that the two texts are equal.
+@deprecated(
+    "verify_gateway_signature is deprecated (Adaptix-Contracts #397) and is "
+    "removed in the next major release: without request_method/request_path it "
+    "skips the signed method/path binding, and its name does not say so. HTTP "
+    "code uses verify_gateway_signature_for_request(request, ...); code no route "
+    "can reach uses verify_gateway_signature_without_request_binding(...).",
+    category=None,
+)
 def verify_gateway_signature(
     *,
     context_b64: str,
@@ -1198,6 +1254,10 @@ def verify_gateway_signature(
 
     Deprecated since 5.45.0 and removed in the next major release (Contracts
     #397, ``DEPRECATION_POLICY.md``). Behaviour is unchanged during the overlap.
+    Since 5.48.0 the function carries the PEP 702 ``@deprecated`` marker, so a
+    type checker with deprecation reporting on (mypy
+    ``--enable-error-code deprecated``, pyright ``reportDeprecated``) names
+    every import, alias and call of it. See ``docs/GATEWAY_VERIFIER_MIGRATION.md``.
 
     The trap this closes: called without ``request_method``/``request_path``,
     this function skips the method/path binding, and its name does not say so.
@@ -1209,10 +1269,13 @@ def verify_gateway_signature(
     * :func:`verify_gateway_signature_without_request_binding` only where no
       route can reach the call, with a comment saying why.
 
-    No runtime ``DeprecationWarning`` is raised: consumers that run their suites
-    under ``-W error`` would fail on repin, which the overlap exists to avoid.
-    ``scripts/check_unbound_gateway_verifier.py`` is the enforcement instead.
+    No runtime ``DeprecationWarning`` is raised by default: consumers that run
+    their suites under ``-W error`` would fail on repin, which the overlap
+    exists to avoid. Setting ``ADAPTIX_GATEWAY_WARN_UNBOUND_VERIFIER=1`` turns
+    the warning on for one process so a lane can list its own call sites.
+    ``scripts/check_unbound_gateway_verifier.py`` is the CI enforcement.
     """
+    warn_if_unbound_verifier_warning_enabled()
     return _verify_gateway_signature(
         context_b64=context_b64,
         signature_hex=signature_hex,
@@ -1447,9 +1510,11 @@ __all__ = [
     "GATEWAY_SHARED_SECRET_ENV",
     "GATEWAY_SIGNATURE_REQUIRE_PATH_ENV",
     "GATEWAY_TRUST_MODE_ENV",
+    "GATEWAY_WARN_UNBOUND_VERIFIER_ENV",
     "TRUST_MODE_ASYMMETRIC",
     "TRUST_MODE_DUAL",
     "TRUST_MODE_HMAC",
+    "UNBOUND_VERIFIER_DEPRECATION",
     "GatewayRequest",
     "GatewaySignatureError",
     "GatewayVerifierConfigurationError",
@@ -1464,4 +1529,5 @@ __all__ = [
     "verify_gateway_signature",
     "verify_gateway_signature_for_request",
     "verify_gateway_signature_without_request_binding",
+    "warn_if_unbound_verifier_warning_enabled",
 ]

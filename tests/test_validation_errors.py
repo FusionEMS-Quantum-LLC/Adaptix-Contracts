@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+
+import pytest
 
 from fastapi import FastAPI, WebSocket
-from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ConfigDict, model_validator
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
 from _asgi_client import ASGIClient
 from adaptix_contracts.validation_errors import (
+    SERVER_SIDE_VALIDATION_ERROR_DETAIL,
+    input_free_server_side_validation_error_handler,
     input_free_validation_error_handler,
     input_free_validation_errors,
     install_input_free_validation_errors,
@@ -240,3 +245,110 @@ def test_websocket_refusal_closes_without_the_value() -> None:
             "msg": "Input should be a valid integer, unable to parse string as an integer",
         }
     ]
+
+
+# --- logs and server-side validation failures (#375, follow-up) --------------
+
+
+def test_refused_request_leaves_no_caller_value_in_any_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    status, text = _post(
+        _app(input_free=True), "/lookup", {"last_name": _LAST_NAME, "dob": _DOB}
+    )
+
+    assert status == 422
+    assert _LAST_NAME not in text and _DOB not in text
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert _LAST_NAME not in logged and _DOB not in logged
+
+
+class _Record(BaseModel):
+    mrn: int
+
+
+def _server_side_app(*, input_free: bool) -> FastAPI:
+    app = FastAPI()
+
+    @app.get("/record")
+    async def record() -> dict[str, int]:
+        # A model built from a stored record, not from the request: the
+        # failing value is the service's own data, and pydantic quotes it.
+        return {"mrn": _Record.model_validate({"mrn": _MRN}).mrn}
+
+    @app.get("/typed", response_model=_Record)
+    async def typed() -> dict[str, str]:
+        return {"mrn": _MRN}
+
+    if input_free:
+        install_input_free_validation_errors(app)
+    return app
+
+
+def _get_unraised(app: FastAPI, path: str) -> tuple[int, str]:
+    response = ASGIClient(app, raise_server_exceptions=False).get(path)
+    return response.status_code, response.text
+
+
+def test_framework_default_quotes_the_value_in_the_exception_text() -> None:
+    # The defect, pinned: unhandled, both exceptions reach the ASGI server's
+    # traceback with the value in their message line.
+    with pytest.raises(ValidationError) as caught:
+        _Record.model_validate({"mrn": _MRN})
+    assert _MRN in str(caught.value)
+
+    response_error = ResponseValidationError(
+        [
+            {
+                "type": "int_parsing",
+                "loc": ("response", "mrn"),
+                "msg": "x",
+                "input": _MRN,
+            }
+        ],
+        body={"mrn": _MRN},
+    )
+    assert _MRN in str(response_error)
+
+
+@pytest.mark.parametrize("path", ["/record", "/typed"])
+def test_server_side_validation_failure_answers_500_without_the_value(
+    path: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    status, text = _get_unraised(_server_side_app(input_free=True), path)
+
+    assert status == 500
+    assert _MRN not in text
+    assert json.loads(text) == {"detail": SERVER_SIDE_VALIDATION_ERROR_DETAIL}
+    (record,) = [
+        r for r in caplog.records if r.name == "adaptix_contracts.validation_errors"
+    ]
+    assert record.levelno == logging.ERROR
+    assert _MRN not in record.getMessage()
+    assert "int_parsing" in record.getMessage()
+    assert path in record.getMessage()
+
+
+def test_server_side_handlers_can_be_left_out() -> None:
+    app = FastAPI()
+
+    install_input_free_validation_errors(app, server_side_errors=False)
+
+    assert RequestValidationError in app.exception_handlers
+    assert ValidationError not in app.exception_handlers
+    assert ResponseValidationError not in app.exception_handlers
+
+
+def test_installer_registers_the_server_side_handlers_by_default() -> None:
+    app = FastAPI()
+
+    install_input_free_validation_errors(app)
+
+    for exc_type in (ValidationError, ResponseValidationError):
+        assert app.exception_handlers[exc_type] is (
+            input_free_server_side_validation_error_handler
+        )

@@ -189,8 +189,13 @@ class _Visitor(ast.NodeVisitor):
         if _call_name(node.func) in self._auth_context_names:
             keywords = {kw.arg for kw in node.keywords}
             # ``**kwargs`` (arg None) may carry request=; it is not provable
-            # either way from the call site, so it is not reported.
-            if "request" not in keywords and None not in keywords:
+            # either way from the call site, so it is not reported. Nor is a
+            # call with a positional argument: the contracts dependency takes
+            # only header keywords, so a positional call targets a service's
+            # own ``get_auth_context`` wrapper, whose first parameter is
+            # usually the request (Billing's ``get_auth_context(request, ...)``
+            # was reported as unbound by the keyword-only rule).
+            if "request" not in keywords and None not in keywords and not node.args:
                 self._add(node, GET_AUTH_CONTEXT_WITHOUT_REQUEST, "plain call")
         self.generic_visit(node)
 
