@@ -12,6 +12,108 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.48.0] - 2026-10-29
+
+### Added
+
+- **`install_input_free_validation_errors` also covers server-side validation
+  failures** (#375 follow-up). A pydantic `ValidationError` raised while a
+  route runs (a model built from a stored record or an upstream answer) and
+  FastAPI's `ResponseValidationError` (a return value that does not fit
+  `response_model`) both quote the failing value in `str(exc)` and carry it in
+  `errors()`; unhandled, they reach the ASGI server's "Exception in ASGI
+  application" traceback with the value in the message line. The installer now
+  registers `input_free_server_side_validation_error_handler` for both. An
+  HTTP caller gets a 500 whose body is only
+  `{"detail": "Internal Server Error"}` (`SERVER_SIDE_VALIDATION_ERROR_DETAIL`);
+  a WebSocket route (Starlette dispatches exception handlers for both scope
+  types, and a frame parsed by hand is the usual source) is closed with 1011
+  and nothing is returned. One `ERROR` record on
+  `adaptix_contracts.validation_errors` carries the exception class, the
+  method (`WEBSOCKET` for a socket), the route template (never the served
+  path), each error's `type` and `loc`, and the traceback frames; it carries
+  neither `msg` (a custom validator's text can repeat the value) nor
+  `str(exc)`. `loc` can still name a mapping key. The record is bounded: the
+  error count and the traceback frames come first, then `type`/`loc` of the
+  first `LOGGED_SERVER_SIDE_ERRORS` (20) errors, so a `ResponseValidationError`
+  over a long `response_model=list[...]` cannot push the frames past a log
+  pipeline's per-event cap. Like every Starlette exception handler it covers an
+  exception raised before the response starts: a `ValidationError` raised in a
+  `BackgroundTask`, in a `StreamingResponse` generator after its first chunk,
+  or in user middleware is not handled and still reaches the server traceback
+  with the value; services catch it there themselves (a test pins the limit).
+
+  This changes the default of a function shipped in 5.47.0: an app that calls
+  the installer and relied on those two exceptions reaching its own `ValueError`
+  handler (pydantic's `ValidationError` subclasses `ValueError`, and Starlette
+  picks the most specific registered class) or its own `Exception`/500 handler
+  (its error envelope, request id or metrics; Starlette runs that one in the
+  outermost `ServerErrorMiddleware`, behind `ExceptionMiddleware`) now answers
+  them 500 here with `{"detail": "Internal Server Error"}`. The two
+  server-side handlers are registered with `setdefault` semantics, so a handler
+  the app already registered for exactly `ValidationError` or
+  `ResponseValidationError` is kept. `install_input_free_validation_errors(app,
+  server_side_errors=False)` keeps the 5.47.0 surface for an app that wants
+  its own routing or envelope, or whose own handler is known not to log
+  `str(exc)`. New
+  tests prove a PHI-shaped value in a refused request appears in no log record
+  (`caplog`); that both HTTP server-side failures and a WebSocket one answer
+  without it; that the log names `/patients/{mrn}` and not the served path;
+  that a validator message echoing the value stays out of the log; the
+  `setdefault`, `ValueError` and `Exception` pre-emption behaviours; the
+  bounded record; and the after-response-start limit.
+- **`verify_gateway_signature` and `gateway_identity.verify` carry the PEP 702
+  `@deprecated` marker** (Contracts #397). mypy with
+  `enable_error_code = ["deprecated"]` and pyright with `reportDeprecated`
+  now report every import, alias and attribute reference to the unbound
+  verifier; the message names both replacements. This repository enables the
+  code on itself, so its only remaining reference is the overlap-period
+  re-export in `gateway_identity`, which carries a `# type: ignore[deprecated]`
+  and its reason. `gateway_identity.verify` is a function of its own now (same
+  keyword parameters, same behaviour) because an alias assignment would leave
+  `gateway_identity.verify(...)` unmarked. A test runs mypy on a consumer
+  snippet and pins which lines are reported.
+- **`ADAPTIX_GATEWAY_WARN_UNBOUND_VERIFIER`** (`GATEWAY_WARN_UNBOUND_VERIFIER_ENV`,
+  Contracts #397). Set truthy (`1`/`true`/`yes`/`on`), each call of the
+  deprecated names emits a `DeprecationWarning` whose `stacklevel` names the
+  caller, so a lane can list its own call sites in one test run. Off by
+  default: the deprecation still ships without a runtime warning because
+  consumers run their suites under `-W error`. `UNBOUND_VERIFIER_DEPRECATION`
+  (the text) and `warn_if_unbound_verifier_warning_enabled` are exported.
+- **`docs/GATEWAY_VERIFIER_MIGRATION.md`**: the migration, the three
+  enforcement layers and a per-lane checklist.
+- **`docs/FLEET_CENSUS_2026-10-28_VALIDATION_ERRORS_AND_GATEWAY_VERIFIER.md`**:
+  every repository's `origin/main` on 2026-10-28, scanned for a `FastAPI(` app
+  and a `RequestValidationError` handler (85 with an app: installer 0, own
+  handler 13, none 72, of which 69 are services), and for the unbound verifier
+  and `get_auth_context` without the request (4 repositories, 8 sites under
+  this change's checker rule: Audit, Core, Voice and this package's own
+  re-export; the checker on `main` also reported Billing's two request-first
+  wrapper calls, 5 repositories and 10 rows; of Governance #347's fourteen
+  file rows in twelve repositories, ten pass `request=` on `main`, Billing's
+  two pass the request positionally to its own wrapper, and Voice's two remain
+  open).
+- The package now imports `typing_extensions` (for PEP 702 `deprecated`). It
+  is not added to `dependencies`: `governance/approved-tools.json` does not
+  list it, and `pydantic>=2.6.0` already requires `typing-extensions>=4.6.1`,
+  above the 4.5.0 that added `deprecated`.
+
+### Fixed
+
+- **`scripts/check_unbound_gateway_verifier.py` no longer reports a
+  `get_auth_context` call whose first positional argument is the request**
+  (Contracts #397). Billing's own wrapper takes the request first
+  (`get_auth_context(request, authorization=..., ...)`) and was reported as
+  unbound by the 2026-10-18 sweep and by the checker on `main`. The exemption
+  is exactly that shape: a first positional argument named `request` or
+  `<x>.request`. Any other positional call is still reported, because the
+  contracts dependency's header parameters are positional-or-keyword and its
+  `request` parameter is deliberately last, so
+  `get_auth_context(user_id, tenant_id, ...)` reaches it with `request=None`
+  and runs the unbound path. `*args` calls join `**kwargs` calls as not
+  provable from the call site. Tests cover both the exempt and the reported
+  shapes.
+
 ## [5.47.0] - 2026-10-20
 
 ### Added

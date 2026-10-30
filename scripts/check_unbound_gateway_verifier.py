@@ -17,11 +17,18 @@ docstrings are never counted.
 
 * ``unbound-verifier``: any import or use of ``verify_gateway_signature``, or of
   its ``gateway_identity.verify`` alias.
-* ``get-auth-context-without-request``: a plain call of ``get_auth_context``
-  without ``request=``, including a call through a local alias made by
-  ``from ... import get_auth_context as <name>``. Resolved as ``Depends(get_auth_context)`` FastAPI
-  supplies the request; called by hand without it, the contracts code runs the
-  unbound path. Analytics and Graph were found this way.
+* ``get-auth-context-without-request``: a call of ``get_auth_context``
+  (including through a local alias made by ``from ... import
+  get_auth_context as <name>``) that passes neither ``request=`` nor the
+  request as its first positional argument. Resolved as
+  ``Depends(get_auth_context)`` FastAPI supplies the request; called by hand
+  without it, the contracts code runs the unbound path. Analytics and Graph
+  were found this way. The detail is ``plain call`` (keywords only) or
+  ``positional call``. Not reported: a first positional argument named
+  ``request`` or ``<x>.request`` (a service's own request-first wrapper,
+  Billing's shape; the contracts dependency itself takes ``request`` last, so
+  any other positional call reaches it with ``request=None``), and ``*args``
+  or ``**kwargs`` calls, which cannot be judged from the call site.
 
 Neither finding is automatically a vulnerability. A worker that no route can
 reach may verify without a binding. Such a site is recorded in the allowlist
@@ -132,6 +139,11 @@ def _call_name(func: ast.expr) -> str | None:
     return None
 
 
+def _is_request_name(arg: ast.expr) -> bool:
+    """``request`` or ``<anything>.request``: the shape a request-first wrapper is called with."""
+    return isinstance(arg, (ast.Name, ast.Attribute)) and _call_name(arg) == "request"
+
+
 class _Visitor(ast.NodeVisitor):
     def __init__(self, path: str) -> None:
         self.path = path
@@ -188,9 +200,26 @@ class _Visitor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         if _call_name(node.func) in self._auth_context_names:
             keywords = {kw.arg for kw in node.keywords}
-            # ``**kwargs`` (arg None) may carry request=; it is not provable
-            # either way from the call site, so it is not reported.
-            if "request" not in keywords and None not in keywords:
+            # ``request=`` binds the request. ``**kwargs`` (arg None) and
+            # ``*args`` may carry it; neither is provable either way from the
+            # call site, so neither is reported. A call whose FIRST positional
+            # argument is named ``request`` (``request``, ``self.request``)
+            # targets a service's own wrapper that takes the request first
+            # (Billing's ``get_auth_context(request, authorization=..., ...)``)
+            # and is not reported either. Every other positional call is: the
+            # contracts dependency's nine header parameters are
+            # positional-or-keyword and ``request`` is deliberately LAST, so
+            # ``get_auth_context(user_id, tenant_id, ...)`` reaches it with
+            # ``request=None`` and runs the unbound path (Governance #347).
+            if "request" in keywords or None in keywords:
+                pass
+            elif any(isinstance(arg, ast.Starred) for arg in node.args):
+                pass
+            elif node.args and _is_request_name(node.args[0]):
+                pass
+            elif node.args:
+                self._add(node, GET_AUTH_CONTEXT_WITHOUT_REQUEST, "positional call")
+            else:
                 self._add(node, GET_AUTH_CONTEXT_WITHOUT_REQUEST, "plain call")
         self.generic_visit(node)
 
