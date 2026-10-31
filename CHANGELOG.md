@@ -12,6 +12,36 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+## [5.49.0] - 2026-10-30
+
+### Added
+
+- **`build_gateway_signed_headers` signs the method/path binding**
+  (Adaptix-Governance #347, the 2026-10-18 ruling). New keyword-only `method`
+  and `path` parameters sign the same two claims the gateway signs into every
+  context it forwards: `method` upper-cased and `path` with its query string
+  and fragment stripped. `gateway_signature` compares them with the request
+  the destination receives, so a service-to-service context bound to
+  `GET /a` is refused on `GET /b` or `POST /a`, and is accepted by a
+  destination that sets `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH`. Before this,
+  the builder could not express the binding, so turning the flag on at a
+  destination refused every service-to-service call to it ("the signed
+  context carries no method/path binding"). Both gateway-v1 (HMAC) and
+  gateway-v2 (Ed25519) contexts carry it. `GatewayClaims` gains the matching
+  `method` and `path` fields.
+
+  Backward compatible: a caller that passes neither gets the unbound context
+  it got before, byte for byte (a test pins it). A binding the verifier would
+  refuse is refused when signing instead, with `GatewaySignatureError`: only
+  one of the two, a blank method, or a path that does not start with `/` (a
+  URL or a relative path). The message does not quote the value, since a path
+  can name a record.
+
+  This release adds the capability only. Each caller in the #347 inventory
+  passes `method` and `path` in its own repository after repinning to this
+  release, and `ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH` stays off until every
+  caller of a destination is updated and deployed.
+
 ## [5.48.0] - 2026-10-29
 
 ### Added

@@ -15,6 +15,7 @@ import base64
 import hashlib
 import hmac
 import json
+import secrets
 import subprocess
 import sys
 import time
@@ -35,7 +36,8 @@ from adaptix_contracts.gateway_signature import (
     verify_gateway_signature_without_request_binding,
 )
 
-_SECRET = "unit-test-hmac-material-not-a-real-value"
+# A fresh secret each run: there is no literal to mistake for a real credential.
+_SECRET = secrets.token_urlsafe(32)
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -349,7 +351,12 @@ def test_type_checker_reports_every_reference_to_the_unbound_verifier(
     # (line 10). Whether it also names the call site of a from-imported name
     # (line 9, as pyright does) is the checker's choice, not this package's.
     # Line 13, the explicit no-binding replacement, is never reported.
-    lines = {line.split(":")[1] for line in reported}
+    # The line number follows the file name. Splitting the whole line on ":"
+    # read the drive letter of a Windows path ("C:\...\consumer.py:2: ...")
+    # as the file and failed there, on a report that was correct.
+    lines = {
+        line.split(f"{consumer.name}:", 1)[1].split(":", 1)[0] for line in reported
+    }
     assert {"2", "10"} <= lines <= {"2", "9", "10"}, reported
     assert all("#397" in line for line in reported)
     assert all("without_request_binding is deprecated" not in line for line in reported)

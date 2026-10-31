@@ -47,6 +47,19 @@ Headers::
   X-Adaptix-Auth-Path      : "gateway-v1" | "gateway-v2"
   X-Adaptix-Auth-Key-Id    : v2 only — kid of the signing key
 
+Method/path binding
+-------------------
+The gateway signs the method and path of the request it forwards a context for
+(``method`` upper-cased, ``path`` with its query string and fragment stripped),
+and ``gateway_signature`` compares them with the request the destination
+receives; ``ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH`` makes the destination
+refuse a context without them. :func:`build_gateway_signed_headers` signs the
+same two claims when its caller passes ``method`` and ``path``, so a
+service-to-service call can be bound to the one request it is made for
+(Adaptix-Governance #347). A caller that passes neither gets the unbound
+context it always got, byte for byte; such a context is refused by any
+destination that turns the flag on.
+
 Round-trip tests (sign here -> verify in ``gateway_signature``) fail the build
 on any drift in either scheme.
 """
@@ -146,12 +159,17 @@ class GatewayClaims:
     demo_lease_id: str | None = None
     demo_persona: str | None = None
     demo_agency_id: str | None = None
+    #: The request this context is for (see "Method/path binding" in the module
+    #: docstring). Both or neither: ``None`` for both signs no binding.
+    method: str | None = None
+    path: str | None = None
 
     def validated(self) -> GatewayClaims:
         """Return ``self`` after checking required fields.
 
         Raises:
-            GatewaySignatureError: on a missing required field or bad TTL.
+            GatewaySignatureError: on a missing required field, a bad TTL, or a
+                method/path binding the verifier would refuse.
         """
         if not (self.user_id or "").strip():
             raise GatewaySignatureError("user_id is required to sign a context")
@@ -162,7 +180,36 @@ class GatewayClaims:
         if self.ttl_seconds <= 0:
             raise GatewaySignatureError("ttl_seconds must be a positive integer")
         self._validate_demo_claims()
+        self._validate_binding()
         return self
+
+    def _validate_binding(self) -> None:
+        """Reject a method/path binding the verifier would refuse.
+
+        The verifier compares a context's ``method`` and ``path`` with the
+        request it arrives on, and refuses one that carries only one of them or
+        anything that is not a request path. Catching that here turns a
+        producer mistake into an error at the call site instead of a 401 at the
+        far end. The values are not quoted: a path can name a record.
+
+        Raises:
+            GatewaySignatureError: If only one of ``method``/``path`` is set, the
+                method is blank, or the path does not start with ``/``.
+        """
+        if self.method is None and self.path is None:
+            return
+        if self.method is None or self.path is None:
+            raise GatewaySignatureError(
+                "method and path are signed together: pass both to bind the context to its request, or neither for an unbound context"
+            )
+        if not self.method.strip():
+            raise GatewaySignatureError(
+                "method is blank; pass the HTTP method of the request this context is for"
+            )
+        if not _bound_path(self.path).startswith("/"):
+            raise GatewaySignatureError(
+                "path must be the request path, starting with '/', not a URL or a relative path; the verifier compares it with the path the destination receives"
+            )
 
     def _validate_demo_claims(self) -> None:
         """Reject demo claim shapes the verifier answers with 401.
@@ -310,7 +357,18 @@ class GatewayClaims:
         if self.scopes is not None:
             claims["scopes"] = list(self.scopes)
         claims.update(self._privilege_claims())
+        claims.update(self._binding_claims())
         return claims
+
+    def _binding_claims(self) -> dict[str, Any]:
+        """Return the ``method``/``path`` claims, signed as the gateway signs them.
+
+        Empty when no binding was asked for, so an unbound context keeps the
+        payload it always had.
+        """
+        if self.method is None or self.path is None:
+            return {}
+        return {"method": self.method.strip().upper(), "path": _bound_path(self.path)}
 
     def _privilege_claims(self) -> dict[str, Any]:
         """Return the privilege/demo claims the verifier reads for authorization.
@@ -353,6 +411,11 @@ class GatewayClaims:
             .decode("ascii")
             .rstrip("=")
         )
+
+
+def _bound_path(path: str) -> str:
+    """``path`` without its query string and fragment, as the gateway signs it."""
+    return path.split("?", 1)[0].split("#", 1)[0]
 
 
 def sign_claims_asymmetric(claims: GatewayClaims) -> tuple[str, str, str]:
@@ -484,6 +547,8 @@ def build_gateway_signed_headers(
     jti: str | None = None,
     ttl_seconds: int = _DEFAULT_TTL_SECONDS,
     now: int | None = None,
+    method: str | None = None,
+    path: str | None = None,
 ) -> dict[str, str]:
     """Return signed-auth headers ready to attach to an outbound request.
 
@@ -503,9 +568,18 @@ def build_gateway_signed_headers(
     refuses a signed context without them. A caller that sets them itself
     afterwards keeps the same values, since the verifier requires equality.
 
+    ``method`` and ``path`` bind the context to the one request it is sent
+    with, as the gateway binds every context it forwards: pass the outbound
+    request's HTTP method and its path on the destination (``"/api/v1/..."``;
+    a query string is ignored). The destination then refuses the context on
+    any other method or path, and accepts it when it sets
+    ``ADAPTIX_GATEWAY_SIGNATURE_REQUIRE_PATH``. Pass both or neither; omitted,
+    the context is unbound exactly as before.
+
     Raises:
-        GatewaySignatureError: on missing required identity fields, or when
-            neither signing scheme is configured.
+        GatewaySignatureError: on missing required identity fields, a
+            method/path binding the verifier would refuse, or when neither
+            signing scheme is configured.
     """  # pylint: disable=too-many-arguments
     claims = GatewayClaims(
         user_id=user_id,
@@ -519,6 +593,8 @@ def build_gateway_signed_headers(
         jti=jti,
         ttl_seconds=ttl_seconds,
         now=now,
+        method=method,
+        path=path,
     )
     if has_signing_material():
         headers = _v2_headers(claims)
