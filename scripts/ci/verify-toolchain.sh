@@ -65,6 +65,13 @@ if [[ -f pyproject.toml && -f uv.lock ]]; then
     uv run python scripts/check_unbound_gateway_verifier.py . \
       --allowlist scripts/unbound_gateway_verifier_allowlist.txt
   fi
+
+  # Contracts #375: refuse a FastAPI app that does not install the input-free
+  # 422 answer, so a refused request never repeats the caller's input.
+  if [[ -f scripts/check_input_free_validation_errors.py ]]; then
+    uv run python scripts/check_input_free_validation_errors.py . \
+      --allowlist scripts/input_free_validation_errors_allowlist.txt
+  fi
 fi
 
 if find . -name '*.tf' -not -path '*/.terraform/*' -print -quit | grep -q .; then

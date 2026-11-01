@@ -1,0 +1,3 @@
+# Allowlist for scripts/check_input_free_validation_errors.py (Contracts #375).
+# Format: <path>:<kind>  # <reason>. Every entry needs a reason.
+# This package builds no FastAPI app outside its tests, so the list is empty.
