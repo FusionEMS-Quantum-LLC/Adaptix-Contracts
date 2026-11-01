@@ -349,7 +349,8 @@ def test_type_checker_reports_every_reference_to_the_unbound_verifier(
     # (line 10). Whether it also names the call site of a from-imported name
     # (line 9, as pyright does) is the checker's choice, not this package's.
     # Line 13, the explicit no-binding replacement, is never reported.
-    lines = {line.split(":")[1] for line in reported}
+    # Read the number after the file name: a Windows path has a drive colon.
+    lines = {line.removeprefix(str(consumer)).split(":")[1] for line in reported}
     assert {"2", "10"} <= lines <= {"2", "9", "10"}, reported
     assert all("#397" in line for line in reported)
     assert all("without_request_binding is deprecated" not in line for line in reported)
