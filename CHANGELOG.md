@@ -12,6 +12,24 @@ from the installed package metadata).
 
 ## [Unreleased]
 
+### Added
+
+- **`scripts/check_input_free_validation_errors.py`**, run by
+  `scripts/ci/verify-toolchain.sh` (Contracts #375, step 4). It parses Python
+  with `ast` and reports every `FastAPI(...)` app construction (including
+  through an import alias or `fastapi.FastAPI`) in a file that calls
+  `install_input_free_validation_errors` fewer times than it builds apps, so a
+  new or changed service cannot ship FastAPI's default 422 answer, which
+  repeats the caller's input. When the file registers its own
+  `RequestValidationError` handler the finding says so. Accepted sites (an
+  own handler known to drop `input`, or an installer call in another module)
+  go in `scripts/input_free_validation_errors_allowlist.txt` with a required
+  reason; the count and stale entries print on every run. Services can run the
+  same script against their own tree. Tests pin the reported shapes and prove,
+  with a real request, that the app it refuses repeats a patient name and the
+  app it passes does not. Adoption by the services in the 2026-10-28 census is
+  not part of this change.
+
 ## [5.48.0] - 2026-10-29
 
 ### Added
