@@ -102,6 +102,26 @@ HEADER_TENANT_ID = "X-Tenant-Id"
 _DEFAULT_TTL_SECONDS = 60
 
 
+def _bound_method_path(
+    method: str | None, path: str | None
+) -> tuple[str | None, str | None]:
+    """Normalize method/path the same way the gateway producer does.
+
+    ``adaptix-gateway .../services/auth_context.py`` upper-cases the method and
+    strips query/fragment from the path, then omits both claims when either is
+    empty. This helper is the contracts copy of that rule so
+    :func:`build_gateway_signed_headers` can stamp the same binding (Governance
+    #347) without importing the gateway.
+    """
+    bound_method = (method or "").strip().upper()
+    bound_path = (path or "").split("?", 1)[0].split("#", 1)[0]
+    if not bound_method and not bound_path:
+        return None, None
+    if not bound_method or not bound_path:
+        return bound_method or None, bound_path or None
+    return bound_method, bound_path
+
+
 @dataclass(frozen=True)
 class GatewayClaims:
     """The identity a signed context forwards, independent of signing scheme.
@@ -146,6 +166,8 @@ class GatewayClaims:
     demo_lease_id: str | None = None
     demo_persona: str | None = None
     demo_agency_id: str | None = None
+    method: str | None = None
+    path: str | None = None
 
     def validated(self) -> GatewayClaims:
         """Return ``self`` after checking required fields.
@@ -162,7 +184,28 @@ class GatewayClaims:
         if self.ttl_seconds <= 0:
             raise GatewaySignatureError("ttl_seconds must be a positive integer")
         self._validate_demo_claims()
+        self._validate_method_path_binding()
         return self
+
+    def _validate_method_path_binding(self) -> None:
+        """Reject a half-set method/path pair (Governance #347).
+
+        The gateway producer omits both claims together, or stamps both. A
+        context with only one cannot be checked by
+        ``gateway_signature._verify_method_path_binding`` and would look like
+        a bound payload while remaining unbound on the missing axis.
+
+        Raises:
+            GatewaySignatureError: If exactly one of ``method`` or ``path`` is
+                set, or either is empty after the same normalization the
+                gateway applies.
+        """
+        bound_method, bound_path = _bound_method_path(self.method, self.path)
+        if (bound_method is None) != (bound_path is None):
+            raise GatewaySignatureError(
+                "method and path must be supplied together so the signed "
+                "context binds the request"
+            )
 
     def _validate_demo_claims(self) -> None:
         """Reject demo claim shapes the verifier answers with 401.
@@ -309,6 +352,10 @@ class GatewayClaims:
             claims["roles"] = list(self.roles)
         if self.scopes is not None:
             claims["scopes"] = list(self.scopes)
+        bound_method, bound_path = _bound_method_path(self.method, self.path)
+        if bound_method is not None and bound_path is not None:
+            claims["method"] = bound_method
+            claims["path"] = bound_path
         claims.update(self._privilege_claims())
         return claims
 
@@ -484,6 +531,8 @@ def build_gateway_signed_headers(
     jti: str | None = None,
     ttl_seconds: int = _DEFAULT_TTL_SECONDS,
     now: int | None = None,
+    method: str | None = None,
+    path: str | None = None,
 ) -> dict[str, str]:
     """Return signed-auth headers ready to attach to an outbound request.
 
@@ -503,9 +552,16 @@ def build_gateway_signed_headers(
     refuses a signed context without them. A caller that sets them itself
     afterwards keeps the same values, since the verifier requires equality.
 
+    ``method`` and ``path`` (Governance #347) are keyword-only and optional
+    together. When both are set they are signed as the same v2 binding the
+    gateway stamps (upper-cased method, query/fragment stripped from path) so
+    a context minted for ``GET /a`` cannot authenticate ``DELETE /b``. Omitting
+    both keeps the historical unbound payload for in-process callers. Supplying
+    only one raises :class:`GatewaySignatureError`.
+
     Raises:
-        GatewaySignatureError: on missing required identity fields, or when
-            neither signing scheme is configured.
+        GatewaySignatureError: on missing required identity fields, a half-set
+            method/path pair, or when neither signing scheme is configured.
     """  # pylint: disable=too-many-arguments
     claims = GatewayClaims(
         user_id=user_id,
@@ -519,6 +575,8 @@ def build_gateway_signed_headers(
         jti=jti,
         ttl_seconds=ttl_seconds,
         now=now,
+        method=method,
+        path=path,
     )
     if has_signing_material():
         headers = _v2_headers(claims)
