@@ -30,6 +30,18 @@ from the installed package metadata).
   app it passes does not. Adoption by the services in the 2026-10-28 census is
   not part of this change.
 
+## [5.49.0] - 2026-11-02
+
+### Added
+
+- **`build_gateway_signed_headers` stamps optional keyword-only `method` and
+  `path` claims** (Governance #347). When both are set they are signed with the
+  same normalization the gateway producer uses (upper-cased method, query and
+  fragment stripped from path) so a context minted for `GET /a` cannot
+  authenticate `DELETE /b`. Omitting both keeps the historical unbound payload.
+  Supplying only one raises `GatewaySignatureError`. Round-trip tests pin the
+  match, the mismatch, the unbound byte shape, and the half-set refusal.
+
 ## [5.48.0] - 2026-10-29
 
 ### Added

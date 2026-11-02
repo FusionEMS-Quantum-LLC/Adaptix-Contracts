@@ -170,3 +170,95 @@ def test_non_positive_ttl_raises() -> None:
             aud="adaptix-ai",
             ttl_seconds=0,
         )
+
+
+def test_headers_helper_omitting_method_path_stays_unbound() -> None:
+    """Governance #347: historical callers keep an unbound payload."""
+    issued = int(time.time())
+    unbound = build_gateway_signed_headers(
+        shared_secret=SECRET,
+        user_id="u",
+        tenant_id="t",
+        aud="adaptix-ai",
+        now=issued,
+    )
+    still_unbound = build_gateway_signed_headers(
+        shared_secret=SECRET,
+        user_id="u",
+        tenant_id="t",
+        aud="adaptix-ai",
+        now=issued,
+        method=None,
+        path=None,
+    )
+    assert unbound[HEADER_AUTH_CONTEXT] == still_unbound[HEADER_AUTH_CONTEXT]
+    payload = verify_gateway_signature(
+        context_b64=unbound[HEADER_AUTH_CONTEXT],
+        signature_hex=unbound[HEADER_AUTH_SIGNATURE],
+        shared_secret=SECRET,
+        auth_path=unbound[HEADER_AUTH_PATH],
+    )
+    assert "method" not in payload
+    assert "path" not in payload
+
+
+def test_headers_helper_signs_method_path_binding() -> None:
+    """Governance #347: GET /vendors cannot authenticate DELETE /work-orders."""
+    headers = build_gateway_signed_headers(
+        shared_secret=SECRET,
+        user_id="u",
+        tenant_id="t",
+        aud="adaptix-ai",
+        method="get",
+        path="/vendors/?q=1#top",
+    )
+    payload = verify_gateway_signature(
+        context_b64=headers[HEADER_AUTH_CONTEXT],
+        signature_hex=headers[HEADER_AUTH_SIGNATURE],
+        shared_secret=SECRET,
+        auth_path=headers[HEADER_AUTH_PATH],
+        request_method="GET",
+        request_path="/vendors/",
+    )
+    assert payload["method"] == "GET"
+    assert payload["path"] == "/vendors/"
+    with pytest.raises(GatewaySignatureError, match="signed method"):
+        verify_gateway_signature(
+            context_b64=headers[HEADER_AUTH_CONTEXT],
+            signature_hex=headers[HEADER_AUTH_SIGNATURE],
+            shared_secret=SECRET,
+            auth_path=headers[HEADER_AUTH_PATH],
+            request_method="DELETE",
+            request_path="/vendors/",
+        )
+    with pytest.raises(GatewaySignatureError, match="signed path"):
+        verify_gateway_signature(
+            context_b64=headers[HEADER_AUTH_CONTEXT],
+            signature_hex=headers[HEADER_AUTH_SIGNATURE],
+            shared_secret=SECRET,
+            auth_path=headers[HEADER_AUTH_PATH],
+            request_method="GET",
+            request_path="/work-orders/",
+        )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"method": "GET", "path": None},
+        {"method": None, "path": "/vendors/"},
+        {"method": "GET", "path": ""},
+        {"method": "", "path": "/vendors/"},
+    ],
+)
+def test_headers_helper_rejects_half_set_method_path(
+    kwargs: dict[str, str | None],
+) -> None:
+    with pytest.raises(GatewaySignatureError, match="method and path"):
+        build_gateway_signed_headers(
+            shared_secret=SECRET,
+            user_id="u",
+            tenant_id="t",
+            aud="adaptix-ai",
+            **kwargs,
+        )
