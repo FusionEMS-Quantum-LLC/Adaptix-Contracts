@@ -6,7 +6,7 @@ name: trivy-security
 # repository, so this repository carries the gate's one job itself. The job
 # below is the scan job of that reusable workflow, unchanged, at the commit
 # named here:
-# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/trivy-reusable.yml@131797d91033cd44458823826b60f6e4612c6687
+# source: FusionEMS-Quantum-LLC/adaptix-ops/.github/workflows/trivy-reusable.yml@60acc825d7d16b023e81fc72e550b450bb0c0b25
 # It publishes the check
 # "adaptix/trivy-security / scan".
 
@@ -31,7 +31,14 @@ permissions:
 jobs:
   scan:
     name: adaptix/trivy-security / scan
-    runs-on: ubuntu-latest
+    # VAL-RUNNER-CONTROL-PLANE-001: WHERE this job runs is a control-plane
+    # decision, never a per-repository edit. The organization or repository
+    # Actions variable ADAPTIX_CI_RUNNER names the runner class (an approved
+    # class in validation/lanes.py, e.g. adaptix-ci for the organization's
+    # ephemeral self-hosted Linux pool); unset, the job runs on GitHub-hosted
+    # ubuntu-latest exactly as before. Moving a repository is: add it to the
+    # runner group, set the variable. Rolling back is: unset the variable.
+    runs-on: ${{ vars.ADAPTIX_CI_RUNNER || 'ubuntu-latest' }}
     # The required-path ceiling (config/platform-standard.yaml
     # requiredCriticalPathTimeoutMinutes); npm test keeps this at or below it.
     timeout-minutes: 15
@@ -114,6 +121,7 @@ jobs:
             --ignorefile "${dir}/central/trivyignore" \
             --cache-dir "${dir}/cache" \
             --scanners vuln,misconfig \
+            --file-patterns 'pip:(^|/)requirements\.lock$' \
             --skip-check-update \
             --disable-telemetry \
             --skip-version-check \
