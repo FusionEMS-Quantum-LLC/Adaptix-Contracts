@@ -14,6 +14,15 @@ from the installed package metadata).
 
 ### Added
 
+- **`transportlink.request.status_changed`** and its payload
+  `TransportRequestStatusChangedEvent`, registered to Adaptix-Transport-Service.
+  One event per transport request status transition (ids, the two statuses,
+  a per-transition `transition_id` and the time; no patient or address data).
+  Transport stages it with `update_request_status` and the readiness promotion
+  to `dispatch_ready` in the same transaction. CAD, the crew app and ePCR had
+  no way to learn of a status change between create and complete. Consumers are
+  not part of this change.
+
 - **`scripts/check_input_free_validation_errors.py`**, run by
   `scripts/ci/verify-toolchain.sh` (Contracts #375, step 4). It parses Python
   with `ast` and reports every `FastAPI(...)` app construction (including
