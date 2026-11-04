@@ -233,6 +233,14 @@ AIR_MISSION_AUTHORIZATION_INVALIDATED: Final[str] = (
 # block above is the same case). See tests/test_transport_event_registration.py.
 TRANSPORTLINK_REQUEST_CREATED: Final[str] = "transportlink.request.created"
 TRANSPORTLINK_SIGNATURE_COMPLETED: Final[str] = "transportlink.signature.completed"
+# One event per request status transition. Producer:
+# transportlink_app/outbox.py ``enqueue_request_status_changed``, staged in the
+# same transaction as ``TransportService.update_request_status`` and the
+# readiness promotion to ``dispatch_ready``. Payload:
+# ``TransportRequestStatusChangedEvent`` (ids, statuses and time only).
+TRANSPORTLINK_REQUEST_STATUS_CHANGED: Final[str] = (
+    "transportlink.request.status_changed"
+)
 
 # ---------------------------------------------------------------------------
 # Billing domain events (producer: Adaptix-Billing-Service, slug ``billing``)
@@ -680,6 +688,10 @@ ALL_EVENTS: Final[dict[str, dict[str, object]]] = {
     # transportlink_app/outbox.py:151 (TransportOutboxEvent put on EventBridge
     # by transportlink_app/outbox_publisher.py)
     TRANSPORTLINK_REQUEST_CREATED: {"version": "1.0", "source_service": "transport"},
+    TRANSPORTLINK_REQUEST_STATUS_CHANGED: {
+        "version": "1.0",
+        "source_service": "transport",
+    },
     # Registered ahead of its producer (see the block above the constant).
     TRANSPORTLINK_SIGNATURE_COMPLETED: {
         "version": "1.0",

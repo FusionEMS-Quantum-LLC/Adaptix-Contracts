@@ -26,6 +26,7 @@ from adaptix_contracts.events.operational_envelope import (
 from adaptix_contracts.events.registry import (
     ALL_EVENTS,
     TRANSPORTLINK_REQUEST_CREATED,
+    TRANSPORTLINK_REQUEST_STATUS_CHANGED,
     TRANSPORTLINK_SIGNATURE_COMPLETED,
     is_registered,
     producer_of,
@@ -34,18 +35,24 @@ from adaptix_contracts.schemas.service_registry import TRANSPORT_SERVICE
 from adaptix_contracts.schemas.transport_contracts import (
     SignatureCompletedEvent,
     TransportRequestCreatedEvent,
+    TransportRequestStatusChangedEvent,
 )
 
 _EVENTS = (
     (TRANSPORTLINK_REQUEST_CREATED, "transportlink.request.created"),
+    (TRANSPORTLINK_REQUEST_STATUS_CHANGED, "transportlink.request.status_changed"),
     (TRANSPORTLINK_SIGNATURE_COMPLETED, "transportlink.signature.completed"),
 )
 _EVENT_TYPES = tuple(event_type for _, event_type in _EVENTS)
 
 _PAYLOAD_BY_EVENT: dict[
-    str, type[TransportRequestCreatedEvent] | type[SignatureCompletedEvent]
+    str,
+    type[TransportRequestCreatedEvent]
+    | type[TransportRequestStatusChangedEvent]
+    | type[SignatureCompletedEvent],
 ] = {
     "transportlink.request.created": TransportRequestCreatedEvent,
+    "transportlink.request.status_changed": TransportRequestStatusChangedEvent,
     "transportlink.signature.completed": SignatureCompletedEvent,
 }
 
@@ -110,6 +117,47 @@ def test_request_created_payload_fields_are_pinned() -> None:
     }
 
 
+def test_request_status_changed_payload_fields_are_pinned() -> None:
+    """Ids, statuses and time only: adding a field here is a PHI review."""
+    assert set(TransportRequestStatusChangedEvent.model_fields) == {
+        "event_type",
+        "request_id",
+        "tenant_id",
+        "from_status",
+        "to_status",
+        "transition_id",
+        "occurred_at",
+    }
+    required = {
+        name
+        for name, field in TransportRequestStatusChangedEvent.model_fields.items()
+        if field.is_required()
+    }
+    assert required == {
+        "request_id",
+        "tenant_id",
+        "to_status",
+        "transition_id",
+        "occurred_at",
+    }
+
+
+def test_request_status_changed_accepts_the_producer_payload() -> None:
+    """The exact shape Transport stages, including the first-status case."""
+    event = TransportRequestStatusChangedEvent.model_validate(
+        {
+            "event_type": "transportlink.request.status_changed",
+            "request_id": "request-1",
+            "tenant_id": "tenant-1",
+            "from_status": None,
+            "to_status": "requested",
+            "transition_id": "transition-1",
+            "occurred_at": "2026-11-04T16:00:00+00:00",
+        }
+    )
+    assert event.to_status == "requested"
+
+
 def test_signature_completed_payload_fields_are_pinned() -> None:
     assert set(SignatureCompletedEvent.model_fields) == {
         "event_type",
@@ -137,12 +185,15 @@ def test_signature_completed_payload_fields_are_pinned() -> None:
     ("name", "payload_model"),
     [
         ("TransportRequestCreatedEvent", TransportRequestCreatedEvent),
+        ("TransportRequestStatusChangedEvent", TransportRequestStatusChangedEvent),
         ("SignatureCompletedEvent", SignatureCompletedEvent),
     ],
 )
 def test_payload_models_stay_exported_from_schemas(
     name: str,
-    payload_model: type[TransportRequestCreatedEvent] | type[SignatureCompletedEvent],
+    payload_model: type[TransportRequestCreatedEvent]
+    | type[TransportRequestStatusChangedEvent]
+    | type[SignatureCompletedEvent],
 ) -> None:
     assert name in schemas.__all__
     assert getattr(schemas, name) is payload_model

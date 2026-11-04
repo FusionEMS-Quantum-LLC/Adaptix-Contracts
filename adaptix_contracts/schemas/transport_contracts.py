@@ -254,6 +254,27 @@ class TransportRequestCreatedEvent(BaseModel):
     created_at: datetime
 
 
+class TransportRequestStatusChangedEvent(BaseModel):
+    """One status transition of a transport request.
+
+    Identifiers, the two statuses and the time only: no patient, address or
+    free text, so a consumer that needs more reads Transport. ``transition_id``
+    is unique per transition and is the key a consumer dedupes a replay on; a
+    request that returns to a status is a new transition with a new id.
+    ``from_status`` is ``None`` only when there is no earlier status.
+    Statuses are strings, not ``TransportRequestStatusContract``, because the
+    producer also uses ``requested`` and ``authorized``.
+    """
+
+    event_type: str = "transportlink.request.status_changed"
+    request_id: str
+    tenant_id: str
+    from_status: str | None = None
+    to_status: str
+    transition_id: str
+    occurred_at: datetime
+
+
 class TripScheduledEvent(BaseModel):
     event_type: str = "transportlink.trip.scheduled"
     trip_id: str
